@@ -101,3 +101,9 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer components {
+  .chat-textarea {
+    min-height: calc(2rem + 2px);
+  }
+}

@@ -1,5 +1,4 @@
-import { useState } from "react";
-import Textarea from "react-textarea-autosize";
+import { useState, useRef, useLayoutEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -11,15 +10,16 @@ import {
   Database,
   Terminal,
   Send,
-  PanelRightOpen,
-  PanelRightClose,
   ChevronRight,
   ChevronDown,
   Search,
   Github,
   Sun,
   Moon,
-  Monitor
+  Monitor,
+  ChevronLeft,
+  ChevronRight as ChevronRightIcon,
+  MessageSquare
 } from "lucide-react";
 import { useTheme } from "@/providers/ThemeProvider";
 
@@ -29,8 +29,24 @@ const Dashboard = () => {
   const [messages, setMessages] = useState([
     { type: "assistant", content: "Hello! How can I help you today?" }
   ]);
-  const [isChatVisible, setIsChatVisible] = useState(false);
+  const [isChatVisible, setIsChatVisible] = useState(true);
   const [openSubmenus, setOpenSubmenus] = useState<{ [key: string]: boolean }>({});
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isChatSidebarCollapsed, setIsChatSidebarCollapsed] = useState(true);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useLayoutEffect(() => {
+    if (textareaRef.current) {
+      const event = new Event('input', { bubbles: true });
+      textareaRef.current.dispatchEvent(event);
+    }
+  }, [isChatSidebarCollapsed]);
+
+  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setChatMessage(e.target.value);
+    e.target.style.height = 'auto';
+    e.target.style.height = `${e.target.scrollHeight}px`;
+  };
 
   const navItems = [
     { icon: Home, label: "Home", active: true },
@@ -57,6 +73,25 @@ const Dashboard = () => {
 
   const toggleSubmenu = (label: string) => {
     setOpenSubmenus(prev => ({ ...prev, [label]: !prev[label] }));
+  };
+
+  const toggleSidebar = () => {
+    setIsSidebarCollapsed(!isSidebarCollapsed);
+  };
+
+  const handleNavItemClick = (item: typeof navItems[0]) => {
+    if (item.subItems) {
+      if (isSidebarCollapsed) {
+        setIsSidebarCollapsed(false);
+        setOpenSubmenus(prev => ({ ...prev, [item.label]: true }));
+      } else {
+        toggleSubmenu(item.label);
+      }
+    }
+  };
+
+  const toggleChatSidebar = () => {
+    setIsChatSidebarCollapsed(!isChatSidebarCollapsed);
   };
 
   return (
@@ -101,57 +136,65 @@ const Dashboard = () => {
               <Monitor className="w-4 h-4" />
             </ToggleGroupItem>
           </ToggleGroup>
-          
-          <Button
-            onClick={() => setIsChatVisible(!isChatVisible)}
-            size="icon"
-            variant="ghost"
-            className="border border-transparent hover:border-[#4a5565] dark:hover:border-zinc-700"
-          >
-            {isChatVisible ? <PanelRightClose className="w-4 h-4" /> : <PanelRightOpen className="w-4 h-4" />}
-          </Button>
         </div>
       </header>
 
       <div className="flex flex-1 overflow-hidden">
         {/* Left Sidebar - Navigation */}
-        <div className="w-64 border-r border-[#4a5565] dark:border-zinc-700 bg-stone-100 dark:bg-zinc-800 p-2">
-          {navItems.map((item, index) => (
-            <div key={index} className="mb-1">
-              <Button
-                variant="ghost"
-                className={`w-full flex items-center justify-between font-mono text-left px-3 py-2 h-auto text-xs ${
-                  item.active 
-                    ? 'bg-[#4a5565] text-stone-100 dark:bg-zinc-50 dark:text-zinc-900' 
-                    : 'hover:bg-stone-300 dark:hover:bg-zinc-700'
-                } border border-transparent hover:border-[#4a5565] dark:hover:border-zinc-700`}
-                onClick={() => item.subItems && toggleSubmenu(item.label)}
-              >
-                <div className="flex items-center">
-                  <item.icon className="w-4 h-4 mr-3" />
-                  {item.label}
-                </div>
-                {item.subItems && (
-                  openSubmenus[item.label] 
-                    ? <ChevronDown className="w-4 h-4" /> 
-                    : <ChevronRight className="w-4 h-4" />
+        <div className={`relative transition-all duration-300 ease-in-out ${
+          isSidebarCollapsed ? 'w-16' : 'w-64'
+        } border-r border-[#4a5565] dark:border-zinc-700 bg-stone-100 dark:bg-zinc-800`}>
+          <div className="p-2">
+            {navItems.map((item, index) => (
+              <div key={index} className="mb-1">
+                <Button
+                  variant="ghost"
+                  className={`w-full flex items-center justify-between font-mono text-left px-3 py-2 h-auto text-xs ${
+                    item.active 
+                      ? 'bg-[#4a5565] text-stone-100 dark:bg-zinc-50 dark:text-zinc-900' 
+                      : 'hover:bg-stone-300 dark:hover:bg-zinc-700'
+                  } border border-transparent hover:border-[#4a5565] dark:hover:border-zinc-700`}
+                  onClick={() => handleNavItemClick(item)}
+                >
+                  <div className="flex items-center">
+                    <item.icon className="w-4 h-4 mr-3" />
+                    {!isSidebarCollapsed && item.label}
+                  </div>
+                  {!isSidebarCollapsed && item.subItems && (
+                    openSubmenus[item.label] 
+                      ? <ChevronDown className="w-4 h-4" /> 
+                      : <ChevronRight className="w-4 h-4" />
+                  )}
+                </Button>
+                {!isSidebarCollapsed && item.subItems && openSubmenus[item.label] && (
+                  <div className="pl-8 mt-1 space-y-1">
+                    {item.subItems.map((subItem, subIndex) => (
+                      <Button
+                        key={subIndex}
+                        variant="ghost"
+                        className="w-full justify-start font-mono text-left px-3 py-1 h-auto text-xs hover:bg-stone-300 dark:hover:bg-zinc-700"
+                      >
+                        {subItem}
+                      </Button>
+                    ))}
+                  </div>
                 )}
-              </Button>
-              {item.subItems && openSubmenus[item.label] && (
-                <div className="pl-8 mt-1 space-y-1">
-                  {item.subItems.map((subItem, subIndex) => (
-                    <Button
-                      key={subIndex}
-                      variant="ghost"
-                      className="w-full justify-start font-mono text-left px-3 py-1 h-auto text-xs hover:bg-stone-300 dark:hover:bg-zinc-700"
-                    >
-                      {subItem}
-                    </Button>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
+              </div>
+            ))}
+          </div>
+          
+          {/* Sidebar Toggle Button */}
+          <button
+            onClick={toggleSidebar}
+            className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-stone-100 dark:bg-zinc-800 border border-[#4a5565] dark:border-zinc-700 rounded-full flex items-center justify-center hover:bg-stone-300 dark:hover:bg-zinc-700 transition-colors z-10"
+            title={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            {isSidebarCollapsed ? (
+              <ChevronRightIcon className="w-3 h-3" />
+            ) : (
+              <ChevronLeft className="w-3 h-3" />
+            )}
+          </button>
         </div>
 
         {/* Main Workspace */}
@@ -216,57 +259,84 @@ const Dashboard = () => {
         </div>
 
         {/* Right Sidebar - AI Assistant */}
-        {isChatVisible && (
-          <div className="w-[25rem] border-l border-[#4a5565] dark:border-zinc-700 bg-stone-100 dark:bg-zinc-800 flex flex-col">
-            {/* Chat Messages */}
-            <ScrollArea className="flex-1 p-2">
-              <div className="space-y-4">
-                {messages.map((message, index) => (
-                  <div key={index} className={`space-y-2`}>
-                    <div className={`text-xs font-bold ${
-                      message.type === 'user' ? 'text-right' : 'text-left'
-                    }`}>
-                      {message.type === 'user' ? 'USER' : 'ASSISTANT'}
+        <div className={`relative transition-all duration-300 ease-in-out ${
+          isChatSidebarCollapsed ? 'w-0' : 'w-[25rem]'
+        }`}>
+          {!isChatSidebarCollapsed && (
+            <div className="h-full w-full border-l border-[#4a5565] dark:border-zinc-700 bg-stone-100 dark:bg-zinc-800 flex flex-col">
+              {/* Chat Messages */}
+              <ScrollArea className="flex-1 p-2">
+                <div className="space-y-4">
+                  {messages.map((message, index) => (
+                    <div key={index} className={`space-y-2`}>
+                      <div className={`text-xs font-bold ${
+                        message.type === 'user' ? 'text-right' : 'text-left'
+                      }`}>
+                        {message.type === 'user' ? 'USER' : 'ASSISTANT'}
+                      </div>
+                      <div className={`p-2 text-xs whitespace-pre-wrap break-words ${
+                        message.type === 'user' 
+                          ? 'border border-[#4a5565] bg-[#4a5565] text-stone-100 ml-8' 
+                          : 'text-[#4a5565] dark:text-zinc-50 mr-8'
+                      }`}>
+                        {message.content}
+                      </div>
                     </div>
-                    <div className={`p-2 text-xs whitespace-pre-wrap break-words ${
-                      message.type === 'user' 
-                        ? 'border border-[#4a5565] bg-[#4a5565] text-stone-100 ml-8' 
-                        : 'text-[#4a5565] dark:text-zinc-50 mr-8'
-                    }`}>
-                      {message.content}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
+                  ))}
+                </div>
+              </ScrollArea>
 
-            {/* Chat Input */}
-            <div className="p-2 border-t border-[#4a5565] dark:border-zinc-700">
-              <div className="flex items-end space-x-2">
-                <Textarea
-                  value={chatMessage}
-                  onChange={(e) => setChatMessage(e.target.value)}
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSendMessage();
-                    }
-                  }}
-                  placeholder="Type message..."
-                  className="flex-1 bg-transparent border border-[#4a5565] dark:border-zinc-700 font-mono text-xs resize-none p-2"
-                  minRows={1}
-                  maxRows={5}
-                />
-                <Button
-                  onClick={handleSendMessage}
-                  size="icon"
-                  className="border border-[#4a5565] bg-stone-100 text-[#4a5565] hover:bg-[#4a5565] hover:text-stone-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50 dark:hover:bg-zinc-50 dark:hover:text-zinc-900 w-8 h-8 flex-shrink-0"
-                >
-                  <Send className="w-4 h-4" />
-                </Button>
+              {/* Chat Input */}
+              <div className="p-2 border-t border-[#4a5565] dark:border-zinc-700">
+                <div className="flex items-end space-x-2">
+                  <div className="flex-1">
+                    <textarea
+                      value={chatMessage}
+                      onChange={handleTextareaChange}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSendMessage();
+                        }
+                      }}
+                      placeholder="Type message..."
+                      className="w-full bg-transparent border border-[#4a5565] dark:border-zinc-700 font-mono text-xs resize-none p-2 overflow-hidden"
+                      rows={1}
+                    />
+                  </div>
+                  <Button
+                    onClick={handleSendMessage}
+                    size="icon"
+                    className="border border-[#4a5565] bg-stone-100 text-[#4a5565] hover:bg-[#4a5565] hover:text-stone-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50 dark:hover:bg-zinc-50 dark:hover:text-zinc-900 w-8 h-8 flex-shrink-0"
+                  >
+                    <Send className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
             </div>
-          </div>
+          )}
+
+          {/* Chat Sidebar Toggle Button */}
+          {!isChatSidebarCollapsed && (
+            <button
+              onClick={toggleChatSidebar}
+              className="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-stone-100 dark:bg-zinc-800 border border-[#4a5565] dark:border-zinc-700 rounded-full flex items-center justify-center hover:bg-stone-300 dark:hover:bg-zinc-700 transition-colors z-10"
+              title="Collapse chat"
+            >
+              <ChevronRightIcon className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+
+        {/* Floating sunnyAI Button (when chat sidebar is collapsed) */}
+        {isChatSidebarCollapsed && (
+          <button
+            onClick={toggleChatSidebar}
+            className="fixed right-4 bottom-4 w-12 h-12 bg-[#4a5565] dark:bg-zinc-50 text-stone-100 dark:text-zinc-900 border border-[#4a5565] dark:border-zinc-700 rounded-full flex items-center justify-center hover:bg-stone-300 dark:hover:bg-zinc-700 transition-colors z-20 shadow-lg"
+            title="Open sunnyAI"
+          >
+            <MessageSquare className="w-6 h-6" />
+          </button>
         )}
       </div>
     </div>
