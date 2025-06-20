@@ -1,41 +1,38 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
 
-export default function IndexPage() {
+import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
+
+const Index = () => {
   const navigate = useNavigate();
 
+  const handleLogin = () => {
+    navigate('/dashboard');
+  };
+
   return (
-    <div style={{ 
-      minHeight: '100vh',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: '2rem',
-      background: 'linear-gradient(to bottom right, #EEF2FF, #E0E7FF)'
-    }}>
-      <h1 style={{
-        fontSize: '4rem',
-        fontWeight: 'bold',
-        color: '#111827'
-      }}>
-        askUNO
-      </h1>
-      <button
-        onClick={() => navigate('/dashboard')}
-        style={{
-          padding: '0.75rem 2rem',
-          backgroundColor: '#2563EB',
-          color: 'white',
-          fontWeight: '500',
-          borderRadius: '0.5rem',
-          cursor: 'pointer',
-          border: 'none',
-          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
-        }}
-      >
-        Login
-      </button>
+    <div className="min-h-screen bg-white text-black font-mono flex items-center justify-center">
+      <div className="text-center space-y-8">
+        <div className="space-y-4">
+          <h1 className="text-6xl font-bold tracking-tight">sunny.ai</h1>
+          <div className="w-32 h-px bg-black mx-auto"></div>
+        </div>
+        
+        <div className="space-y-6">
+          <p className="text-lg text-gray-600 max-w-md mx-auto leading-relaxed">
+            Intelligent workspace for modern development
+          </p>
+          
+          <Button 
+            onClick={handleLogin}
+            className="bg-white text-black border-2 border-black hover:bg-black hover:text-white transition-colors duration-200 px-8 py-3 text-base font-mono font-medium"
+            variant="outline"
+          >
+            [ LOGIN ]
+          </Button>
+        </div>
+      </div>
     </div>
   );
-} 
+};
+
+export default Index;
