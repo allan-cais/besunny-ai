@@ -1,7 +1,6 @@
-import { useState, useRef, useLayoutEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { 
   Home, 
@@ -9,7 +8,6 @@ import {
   Settings, 
   Database,
   Terminal,
-  Send,
   ChevronRight,
   ChevronDown,
   Search,
@@ -18,35 +16,16 @@ import {
   Moon,
   Monitor,
   ChevronLeft,
-  ChevronRight as ChevronRightIcon,
-  MessageSquare
+  ChevronRight as ChevronRightIcon
 } from "lucide-react";
 import { useTheme } from "@/providers/ThemeProvider";
+import AIAssistant from "@/components/AIAssistant";
 
 const Dashboard = () => {
   const { theme, setTheme } = useTheme();
-  const [chatMessage, setChatMessage] = useState("");
-  const [messages, setMessages] = useState([
-    { type: "assistant", content: "Hello! How can I help you today?" }
-  ]);
-  const [isChatVisible, setIsChatVisible] = useState(true);
   const [openSubmenus, setOpenSubmenus] = useState<{ [key: string]: boolean }>({});
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isChatSidebarCollapsed, setIsChatSidebarCollapsed] = useState(true);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  useLayoutEffect(() => {
-    if (textareaRef.current) {
-      const event = new Event('input', { bubbles: true });
-      textareaRef.current.dispatchEvent(event);
-    }
-  }, [isChatSidebarCollapsed]);
-
-  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setChatMessage(e.target.value);
-    e.target.style.height = 'auto';
-    e.target.style.height = `${e.target.scrollHeight}px`;
-  };
 
   const navItems = [
     { icon: Home, label: "Home", active: true },
@@ -60,16 +39,6 @@ const Dashboard = () => {
     { icon: Terminal, label: "Terminal", active: false },
     { icon: Settings, label: "Settings", active: false },
   ];
-
-  const handleSendMessage = () => {
-    if (chatMessage.trim()) {
-      setMessages([...messages, { type: "user", content: chatMessage }]);
-      setChatMessage("");
-      setTimeout(() => {
-        setMessages(prev => [...prev, { type: "assistant", content: "I understand. Let me help you with that." }]);
-      }, 1000);
-    }
-  };
 
   const toggleSubmenu = (label: string) => {
     setOpenSubmenus(prev => ({ ...prev, [label]: !prev[label] }));
@@ -248,7 +217,7 @@ const Dashboard = () => {
                   </Button>
                   <Button 
                     variant="outline" 
-                    className="border border-[#4a5565] hover:bg-[#4a5565] hover:text-stone-100 dark:border-zinc-700 dark:hover:bg-zinc-50 dark:hover:text-zinc-900 transition-colors p-4 h-auto font-mono text-xs"
+                    className="border border-[#4a5565] hover:bg-[#4a5565] hover:text-stone-100 dark:border-zinc-700 dark:hover:bg-zinc-50 dark:hover:text-zinc-50 dark:hover:text-zinc-900 transition-colors p-4 h-auto font-mono text-xs"
                   >
                     [ OPEN TERMINAL ]
                   </Button>
@@ -258,86 +227,11 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Right Sidebar - AI Assistant */}
-        <div className={`relative transition-all duration-300 ease-in-out ${
-          isChatSidebarCollapsed ? 'w-0' : 'w-[25rem]'
-        }`}>
-          {!isChatSidebarCollapsed && (
-            <div className="h-full w-full border-l border-[#4a5565] dark:border-zinc-700 bg-stone-100 dark:bg-zinc-800 flex flex-col">
-              {/* Chat Messages */}
-              <ScrollArea className="flex-1 p-2">
-                <div className="space-y-4">
-                  {messages.map((message, index) => (
-                    <div key={index} className={`space-y-2`}>
-                      <div className={`text-xs font-bold ${
-                        message.type === 'user' ? 'text-right' : 'text-left'
-                      }`}>
-                        {message.type === 'user' ? 'USER' : 'ASSISTANT'}
-                      </div>
-                      <div className={`p-2 text-xs whitespace-pre-wrap break-words ${
-                        message.type === 'user' 
-                          ? 'border border-[#4a5565] bg-[#4a5565] text-stone-100 ml-8' 
-                          : 'text-[#4a5565] dark:text-zinc-50 mr-8'
-                      }`}>
-                        {message.content}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-
-              {/* Chat Input */}
-              <div className="p-2 border-t border-[#4a5565] dark:border-zinc-700">
-                <div className="flex items-end space-x-2">
-                  <div className="flex-1">
-                    <textarea
-                      value={chatMessage}
-                      onChange={handleTextareaChange}
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault();
-                          handleSendMessage();
-                        }
-                      }}
-                      placeholder="Type message..."
-                      className="w-full bg-transparent border border-[#4a5565] dark:border-zinc-700 font-mono text-xs resize-none p-2 overflow-hidden"
-                      rows={1}
-                    />
-                  </div>
-                  <Button
-                    onClick={handleSendMessage}
-                    size="icon"
-                    className="border border-[#4a5565] bg-stone-100 text-[#4a5565] hover:bg-[#4a5565] hover:text-stone-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50 dark:hover:bg-zinc-50 dark:hover:text-zinc-900 w-8 h-8 flex-shrink-0"
-                  >
-                    <Send className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Chat Sidebar Toggle Button */}
-          {!isChatSidebarCollapsed && (
-            <button
-              onClick={toggleChatSidebar}
-              className="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-stone-100 dark:bg-zinc-800 border border-[#4a5565] dark:border-zinc-700 rounded-full flex items-center justify-center hover:bg-stone-300 dark:hover:bg-zinc-700 transition-colors z-10"
-              title="Collapse chat"
-            >
-              <ChevronRightIcon className="w-3 h-3" />
-            </button>
-          )}
-        </div>
-
-        {/* Floating sunnyAI Button (when chat sidebar is collapsed) */}
-        {isChatSidebarCollapsed && (
-          <button
-            onClick={toggleChatSidebar}
-            className="fixed right-4 bottom-4 w-12 h-12 bg-[#4a5565] dark:bg-zinc-50 text-stone-100 dark:text-zinc-900 border border-[#4a5565] dark:border-zinc-700 rounded-full flex items-center justify-center hover:bg-stone-300 dark:hover:bg-zinc-700 transition-colors z-20 shadow-lg"
-            title="Open sunnyAI"
-          >
-            <MessageSquare className="w-6 h-6" />
-          </button>
-        )}
+        {/* AI Assistant Component */}
+        <AIAssistant 
+          isCollapsed={isChatSidebarCollapsed}
+          onToggle={toggleChatSidebar}
+        />
       </div>
     </div>
   );
