@@ -218,19 +218,18 @@ const NavigationSidebar = ({
 
           {/* Chats Section */}
           <div className="mt-6">
-            <div className="px-3 py-2 text-xs font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+            <div className="px-3 py-2 text-xs font-mono text-gray-600 dark:text-gray-400">
               Chats
             </div>
             <div className="space-y-1">
               {/* New Chat Button - First item under Chats */}
-              <Button
-                variant="ghost"
-                className="w-full flex items-center justify-start font-mono text-left px-3 py-2 h-auto text-xs bg-[#4a5565] text-stone-100 dark:bg-zinc-50 dark:text-zinc-900 hover:bg-[#4a5565]/90 dark:hover:bg-zinc-50/90 border border-transparent"
+              <div
+                className="w-full flex items-center justify-start font-mono text-left px-3 py-2 h-auto text-xs cursor-pointer hover:bg-stone-300 dark:hover:bg-zinc-700 border border-transparent hover:border-[#4a5565] dark:hover:border-zinc-700 rounded-md transition-colors"
                 onClick={onNewChat}
               >
                 <Plus className="w-4 h-4 mr-3" />
                 {!isCollapsed && "New Chat"}
-              </Button>
+              </div>
               
               {/* Existing Chats */}
               {chats.map((chat) => (
@@ -238,62 +237,58 @@ const NavigationSidebar = ({
                   key={chat.id}
                   className={`group relative flex items-center justify-between font-mono text-left px-3 py-2 h-auto text-xs ${
                     activeChatId === chat.id
-                      ? 'bg-[#4a5565] text-stone-100 dark:bg-zinc-50 dark:text-zinc-900'
+                      ? 'bg-stone-300 dark:bg-zinc-700'
                       : 'hover:bg-stone-300 dark:hover:bg-zinc-700'
                   } border border-transparent hover:border-[#4a5565] dark:hover:border-zinc-700 rounded-md`}
                 >
                   <Button
                     variant="ghost"
-                    className={`w-full flex items-center justify-start h-auto p-0 ${
+                    className={`w-full flex items-center justify-start h-auto p-0 font-mono text-xs bg-transparent ${
                       activeChatId === chat.id
-                        ? 'bg-transparent text-stone-100 dark:text-zinc-900'
+                        ? 'hover:bg-transparent'
                         : 'hover:bg-transparent'
                     }`}
                     onClick={() => onChatSelect(chat.id)}
                   >
-                    <div className="flex items-center flex-1 min-w-0">
-                      <MessageSquare className="w-4 h-4 mr-3 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <div className="truncate">{chat.title}</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                          {new Date(chat.lastMessageAt).toLocaleDateString()}
-                        </div>
-                      </div>
-                    </div>
+                    <MessageSquare className="w-4 h-4 mr-3 flex-shrink-0" />
+                    <span className="truncate">{chat.title}</span>
+                  </Button>
+                  
+                  <div className="flex items-center">
                     {chat.unreadCount > 0 && (
-                      <div className="ml-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center flex-shrink-0">
+                      <div className="mr-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center flex-shrink-0">
                         {chat.unreadCount}
                       </div>
                     )}
-                  </Button>
-                  
-                  {/* Three-dot menu - only visible on hover */}
-                  {!isCollapsed && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-stone-400 dark:hover:bg-zinc-600"
-                        >
-                          <MoreHorizontal className="h-3 w-3" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-48">
-                        <DropdownMenuItem onClick={() => handleRenameClick(chat)}>
-                          <Edit className="mr-2 h-4 w-4" />
-                          <span>Rename chat</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          onClick={() => handleDeleteClick(chat)}
-                          className="text-red-600 focus:text-red-600"
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          <span>Delete chat</span>
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
+                    
+                    {/* Three-dot menu - only visible on hover */}
+                    {!isCollapsed && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-stone-400 dark:hover:bg-zinc-600"
+                          >
+                            <MoreHorizontal className="h-3 w-3" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                          <DropdownMenuItem onClick={() => handleRenameClick(chat)}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            <span>Rename chat</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => handleDeleteClick(chat)}
+                            className="text-red-600 focus:text-red-600"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            <span>Delete chat</span>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
