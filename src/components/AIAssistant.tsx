@@ -31,6 +31,9 @@ const AIAssistant = ({ isCollapsed, onToggle }: AIAssistantProps) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
+  // Get n8n webhook URL from environment or use default
+  const N8N_WEBHOOK_URL = import.meta.env.VITE_N8N_WEBHOOK_URL || 'https://n8n.customaistudio.io/webhook/kirit-rag-webhook';
+
   useLayoutEffect(() => {
     if (textareaRef.current) {
       const event = new Event('input', { bubbles: true });
@@ -70,8 +73,8 @@ const AIAssistant = ({ isCollapsed, onToggle }: AIAssistantProps) => {
 
         setMessages(prev => [...prev, assistantMessage]);
 
-        // Call the backend API
-        const response = await fetch('/api/chat', {
+        // Call n8n webhook directly
+        const response = await fetch(N8N_WEBHOOK_URL, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -79,72 +82,53 @@ const AIAssistant = ({ isCollapsed, onToggle }: AIAssistantProps) => {
           body: JSON.stringify({
             message: userMessage.content,
             sessionId: userMessage.sessionId,
-            messageId: assistantMessage.id
+            messageId: assistantMessage.id,
+            timestamp: new Date().toISOString(),
+            metadata: {
+              userAgent: navigator.userAgent,
+              source: 'frontend'
+            }
           }),
         });
 
         if (!response.ok) {
-          throw new Error('Failed to send message');
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
 
-        // Handle streaming response
-        const reader = response.body?.getReader();
-        if (reader) {
-          const decoder = new TextDecoder();
-          let accumulatedContent = "";
+        // Get the response text
+        const responseText = await response.text();
+        console.log('n8n response:', responseText);
 
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            const chunk = decoder.decode(value);
-            const lines = chunk.split('\n');
-
-            for (const line of lines) {
-              if (line.startsWith('data: ')) {
-                const data = line.slice(6);
-                if (data === '[DONE]') {
-                  // Save messages to Supabase here
-                  await saveMessagesToSupabase([userMessage, { ...assistantMessage, content: accumulatedContent }]);
-                  setIsLoading(false);
-                  return;
-                }
-                
-                try {
-                  const parsed = JSON.parse(data);
-                  let displayContent = parsed.content;
-                  // If the content is a JSON string with an 'output' field, parse and use it
-                  if (typeof displayContent === 'string') {
-                    try {
-                      const maybeJson = JSON.parse(displayContent);
-                      if (maybeJson && typeof maybeJson === 'object' && maybeJson.output) {
-                        displayContent = maybeJson.output;
-                      }
-                    } catch {}
-                  }
-                  accumulatedContent += displayContent;
-                  setMessages(prev => 
-                    prev.map(msg => 
-                      msg.id === assistantMessage.id 
-                        ? { ...msg, content: accumulatedContent }
-                        : msg
-                    )
-                  );
-                } catch (e) {
-                  // Handle non-JSON data
-                  accumulatedContent += data;
-                  setMessages(prev => 
-                    prev.map(msg => 
-                      msg.id === assistantMessage.id 
-                        ? { ...msg, content: accumulatedContent }
-                        : msg
-                    )
-                  );
-                }
-              }
-            }
+        let displayContent = responseText;
+        
+        // Try to parse as JSON and extract the output field
+        try {
+          const jsonResponse = JSON.parse(responseText);
+          if (jsonResponse.output) {
+            displayContent = jsonResponse.output;
+          } else if (jsonResponse.message) {
+            displayContent = jsonResponse.message;
+          } else if (jsonResponse.content) {
+            displayContent = jsonResponse.content;
           }
+        } catch (parseError) {
+          // If not JSON, use the raw text
+          console.log('Response is not JSON, using raw text');
         }
+
+        // Update the assistant message with the response
+        setMessages(prev => 
+          prev.map(msg => 
+            msg.id === assistantMessage.id 
+              ? { ...msg, content: displayContent }
+              : msg
+          )
+        );
+
+        // Save messages to localStorage (since we don't have Supabase in frontend)
+        const allMessages = [...messages, userMessage, { ...assistantMessage, content: displayContent }];
+        localStorage.setItem('chat_messages', JSON.stringify(allMessages));
+
       } catch (error) {
         console.error('Error sending message:', error);
         setMessages(prev => {
@@ -166,15 +150,32 @@ const AIAssistant = ({ isCollapsed, onToggle }: AIAssistantProps) => {
     }
   };
 
-  const saveMessagesToSupabase = async (messages: ChatMessage[]) => {
+  const saveMessagesToLocalStorage = (messages: ChatMessage[]) => {
     try {
-      // This will be implemented when Supabase is set up
-      console.log('Saving messages to Supabase:', messages);
-      // await supabase.from('chat_messages').insert(messages);
+      localStorage.setItem('chat_messages', JSON.stringify(messages));
     } catch (error) {
-      console.error('Error saving messages to Supabase:', error);
+      console.error('Error saving messages to localStorage:', error);
     }
   };
+
+  const loadMessagesFromLocalStorage = () => {
+    try {
+      const saved = localStorage.getItem('chat_messages');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          setMessages(parsed);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading messages from localStorage:', error);
+    }
+  };
+
+  // Load messages on component mount
+  useLayoutEffect(() => {
+    loadMessagesFromLocalStorage();
+  }, []);
 
   return (
     <>

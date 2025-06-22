@@ -1,15 +1,15 @@
 # Sunny AI - Intelligent Development Environment
 
-A modern, intelligent development environment with an embedded AI assistant powered by n8n webhooks and real-time streaming chat.
+A modern, intelligent development environment with an embedded AI assistant powered by n8n webhooks. **Fully client-side - perfect for Netlify deployment!**
 
 ## Features
 
 - 🎨 **Modern UI**: Clean, monospace design with dark/light theme support
-- 🤖 **AI Assistant**: Real-time chat with streaming responses
-- 🔄 **n8n Integration**: Flexible backend powered by n8n workflows
-- 💾 **Message Storage**: Persistent chat history with Supabase
+- 🤖 **AI Assistant**: Real-time chat with n8n webhook integration
+- 🔄 **n8n Integration**: Direct webhook calls from the frontend
+- 💾 **Local Storage**: Persistent chat history using browser storage
 - 📱 **Responsive**: Works on desktop and mobile devices
-- ⚡ **Real-time**: Server-Sent Events for smooth streaming
+- ⚡ **Netlify Ready**: No backend servers required
 
 ## Quick Start
 
@@ -21,40 +21,24 @@ cd kirit-askuno
 npm install
 ```
 
-### 2. Backend Setup
+### 2. Environment Configuration
+
+Copy `env.example` to `.env` and configure your n8n webhook URL:
 
 ```bash
-cd server
-npm install
 cp env.example .env
 ```
 
-Edit `server/.env` and configure:
+Edit `.env`:
 ```env
-N8N_WEBHOOK_URL=http://localhost:3002/webhook/chat  # For testing with mock
-PORT=3001
+VITE_N8N_WEBHOOK_URL=https://n8n.customaistudio.io/webhook/kirit-rag-webhook
 ```
 
-### 3. Start Development Servers
+### 3. Start Development
 
-**Option A: Full Stack (Recommended)**
 ```bash
-npm run dev:full
-```
-
-**Option B: Separate Terminals**
-```bash
-# Terminal 1 - Frontend
 npm run dev
-
-# Terminal 2 - Backend
-cd server && npm run dev
-
-# Terminal 3 - Mock n8n (for testing)
-cd server && npm run mock-n8n
 ```
-
-### 4. Test the Setup
 
 Visit `http://localhost:5173` and click the chat button in the bottom-right corner.
 
@@ -64,102 +48,77 @@ Visit `http://localhost:5173` and click the chat button in the bottom-right corn
 kirit-askuno/
 ├── src/
 │   ├── components/
-│   │   ├── AIAssistant.tsx    # AI Chat component
+│   │   ├── AIAssistant.tsx    # AI Chat component (client-side)
 │   │   └── ui/                # Shadcn UI components
 │   ├── pages/
 │   │   └── dashboard.tsx      # Main dashboard
 │   └── ...
-├── server/
-│   ├── index.ts              # Main Express server
+├── server/                    # Backend (optional, for development)
+│   ├── index.ts              # Express server (not needed for production)
 │   ├── services/
-│   │   └── supabase.ts       # Database service
-│   ├── mock-n8n.js           # Mock webhook for testing
-│   └── test-api.js           # API test script
+│   │   └── supabase.ts       # Database service (optional)
+│   └── ...
 └── ...
 ```
 
 ## AI Assistant Features
 
-### Real-time Streaming
-- Server-Sent Events (SSE) for smooth text streaming
-- Preserves scroll position during streaming
-- Graceful error handling and fallbacks
+### Direct n8n Integration
+- Calls n8n webhook directly from the browser
+- No backend server required
+- Handles JSON responses with `output` field
+- Graceful error handling
 
 ### Message Management
-- Unique session IDs for conversation tracking
-- Message persistence with Supabase
-- Chat history retrieval
+- Local storage for chat history persistence
+- Session management
+- Automatic message loading on page refresh
 
-### n8n Integration
-- Flexible webhook-based architecture
-- Support for both streaming and non-streaming responses
-- Easy integration with any LLM via n8n workflows
-
-## API Endpoints
-
-### POST /api/chat
-Send a message and receive streaming response.
-
-```javascript
-const response = await fetch('/api/chat', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    message: 'Hello, how are you?',
-    sessionId: 'user-session-123',
-    messageId: 'msg-456'
-  })
-});
-
-// Handle streaming response
-const reader = response.body.getReader();
-while (true) {
-  const { done, value } = await reader.read();
-  if (done) break;
-  // Process streaming data
-}
-```
-
-### GET /api/chat/:sessionId
-Retrieve chat history for a session.
-
-### GET /api/health
-Health check endpoint.
+### Netlify Deployment Ready
+- Fully static - no server-side code needed
+- Environment variables for configuration
+- Works with Netlify's serverless functions (if needed)
 
 ## Configuration
 
 ### Environment Variables
 
-**Frontend** (Vite automatically loads `.env`):
+Create a `.env` file in the root directory:
+
 ```env
-VITE_API_URL=http://localhost:3001
+# Required: Your n8n webhook URL
+VITE_N8N_WEBHOOK_URL=https://n8n.customaistudio.io/webhook/kirit-rag-webhook
+
+# Optional: Add any other frontend environment variables
+# VITE_APP_NAME=Sunny AI
+# VITE_DEBUG=true
 ```
 
-**Backend** (`server/.env`):
-```env
-PORT=3001
-N8N_WEBHOOK_URL=https://your-n8n-instance.com/webhook/chat
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_ANON_KEY=your-supabase-anon-key
+### n8n Webhook Setup
+
+Your n8n workflow should:
+
+1. Accept POST requests with the message data
+2. Return a JSON response with an `output` field:
+
+```json
+{
+  "output": "Hello! I received your message and here's my response."
+}
 ```
 
-### Supabase Setup (Optional)
-
-If using Supabase for message storage:
-
-```sql
--- Create chat_messages table
-CREATE TABLE chat_messages (
-  id TEXT PRIMARY KEY,
-  session_id TEXT NOT NULL,
-  role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
-  content TEXT NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Create indexes
-CREATE INDEX idx_chat_messages_session_id ON chat_messages(session_id);
-CREATE INDEX idx_chat_messages_created_at ON chat_messages(created_at);
+**Expected Request Format:**
+```json
+{
+  "message": "User message",
+  "sessionId": "session-id",
+  "messageId": "message-id",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "metadata": {
+    "userAgent": "Mozilla/5.0...",
+    "source": "frontend"
+  }
+}
 ```
 
 ## Development
@@ -167,86 +126,95 @@ CREATE INDEX idx_chat_messages_created_at ON chat_messages(created_at);
 ### Available Scripts
 
 ```bash
-# Frontend
-npm run dev              # Start frontend only
+# Development
+npm run dev              # Start development server
 npm run build           # Build for production
 npm run preview         # Preview production build
 
-# Backend
-npm run start:server    # Start production backend
-cd server && npm run dev # Start development backend
-
-# Full Stack
-npm run dev:full        # Start both frontend and backend
-npm run build:all       # Build both frontend and backend
-
-# Testing
-cd server && npm run mock-n8n  # Start mock n8n webhook
-cd server && npm run test      # Test API endpoints
+# Linting
+npm run lint            # Run ESLint
 ```
 
-### Testing
+### Local Development with Backend (Optional)
 
-1. **Start mock n8n webhook**:
-   ```bash
-   cd server && npm run mock-n8n
-   ```
+If you want to test with a local backend during development:
 
-2. **Test API endpoints**:
-   ```bash
-   cd server && npm run test
-   ```
+```bash
+# Terminal 1 - Frontend
+npm run dev
 
-3. **Manual testing**:
-   - Open `http://localhost:5173`
-   - Click the chat button
-   - Send a message and watch the streaming response
+# Terminal 2 - Backend (optional)
+cd server && npm run dev
 
-## Production Deployment
+# Terminal 3 - Mock n8n (optional)
+cd server && npm run mock-n8n
+```
 
-### Frontend (Netlify/Vercel)
+## Deployment
+
+### Netlify (Recommended)
+
+1. **Connect your repository** to Netlify
+2. **Set build settings**:
+   - Build command: `npm run build`
+   - Publish directory: `dist`
+3. **Add environment variables** in Netlify dashboard:
+   - `VITE_N8N_WEBHOOK_URL`: Your n8n webhook URL
+4. **Deploy!**
+
+### Vercel
+
+1. **Connect your repository** to Vercel
+2. **Add environment variables**:
+   - `VITE_N8N_WEBHOOK_URL`: Your n8n webhook URL
+3. **Deploy!**
+
+### Manual Deployment
+
 ```bash
 npm run build
-# Deploy dist/ folder
+# Upload the `dist/` folder to your hosting provider
 ```
-
-### Backend (Railway/Render/Heroku)
-```bash
-cd server
-npm run build
-npm start
-```
-
-### Environment Variables for Production
-- Set `N8N_WEBHOOK_URL` to your production n8n instance
-- Configure `SUPABASE_URL` and `SUPABASE_ANON_KEY` for production database
-- Update `VITE_API_URL` to point to your production backend
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Chat not working**:
-   - Check if backend is running on port 3001
-   - Verify n8n webhook URL is correct
-   - Check browser console for errors
+1. **CORS Errors**:
+   - Ensure your n8n webhook allows requests from your domain
+   - Check n8n CORS settings
 
-2. **Streaming not working**:
-   - Ensure n8n supports streaming responses
-   - Check CORS settings
-   - Verify proxy configuration in `vite.config.ts`
+2. **Webhook Not Responding**:
+   - Verify the webhook URL is correct
+   - Check n8n workflow is active
+   - Test webhook directly with curl
 
-3. **Supabase connection issues**:
-   - Verify credentials in `server/.env`
-   - Check if tables exist
-   - Ensure proper permissions
+3. **Environment Variables Not Working**:
+   - Ensure variables start with `VITE_`
+   - Rebuild after changing environment variables
+   - Check Netlify/Vercel environment variable settings
 
 ### Debug Mode
 
 Enable debug logging by setting:
 ```env
-DEBUG=true
+VITE_DEBUG=true
 ```
+
+## Architecture
+
+### Client-Side Only
+- ✅ No backend server required
+- ✅ Works with static hosting (Netlify, Vercel, etc.)
+- ✅ Direct n8n webhook integration
+- ✅ Local storage for persistence
+- ✅ Environment variable configuration
+
+### Optional Backend (Development)
+- 🔧 Express server for local development
+- 🔧 Supabase integration for production database
+- 🔧 Mock n8n webhook for testing
+- 🔧 Advanced features like streaming responses
 
 ## Contributing
 
