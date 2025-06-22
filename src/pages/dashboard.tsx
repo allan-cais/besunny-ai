@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -16,10 +16,30 @@ import {
   Moon,
   Monitor,
   ChevronLeft,
-  ChevronRight as ChevronRightIcon
+  ChevronRight as ChevronRightIcon,
+  Plus,
+  MessageSquare,
+  MoreHorizontal,
+  Edit,
+  Trash2
 } from "lucide-react";
 import { useTheme } from "@/providers/ThemeProvider";
 import AIAssistant from "@/components/AIAssistant";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 
 // Header Component
 const Header = () => {
@@ -77,6 +97,20 @@ interface NavigationSidebarProps {
   openSubmenus: { [key: string]: boolean };
   onToggleSubmenu: (label: string) => void;
   onNavItemClick: (item: any) => void;
+  onNewChat: () => void;
+  chats: ChatSession[];
+  activeChatId: string | null;
+  onChatSelect: (chatId: string) => void;
+  onRenameChat: (chatId: string, newTitle: string) => void;
+  onDeleteChat: (chatId: string) => void;
+}
+
+interface ChatSession {
+  id: string;
+  title: string;
+  createdAt: string;
+  lastMessageAt: string;
+  unreadCount: number;
 }
 
 const NavigationSidebar = ({ 
@@ -84,8 +118,19 @@ const NavigationSidebar = ({
   onToggle, 
   openSubmenus, 
   onToggleSubmenu, 
-  onNavItemClick 
+  onNavItemClick,
+  onNewChat,
+  chats,
+  activeChatId,
+  onChatSelect,
+  onRenameChat,
+  onDeleteChat
 }: NavigationSidebarProps) => {
+  const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selectedChat, setSelectedChat] = useState<ChatSession | null>(null);
+  const [newTitle, setNewTitle] = useState("");
+
   const navItems = [
     { icon: Home, label: "Home", active: true },
     { 
@@ -99,62 +144,238 @@ const NavigationSidebar = ({
     { icon: Settings, label: "Settings", active: false },
   ];
 
+  const handleRenameClick = (chat: ChatSession) => {
+    setSelectedChat(chat);
+    setNewTitle(chat.title);
+    setRenameDialogOpen(true);
+  };
+
+  const handleDeleteClick = (chat: ChatSession) => {
+    setSelectedChat(chat);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleRenameConfirm = () => {
+    if (selectedChat && newTitle.trim()) {
+      onRenameChat(selectedChat.id, newTitle.trim());
+      setRenameDialogOpen(false);
+      setSelectedChat(null);
+      setNewTitle("");
+    }
+  };
+
+  const handleDeleteConfirm = () => {
+    if (selectedChat) {
+      onDeleteChat(selectedChat.id);
+      setDeleteDialogOpen(false);
+      setSelectedChat(null);
+    }
+  };
+
   return (
-    <div className={`relative transition-all duration-300 ease-in-out ${
-      isCollapsed ? 'w-16' : 'w-64'
-    } border-r border-[#4a5565] dark:border-zinc-700 bg-stone-100 dark:bg-zinc-800`}>
-      <div className="p-2">
-        {navItems.map((item, index) => (
-          <div key={index} className="mb-1">
-            <Button
-              variant="ghost"
-              className={`w-full flex items-center justify-between font-mono text-left px-3 py-2 h-auto text-xs ${
-                item.active 
-                  ? 'bg-[#4a5565] text-stone-100 dark:bg-zinc-50 dark:text-zinc-900' 
-                  : 'hover:bg-stone-300 dark:hover:bg-zinc-700'
-              } border border-transparent hover:border-[#4a5565] dark:hover:border-zinc-700`}
-              onClick={() => onNavItemClick(item)}
-            >
-              <div className="flex items-center">
-                <item.icon className="w-4 h-4 mr-3" />
-                {!isCollapsed && item.label}
-              </div>
-              {!isCollapsed && item.subItems && (
-                openSubmenus[item.label] 
-                  ? <ChevronDown className="w-4 h-4" /> 
-                  : <ChevronRight className="w-4 h-4" />
+    <>
+      <div className={`relative transition-all duration-300 ease-in-out ${
+        isCollapsed ? 'w-16' : 'w-64'
+      } border-r border-[#4a5565] dark:border-zinc-700 bg-stone-100 dark:bg-zinc-800`}>
+        <div className="p-2">
+          {/* Regular Navigation Items */}
+          {navItems.map((item, index) => (
+            <div key={index} className="mb-1">
+              <Button
+                variant="ghost"
+                className={`w-full flex items-center justify-between font-mono text-left px-3 py-2 h-auto text-xs ${
+                  item.active 
+                    ? 'bg-[#4a5565] text-stone-100 dark:bg-zinc-50 dark:text-zinc-900' 
+                    : 'hover:bg-stone-300 dark:hover:bg-zinc-700'
+                } border border-transparent hover:border-[#4a5565] dark:hover:border-zinc-700`}
+                onClick={() => onNavItemClick(item)}
+              >
+                <div className="flex items-center">
+                  <item.icon className="w-4 h-4 mr-3" />
+                  {!isCollapsed && item.label}
+                </div>
+                {!isCollapsed && item.subItems && (
+                  openSubmenus[item.label] 
+                    ? <ChevronDown className="w-4 h-4" /> 
+                    : <ChevronRight className="w-4 h-4" />
+                )}
+              </Button>
+              {!isCollapsed && item.subItems && openSubmenus[item.label] && (
+                <div className="pl-8 mt-1 space-y-1">
+                  {item.subItems.map((subItem: string, subIndex: number) => (
+                    <Button
+                      key={subIndex}
+                      variant="ghost"
+                      className="w-full justify-start font-mono text-left px-3 py-1 h-auto text-xs hover:bg-stone-300 dark:hover:bg-zinc-700"
+                    >
+                      {subItem}
+                    </Button>
+                  ))}
+                </div>
               )}
-            </Button>
-            {!isCollapsed && item.subItems && openSubmenus[item.label] && (
-              <div className="pl-8 mt-1 space-y-1">
-                {item.subItems.map((subItem: string, subIndex: number) => (
+            </div>
+          ))}
+
+          {/* Chats Section */}
+          <div className="mt-6">
+            <div className="px-3 py-2 text-xs font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+              Chats
+            </div>
+            <div className="space-y-1">
+              {/* New Chat Button - First item under Chats */}
+              <Button
+                variant="ghost"
+                className="w-full flex items-center justify-start font-mono text-left px-3 py-2 h-auto text-xs bg-[#4a5565] text-stone-100 dark:bg-zinc-50 dark:text-zinc-900 hover:bg-[#4a5565]/90 dark:hover:bg-zinc-50/90 border border-transparent"
+                onClick={onNewChat}
+              >
+                <Plus className="w-4 h-4 mr-3" />
+                {!isCollapsed && "New Chat"}
+              </Button>
+              
+              {/* Existing Chats */}
+              {chats.map((chat) => (
+                <div
+                  key={chat.id}
+                  className={`group relative flex items-center justify-between font-mono text-left px-3 py-2 h-auto text-xs ${
+                    activeChatId === chat.id
+                      ? 'bg-[#4a5565] text-stone-100 dark:bg-zinc-50 dark:text-zinc-900'
+                      : 'hover:bg-stone-300 dark:hover:bg-zinc-700'
+                  } border border-transparent hover:border-[#4a5565] dark:hover:border-zinc-700 rounded-md`}
+                >
                   <Button
-                    key={subIndex}
                     variant="ghost"
-                    className="w-full justify-start font-mono text-left px-3 py-1 h-auto text-xs hover:bg-stone-300 dark:hover:bg-zinc-700"
+                    className={`w-full flex items-center justify-start h-auto p-0 ${
+                      activeChatId === chat.id
+                        ? 'bg-transparent text-stone-100 dark:text-zinc-900'
+                        : 'hover:bg-transparent'
+                    }`}
+                    onClick={() => onChatSelect(chat.id)}
                   >
-                    {subItem}
+                    <div className="flex items-center flex-1 min-w-0">
+                      <MessageSquare className="w-4 h-4 mr-3 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="truncate">{chat.title}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                          {new Date(chat.lastMessageAt).toLocaleDateString()}
+                        </div>
+                      </div>
+                    </div>
+                    {chat.unreadCount > 0 && (
+                      <div className="ml-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center flex-shrink-0">
+                        {chat.unreadCount}
+                      </div>
+                    )}
                   </Button>
-                ))}
-              </div>
-            )}
+                  
+                  {/* Three-dot menu - only visible on hover */}
+                  {!isCollapsed && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-stone-400 dark:hover:bg-zinc-600"
+                        >
+                          <MoreHorizontal className="h-3 w-3" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-48">
+                        <DropdownMenuItem onClick={() => handleRenameClick(chat)}>
+                          <Edit className="mr-2 h-4 w-4" />
+                          <span>Rename chat</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          onClick={() => handleDeleteClick(chat)}
+                          className="text-red-600 focus:text-red-600"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          <span>Delete chat</span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
-        ))}
+        </div>
+        
+        {/* Sidebar Toggle Button */}
+        <button
+          onClick={onToggle}
+          className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-stone-100 dark:bg-zinc-800 border border-[#4a5565] dark:border-zinc-700 rounded-full flex items-center justify-center hover:bg-stone-300 dark:hover:bg-zinc-700 transition-colors z-10"
+          title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          {isCollapsed ? (
+            <ChevronRightIcon className="w-3 h-3" />
+          ) : (
+            <ChevronLeft className="w-3 h-3" />
+          )}
+        </button>
       </div>
-      
-      {/* Sidebar Toggle Button */}
-      <button
-        onClick={onToggle}
-        className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-stone-100 dark:bg-zinc-800 border border-[#4a5565] dark:border-zinc-700 rounded-full flex items-center justify-center hover:bg-stone-300 dark:hover:bg-zinc-700 transition-colors z-10"
-        title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-      >
-        {isCollapsed ? (
-          <ChevronRightIcon className="w-3 h-3" />
-        ) : (
-          <ChevronLeft className="w-3 h-3" />
-        )}
-      </button>
-    </div>
+
+      {/* Rename Chat Dialog */}
+      <Dialog open={renameDialogOpen} onOpenChange={setRenameDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Rename Chat</DialogTitle>
+            <DialogDescription>
+              Enter a new name for your chat.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="name" className="text-right">
+                Name
+              </Label>
+              <Input
+                id="name"
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+                className="col-span-3"
+                placeholder="Enter chat name..."
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    handleRenameConfirm();
+                  }
+                }}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleRenameConfirm} disabled={!newTitle.trim()}>
+              Rename
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Chat Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Delete Chat</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete "{selectedChat?.title}"? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleDeleteConfirm}
+            >
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 
@@ -240,6 +461,39 @@ const Dashboard = () => {
   const [openSubmenus, setOpenSubmenus] = useState<{ [key: string]: boolean }>({});
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isChatSidebarCollapsed, setIsChatSidebarCollapsed] = useState(true);
+  const [chats, setChats] = useState<ChatSession[]>([]);
+  const [activeChatId, setActiveChatId] = useState<string | null>(null);
+
+  // Load chats from localStorage on component mount
+  useEffect(() => {
+    try {
+      const savedChats = localStorage.getItem('chat_sessions');
+      if (savedChats) {
+        const parsedChats = JSON.parse(savedChats);
+        if (Array.isArray(parsedChats)) {
+          setChats(parsedChats);
+          // Set the most recent chat as active if no active chat is set
+          if (parsedChats.length > 0 && !activeChatId) {
+            const mostRecent = parsedChats.sort((a, b) => 
+              new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime()
+            )[0];
+            setActiveChatId(mostRecent.id);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error loading chat sessions:', error);
+    }
+  }, []);
+
+  // Save chats to localStorage whenever chats change
+  useEffect(() => {
+    try {
+      localStorage.setItem('chat_sessions', JSON.stringify(chats));
+    } catch (error) {
+      console.error('Error saving chat sessions:', error);
+    }
+  }, [chats]);
 
   const toggleSubmenu = (label: string) => {
     setOpenSubmenus(prev => ({ ...prev, [label]: !prev[label] }));
@@ -264,8 +518,72 @@ const Dashboard = () => {
     setIsChatSidebarCollapsed(!isChatSidebarCollapsed);
   };
 
+  const createNewChat = () => {
+    const newChat: ChatSession = {
+      id: `chat_${Date.now()}`,
+      title: `Chat ${chats.length + 1}`,
+      createdAt: new Date().toISOString(),
+      lastMessageAt: new Date().toISOString(),
+      unreadCount: 0
+    };
+    
+    setChats(prev => [...prev, newChat]);
+    setActiveChatId(newChat.id);
+    setIsChatSidebarCollapsed(false);
+  };
+
+  const selectChat = (chatId: string) => {
+    setActiveChatId(chatId);
+    setIsChatSidebarCollapsed(false);
+    
+    // Mark chat as read
+    setChats(prev => 
+      prev.map(chat => 
+        chat.id === chatId 
+          ? { ...chat, unreadCount: 0 }
+          : chat
+      )
+    );
+  };
+
+  const renameChat = (chatId: string, newTitle: string) => {
+    setChats(prev => 
+      prev.map(chat => 
+        chat.id === chatId 
+          ? { ...chat, title: newTitle }
+          : chat
+      )
+    );
+  };
+
+  const deleteChat = (chatId: string) => {
+    // Remove the chat from the list
+    setChats(prev => prev.filter(chat => chat.id !== chatId));
+    
+    // If the deleted chat was active, set a new active chat or null
+    if (activeChatId === chatId) {
+      const remainingChats = chats.filter(chat => chat.id !== chatId);
+      if (remainingChats.length > 0) {
+        // Set the most recent chat as active
+        const mostRecent = remainingChats.sort((a, b) => 
+          new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime()
+        )[0];
+        setActiveChatId(mostRecent.id);
+      } else {
+        setActiveChatId(null);
+      }
+    }
+    
+    // Also delete the chat messages from localStorage
+    try {
+      localStorage.removeItem(`chat_messages_${chatId}`);
+    } catch (error) {
+      console.error('Error deleting chat messages from localStorage:', error);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-stone-100 text-[#4a5565] dark:bg-zinc-800 dark:text-zinc-50 font-mono flex flex-col text-xs">
+    <div className="h-screen bg-stone-100 text-[#4a5565] dark:bg-zinc-800 dark:text-zinc-50 font-mono flex flex-col text-xs">
       <Header />
 
       <div className="flex flex-1 overflow-hidden">
@@ -275,6 +593,12 @@ const Dashboard = () => {
           openSubmenus={openSubmenus}
           onToggleSubmenu={toggleSubmenu}
           onNavItemClick={handleNavItemClick}
+          onNewChat={createNewChat}
+          chats={chats}
+          activeChatId={activeChatId}
+          onChatSelect={selectChat}
+          onRenameChat={renameChat}
+          onDeleteChat={deleteChat}
         />
 
         <MainWorkspace />
@@ -282,6 +606,9 @@ const Dashboard = () => {
         <AIAssistant 
           isCollapsed={isChatSidebarCollapsed}
           onToggle={toggleChatSidebar}
+          activeChatId={activeChatId}
+          chats={chats}
+          onChatUpdate={(updatedChats) => setChats(updatedChats)}
         />
       </div>
     </div>
