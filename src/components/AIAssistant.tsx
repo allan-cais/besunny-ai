@@ -2,21 +2,24 @@ import { useState, useRef, useLayoutEffect, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send, ChevronRight, MessageSquare } from "lucide-react";
+import { useSupabase, useSupabaseSubscription } from "@/hooks/use-supabase";
+import { ChatMessage as SupabaseChatMessage } from "@/lib/supabase";
 
 interface ChatMessage {
   id: string;
-  sessionId: string;
-  role: 'user' | 'assistant';
-  content: string;
-  createdAt: string;
+  session_id: string;
+  role?: string;
+  message?: string;
+  used_chunks?: string[];
+  created_at: string;
 }
 
 interface ChatSession {
   id: string;
-  title: string;
-  createdAt: string;
-  lastMessageAt: string;
-  unreadCount: number;
+  user_id?: string;
+  project_id?: string;
+  started_at: string;
+  ended_at?: string;
 }
 
 interface AIAssistantProps {
@@ -25,9 +28,19 @@ interface AIAssistantProps {
   activeChatId: string | null;
   chats: ChatSession[];
   onChatUpdate: (updatedChats: ChatSession[]) => void;
+  currentUserId?: string;
+  currentProjectId?: string;
 }
 
-const AIAssistant = ({ isCollapsed, onToggle, activeChatId, chats, onChatUpdate }: AIAssistantProps) => {
+const AIAssistant = ({ 
+  isCollapsed, 
+  onToggle, 
+  activeChatId, 
+  chats, 
+  onChatUpdate,
+  currentUserId,
+  currentProjectId 
+}: AIAssistantProps) => {
   const [chatMessage, setChatMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -35,8 +48,35 @@ const AIAssistant = ({ isCollapsed, onToggle, activeChatId, chats, onChatUpdate 
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const assistantContainerRef = useRef<HTMLDivElement>(null);
 
+  // Supabase hooks
+  const { 
+    isLoading: supabaseLoading, 
+    error: supabaseError, 
+    saveMessages, 
+    getMessagesBySession, 
+    createChatSession,
+    isConfigured: supabaseConfigured 
+  } = useSupabase();
+
   // Get n8n webhook URL from environment or use default
   const N8N_WEBHOOK_URL = import.meta.env.VITE_N8N_WEBHOOK_URL || 'https://n8n.customaistudio.io/webhook/kirit-rag-webhook';
+
+  // Real-time subscription for messages
+  useSupabaseSubscription(activeChatId || '', (payload) => {
+    if (payload.eventType === 'INSERT' && payload.new) {
+      const newMessage = payload.new as SupabaseChatMessage;
+      if (newMessage.session_id === activeChatId) {
+        setMessages(prev => {
+          // Check if message already exists
+          const exists = prev.some(msg => msg.id === newMessage.id);
+          if (!exists) {
+            return [...prev, newMessage];
+          }
+          return prev;
+        });
+      }
+    }
+  });
 
   // Load messages for the active chat
   useEffect(() => {
@@ -60,35 +100,44 @@ const AIAssistant = ({ isCollapsed, onToggle, activeChatId, chats, onChatUpdate 
     e.target.style.height = `${e.target.scrollHeight}px`;
   };
 
-  const loadMessagesForChat = (chatId: string) => {
+  const loadMessagesForChat = async (chatId: string) => {
     try {
-      const saved = localStorage.getItem(`chat_messages_${chatId}`);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          setMessages(parsed);
-        }
-      } else {
-        // Initialize with welcome message for new chats
-        setMessages([{
-          id: "1",
-          sessionId: chatId,
+      const supabaseMessages = await getMessagesBySession(chatId, 100);
+      let loadedMessages: ChatMessage[] = supabaseMessages;
+      // If no messages found, initialize with welcome message
+      if (loadedMessages.length === 0) {
+        loadedMessages = [{
+          id: crypto.randomUUID(),
+          session_id: chatId,
           role: "assistant",
-          content: "Hello! How can I help you today?",
-          createdAt: new Date().toISOString()
-        }]);
+          message: "Hello! How can I help you today?",
+          created_at: new Date().toISOString()
+        }];
       }
+      setMessages(loadedMessages);
     } catch (error) {
-      console.error('Error loading messages for chat:', error);
-      setMessages([]);
+      setMessages([{
+        id: crypto.randomUUID(),
+        session_id: chatId,
+        role: "assistant",
+        message: "Hello! How can I help you today?",
+        created_at: new Date().toISOString()
+      }]);
     }
   };
 
-  const saveMessagesForChat = (chatId: string, messages: ChatMessage[]) => {
+  const saveMessagesForChat = async (chatId: string, messages: ChatMessage[]) => {
     try {
-      localStorage.setItem(`chat_messages_${chatId}`, JSON.stringify(messages));
+      // Convert to the format expected by Supabase (omit created_at for new messages)
+      const messagesToSave = messages.map(msg => ({
+        id: msg.id,
+        session_id: msg.session_id,
+        role: msg.role,
+        message: msg.message,
+        used_chunks: msg.used_chunks || []
+      }));
+      await saveMessages(messagesToSave);
     } catch (error) {
-      console.error('Error saving messages for chat:', error);
     }
   };
 
@@ -97,17 +146,10 @@ const AIAssistant = ({ isCollapsed, onToggle, activeChatId, chats, onChatUpdate 
       if (chat.id === chatId) {
         return {
           ...chat,
-          title: lastMessage.length > 30 ? lastMessage.substring(0, 30) + '...' : lastMessage,
-          lastMessageAt: new Date().toISOString(),
-          unreadCount: 0
-        };
-      } else {
-        // Increment unread count for other chats
-        return {
-          ...chat,
-          unreadCount: chat.unreadCount + 1
+          started_at: new Date().toISOString()
         };
       }
+      return chat;
     });
     onChatUpdate(updatedChats);
   };
@@ -115,108 +157,21 @@ const AIAssistant = ({ isCollapsed, onToggle, activeChatId, chats, onChatUpdate 
   const handleSendMessage = async () => {
     if (chatMessage.trim() && !isLoading && activeChatId) {
       const userMessage: ChatMessage = {
-        id: Date.now().toString(),
-        sessionId: activeChatId,
+        id: crypto.randomUUID(),
+        session_id: activeChatId,
         role: "user",
-        content: chatMessage,
-        createdAt: new Date().toISOString()
+        message: chatMessage,
+        created_at: new Date().toISOString()
       };
-
       const newMessages = [...messages, userMessage];
       setMessages(newMessages);
       setChatMessage("");
       setIsLoading(true);
-
-      // Update chat metadata with the user's message
-      updateChatMetadata(activeChatId, chatMessage);
-
       try {
-        // Create a placeholder assistant message that will be updated
-        const assistantMessage: ChatMessage = {
-          id: (Date.now() + 1).toString(),
-          sessionId: activeChatId,
-          role: "assistant",
-          content: "",
-          createdAt: new Date().toISOString()
-        };
-
-        const messagesWithAssistant = [...newMessages, assistantMessage];
-        setMessages(messagesWithAssistant);
-
-        // Call n8n webhook directly
-        const response = await fetch(N8N_WEBHOOK_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            message: userMessage.content,
-            sessionId: activeChatId,
-            messageId: assistantMessage.id,
-            timestamp: new Date().toISOString(),
-            metadata: {
-              userAgent: navigator.userAgent,
-              source: 'frontend'
-            }
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        // Get the response text
-        const responseText = await response.text();
-        console.log('n8n response:', responseText);
-
-        let displayContent = responseText;
-        
-        // Try to parse as JSON and extract the output field
-        try {
-          const jsonResponse = JSON.parse(responseText);
-          if (jsonResponse.output) {
-            displayContent = jsonResponse.output;
-          } else if (jsonResponse.message) {
-            displayContent = jsonResponse.message;
-          } else if (jsonResponse.content) {
-            displayContent = jsonResponse.content;
-          }
-        } catch (parseError) {
-          // If not JSON, use the raw text
-          console.log('Response is not JSON, using raw text');
-        }
-
-        // Update the assistant message with the response
-        const finalMessages = messagesWithAssistant.map(msg => 
-          msg.id === assistantMessage.id 
-            ? { ...msg, content: displayContent }
-            : msg
-        );
-        
-        setMessages(finalMessages);
-        saveMessagesForChat(activeChatId, finalMessages);
-
-        // Update chat metadata with the assistant's response
-        updateChatMetadata(activeChatId, displayContent);
-
+        await saveMessagesForChat(activeChatId, [userMessage]);
       } catch (error) {
-        console.error('Error sending message:', error);
-        setMessages(prev => {
-          // Find the last assistant message and update it
-          const lastAssistantIndex = prev.map(m => m.role).lastIndexOf('assistant');
-          if (lastAssistantIndex !== -1) {
-            const updated = [...prev];
-            updated[lastAssistantIndex] = {
-              ...updated[lastAssistantIndex],
-              content: "Sorry, I encountered an error. Please try again."
-            };
-            return updated;
-          }
-          return prev;
-        });
-      } finally {
-        setIsLoading(false);
       }
+      setIsLoading(false);
     }
   };
 
@@ -307,7 +262,10 @@ const AIAssistant = ({ isCollapsed, onToggle, activeChatId, chats, onChatUpdate 
             {/* Chat Header */}
             <div className="p-3 border-b border-[#4a5565] dark:border-zinc-700 flex-shrink-0">
               <div className="text-sm font-bold">
-                {chats.find(chat => chat.id === activeChatId)?.title || 'Chat'}
+                Chat Session
+              </div>
+              <div className="text-xs text-gray-500">
+                {activeChatId}
               </div>
             </div>
 
@@ -326,8 +284,8 @@ const AIAssistant = ({ isCollapsed, onToggle, activeChatId, chats, onChatUpdate 
                         ? 'border border-[#4a5565] bg-[#4a5565] text-stone-100 ml-8' 
                         : 'text-[#4a5565] dark:text-zinc-50 mr-8'
                     }`}>
-                      {message.content}
-                      {message.role === 'assistant' && isLoading && message.content === "" && (
+                      {message.message}
+                      {message.role === 'assistant' && isLoading && message.message === "" && (
                         <span className="animate-pulse">...</span>
                       )}
                     </div>

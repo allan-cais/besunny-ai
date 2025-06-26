@@ -5,7 +5,7 @@ const Index = () => {
   const navigate = useNavigate();
 
   const handleLogin = () => {
-    navigate('/dashboard');
+    navigate('/auth');
   };
 
   return (

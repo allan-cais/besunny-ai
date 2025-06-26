@@ -1,36 +1,14 @@
-import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { 
-  Home, 
-  FileText, 
-  Settings, 
-  Database,
-  Terminal,
-  ChevronRight,
-  ChevronDown,
-  Search,
-  Github,
-  Sun,
-  Moon,
-  Monitor,
-  ChevronLeft,
-  ChevronRight as ChevronRightIcon,
-  Plus,
-  MessageSquare,
-  MoreHorizontal,
-  Edit,
-  Trash2
-} from "lucide-react";
-import { useTheme } from "@/providers/ThemeProvider";
-import AIAssistant from "@/components/AIAssistant";
+import React, { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from '@/components/ui/dropdown-menu';
 import {
   Dialog,
   DialogContent,
@@ -38,8 +16,37 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { 
+  Home, 
+  FileText, 
+  Database, 
+  Terminal, 
+  Settings, 
+  ChevronDown, 
+  ChevronRight, 
+  ChevronLeft,
+  ChevronRightIcon,
+  MessageSquare,
+  Plus,
+  MoreHorizontal,
+  Edit,
+  Trash2,
+  User,
+  LogOut,
+  Search
+} from 'lucide-react';
+import { useAuth } from '@/providers/AuthProvider';
+import { useSupabase } from '@/hooks/use-supabase';
+import { Project, ChatSession } from '@/lib/supabase';
+import CreateProjectDialog from '@/components/CreateProjectDialog';
+import AIAssistant from '@/components/AIAssistant';
+import { useTheme } from "@/providers/ThemeProvider";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Sun, Moon, Monitor } from "lucide-react";
+import UserAccountMenu from "@/components/auth/UserAccountMenu";
 
 // Header Component
 const Header = () => {
@@ -58,14 +65,7 @@ const Header = () => {
         </div>
       </div>
       <div className="flex items-center space-x-4">
-        <Button
-          size="icon"
-          variant="ghost"
-          className="border border-transparent hover:border-[#4a5565] dark:hover:border-zinc-700"
-          onClick={() => window.open("https://github.com", "_blank")}
-        >
-          <Github className="w-4 h-4" />
-        </Button>
+        <UserAccountMenu />
 
         <ToggleGroup 
           type="single" 
@@ -98,19 +98,32 @@ interface NavigationSidebarProps {
   onToggleSubmenu: (label: string) => void;
   onNavItemClick: (item: any) => void;
   onNewChat: () => void;
-  chats: ChatSession[];
+  onNewProject: () => void;
+  chats: DashboardChatSession[];
+  projects: Project[];
   activeChatId: string | null;
+  activeProjectId: string | null;
   onChatSelect: (chatId: string) => void;
+  onProjectSelect: (projectId: string) => void;
   onRenameChat: (chatId: string, newTitle: string) => void;
   onDeleteChat: (chatId: string) => void;
 }
 
-interface ChatSession {
+interface DashboardChatSession {
   id: string;
   title: string;
   createdAt: string;
   lastMessageAt: string;
   unreadCount: number;
+}
+
+// Interface for AIAssistant component
+interface AIChatSession {
+  id: string;
+  user_id?: string;
+  project_id?: string;
+  started_at: string;
+  ended_at?: string;
 }
 
 const NavigationSidebar = ({ 
@@ -120,15 +133,19 @@ const NavigationSidebar = ({
   onToggleSubmenu, 
   onNavItemClick,
   onNewChat,
+  onNewProject,
   chats,
+  projects,
   activeChatId,
+  activeProjectId,
   onChatSelect,
+  onProjectSelect,
   onRenameChat,
   onDeleteChat
 }: NavigationSidebarProps) => {
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [selectedChat, setSelectedChat] = useState<ChatSession | null>(null);
+  const [selectedChat, setSelectedChat] = useState<DashboardChatSession | null>(null);
   const [newTitle, setNewTitle] = useState("");
 
   const navItems = [
@@ -137,20 +154,20 @@ const NavigationSidebar = ({
       icon: FileText, 
       label: "Projects", 
       active: false,
-      subItems: ["Spinbrush", "Iberdrola", "Abridge"]
+      subItems: projects.map(p => p.name)
     },
     { icon: Database, label: "Data", active: false },
     { icon: Terminal, label: "Terminal", active: false },
     { icon: Settings, label: "Settings", active: false },
   ];
 
-  const handleRenameClick = (chat: ChatSession) => {
+  const handleRenameClick = (chat: DashboardChatSession) => {
     setSelectedChat(chat);
     setNewTitle(chat.title);
     setRenameDialogOpen(true);
   };
 
-  const handleDeleteClick = (chat: ChatSession) => {
+  const handleDeleteClick = (chat: DashboardChatSession) => {
     setSelectedChat(chat);
     setDeleteDialogOpen(true);
   };
@@ -183,11 +200,11 @@ const NavigationSidebar = ({
             <div key={index} className="mb-1">
               <Button
                 variant="ghost"
-                className={`w-full flex items-center justify-between font-mono text-left px-3 py-2 h-auto text-xs ${
-                  item.active 
-                    ? 'bg-[#4a5565] text-stone-100 dark:bg-zinc-50 dark:text-zinc-900' 
-                    : 'hover:bg-stone-300 dark:hover:bg-zinc-700'
-                } border border-transparent hover:border-[#4a5565] dark:hover:border-zinc-700`}
+                className={`w-full flex items-center justify-between font-mono text-left px-3 py-2 h-auto text-xs
+                  ${item.active
+                    ? 'bg-stone-300 text-[#4a5565] border border-transparent hover:border-[#4a5565] hover:!bg-stone-300'
+                    : 'hover:bg-stone-300 dark:hover:bg-zinc-700 border border-transparent hover:border-[#4a5565] dark:hover:border-zinc-700'}
+                `}
                 onClick={() => onNavItemClick(item)}
               >
                 <div className="flex items-center">
@@ -202,13 +219,28 @@ const NavigationSidebar = ({
               </Button>
               {!isCollapsed && item.subItems && openSubmenus[item.label] && (
                 <div className="pl-8 mt-1 space-y-1">
-                  {item.subItems.map((subItem: string, subIndex: number) => (
+                  {/* New Project Button - First item under Projects */}
+                  <div
+                    className="w-full flex items-center justify-start font-mono text-left px-3 py-2 h-auto text-xs cursor-pointer hover:bg-stone-300 dark:hover:bg-zinc-700 border border-transparent hover:border-[#4a5565] dark:hover:border-zinc-700 rounded-md transition-colors"
+                    onClick={onNewProject}
+                  >
+                    <Plus className="w-4 h-4 mr-3" />
+                    New Project
+                  </div>
+                  
+                  {/* Existing Projects */}
+                  {projects.map((project) => (
                     <Button
-                      key={subIndex}
+                      key={project.id}
                       variant="ghost"
-                      className="w-full justify-start font-mono text-left px-3 py-1 h-auto text-xs hover:bg-stone-300 dark:hover:bg-zinc-700"
+                      className={`w-full justify-start font-mono text-left px-3 py-1 h-auto text-xs ${
+                        activeProjectId === project.id
+                          ? 'bg-stone-300 dark:bg-zinc-700'
+                          : 'hover:bg-stone-300 dark:hover:bg-zinc-700'
+                      }`}
+                      onClick={() => onProjectSelect(project.id)}
                     >
-                      {subItem}
+                      {project.name}
                     </Button>
                   ))}
                 </div>
@@ -273,14 +305,17 @@ const NavigationSidebar = ({
                             <MoreHorizontal className="h-3 w-3" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-48">
-                          <DropdownMenuItem onClick={() => handleRenameClick(chat)}>
+                        <DropdownMenuContent align="end" className="w-48 bg-stone-100 dark:bg-zinc-800 border border-[#4a5565] dark:border-zinc-700 font-mono text-xs p-1">
+                          <DropdownMenuItem 
+                            onClick={() => handleRenameClick(chat)}
+                            className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-stone-300 dark:hover:bg-zinc-700 focus:bg-stone-300 dark:focus:bg-zinc-700 cursor-pointer font-mono text-xs text-[#222] dark:text-zinc-100"
+                          >
                             <Edit className="mr-2 h-4 w-4" />
-                            <span>Rename chat</span>
+                            <span className="font-bold">Rename chat</span>
                           </DropdownMenuItem>
                           <DropdownMenuItem 
                             onClick={() => handleDeleteClick(chat)}
-                            className="text-red-600 focus:text-red-600"
+                            className="flex items-center gap-2 px-3 py-2 rounded-md text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900 focus:bg-red-100 dark:focus:bg-red-900 cursor-pointer font-mono text-xs"
                           >
                             <Trash2 className="mr-2 h-4 w-4" />
                             <span>Delete chat</span>
@@ -311,24 +346,26 @@ const NavigationSidebar = ({
 
       {/* Rename Chat Dialog */}
       <Dialog open={renameDialogOpen} onOpenChange={setRenameDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[425px] bg-stone-100 dark:bg-zinc-800 border border-[#4a5565] dark:border-zinc-700 font-mono text-xs">
           <DialogHeader>
-            <DialogTitle>Rename Chat</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-[#4a5565] dark:text-zinc-50 font-mono text-sm font-bold">
+              RENAME CHAT
+            </DialogTitle>
+            <DialogDescription className="text-gray-600 dark:text-gray-400 font-mono text-xs">
               Enter a new name for your chat.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="name" className="text-right">
-                Name
+            <div className="grid gap-2">
+              <Label htmlFor="name" className="text-[#4a5565] dark:text-zinc-300 font-mono text-xs font-bold">
+                CHAT NAME
               </Label>
               <Input
                 id="name"
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
-                className="col-span-3"
                 placeholder="Enter chat name..."
+                className="font-mono text-xs border border-[#4a5565] dark:border-zinc-700 bg-stone-50 dark:bg-zinc-900 text-[#4a5565] dark:text-zinc-50 placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:border-[#4a5565] dark:focus:border-zinc-600"
                 onKeyPress={(e) => {
                   if (e.key === 'Enter') {
                     handleRenameConfirm();
@@ -337,12 +374,20 @@ const NavigationSidebar = ({
               />
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRenameDialogOpen(false)}>
-              Cancel
+          <DialogFooter className="gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setRenameDialogOpen(false)}
+              className="font-mono text-xs border border-[#4a5565] dark:border-zinc-700 bg-stone-100 dark:bg-zinc-800 text-[#4a5565] dark:text-zinc-50 hover:bg-stone-300 dark:hover:bg-zinc-700"
+            >
+              CANCEL
             </Button>
-            <Button onClick={handleRenameConfirm} disabled={!newTitle.trim()}>
-              Rename
+            <Button 
+              onClick={handleRenameConfirm} 
+              disabled={!newTitle.trim()}
+              className="font-mono text-xs bg-[#4a5565] dark:bg-zinc-50 text-stone-100 dark:text-zinc-900 hover:bg-[#3a4555] dark:hover:bg-zinc-200 disabled:opacity-50"
+            >
+              RENAME
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -350,22 +395,29 @@ const NavigationSidebar = ({
 
       {/* Delete Chat Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[425px] bg-stone-100 dark:bg-zinc-800 border border-[#4a5565] dark:border-zinc-700 font-mono text-xs">
           <DialogHeader>
-            <DialogTitle>Delete Chat</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-[#4a5565] dark:text-zinc-50 font-mono text-sm font-bold">
+              DELETE CHAT
+            </DialogTitle>
+            <DialogDescription className="text-gray-600 dark:text-gray-400 font-mono text-xs">
               Are you sure you want to delete "{selectedChat?.title}"? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
-              Cancel
+          <DialogFooter className="gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setDeleteDialogOpen(false)}
+              className="font-mono text-xs border border-[#4a5565] dark:border-zinc-700 bg-stone-100 dark:bg-zinc-800 text-[#4a5565] dark:text-zinc-50 hover:bg-stone-300 dark:hover:bg-zinc-700"
+            >
+              CANCEL
             </Button>
             <Button 
               variant="destructive" 
               onClick={handleDeleteConfirm}
+              className="font-mono text-xs bg-red-600 dark:bg-red-700 text-white hover:bg-red-700 dark:hover:bg-red-800"
             >
-              Delete
+              DELETE
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -453,42 +505,149 @@ const MainWorkspace = () => {
 };
 
 const Dashboard = () => {
+  const { user } = useAuth();
+  const { getProjectsForUser, getChatSessions, createChatSession, endChatSession } = useSupabase();
   const [openSubmenus, setOpenSubmenus] = useState<{ [key: string]: boolean }>({});
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isChatSidebarCollapsed, setIsChatSidebarCollapsed] = useState(true);
-  const [chats, setChats] = useState<ChatSession[]>([]);
+  const [chats, setChats] = useState<DashboardChatSession[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [createProjectDialogOpen, setCreateProjectDialogOpen] = useState(false);
 
-  // Load chats from localStorage on component mount
+  // Load projects for the current user
   useEffect(() => {
+    if (user?.id) {
+      loadUserProjects();
+    }
+  }, [user?.id]);
+
+  const loadUserProjects = async () => {
+    if (!user?.id) return;
+    
     try {
-      const savedChats = localStorage.getItem('chat_sessions');
-      if (savedChats) {
-        const parsedChats = JSON.parse(savedChats);
-        if (Array.isArray(parsedChats)) {
-          setChats(parsedChats);
-          // Set the most recent chat as active if no active chat is set
-          if (parsedChats.length > 0 && !activeChatId) {
-            const mostRecent = parsedChats.sort((a, b) => 
-              new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime()
-            )[0];
-            setActiveChatId(mostRecent.id);
-          }
-        }
+      const userProjects = await getProjectsForUser(user.id);
+      setProjects(userProjects);
+    } catch (error) {
+      console.error('Error loading user projects:', error);
+    }
+  };
+
+  // Fetch chat sessions from Supabase on load
+  useEffect(() => {
+    if (user?.id) {
+      loadUserChats();
+    }
+  }, [user?.id]);
+
+  const loadUserChats = async () => {
+    if (!user?.id) return;
+    try {
+      const sessions: ChatSession[] = await getChatSessions(user.id);
+      const dashboardChats: DashboardChatSession[] = sessions.map(session => ({
+        id: session.id,
+        title: session.id.startsWith('chat_') ? `Chat ${session.id.split('_')[1]}` : session.id,
+        createdAt: session.started_at,
+        lastMessageAt: session.started_at,
+        unreadCount: 0
+      }));
+      setChats(dashboardChats);
+      if (dashboardChats.length > 0 && !activeChatId) {
+        setActiveChatId(dashboardChats[0].id);
       }
     } catch (error) {
       console.error('Error loading chat sessions:', error);
     }
-  }, []);
+  };
 
-  // Save chats to localStorage whenever chats change
-  useEffect(() => {
+  // Convert DashboardChatSession to AIChatSession
+  const convertToAIChatSession = (chat: DashboardChatSession): AIChatSession => ({
+    id: chat.id,
+    user_id: undefined,
+    project_id: undefined,
+    started_at: chat.createdAt,
+    ended_at: undefined
+  });
+
+  // Convert AIChatSession to DashboardChatSession
+  const convertToDashboardChatSession = (chat: AIChatSession): DashboardChatSession => ({
+    id: chat.id,
+    title: `Chat ${chat.id}`,
+    createdAt: chat.started_at,
+    lastMessageAt: chat.started_at,
+    unreadCount: 0
+  });
+
+  // Convert array of DashboardChatSession to AIChatSession
+  const convertChatsToAI = (dashboardChats: DashboardChatSession[]): AIChatSession[] => {
+    return dashboardChats.map(convertToAIChatSession);
+  };
+
+  // Handle chat updates from AIAssistant
+  const handleAIChatUpdate = (updatedAIChats: AIChatSession[]) => {
+    const updatedDashboardChats = updatedAIChats.map(convertToDashboardChatSession);
+    setChats(updatedDashboardChats);
+  };
+
+  // Create new chat session in Supabase
+  const createNewChat = async () => {
+    if (!user?.id) return;
+    const newId = `chat_${Date.now()}`;
+    const session: Omit<ChatSession, 'started_at'> = {
+      id: newId,
+      user_id: user.id,
+      project_id: activeProjectId || undefined
+    };
     try {
-      localStorage.setItem('chat_sessions', JSON.stringify(chats));
+      const newSession = await createChatSession(session);
+      const newChat: DashboardChatSession = {
+        id: newSession.id,
+        title: `Chat ${chats.length + 1}`,
+        createdAt: newSession.started_at,
+        lastMessageAt: newSession.started_at,
+        unreadCount: 0
+      };
+      setChats(prev => [newChat, ...prev]);
+      setActiveChatId(newChat.id);
     } catch (error) {
-      console.error('Error saving chat sessions:', error);
+      console.error('Error creating chat session:', error);
     }
-  }, [chats]);
+  };
+
+  // Rename chat session in Supabase
+  const renameChat = async (chatId: string, newTitle: string) => {
+    // Optionally, you can add a title field to chat_sessions in DB, but for now, just update local state
+    setChats(prev => prev.map(chat => chat.id === chatId ? { ...chat, title: newTitle } : chat));
+  };
+
+  // Delete chat session and its messages in Supabase
+  const deleteChat = async (chatId: string) => {
+    try {
+      // End the chat session (soft delete)
+      await endChatSession(chatId);
+      // Optionally, you can also delete all messages for this session
+      setChats(prev => prev.filter(chat => chat.id !== chatId));
+      if (activeChatId === chatId) {
+        setActiveChatId(chats.length > 1 ? chats[0].id : null);
+      }
+    } catch (error) {
+      console.error('Error deleting chat session:', error);
+    }
+  };
+
+  const createNewProject = () => {
+    setCreateProjectDialogOpen(true);
+  };
+
+  const selectProject = (projectId: string) => {
+    setActiveProjectId(projectId);
+  };
+
+  const handleProjectCreated = (newProject: Project) => {
+    setProjects(prev => [newProject, ...prev]);
+    setActiveProjectId(newProject.id);
+  };
 
   const toggleSubmenu = (label: string) => {
     setOpenSubmenus(prev => ({ ...prev, [label]: !prev[label] }));
@@ -510,21 +669,21 @@ const Dashboard = () => {
   };
 
   const toggleChatSidebar = () => {
-    setIsChatSidebarCollapsed(!isChatSidebarCollapsed);
-  };
-
-  const createNewChat = () => {
-    const newChat: ChatSession = {
-      id: `chat_${Date.now()}`,
-      title: `Chat ${chats.length + 1}`,
-      createdAt: new Date().toISOString(),
-      lastMessageAt: new Date().toISOString(),
-      unreadCount: 0
-    };
-    
-    setChats(prev => [...prev, newChat]);
-    setActiveChatId(newChat.id);
-    setIsChatSidebarCollapsed(false);
+    // If opening the chat sidebar and there are no chats, create a new chat
+    if (isChatSidebarCollapsed && chats.length === 0) {
+      const newChat: DashboardChatSession = {
+        id: `chat_${Date.now()}`,
+        title: `Chat 1`,
+        createdAt: new Date().toISOString(),
+        lastMessageAt: new Date().toISOString(),
+        unreadCount: 0
+      };
+      setChats([newChat]);
+      setActiveChatId(newChat.id);
+      setIsChatSidebarCollapsed(false);
+    } else {
+      setIsChatSidebarCollapsed(!isChatSidebarCollapsed);
+    }
   };
 
   const selectChat = (chatId: string) => {
@@ -541,42 +700,6 @@ const Dashboard = () => {
     );
   };
 
-  const renameChat = (chatId: string, newTitle: string) => {
-    setChats(prev => 
-      prev.map(chat => 
-        chat.id === chatId 
-          ? { ...chat, title: newTitle }
-          : chat
-      )
-    );
-  };
-
-  const deleteChat = (chatId: string) => {
-    // Remove the chat from the list
-    setChats(prev => prev.filter(chat => chat.id !== chatId));
-    
-    // If the deleted chat was active, set a new active chat or null
-    if (activeChatId === chatId) {
-      const remainingChats = chats.filter(chat => chat.id !== chatId);
-      if (remainingChats.length > 0) {
-        // Set the most recent chat as active
-        const mostRecent = remainingChats.sort((a, b) => 
-          new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime()
-        )[0];
-        setActiveChatId(mostRecent.id);
-      } else {
-        setActiveChatId(null);
-      }
-    }
-    
-    // Also delete the chat messages from localStorage
-    try {
-      localStorage.removeItem(`chat_messages_${chatId}`);
-    } catch (error) {
-      console.error('Error deleting chat messages from localStorage:', error);
-    }
-  };
-
   return (
     <div className="h-screen bg-stone-100 text-[#4a5565] dark:bg-zinc-800 dark:text-zinc-50 font-mono flex flex-col text-xs">
       <Header />
@@ -589,9 +712,13 @@ const Dashboard = () => {
           onToggleSubmenu={toggleSubmenu}
           onNavItemClick={handleNavItemClick}
           onNewChat={createNewChat}
+          onNewProject={createNewProject}
           chats={chats}
+          projects={projects}
           activeChatId={activeChatId}
+          activeProjectId={activeProjectId}
           onChatSelect={selectChat}
+          onProjectSelect={selectProject}
           onRenameChat={renameChat}
           onDeleteChat={deleteChat}
         />
@@ -602,10 +729,20 @@ const Dashboard = () => {
           isCollapsed={isChatSidebarCollapsed}
           onToggle={toggleChatSidebar}
           activeChatId={activeChatId}
-          chats={chats}
-          onChatUpdate={(updatedChats) => setChats(updatedChats)}
+          chats={convertChatsToAI(chats)}
+          onChatUpdate={handleAIChatUpdate}
+          currentUserId={user?.id}
+          currentProjectId={activeProjectId}
         />
       </div>
+
+      {/* Create Project Dialog */}
+      <CreateProjectDialog
+        open={createProjectDialogOpen}
+        onOpenChange={setCreateProjectDialogOpen}
+        onProjectCreated={handleProjectCreated}
+        currentUserId={user?.id || ''}
+      />
     </div>
   );
 };
