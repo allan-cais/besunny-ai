@@ -32,45 +32,39 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get initial session
+    let unsubscribed = false;
+
+    // Restore session from storage
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (unsubscribed) return;
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+      if (!session) {
+        localStorage.clear();
+        sessionStorage.clear();
+      }
+    }).catch(() => {
+      if (unsubscribed) return;
+      setSession(null);
+      setUser(null);
+      setLoading(false);
+      localStorage.clear();
+      sessionStorage.clear();
     });
 
     // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (unsubscribed) return;
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
-
-      // If user signs in, create/update user record in our users table
-      if (event === 'SIGNED_IN' && session?.user) {
-        try {
-          const { error } = await supabase
-            .from('users')
-            .upsert({
-              id: session.user.id,
-              email: session.user.email,
-              name: session.user.user_metadata?.name || session.user.email?.split('@')[0],
-              created_at: new Date().toISOString(),
-            }, {
-              onConflict: 'email'
-            });
-
-          if (error) {
-            console.error('Error upserting user:', error);
-          }
-        } catch (error) {
-          console.error('Error creating user record:', error);
-        }
-      }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      unsubscribed = true;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
@@ -124,7 +118,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   return (
     <AuthContext.Provider value={value}>
-      {children}
+      {loading ? (
+        <div style={{ padding: 40, textAlign: 'center' }}>
+          <span>Loading session...</span>
+        </div>
+      ) : children}
     </AuthContext.Provider>
   );
 }; 

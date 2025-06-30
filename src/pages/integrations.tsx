@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -15,7 +15,8 @@ import {
   ExternalLink,
   Loader2,
   AlertCircle,
-  Trash2
+  Trash2,
+  RefreshCw
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -26,67 +27,78 @@ interface GoogleIntegrationStatus {
 }
 
 const IntegrationsPage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [googleStatus, setGoogleStatus] = useState<GoogleIntegrationStatus | null>(null);
   const [loading, setLoading] = useState(false);
+  const [connecting, setConnecting] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [pageLoading, setPageLoading] = useState(true);
+  const hasHandledCallback = useRef(false);
 
   // Check for OAuth callback parameters
   useEffect(() => {
     const errorParam = searchParams.get('error');
-    const successParam = searchParams.get('success');
-    const emailParam = searchParams.get('email');
+    const codeParam = searchParams.get('code');
+    const stateParam = searchParams.get('state');
 
     if (errorParam) {
       setError(getErrorMessage(errorParam));
-    } else if (successParam && emailParam) {
-      setSuccess(`Successfully connected to Google account: ${emailParam}`);
-      // Refresh the status
-      loadGoogleStatus();
+      setSuccess(null);
+    } else if (codeParam && stateParam && !hasHandledCallback.current) {
+      hasHandledCallback.current = true;
+      setError(null);
+      setSuccess(null);
+      handleOAuthCallback(codeParam, stateParam);
     }
   }, [searchParams]);
 
-  // Load Google integration status on component mount
+  // Load Google integration status when user changes
   useEffect(() => {
-    if (user?.id) {
+    if (!authLoading && user?.id) {
       loadGoogleStatus();
+      setPageLoading(false);
+    } else if (!authLoading && !user?.id) {
+      setPageLoading(false);
+      setError('User session not found. Please log in again.');
     }
-  }, [user?.id]);
+  }, [authLoading, user?.id]);
 
   const getErrorMessage = (errorCode: string): string => {
     switch (errorCode) {
-      case 'oauth_denied':
+      case 'access_denied':
         return 'Google OAuth was denied. Please try again.';
-      case 'no_code':
-        return 'No authorization code received from Google.';
-      case 'no_user_id':
-        return 'User ID not found. Please log in again.';
-      case 'callback_failed':
-        return 'Failed to complete OAuth process. Please try again.';
+      case 'invalid_request':
+        return 'Invalid OAuth request. Please try again.';
+      case 'server_error':
+        return 'Google server error. Please try again later.';
+      case 'temporarily_unavailable':
+        return 'Google service temporarily unavailable. Please try again later.';
       default:
         return 'An unexpected error occurred during OAuth.';
     }
   };
 
   const loadGoogleStatus = async () => {
-    if (!user?.id) {
-      return;
-    }
+    if (!user?.id) return;
+    
     try {
       setLoading(true);
+      setError(null);
+      
       const { data: credentials, error } = await supabase
         .from('google_credentials')
         .select('*')
         .eq('user_id', user.id)
         .maybeSingle();
+        
       if (error && error.code !== 'PGRST116') {
-        setError('Failed to load Google integration status.');
-        return;
+        throw new Error(error.message);
       }
+      
       if (credentials) {
         setGoogleStatus({
           connected: true,
@@ -97,7 +109,9 @@ const IntegrationsPage: React.FC = () => {
         setGoogleStatus({ connected: false });
       }
     } catch (error) {
-      setError('Failed to load Google integration status.');
+      console.error('Error loading Google status:', error);
+      setError('Failed to load Google integration status');
+      setGoogleStatus({ connected: false });
     } finally {
       setLoading(false);
     }
@@ -109,9 +123,8 @@ const IntegrationsPage: React.FC = () => {
       return;
     }
 
-    // Generate OAuth URL on the frontend
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-    const redirectUri = `${window.location.origin}/oauth/callback`;
+    const redirectUri = `${window.location.origin}/integrations`;
     
     if (!clientId) {
       setError('Google OAuth client ID not configured');
@@ -119,9 +132,10 @@ const IntegrationsPage: React.FC = () => {
     }
 
     const scopes = [
-      'https://www.googleapis.com/auth/gmail.readonly',
+      'https://www.googleapis.com/auth/gmail.modify',
       'https://www.googleapis.com/auth/drive.readonly',
-      'https://www.googleapis.com/auth/userinfo.email'
+      'https://www.googleapis.com/auth/userinfo.email',
+      'https://www.googleapis.com/auth/pubsub'
     ].join(' ');
 
     const params = new URLSearchParams({
@@ -131,11 +145,65 @@ const IntegrationsPage: React.FC = () => {
       scope: scopes,
       access_type: 'offline',
       prompt: 'consent',
-      state: user.id // Pass user ID as state for security
+      state: user.id
     });
 
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
     window.location.href = authUrl;
+  };
+
+  const handleOAuthCallback = async (code: string, state: string) => {
+    if (!user?.id || state !== user.id) {
+      setError('Invalid OAuth callback');
+      setSuccess(null);
+      return;
+    }
+
+    try {
+      setConnecting(true);
+      setError(null);
+      setSuccess(null);
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error('No valid session found');
+      }
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/exchange-google-token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ code }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        setError(result.error || 'Failed to exchange token');
+        setSuccess(null);
+        throw new Error(result.error || 'Failed to exchange token');
+      }
+
+      if (result.success) {
+        setSuccess(`Successfully connected to Google account: ${result.email}`);
+        setError(null);
+        await loadGoogleStatus();
+        // Remove code/state from URL to prevent re-triggering
+        navigate('/integrations', { replace: true });
+      } else {
+        setError(result.message || 'Failed to connect Google account');
+        setSuccess(null);
+        throw new Error(result.message || 'Failed to connect Google account');
+      }
+    } catch (error) {
+      setError(error.message || 'Failed to complete OAuth process');
+      setSuccess(null);
+      console.error('OAuth callback error:', error);
+    } finally {
+      setConnecting(false);
+    }
   };
 
   const handleGoogleDisconnect = async () => {
@@ -143,22 +211,56 @@ const IntegrationsPage: React.FC = () => {
 
     try {
       setDisconnecting(true);
+      setError(null);
       
-      // Delete Google credentials directly from Supabase
-      const { error } = await supabase
+      // Get current credentials for token revocation
+      const { data: credentials } = await supabase
+        .from('google_credentials')
+        .select('access_token, refresh_token')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      // Revoke tokens at Google (if available)
+      if (credentials?.access_token) {
+        try {
+          await fetch('https://oauth2.googleapis.com/revoke', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ token: credentials.access_token }),
+          });
+        } catch (error) {
+          console.warn('Could not revoke access token:', error);
+        }
+      }
+
+      if (credentials?.refresh_token) {
+        try {
+          await fetch('https://oauth2.googleapis.com/revoke', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ token: credentials.refresh_token }),
+          });
+        } catch (error) {
+          console.warn('Could not revoke refresh token:', error);
+        }
+      }
+
+      // Delete credentials from database
+      const { error: deleteError } = await supabase
         .from('google_credentials')
         .delete()
         .eq('user_id', user.id);
 
-      if (error) {
-        setError('Failed to disconnect from Google');
-        return;
+      if (deleteError) {
+        throw new Error(deleteError.message);
       }
 
       setGoogleStatus({ connected: false });
       setSuccess('Successfully disconnected from Google');
+      setTimeout(() => setSuccess(null), 3000);
     } catch (error) {
-      setError('Failed to disconnect from Google');
+      console.error('Disconnect error:', error);
+      setError(error.message || 'Failed to disconnect from Google');
     } finally {
       setDisconnecting(false);
     }
@@ -169,9 +271,17 @@ const IntegrationsPage: React.FC = () => {
     return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
   };
 
+  if (authLoading || pageLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="w-8 h-8 animate-spin mr-2" />
+        <span>Loading...</span>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-stone-100 dark:bg-zinc-800 text-[#4a5565] dark:text-zinc-50 font-mono">
-      {/* Header */}
       <header className="border-b border-[#4a5565] dark:border-zinc-700 bg-stone-100 dark:bg-zinc-800 px-4 py-4">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center space-x-4">
@@ -193,25 +303,29 @@ const IntegrationsPage: React.FC = () => {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="max-w-6xl mx-auto px-4 py-8">
-        {/* Alerts */}
+        {/* Error Alert */}
         {error && (
-          <Alert variant="destructive" className="mb-6 border-red-500 bg-red-50 dark:bg-red-900/20">
+          <Alert className="mb-6 border-red-500 bg-red-50 dark:bg-red-900/20">
             <AlertCircle className="h-4 w-4" />
-            <AlertDescription className="text-xs">{error}</AlertDescription>
+            <AlertDescription className="text-red-800 dark:text-red-200">
+              {error}
+            </AlertDescription>
           </Alert>
         )}
 
+        {/* Success Alert */}
         {success && (
           <Alert className="mb-6 border-green-500 bg-green-50 dark:bg-green-900/20">
             <CheckCircle className="h-4 w-4" />
-            <AlertDescription className="text-xs">{success}</AlertDescription>
+            <AlertDescription className="text-green-800 dark:text-green-200">
+              {success}
+            </AlertDescription>
           </Alert>
         )}
 
-        {/* Google Integration */}
-        <Card className="bg-white dark:bg-zinc-900 border border-[#4a5565] dark:border-zinc-700">
+        {/* Google Integration Card */}
+        <Card className="bg-white dark:bg-zinc-900 border border-[#4a5565] dark:border-zinc-700 mb-8">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
@@ -246,6 +360,11 @@ const IntegrationsPage: React.FC = () => {
                 <Loader2 className="w-6 h-6 animate-spin mr-2" />
                 <span className="text-sm">Loading status...</span>
               </div>
+            ) : connecting ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin mr-2" />
+                <span className="text-sm">Connecting to Google...</span>
+              </div>
             ) : googleStatus?.connected ? (
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -270,7 +389,7 @@ const IntegrationsPage: React.FC = () => {
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2">
                       <Mail className="w-4 h-4 text-green-600 dark:text-green-400" />
-                      <span className="text-xs">Gmail (Read-only)</span>
+                      <span className="text-xs">Gmail (Read & Modify)</span>
                     </div>
                     <div className="flex items-center space-x-2">
                       <HardDrive className="w-4 h-4 text-green-600 dark:text-green-400" />
@@ -303,83 +422,50 @@ const IntegrationsPage: React.FC = () => {
                     onClick={loadGoogleStatus}
                     className="font-mono text-xs border border-[#4a5565] dark:border-zinc-700 hover:bg-[#4a5565] hover:text-stone-100 dark:hover:bg-zinc-50 dark:hover:text-zinc-900 transition-colors"
                   >
+                    <RefreshCw className="mr-2 h-4 w-4" />
                     REFRESH STATUS
                   </Button>
                 </div>
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                  <h4 className="text-sm font-bold text-blue-800 dark:text-blue-200 mb-2">
-                    CONNECT YOUR GOOGLE ACCOUNT
-                  </h4>
-                  <p className="text-xs text-blue-700 dark:text-blue-300 mb-4">
-                    Connect your Gmail and Google Drive to enable data ingestion and analysis. 
-                    We'll request read-only access to your emails and files.
+                <div className="text-center py-8">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                    Connect your Google account to enable Gmail and Google Drive integration
                   </p>
-                  <ul className="text-xs text-blue-700 dark:text-blue-300 space-y-1">
-                    <li>• Read access to your Gmail messages</li>
-                    <li>• Read access to your Google Drive files</li>
-                    <li>• Secure token storage in our database</li>
-                    <li>• Automatic data ingestion via n8n workflows</li>
-                  </ul>
+                  <Button
+                    onClick={handleGoogleConnect}
+                    className="font-mono text-xs bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    <Mail className="mr-2 h-4 w-4" />
+                    CONNECT GOOGLE ACCOUNT
+                  </Button>
                 </div>
-
-                <Button
-                  onClick={handleGoogleConnect}
-                  className="font-mono text-xs bg-blue-600 hover:bg-blue-700 text-white border border-blue-600 hover:border-blue-700 transition-colors"
-                >
-                  <ExternalLink className="mr-2 h-4 w-4" />
-                  CONNECT GOOGLE ACCOUNT
-                </Button>
               </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Coming Soon Integrations */}
+        {/* Other Integrations */}
         <div className="mt-8">
           <h2 className="text-lg font-bold mb-4">COMING SOON</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <Card className="bg-white dark:bg-zinc-900 border border-[#4a5565] dark:border-zinc-700 opacity-50">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card className="opacity-60">
               <CardHeader>
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center">
-                    <Mail className="w-4 h-4 text-gray-500" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-sm font-bold">OUTLOOK</CardTitle>
-                    <CardDescription className="text-xs">Microsoft 365 integration</CardDescription>
-                  </div>
-                </div>
+                <CardTitle>OUTLOOK</CardTitle>
+                <CardDescription>Microsoft 365 integration</CardDescription>
               </CardHeader>
             </Card>
-
-            <Card className="bg-white dark:bg-zinc-900 border border-[#4a5565] dark:border-zinc-700 opacity-50">
+            <Card className="opacity-60">
               <CardHeader>
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center">
-                    <HardDrive className="w-4 h-4 text-gray-500" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-sm font-bold">DROPBOX</CardTitle>
-                    <CardDescription className="text-xs">File storage integration</CardDescription>
-                  </div>
-                </div>
+                <CardTitle>DROPBOX</CardTitle>
+                <CardDescription>File storage integration</CardDescription>
               </CardHeader>
             </Card>
-
-            <Card className="bg-white dark:bg-zinc-900 border border-[#4a5565] dark:border-zinc-700 opacity-50">
+            <Card className="opacity-60">
               <CardHeader>
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center">
-                    <Mail className="w-4 h-4 text-gray-500" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-sm font-bold">SLACK</CardTitle>
-                    <CardDescription className="text-xs">Team communication integration</CardDescription>
-                  </div>
-                </div>
+                <CardTitle>SLACK</CardTitle>
+                <CardDescription>Team communication integration</CardDescription>
               </CardHeader>
             </Card>
           </div>
