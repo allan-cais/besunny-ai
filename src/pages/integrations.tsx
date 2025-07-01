@@ -192,11 +192,13 @@ const IntegrationsPage: React.FC = () => {
       setError(null);
       setSuccess(null);
 
+      // Get the current session for authentication
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) {
         throw new Error('No valid session found');
       }
 
+      // POST the code to the backend Edge Function
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/exchange-google-token`, {
         method: 'POST',
         headers: {
