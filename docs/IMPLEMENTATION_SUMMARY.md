@@ -88,7 +88,7 @@ GOOGLE_REDIRECT_URI=http://localhost:3001/api/oauth/google/callback
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
 FRONTEND_URL=http://localhost:5173
-N8N_GOOGLE_WEBHOOK_URL=https://n8n.yourdomain.com/webhook/start-ingestion
+N8N_GOOGLE_WEBHOOK_URL=https://n8n.customaistudio.io/webhook/kirit-rag-webhook
 ```
 
 ### Frontend (.env.local)

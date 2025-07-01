@@ -40,13 +40,14 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/providers/AuthProvider';
 import { useSupabase } from '@/hooks/use-supabase';
-import { Project, ChatSession } from '@/lib/supabase';
+import { Project, ChatSession, supabaseService } from '@/lib/supabase';
 import CreateProjectDialog from '@/components/CreateProjectDialog';
 import AIAssistant from '@/components/AIAssistant';
 import { useTheme } from "@/providers/ThemeProvider";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Sun, Moon, Monitor } from "lucide-react";
 import UserAccountMenu from "@/components/auth/UserAccountMenu";
+import { v4 as uuidv4 } from 'uuid';
 
 // Header Component
 const Header = () => {
@@ -545,7 +546,9 @@ const Dashboard = () => {
     if (!user?.id) return;
     try {
       const sessions: ChatSession[] = await getChatSessions(user.id);
-      const dashboardChats: DashboardChatSession[] = sessions.map(session => ({
+      // Only include active chats (ended_at is null)
+      const activeSessions = sessions.filter(session => !session.ended_at);
+      const dashboardChats: DashboardChatSession[] = activeSessions.map(session => ({
         id: session.id,
         title: session.id.startsWith('chat_') ? `Chat ${session.id.split('_')[1]}` : session.id,
         createdAt: session.started_at,
@@ -592,8 +595,15 @@ const Dashboard = () => {
 
   // Create new chat session in Supabase
   const createNewChat = async () => {
-    if (!user?.id) return;
-    const newId = `chat_${Date.now()}`;
+    if (!user?.id) {
+      return;
+    }
+    
+    if (!supabaseService?.isConfigured?.()) {
+      return;
+    }
+    
+    const newId = uuidv4();
     const session: Omit<ChatSession, 'started_at'> = {
       id: newId,
       user_id: user.id,
@@ -616,17 +626,14 @@ const Dashboard = () => {
   };
 
   // Rename chat session in Supabase
-  const renameChat = async (chatId: string, newTitle: string) => {
-    // Optionally, you can add a title field to chat_sessions in DB, but for now, just update local state
+  const renameChat = (chatId: string, newTitle: string) => {
     setChats(prev => prev.map(chat => chat.id === chatId ? { ...chat, title: newTitle } : chat));
   };
 
   // Delete chat session and its messages in Supabase
   const deleteChat = async (chatId: string) => {
     try {
-      // End the chat session (soft delete)
       await endChatSession(chatId);
-      // Optionally, you can also delete all messages for this session
       setChats(prev => prev.filter(chat => chat.id !== chatId));
       if (activeChatId === chatId) {
         setActiveChatId(chats.length > 1 ? chats[0].id : null);
@@ -669,20 +676,13 @@ const Dashboard = () => {
   };
 
   const toggleChatSidebar = () => {
-    // If opening the chat sidebar and there are no chats, create a new chat
     if (isChatSidebarCollapsed && chats.length === 0) {
-      const newChat: DashboardChatSession = {
-        id: `chat_${Date.now()}`,
-        title: `Chat 1`,
-        createdAt: new Date().toISOString(),
-        lastMessageAt: new Date().toISOString(),
-        unreadCount: 0
-      };
-      setChats([newChat]);
-      setActiveChatId(newChat.id);
+      createNewChat();
+      setIsChatSidebarCollapsed(false);
+    } else if (isChatSidebarCollapsed) {
       setIsChatSidebarCollapsed(false);
     } else {
-      setIsChatSidebarCollapsed(!isChatSidebarCollapsed);
+      setIsChatSidebarCollapsed(true);
     }
   };
 
@@ -690,7 +690,6 @@ const Dashboard = () => {
     setActiveChatId(chatId);
     setIsChatSidebarCollapsed(false);
     
-    // Mark chat as read
     setChats(prev => 
       prev.map(chat => 
         chat.id === chatId 

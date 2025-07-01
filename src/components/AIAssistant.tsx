@@ -63,27 +63,36 @@ const AIAssistant = ({
 
   // Real-time subscription for messages
   useSupabaseSubscription(activeChatId || '', (payload) => {
+    console.log('Real-time subscription payload:', payload);
     if (payload.eventType === 'INSERT' && payload.new) {
       const newMessage = payload.new as SupabaseChatMessage;
+      console.log('New message received via subscription:', newMessage);
       if (newMessage.session_id === activeChatId) {
         setMessages(prev => {
           // Check if message already exists
           const exists = prev.some(msg => msg.id === newMessage.id);
           if (!exists) {
+            console.log('Adding new message to state:', newMessage);
             return [...prev, newMessage];
           }
+          console.log('Message already exists in state, skipping');
           return prev;
         });
+      } else {
+        console.log('Message session_id does not match activeChatId:', newMessage.session_id, activeChatId);
       }
     }
   });
 
   const loadMessagesForChat = useCallback(async (chatId: string) => {
+    console.log('Loading messages for chat:', chatId);
     try {
       const supabaseMessages = await getMessagesBySession(chatId, 100);
+      console.log('Messages loaded from database:', supabaseMessages);
       let loadedMessages: ChatMessage[] = supabaseMessages;
       // If no messages found, initialize with welcome message
       if (loadedMessages.length === 0) {
+        console.log('No messages found, adding welcome message');
         loadedMessages = [{
           id: crypto.randomUUID(),
           session_id: chatId,
@@ -93,7 +102,9 @@ const AIAssistant = ({
         }];
       }
       setMessages(loadedMessages);
+      console.log('Messages set in state:', loadedMessages);
     } catch (error) {
+      console.error('Error loading messages:', error);
       setMessages([{
         id: crypto.randomUUID(),
         session_id: chatId,
@@ -157,6 +168,8 @@ const AIAssistant = ({
 
   const handleSendMessage = async () => {
     if (chatMessage.trim() && !isLoading && activeChatId) {
+      console.log('Sending message:', { chatMessage, activeChatId, currentUserId, currentProjectId });
+      
       const userMessage: ChatMessage = {
         id: crypto.randomUUID(),
         session_id: activeChatId,
@@ -168,12 +181,76 @@ const AIAssistant = ({
       setMessages(newMessages);
       setChatMessage("");
       setIsLoading(true);
+      
       try {
+        // Save user message to database
+        console.log('Saving message to database:', userMessage);
         await saveMessagesForChat(activeChatId, [userMessage]);
+        console.log('Message saved to database successfully');
+        
+        // Send message to n8n webhook for AI processing
+        const webhookPayload = {
+          session_id: activeChatId,
+          user_id: currentUserId,
+          project_id: currentProjectId,
+          message: userMessage.message,
+          message_id: userMessage.id,
+          timestamp: new Date().toISOString()
+        };
+        
+        console.log('Sending message to n8n webhook:', webhookPayload);
+        console.log('N8N Webhook URL:', N8N_WEBHOOK_URL);
+        
+        const webhookResponse = await fetch(N8N_WEBHOOK_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(webhookPayload),
+        });
+        
+        console.log('N8N webhook response status:', webhookResponse.status);
+        
+        if (!webhookResponse.ok) {
+          const errorText = await webhookResponse.text();
+          console.error('N8N webhook error:', webhookResponse.status, webhookResponse.statusText, errorText);
+        } else {
+          const responseText = await webhookResponse.text();
+          console.log('Message sent to n8n webhook successfully:', responseText);
+          // Parse the assistant's reply from n8n
+          let assistantReply = '';
+          try {
+            const webhookResult = JSON.parse(responseText);
+            assistantReply = webhookResult.output || webhookResult.message || responseText;
+          } catch (e) {
+            assistantReply = responseText;
+          }
+          const assistantMessage: ChatMessage = {
+            id: crypto.randomUUID(),
+            session_id: activeChatId,
+            role: "assistant",
+            message: assistantReply,
+            created_at: new Date().toISOString()
+          };
+          // Save assistant message to Supabase
+          await saveMessagesForChat(activeChatId, [assistantMessage]);
+          setMessages(prev => [...prev, assistantMessage]);
+        }
+        
       } catch (error) {
-        console.error('Error saving messages for chat:', error);
+        console.error('Error processing message:', error);
+        // Add error message to chat
+        const errorMessage: ChatMessage = {
+          id: crypto.randomUUID(),
+          session_id: activeChatId,
+          role: "assistant",
+          message: "Sorry, I encountered an error processing your message. Please try again.",
+          created_at: new Date().toISOString()
+        };
+        setMessages(prev => [...prev, errorMessage]);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     }
   };
 

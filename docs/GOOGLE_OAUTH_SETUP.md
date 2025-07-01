@@ -69,7 +69,7 @@ GOOGLE_CLIENT_SECRET=your-google-client-secret
 GOOGLE_REDIRECT_URI=http://localhost:3001/api/oauth/google/callback
 
 # N8N Webhook for Google Integration
-N8N_GOOGLE_WEBHOOK_URL=https://n8n.yourdomain.com/webhook/start-ingestion
+N8N_GOOGLE_WEBHOOK_URL=https://n8n.customaistudio.io/webhook/kirit-rag-webhook
 ```
 
 ### 2.2 Frontend Environment Variables

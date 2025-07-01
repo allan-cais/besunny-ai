@@ -27,6 +27,7 @@ interface GoogleIntegrationStatus {
   connected: boolean;
   expiresAt?: string;
   email?: string;
+  scopeMismatch?: boolean;
 }
 
 const IntegrationsPage: React.FC = () => {
@@ -103,10 +104,21 @@ const IntegrationsPage: React.FC = () => {
       }
       
       if (credentials) {
+        // Check if stored scopes match current requested scopes
+        const currentScopes = [
+          'https://www.googleapis.com/auth/gmail.modify',
+          'https://www.googleapis.com/auth/drive',
+          'https://www.googleapis.com/auth/userinfo.email',
+          'https://www.googleapis.com/auth/calendar.readonly'
+        ].join(' ');
+        
+        const scopeMismatch = credentials.scope !== currentScopes;
+        
         setGoogleStatus({
           connected: true,
           expiresAt: credentials.expires_at,
-          email: credentials.google_email
+          email: credentials.google_email,
+          scopeMismatch
         });
       } else {
         setGoogleStatus({ connected: false });
@@ -120,7 +132,7 @@ const IntegrationsPage: React.FC = () => {
     }
   };
 
-  const handleGoogleConnect = () => {
+  const handleGoogleConnect = async () => {
     if (!user?.id) {
       setError('User not authenticated');
       return;
@@ -134,15 +146,24 @@ const IntegrationsPage: React.FC = () => {
       return;
     }
 
+    // If user is already connected, disconnect first to clear old tokens
+    if (googleStatus?.connected) {
+      try {
+        setConnecting(true);
+        await handleGoogleDisconnect();
+      } catch (error) {
+        console.warn('Failed to disconnect before reconnecting:', error);
+        // Continue anyway - the prompt=consent should handle scope updates
+      } finally {
+        setConnecting(false);
+      }
+    }
+
     const scopes = [
       'https://www.googleapis.com/auth/gmail.modify',
-      'https://www.googleapis.com/auth/drive.readonly',
+      'https://www.googleapis.com/auth/drive',
       'https://www.googleapis.com/auth/userinfo.email',
-      'https://www.googleapis.com/auth/pubsub',
-      'https://www.googleapis.com/auth/calendar.readonly',
-      'https://www.googleapis.com/auth/contacts.readonly',
-      'https://www.googleapis.com/auth/gmail.send',
-      'https://www.googleapis.com/auth/drive'
+      'https://www.googleapis.com/auth/calendar.readonly'
     ].join(' ');
 
     const params = new URLSearchParams({
@@ -331,6 +352,16 @@ const IntegrationsPage: React.FC = () => {
           </Alert>
         )}
 
+        {/* Scope Mismatch Warning */}
+        {googleStatus?.connected && googleStatus?.scopeMismatch && (
+          <Alert className="mb-6 border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="text-yellow-800 dark:text-yellow-200">
+              <strong>Scope Update Required:</strong> Your Google integration was connected with different permissions than currently requested. Click "RECONNECT" to update your permissions with the latest scopes.
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Google Integration Card */}
         <Card className="bg-white dark:bg-zinc-900 border border-[#4a5565] dark:border-zinc-700 mb-8">
           <CardHeader>
@@ -415,6 +446,11 @@ const IntegrationsPage: React.FC = () => {
                       <span className="text-xs">Google Pub/Sub</span>
                     </div>
                   </div>
+                  <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
+                    <p className="text-xs text-blue-800 dark:text-blue-200">
+                      <strong>Note:</strong> If you've updated scopes in Google Cloud Console, click "RECONNECT" to refresh your permissions with the new scopes.
+                    </p>
+                  </div>
                 </div>
 
                 <div className="flex items-center space-x-3 pt-4">
@@ -433,6 +469,24 @@ const IntegrationsPage: React.FC = () => {
                       <>
                         <Trash2 className="mr-2 h-4 w-4" />
                         DISCONNECT
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleGoogleConnect}
+                    disabled={connecting}
+                    className="font-mono text-xs border-blue-500 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                  >
+                    {connecting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        RECONNECTING...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        RECONNECT (UPDATE SCOPES)
                       </>
                     )}
                   </Button>
