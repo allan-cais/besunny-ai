@@ -112,7 +112,17 @@ const IntegrationsPage: React.FC = () => {
           'https://www.googleapis.com/auth/calendar.readonly'
         ].join(' ');
         
-        const scopeMismatch = credentials.scope !== currentScopes;
+        function normalizeScopes(scopeString: string) {
+          return scopeString
+            .split(/\s+/)
+            .filter(Boolean)
+            .sort()
+            .join(' ');
+        }
+        
+        const normalizedStored = normalizeScopes(credentials.scope);
+        const normalizedCurrent = normalizeScopes(currentScopes);
+        const scopeMismatch = normalizedStored !== normalizedCurrent;
         
         setGoogleStatus({
           connected: true,
