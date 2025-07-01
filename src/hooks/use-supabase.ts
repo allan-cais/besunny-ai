@@ -297,7 +297,7 @@ export const useSupabase = () => {
 };
 
 // Hook for real-time subscriptions to messages
-export const useSupabaseSubscription = (sessionId: string, callback: (payload: any) => void) => {
+export const useSupabaseSubscription = (sessionId: string, callback: (payload: Record<string, unknown>) => void) => {
   useEffect(() => {
     if (!supabaseService.isConfigured() || !sessionId) {
       return;
@@ -312,7 +312,7 @@ export const useSupabaseSubscription = (sessionId: string, callback: (payload: a
 };
 
 // Hook for real-time subscriptions to sessions
-export const useSupabaseSessionSubscription = (userId: string, callback: (payload: any) => void) => {
+export const useSupabaseSessionSubscription = (userId: string, callback: (payload: Record<string, unknown>) => void) => {
   useEffect(() => {
     if (!supabaseService.isConfigured() || !userId) {
       return;

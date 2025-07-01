@@ -29,9 +29,14 @@ This guide will help you set up Google OAuth2 integration for Gmail and Google D
 4. Configure the OAuth consent screen:
    - Add your domain to authorized domains
    - Add scopes:
-     - `https://www.googleapis.com/auth/gmail.readonly`
+     - `https://www.googleapis.com/auth/gmail.modify`
      - `https://www.googleapis.com/auth/drive.readonly`
      - `https://www.googleapis.com/auth/userinfo.email`
+     - `https://www.googleapis.com/auth/pubsub`
+     - `https://www.googleapis.com/auth/calendar.readonly`
+     - `https://www.googleapis.com/auth/contacts.readonly`
+     - `https://www.googleapis.com/auth/gmail.send`
+     - `https://www.googleapis.com/auth/drive`
 5. Add authorized redirect URIs:
    - `http://localhost:3001/api/oauth/google/callback` (for development)
    - `https://yourdomain.com/api/oauth/google/callback` (for production)

@@ -59,7 +59,7 @@ export interface DocumentChunk {
   chunk_index?: number;
   text?: string;
   embedding_id?: string;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
   created_at: string;
 }
 
@@ -83,7 +83,7 @@ export interface Summary {
   project_id: string;
   date?: string;
   summary?: string;
-  alerts?: any;
+  alerts?: Record<string, unknown>;
   references?: string[];
   created_by?: string;
   created_at: string;
@@ -123,7 +123,7 @@ export interface AgentLog {
   agent_name?: string;
   input_id?: string;
   input_type?: string;
-  output?: any;
+  output?: Record<string, unknown>;
   confidence?: number;
   notes?: string;
   created_at: string;
@@ -318,7 +318,7 @@ export const supabaseService = {
   },
 
   // Real-time subscriptions
-  subscribeToMessages(sessionId: string, callback: (payload: any) => void) {
+  subscribeToMessages(sessionId: string, callback: (payload: Record<string, unknown>) => void) {
     return supabase
       .channel(`chat_messages:${sessionId}`)
       .on(
@@ -334,7 +334,7 @@ export const supabaseService = {
       .subscribe();
   },
 
-  subscribeToSessions(userId: string, callback: (payload: any) => void) {
+  subscribeToSessions(userId: string, callback: (payload: Record<string, unknown>) => void) {
     return supabase
       .channel(`chat_sessions:${userId}`)
       .on(

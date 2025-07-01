@@ -1,7 +1,7 @@
-const { fontFamily } = require("tailwindcss/defaultTheme")
+import { fontFamily } from "tailwindcss/defaultTheme"
+import type { Config } from "tailwindcss"
 
-/** @type {import('tailwindcss').Config} */
-module.exports = {
+const config: Config = {
 	darkMode: ["class"],
 	content: [
 		"./pages/**/*.{ts,tsx}",
@@ -96,5 +96,8 @@ module.exports = {
 			}
 		}
 	},
+	// eslint-disable-next-line @typescript-eslint/no-require-imports
 	plugins: [require("tailwindcss-animate")],
 }
+
+export default config

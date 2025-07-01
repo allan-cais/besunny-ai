@@ -16,7 +16,10 @@ import {
   Loader2,
   AlertCircle,
   Trash2,
-  RefreshCw
+  RefreshCw,
+  Calendar,
+  Users,
+  MessageSquare
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -135,7 +138,11 @@ const IntegrationsPage: React.FC = () => {
       'https://www.googleapis.com/auth/gmail.modify',
       'https://www.googleapis.com/auth/drive.readonly',
       'https://www.googleapis.com/auth/userinfo.email',
-      'https://www.googleapis.com/auth/pubsub'
+      'https://www.googleapis.com/auth/pubsub',
+      'https://www.googleapis.com/auth/calendar.readonly',
+      'https://www.googleapis.com/auth/contacts.readonly',
+      'https://www.googleapis.com/auth/gmail.send',
+      'https://www.googleapis.com/auth/drive'
     ].join(' ');
 
     const params = new URLSearchParams({
@@ -335,7 +342,7 @@ const IntegrationsPage: React.FC = () => {
                 <div>
                   <CardTitle className="text-base font-bold">GOOGLE WORKSPACE</CardTitle>
                   <CardDescription className="text-xs text-gray-600 dark:text-gray-400">
-                    Connect Gmail and Google Drive for data ingestion
+                    Connect Gmail, Google Drive, Calendar, Contacts and more for comprehensive data integration
                   </CardDescription>
                 </div>
               </div>
@@ -389,11 +396,23 @@ const IntegrationsPage: React.FC = () => {
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2">
                       <Mail className="w-4 h-4 text-green-600 dark:text-green-400" />
-                      <span className="text-xs">Gmail (Read & Modify)</span>
+                      <span className="text-xs">Gmail (Read, Modify & Send)</span>
                     </div>
                     <div className="flex items-center space-x-2">
                       <HardDrive className="w-4 h-4 text-green-600 dark:text-green-400" />
-                      <span className="text-xs">Google Drive (Read-only)</span>
+                      <span className="text-xs">Google Drive (Full Access)</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Calendar className="w-4 h-4 text-green-600 dark:text-green-400" />
+                      <span className="text-xs">Google Calendar (Read-only)</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Users className="w-4 h-4 text-green-600 dark:text-green-400" />
+                      <span className="text-xs">Google Contacts (Read-only)</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <MessageSquare className="w-4 h-4 text-green-600 dark:text-green-400" />
+                      <span className="text-xs">Google Pub/Sub</span>
                     </div>
                   </div>
                 </div>
@@ -431,7 +450,7 @@ const IntegrationsPage: React.FC = () => {
               <div className="space-y-4">
                 <div className="text-center py-8">
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                    Connect your Google account to enable Gmail and Google Drive integration
+                    Connect your Google account to enable comprehensive Google Workspace integration including Gmail, Drive, Calendar, Contacts and more
                   </p>
                   <Button
                     onClick={handleGoogleConnect}

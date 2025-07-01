@@ -52,7 +52,7 @@ VITE_GOOGLE_REDIRECT_URI=http://localhost:5173/integrations
 4. Create OAuth 2.0 credentials:
    - Application type: Web application
    - Authorized redirect URIs: `http://localhost:5173/integrations`
-   - Scopes: `gmail.modify`, `drive.readonly`, `userinfo.email`, `pubsub`
+   - Scopes: `gmail.modify`, `drive.readonly`, `userinfo.email`, `pubsub`, `calendar.readonly`, `contacts.readonly`, `gmail.send`, `drive`
 
 ### 3. Deploy Edge Function
 
@@ -138,6 +138,10 @@ CREATE TABLE google_credentials (
 - `drive.readonly` - Read Google Drive files
 - `userinfo.email` - Get user email
 - `pubsub` - Google Pub/Sub access
+- `calendar.readonly` - Read Google Calendar events
+- `contacts.readonly` - Read Google Contacts
+- `gmail.send` - Send emails
+- `drive` - Google Drive access
 
 ### 🛡️ Security
 - JWT authentication for API calls

@@ -17,9 +17,14 @@ Successfully implemented a complete Google OAuth2 integration for Gmail and Goog
 - Credential management (get, delete)
 
 **Scopes Requested:**
-- `https://www.googleapis.com/auth/gmail.readonly`
+- `https://www.googleapis.com/auth/gmail.modify`
 - `https://www.googleapis.com/auth/drive.readonly`
 - `https://www.googleapis.com/auth/userinfo.email`
+- `https://www.googleapis.com/auth/pubsub`
+- `https://www.googleapis.com/auth/calendar.readonly`
+- `https://www.googleapis.com/auth/contacts.readonly`
+- `https://www.googleapis.com/auth/gmail.send`
+- `https://www.googleapis.com/auth/drive`
 
 ### 2. API Routes (`server/index.ts`)
 

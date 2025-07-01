@@ -1,4 +1,4 @@
-import { useState, useRef, useLayoutEffect, useEffect } from "react";
+import { useState, useRef, useLayoutEffect, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send, ChevronRight, MessageSquare } from "lucide-react";
@@ -78,29 +78,7 @@ const AIAssistant = ({
     }
   });
 
-  // Load messages for the active chat
-  useEffect(() => {
-    if (activeChatId) {
-      loadMessagesForChat(activeChatId);
-    } else {
-      setMessages([]);
-    }
-  }, [activeChatId]);
-
-  useLayoutEffect(() => {
-    if (textareaRef.current) {
-      const event = new Event('input', { bubbles: true });
-      textareaRef.current.dispatchEvent(event);
-    }
-  }, [isCollapsed]);
-
-  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setChatMessage(e.target.value);
-    e.target.style.height = 'auto';
-    e.target.style.height = `${e.target.scrollHeight}px`;
-  };
-
-  const loadMessagesForChat = async (chatId: string) => {
+  const loadMessagesForChat = useCallback(async (chatId: string) => {
     try {
       const supabaseMessages = await getMessagesBySession(chatId, 100);
       let loadedMessages: ChatMessage[] = supabaseMessages;
@@ -124,6 +102,28 @@ const AIAssistant = ({
         created_at: new Date().toISOString()
       }]);
     }
+  }, [getMessagesBySession]);
+
+  // Load messages for the active chat
+  useEffect(() => {
+    if (activeChatId) {
+      loadMessagesForChat(activeChatId);
+    } else {
+      setMessages([]);
+    }
+  }, [activeChatId, loadMessagesForChat]);
+
+  useLayoutEffect(() => {
+    if (textareaRef.current) {
+      const event = new Event('input', { bubbles: true });
+      textareaRef.current.dispatchEvent(event);
+    }
+  }, [isCollapsed]);
+
+  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setChatMessage(e.target.value);
+    e.target.style.height = 'auto';
+    e.target.style.height = `${e.target.scrollHeight}px`;
   };
 
   const saveMessagesForChat = async (chatId: string, messages: ChatMessage[]) => {
@@ -138,6 +138,7 @@ const AIAssistant = ({
       }));
       await saveMessages(messagesToSave);
     } catch (error) {
+      console.error('Error saving messages:', error);
     }
   };
 
@@ -170,6 +171,7 @@ const AIAssistant = ({
       try {
         await saveMessagesForChat(activeChatId, [userMessage]);
       } catch (error) {
+        console.error('Error saving messages for chat:', error);
       }
       setIsLoading(false);
     }

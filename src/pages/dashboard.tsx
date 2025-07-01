@@ -96,7 +96,7 @@ interface NavigationSidebarProps {
   onToggle: () => void;
   openSubmenus: { [key: string]: boolean };
   onToggleSubmenu: (label: string) => void;
-  onNavItemClick: (item: any) => void;
+  onNavItemClick: (item: { icon: React.ComponentType; label: string; active: boolean; subItems?: string[] }) => void;
   onNewChat: () => void;
   onNewProject: () => void;
   chats: DashboardChatSession[];
@@ -657,7 +657,7 @@ const Dashboard = () => {
     setIsSidebarCollapsed(!isSidebarCollapsed);
   };
 
-  const handleNavItemClick = (item: any) => {
+  const handleNavItemClick = (item: { icon: React.ComponentType; label: string; active: boolean; subItems?: string[] }) => {
     if (item.subItems) {
       if (isSidebarCollapsed) {
         setIsSidebarCollapsed(false);
