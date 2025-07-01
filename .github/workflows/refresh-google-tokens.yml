@@ -11,7 +11,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Call Supabase Edge Function to refresh tokens
+        env:
+          REFRESH_GOOGLE_TOKEN_URL: ${{ secrets.REFRESH_GOOGLE_TOKEN_URL }}
         run: |
           curl -X POST \
             -H "Content-Type: application/json" \
-            "${{ secrets.REFRESH_GOOGLE_TOKEN_URL }}" 
+            "$REFRESH_GOOGLE_TOKEN_URL" 

@@ -116,6 +116,7 @@ const IntegrationsPage: React.FC = () => {
           return scopeString
             .split(/\s+/)
             .filter(Boolean)
+            .filter(scope => scope !== 'openid')
             .sort()
             .join(' ');
         }
