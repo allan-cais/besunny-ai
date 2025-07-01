@@ -27,5 +27,11 @@ supabase/.temp/
 *.njsproj
 *.sln
 *.sw?
+
+# Ignore environment files and local Supabase state
 .env
-.env.*
+.env.local
+
+# Do NOT ignore supabase-migrations or supabase/functions
+# (these are needed for version control and deployment)
+.supabase/
