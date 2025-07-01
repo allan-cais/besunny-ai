@@ -124,6 +124,13 @@ const IntegrationsPage: React.FC = () => {
         const normalizedCurrent = normalizeScopes(currentScopes);
         const scopeMismatch = normalizedStored !== normalizedCurrent;
         
+        // Debug logging
+        console.log('[Scopes Debug] Stored:', credentials.scope);
+        console.log('[Scopes Debug] Current:', currentScopes);
+        console.log('[Scopes Debug] Normalized Stored:', normalizedStored);
+        console.log('[Scopes Debug] Normalized Current:', normalizedCurrent);
+        console.log('[Scopes Debug] Mismatch:', scopeMismatch);
+        
         setGoogleStatus({
           connected: true,
           expiresAt: credentials.expires_at,
