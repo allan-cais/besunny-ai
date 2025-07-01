@@ -375,7 +375,7 @@ const IntegrationsPage: React.FC = () => {
                 <div>
                   <CardTitle className="text-base font-bold">GOOGLE WORKSPACE</CardTitle>
                   <CardDescription className="text-xs text-gray-600 dark:text-gray-400">
-                    Connect Gmail, Google Drive, Calendar, Contacts and more for comprehensive data integration
+                    Connect Gmail, Google Drive, and Calendar for comprehensive data integration
                   </CardDescription>
                 </div>
               </div>
@@ -441,16 +441,12 @@ const IntegrationsPage: React.FC = () => {
                     </div>
                     <div className="flex items-center space-x-2">
                       <Users className="w-4 h-4 text-green-600 dark:text-green-400" />
-                      <span className="text-xs">Google Contacts (Read-only)</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <MessageSquare className="w-4 h-4 text-green-600 dark:text-green-400" />
-                      <span className="text-xs">Google Pub/Sub</span>
+                      <span className="text-xs">Google Account Email (userinfo.email)</span>
                     </div>
                   </div>
                   <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
                     <p className="text-xs text-blue-800 dark:text-blue-200">
-                      <strong>Note:</strong> If you've updated scopes in Google Cloud Console, click "RECONNECT" to refresh your permissions with the new scopes.
+                      <strong>Note:</strong> Only the above permissions are requested. If you've updated scopes in Google Cloud Console, click "RECONNECT" to refresh your permissions with the new scopes.
                     </p>
                   </div>
                 </div>
@@ -503,19 +499,15 @@ const IntegrationsPage: React.FC = () => {
                 </div>
               </div>
             ) : (
-              <div className="space-y-4">
-                <div className="text-center py-8">
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                    Connect your Google account to enable comprehensive Google Workspace integration including Gmail, Drive, Calendar, Contacts and more
-                  </p>
-                  <Button
-                    onClick={handleGoogleConnect}
-                    className="font-mono text-xs bg-blue-600 hover:bg-blue-700 text-white"
-                  >
-                    <Mail className="mr-2 h-4 w-4" />
-                    CONNECT GOOGLE ACCOUNT
-                  </Button>
-                </div>
+              <div className="flex flex-col items-center justify-center py-12">
+                <Button
+                  onClick={handleGoogleConnect}
+                  className="font-mono text-xs bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-md shadow-md"
+                  size="lg"
+                >
+                  <Mail className="mr-2 h-4 w-4" />
+                  CONNECT GOOGLE ACCOUNT
+                </Button>
               </div>
             )}
           </CardContent>
