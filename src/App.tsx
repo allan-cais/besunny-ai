@@ -12,6 +12,7 @@ import IntegrationsPage from "./pages/integrations";
 import OAuthCallback from "./pages/oauth-callback";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
+import ProjectDashboard from "./pages/project";
 
 const queryClient = new QueryClient();
 
@@ -46,6 +47,14 @@ const App = () => (
                 path="/oauth/callback" 
                 element={
                   <OAuthCallback />
+                } 
+              />
+              <Route 
+                path="/project/:projectId" 
+                element={
+                  <ProtectedRoute>
+                    <ProjectDashboard />
+                  </ProtectedRoute>
                 } 
               />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

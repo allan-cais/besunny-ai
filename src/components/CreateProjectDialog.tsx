@@ -33,6 +33,7 @@ const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [consent, setConsent] = useState(false);
 
   const { createProject } = useSupabase();
 
@@ -41,6 +42,10 @@ const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
     
     if (!name.trim()) {
       setError('Project name is required');
+      return;
+    }
+    if (!consent) {
+      setError('You must allow Sunny AI to scan and categorize your data.');
       return;
     }
 
@@ -88,7 +93,7 @@ const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
             CREATE NEW PROJECT
           </DialogTitle>
           <DialogDescription className="text-gray-600 dark:text-gray-400 font-mono text-xs">
-            Create a new project to organize your work and collaborate with others.
+            Create a new project to organize your work and collaborate with your data.
           </DialogDescription>
         </DialogHeader>
         
@@ -123,6 +128,21 @@ const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
               />
             </div>
 
+            <div className="flex items-start gap-2 mt-2">
+              <input
+                id="consent"
+                type="checkbox"
+                checked={consent}
+                onChange={e => setConsent(e.target.checked)}
+                disabled={loading}
+                required
+                className="mt-1 accent-[#4a5565] dark:accent-zinc-50"
+              />
+              <label htmlFor="consent" className="text-xs text-[#4a5565] dark:text-zinc-300 font-mono select-none">
+                Allow Sunny AI to scan, analyze, and categorize email and document data from your connected Google account for enhanced project intelligence.
+              </label>
+            </div>
+
             {error && (
               <Alert variant="destructive" className="border-red-500 bg-red-50 dark:bg-red-900/20">
                 <AlertDescription className="font-mono text-xs text-red-700 dark:text-red-400">
@@ -144,11 +164,11 @@ const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
             </Button>
             <Button 
               type="submit" 
-              disabled={loading}
+              disabled={loading || !consent}
               className="font-mono text-xs bg-[#4a5565] dark:bg-zinc-50 text-stone-100 dark:text-zinc-900 hover:bg-[#3a4555] dark:hover:bg-zinc-200"
             >
               {loading && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
-              CREATE PROJECT
+              Build Intelligence
             </Button>
           </DialogFooter>
         </form>

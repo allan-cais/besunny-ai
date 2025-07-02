@@ -207,6 +207,34 @@ export const supabaseService = {
     return data || [];
   },
 
+  async updateProject(projectId: string, updates: Partial<Project>): Promise<Project> {
+    const { data, error } = await supabase
+      .from('projects')
+      .update(updates)
+      .eq('id', projectId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating project:', error);
+      throw error;
+    }
+
+    return data;
+  },
+
+  async deleteProject(projectId: string): Promise<void> {
+    const { error } = await supabase
+      .from('projects')
+      .delete()
+      .eq('id', projectId);
+
+    if (error) {
+      console.error('Error deleting project:', error);
+      throw error;
+    }
+  },
+
   // Chat session operations
   async createChatSession(session: Omit<ChatSession, 'started_at'>): Promise<ChatSession> {
     const { data, error } = await supabase
