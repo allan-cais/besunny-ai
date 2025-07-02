@@ -15,5 +15,6 @@ jobs:
           REFRESH_GOOGLE_TOKEN_URL: ${{ secrets.REFRESH_GOOGLE_TOKEN_URL }}
         run: |
           curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
             -H "Content-Type: application/json" \
             "$REFRESH_GOOGLE_TOKEN_URL" 
