@@ -55,7 +55,8 @@ const AIAssistant = ({
     saveMessages, 
     getMessagesBySession, 
     createChatSession,
-    isConfigured: supabaseConfigured 
+    isConfigured: supabaseConfigured,
+    updateChatSession
   } = useSupabase();
 
   // Get n8n webhook URL from environment or use default
@@ -181,6 +182,21 @@ const AIAssistant = ({
       setMessages(newMessages);
       setChatMessage("");
       setIsLoading(true);
+      
+      // If this is the first user message in the chat, generate a chat name
+      const userMessages = newMessages.filter(m => m.role === 'user');
+      if (userMessages.length === 1) {
+        // Generate a name from the first message
+        const words = userMessage.message.trim().split(/\s+/);
+        let chatName = words.slice(0, 6).join(' ');
+        if (words.length > 6) chatName += '...';
+        chatName = chatName.charAt(0).toUpperCase() + chatName.slice(1);
+        try {
+          await updateChatSession(activeChatId, { name: chatName });
+        } catch (err) {
+          console.error('Failed to update chat name:', err);
+        }
+      }
       
       try {
         // Save user message to database

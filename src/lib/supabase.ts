@@ -107,6 +107,7 @@ export interface ChatSession {
   project_id?: string;
   started_at: string;
   ended_at?: string;
+  name?: string;
 }
 
 export interface ChatMessage {
@@ -284,6 +285,22 @@ export const supabaseService = {
       console.error('Error ending chat session:', error);
       throw error;
     }
+  },
+
+  async updateChatSession(sessionId: string, updates: Partial<ChatSession>): Promise<ChatSession> {
+    const { data, error } = await supabase
+      .from('chat_sessions')
+      .update(updates)
+      .eq('id', sessionId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating chat session:', error);
+      throw error;
+    }
+
+    return data;
   },
 
   // Chat message operations

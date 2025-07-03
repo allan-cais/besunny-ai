@@ -145,6 +145,24 @@ export const useSupabase = () => {
     }
   }, []);
 
+  const updateChatSession = useCallback(async (sessionId: string, updates: Partial<ChatSession>) => {
+    if (!supabaseService.isConfigured()) {
+      console.warn('Supabase not configured');
+      return null;
+    }
+    setIsLoading(true);
+    setError(null);
+    try {
+      const updatedSession = await supabaseService.updateChatSession(sessionId, updates);
+      return updatedSession;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update chat session');
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   const getChatSessions = useCallback(async (userId?: string, projectId?: string) => {
     if (!supabaseService.isConfigured()) {
       console.warn('Supabase not configured');
@@ -281,6 +299,7 @@ export const useSupabase = () => {
     
     // Chat session operations
     createChatSession,
+    updateChatSession,
     getChatSessions,
     endChatSession,
     

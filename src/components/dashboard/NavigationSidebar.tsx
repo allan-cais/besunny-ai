@@ -73,7 +73,7 @@ const NavigationSidebar = ({
       subItems: projects.map(p => p.name)
     },
     { icon: Database, label: "Data", active: false },
-    { icon: Terminal, label: "Terminal", active: false },
+    { icon: Terminal, label: "Playbooks", active: false },
     { icon: Settings, label: "Settings", active: false },
   ];
 

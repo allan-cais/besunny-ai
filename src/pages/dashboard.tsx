@@ -16,7 +16,7 @@ import {
 
 const Dashboard = () => {
   const { user } = useAuth();
-  const { getProjectsForUser, getChatSessions, createChatSession, endChatSession } = useSupabase();
+  const { getProjectsForUser, getChatSessions, createChatSession, endChatSession, updateChatSession } = useSupabase();
   const [openSubmenus, setOpenSubmenus] = useState<{ [key: string]: boolean }>({});
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isChatSidebarCollapsed, setIsChatSidebarCollapsed] = useState(true);
@@ -62,7 +62,7 @@ const Dashboard = () => {
       const activeSessions = sessions.filter(session => !session.ended_at);
       const dashboardChats: DashboardChatSession[] = activeSessions.map(session => ({
         id: session.id,
-        title: session.id.startsWith('chat_') ? `Chat ${session.id.split('_')[1]}` : session.id,
+        title: session.name || (session.id.startsWith('chat_') ? `Chat ${session.id.split('_')[1]}` : session.id),
         createdAt: session.started_at,
         lastMessageAt: session.started_at,
         unreadCount: 0
@@ -119,13 +119,14 @@ const Dashboard = () => {
     const session: Omit<ChatSession, 'started_at'> = {
       id: newId,
       user_id: user.id,
-      project_id: activeProjectId || undefined
+      project_id: activeProjectId || undefined,
+      name: 'New Chat'
     };
     try {
       const newSession = await createChatSession(session);
       const newChat: DashboardChatSession = {
         id: newSession.id,
-        title: `Chat ${chats.length + 1}`,
+        title: newSession.name || `Chat ${chats.length + 1}`,
         createdAt: newSession.started_at,
         lastMessageAt: newSession.started_at,
         unreadCount: 0
@@ -138,8 +139,13 @@ const Dashboard = () => {
   };
 
   // Rename chat session in Supabase
-  const renameChat = (chatId: string, newTitle: string) => {
-    setChats(prev => prev.map(chat => chat.id === chatId ? { ...chat, title: newTitle } : chat));
+  const renameChat = async (chatId: string, newTitle: string) => {
+    try {
+      await updateChatSession(chatId, { name: newTitle });
+      setChats(prev => prev.map(chat => chat.id === chatId ? { ...chat, title: newTitle } : chat));
+    } catch (error) {
+      console.error('Error renaming chat session:', error);
+    }
   };
 
   // Delete chat session and its messages in Supabase
