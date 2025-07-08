@@ -22,6 +22,8 @@ import {
   MessageSquare
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+// import AttendeeIntegration from '@/components/integrations/AttendeeIntegration';
+import { ApiKeyStatus } from '@/lib/api-keys';
 
 interface GoogleIntegrationStatus {
   connected: boolean;
@@ -41,6 +43,7 @@ const IntegrationsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [pageLoading, setPageLoading] = useState(true);
+  // const [attendeeStatus, setAttendeeStatus] = useState<ApiKeyStatus | null>(null);
   const hasHandledCallback = useRef(false);
 
   // Check for OAuth callback parameters
@@ -124,13 +127,6 @@ const IntegrationsPage: React.FC = () => {
         const normalizedStored = normalizeScopes(credentials.scope);
         const normalizedCurrent = normalizeScopes(currentScopes);
         const scopeMismatch = normalizedStored !== normalizedCurrent;
-        
-        // Debug logging
-        console.log('[Scopes Debug] Stored:', credentials.scope);
-        console.log('[Scopes Debug] Current:', currentScopes);
-        console.log('[Scopes Debug] Normalized Stored:', normalizedStored);
-        console.log('[Scopes Debug] Normalized Current:', normalizedCurrent);
-        console.log('[Scopes Debug] Mismatch:', scopeMismatch);
         
         setGoogleStatus({
           connected: true,
@@ -388,7 +384,7 @@ const IntegrationsPage: React.FC = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center">
-                  <Mail className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  <img src="https://www.gstatic.com/marketing-cms/assets/images/d5/dc/cfe9ce8b4425b410b49b7f2dd3f3/g.webp=s96-fcrop64=1,00000000ffffffff-rw" alt="Google Logo" className="w-7 h-7" />
                 </div>
                 <div>
                   <CardTitle className="text-base font-bold">GOOGLE WORKSPACE</CardTitle>
@@ -530,6 +526,9 @@ const IntegrationsPage: React.FC = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* Attendee Integration Card - Hidden for now, using master API key */}
+        {/* <AttendeeIntegration onStatusChange={setAttendeeStatus} /> */}
 
         {/* Other Integrations */}
         <div className="mt-8">
