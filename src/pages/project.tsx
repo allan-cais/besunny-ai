@@ -3,7 +3,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { supabaseService, Project } from '@/lib/supabase';
-import SendBotToMeetingCard from '@/components/dashboard/SendBotToMeetingCard';
+import ProjectMeetingsCard from '@/components/dashboard/ProjectMeetingsCard';
 
 const colorMap = {
   red: 'bg-red-500',
@@ -77,9 +77,6 @@ const ProjectDashboard = ({ projectId }: ProjectDashboardProps) => {
       </div>
       <div className="flex-1 p-8 pt-4">
         <div className="max-w-4xl mx-auto space-y-8">
-          {/* Send Bot to Meeting Card */}
-          <SendBotToMeetingCard />
-          
           <div className="text-center space-y-4">
             <h1 className="text-2xl font-bold">SUNNY DAILY DIGEST</h1>
             <div className="w-24 h-px bg-[#4a5565] dark:bg-zinc-700 mx-auto"></div>
@@ -149,6 +146,9 @@ const ProjectDashboard = ({ projectId }: ProjectDashboardProps) => {
               ))}
             </CardContent>
           </Card>
+
+          {/* Project Meetings Card */}
+          <ProjectMeetingsCard projectId={projectId} />
         </div>
       </div>
     </div>

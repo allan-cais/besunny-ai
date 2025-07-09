@@ -33,7 +33,7 @@ This guide will help you set up Google OAuth2 integration for Gmail and Google D
      - `https://www.googleapis.com/auth/drive.readonly`
      - `https://www.googleapis.com/auth/userinfo.email`
      - `https://www.googleapis.com/auth/pubsub`
-     - `https://www.googleapis.com/auth/calendar.readonly`
+     - `https://www.googleapis.com/auth/calendar`
      - `https://www.googleapis.com/auth/contacts.readonly`
      - `https://www.googleapis.com/auth/gmail.send`
      - `https://www.googleapis.com/auth/drive`

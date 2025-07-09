@@ -112,7 +112,7 @@ const IntegrationsPage: React.FC = () => {
           'https://www.googleapis.com/auth/gmail.modify',
           'https://www.googleapis.com/auth/drive',
           'https://www.googleapis.com/auth/userinfo.email',
-          'https://www.googleapis.com/auth/calendar.readonly'
+          'https://www.googleapis.com/auth/calendar'
         ].join(' ');
         
         function normalizeScopes(scopeString: string) {
@@ -177,7 +177,7 @@ const IntegrationsPage: React.FC = () => {
       'https://www.googleapis.com/auth/gmail.modify',
       'https://www.googleapis.com/auth/drive',
       'https://www.googleapis.com/auth/userinfo.email',
-      'https://www.googleapis.com/auth/calendar.readonly'
+      'https://www.googleapis.com/auth/calendar'
     ].join(' ');
 
     const params = new URLSearchParams({
@@ -451,7 +451,7 @@ const IntegrationsPage: React.FC = () => {
                     </div>
                     <div className="flex items-center space-x-2">
                       <Calendar className="w-4 h-4 text-green-600 dark:text-green-400" />
-                      <span className="text-xs">Google Calendar (Read-only)</span>
+                      <span className="text-xs">Google Calendar (Full Access)</span>
                     </div>
                     <div className="flex items-center space-x-2">
                       <Users className="w-4 h-4 text-green-600 dark:text-green-400" />
