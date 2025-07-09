@@ -23,6 +23,11 @@ interface ProjectMeetingsCardProps {
   projectId?: string;
 }
 
+function stripHtml(html: string): string {
+  if (!html) return '';
+  return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 const ProjectMeetingsCard: React.FC<ProjectMeetingsCardProps> = ({ projectId }) => {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [loading, setLoading] = useState(false);
@@ -122,6 +127,14 @@ const ProjectMeetingsCard: React.FC<ProjectMeetingsCardProps> = ({ projectId }) 
 
   const getStatusBadge = (status: Meeting['status']) => {
     switch (status) {
+      case 'accepted':
+        return <Badge variant="secondary" className="bg-green-100 text-green-800">Attending</Badge>;
+      case 'declined':
+        return <Badge variant="secondary" className="bg-red-100 text-red-800">Declined</Badge>;
+      case 'tentative':
+        return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">Tentative</Badge>;
+      case 'needsAction':
+        return <Badge variant="secondary" className="bg-gray-100 text-gray-800">Invited</Badge>;
       case 'pending':
         return <Badge variant="secondary" className="bg-gray-100 text-gray-800">Pending</Badge>;
       case 'bot_scheduled':
@@ -141,7 +154,7 @@ const ProjectMeetingsCard: React.FC<ProjectMeetingsCardProps> = ({ projectId }) 
 
   const canSendBot = (meeting: Meeting) => {
     return meeting.meeting_url && 
-           meeting.status === 'pending' && 
+           (meeting.status === 'pending' || meeting.status === 'accepted') && 
            !sendingBot;
   };
 
@@ -264,7 +277,7 @@ const ProjectMeetingsCard: React.FC<ProjectMeetingsCardProps> = ({ projectId }) 
                 
                 {meeting.description && (
                   <p className="text-xs text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
-                    {meeting.description}
+                    {stripHtml(meeting.description)}
                   </p>
                 )}
                 

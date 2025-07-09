@@ -15,7 +15,7 @@ export interface Meeting {
   bot_chat_message?: string;
   transcript?: string;
   transcript_url?: string;
-  status: 'pending' | 'bot_scheduled' | 'bot_joined' | 'transcribing' | 'completed' | 'failed';
+  status: 'pending' | 'bot_scheduled' | 'bot_joined' | 'transcribing' | 'completed' | 'failed' | 'accepted' | 'declined' | 'tentative' | 'needsAction';
   created_at: string;
   updated_at: string;
 }

@@ -119,6 +119,13 @@ function extractMeetingUrl(event: any): string | null {
   return null;
 }
 
+function stripHtml(html: string): string {
+  // Remove HTML tags and decode basic entities
+  if (!html) return '';
+  const tmp = html.replace(/<[^>]+>/g, ' ');
+  return tmp.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, ' ').trim();
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return withCORS(new Response('ok', { status: 200 }));
@@ -172,16 +179,28 @@ serve(async (req) => {
         const meetingUrl = extractMeetingUrl(event);
         
         if (meetingUrl) {
+          // Log attendees and creator for debugging
+          console.log('Event:', event.summary, 'Attendees:', event.attendees, 'Creator:', event.creator);
+          // Find the user's attendee status if available
+          let attendeeStatus = 'pending';
+          if (Array.isArray(event.attendees)) {
+            const selfAttendee = event.attendees.find((a: any) => a.self);
+            if (selfAttendee && selfAttendee.responseStatus) {
+              attendeeStatus = selfAttendee.responseStatus; // 'accepted', 'declined', 'tentative', 'needsAction'
+            }
+          } else if (event.creator && event.creator.email === credentials.google_email) {
+            attendeeStatus = 'accepted';
+          }
           const meeting = {
             user_id: userId,
             project_id: projectId,
             google_calendar_event_id: event.id,
             title: event.summary || 'Untitled Meeting',
-            description: event.description || '',
+            description: stripHtml(event.description || ''),
             meeting_url: meetingUrl,
             start_time: event.start.dateTime || event.start.date,
             end_time: event.end.dateTime || event.end.date,
-            status: 'pending',
+            status: attendeeStatus,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           };
@@ -217,6 +236,7 @@ serve(async (req) => {
                 start_time: meeting.start_time,
                 end_time: meeting.end_time,
                 meeting_url: meeting.meeting_url,
+                status: meeting.status,
                 updated_at: new Date().toISOString(),
               })
               .eq('id', existingMeeting.id)

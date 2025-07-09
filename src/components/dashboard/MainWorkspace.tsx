@@ -22,13 +22,32 @@ const MainWorkspace = ({
   }
   
   if (activeCenterPanel === 'meetings') {
+    // Meetings view should be fully fluid, no max-w-4xl wrapper
     return <MeetingsPage />;
   }
   
   if (activeProjectId) {
-    return <ProjectDashboard projectId={activeProjectId} />;
+    // Project dashboard should be centered and max-width
+    return (
+      <div className="flex-1 flex flex-col overflow-y-auto">
+        <div className="p-4 flex items-center">
+          <div>
+            <span className="text-xs font-medium">PROJECT</span>
+            <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {/* Project name will be rendered inside ProjectDashboard */}
+            </div>
+          </div>
+        </div>
+        <div className="flex-1 p-8 pt-4">
+          <div className="max-w-4xl mx-auto space-y-8">
+            <ProjectDashboard projectId={activeProjectId} />
+          </div>
+        </div>
+      </div>
+    );
   }
   
+  // Default workspace view (centered, max-width)
   return (
     <div className="flex-1 flex flex-col overflow-y-auto">
       {/* Workspace Header */}

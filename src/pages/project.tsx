@@ -76,7 +76,7 @@ const ProjectDashboard = ({ projectId }: ProjectDashboardProps) => {
         </div>
       </div>
       <div className="flex-1 p-8 pt-4">
-        <div className="max-w-4xl mx-auto space-y-8">
+        <div className="space-y-8">
           <div className="text-center space-y-4">
             <h1 className="text-2xl font-bold">SUNNY DAILY DIGEST</h1>
             <div className="w-24 h-px bg-[#4a5565] dark:bg-zinc-700 mx-auto"></div>
