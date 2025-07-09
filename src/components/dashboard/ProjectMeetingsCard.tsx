@@ -20,7 +20,7 @@ import { calendarService, Meeting } from '@/lib/calendar';
 import { apiKeyService } from '@/lib/api-keys';
 
 interface ProjectMeetingsCardProps {
-  projectId: string;
+  projectId?: string;
 }
 
 const ProjectMeetingsCard: React.FC<ProjectMeetingsCardProps> = ({ projectId }) => {
@@ -32,15 +32,20 @@ const ProjectMeetingsCard: React.FC<ProjectMeetingsCardProps> = ({ projectId }) 
   const [success, setSuccess] = useState<string | null>(null);
 
   useEffect(() => {
-    loadProjectMeetings();
+    loadMeetings();
   }, [projectId]);
 
-  const loadProjectMeetings = async () => {
+  const loadMeetings = async () => {
     try {
       setLoading(true);
       setError(null);
-      const projectMeetings = await calendarService.getProjectMeetings(projectId);
-      setMeetings(projectMeetings);
+      let loadedMeetings: Meeting[];
+      if (projectId) {
+        loadedMeetings = await calendarService.getProjectMeetings(projectId);
+      } else {
+        loadedMeetings = await calendarService.getUpcomingMeetings();
+      }
+      setMeetings(loadedMeetings);
     } catch (err: any) {
       setError(err.message || 'Failed to load meetings');
     } finally {
@@ -58,7 +63,7 @@ const ProjectMeetingsCard: React.FC<ProjectMeetingsCardProps> = ({ projectId }) 
       setSuccess(`Synced ${result.meetings_with_urls} meetings with video URLs from ${result.total_events} total events`);
       
       // Reload meetings after sync
-      await loadProjectMeetings();
+      await loadMeetings();
     } catch (err: any) {
       setError(err.message || 'Failed to sync calendar events');
     } finally {
@@ -95,7 +100,7 @@ const ProjectMeetingsCard: React.FC<ProjectMeetingsCardProps> = ({ projectId }) 
       setSuccess(`Bot scheduled for "${meeting.title}" successfully!`);
       
       // Reload meetings to show updated status
-      await loadProjectMeetings();
+      await loadMeetings();
     } catch (err: any) {
       setError(err.message || 'Failed to send bot to meeting');
     } finally {

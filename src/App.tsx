@@ -13,6 +13,7 @@ import OAuthCallback from "./pages/oauth-callback";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import ProjectDashboard from "./pages/project";
+import MeetingsPage from "./pages/meetings";
 
 const queryClient = new QueryClient();
 
@@ -54,6 +55,14 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <ProjectDashboard />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/meetings" 
+                element={
+                  <ProtectedRoute>
+                    <MeetingsPage />
                   </ProtectedRoute>
                 } 
               />

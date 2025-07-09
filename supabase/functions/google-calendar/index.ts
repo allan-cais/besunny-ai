@@ -154,8 +154,7 @@ serve(async (req) => {
       
       if (!calendarResponse.ok) {
         const errorBody = await calendarResponse.text();
-        const errorMsg = `Calendar API error: ${calendarResponse.status} - ${errorBody}`;
-        console.error(errorMsg);
+        const errorMsg = `Calendar API error: ${calendarResponse.status}`;
         return withCORS(new Response(JSON.stringify({
           ok: false,
           error: errorMsg,
@@ -204,7 +203,7 @@ serve(async (req) => {
               .single();
             
             if (insertError) {
-              console.error('Failed to insert meeting:', insertError);
+              // No logging
             } else {
               meetings.push(insertedMeeting);
             }
@@ -225,7 +224,7 @@ serve(async (req) => {
               .single();
             
             if (updateError) {
-              console.error('Failed to update meeting:', updateError);
+              // No logging
             } else {
               meetings.push(updatedMeeting);
             }
@@ -241,7 +240,6 @@ serve(async (req) => {
       }), { status: 200 }));
       
     } catch (e) {
-      console.error('Calendar fetch error:', e);
       return withCORS(new Response(JSON.stringify({
         ok: false,
         error: e.message || String(e),
@@ -277,7 +275,6 @@ serve(async (req) => {
       }), { status: 200 }));
       
     } catch (e) {
-      console.error('Meetings fetch error:', e);
       return withCORS(new Response(JSON.stringify({
         ok: false,
         error: e.message,

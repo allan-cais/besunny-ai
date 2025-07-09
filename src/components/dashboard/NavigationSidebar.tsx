@@ -31,6 +31,7 @@ import {
   MoreHorizontal,
   Edit,
   Trash2,
+  Calendar,
 } from 'lucide-react';
 import { NavigationSidebarProps, DashboardChatSession } from './types';
 import { Project } from '@/lib/supabase';
@@ -72,6 +73,7 @@ const NavigationSidebar = ({
       active: false,
       subItems: projects.map(p => p.name)
     },
+    { icon: Calendar, label: "Meetings", active: false },
     { icon: Database, label: "Data", active: false },
     { icon: Terminal, label: "Playbooks", active: false },
     { icon: Settings, label: "Settings", active: false },

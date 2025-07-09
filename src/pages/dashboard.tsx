@@ -190,6 +190,12 @@ const Dashboard = () => {
       setActiveFeedItemId(null);
       return;
     }
+    if (item.label === 'Meetings') {
+      setActiveCenterPanel('meetings');
+      setActiveProjectId(null);
+      setActiveFeedItemId(null);
+      return;
+    }
     if (item.subItems) {
       if (isSidebarCollapsed) {
         setIsSidebarCollapsed(false);

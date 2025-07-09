@@ -39,8 +39,6 @@ serve(async (req) => {
   }
 
   try {
-    console.log('[exchange-google-token] Request received:', req.method, req.url)
-
     // Validate request method
     if (req.method !== 'POST') {
       throw new Error('Method not allowed')
@@ -57,7 +55,6 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SERVICE_ROLE_KEY')
     
     if (!supabaseUrl || !supabaseServiceKey) {
-      console.error('[exchange-google-token] Missing Supabase configuration')
       throw new Error('Server configuration error')
     }
 
@@ -68,11 +65,8 @@ serve(async (req) => {
     const { data: { user }, error: authError } = await supabase.auth.getUser(token)
     
     if (authError || !user) {
-      console.error('[exchange-google-token] Authentication error:', authError)
       throw new Error('Invalid or expired token')
     }
-
-    console.log('[exchange-google-token] Authenticated user:', user.id)
 
     // Parse request body
     const { code } = await req.json()
@@ -87,11 +81,8 @@ serve(async (req) => {
     const redirectUri = Deno.env.get('GOOGLE_REDIRECT_URI')
 
     if (!clientId || !clientSecret || !redirectUri) {
-      console.error('[exchange-google-token] Missing Google OAuth configuration')
       throw new Error('OAuth configuration missing')
     }
-
-    console.log('[exchange-google-token] Exchanging authorization code for tokens...')
 
     // Exchange authorization code for tokens
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
@@ -110,12 +101,10 @@ serve(async (req) => {
 
     if (!tokenResponse.ok) {
       const errorText = await tokenResponse.text()
-      console.error('[exchange-google-token] Google token exchange failed:', tokenResponse.status, errorText)
       throw new Error(`Token exchange failed: ${tokenResponse.status}`)
     }
 
     const tokens: TokenResponse = await tokenResponse.json()
-    console.log('[exchange-google-token] Tokens received, fetching user info...')
 
     // Get user information from Google
     const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
@@ -125,12 +114,10 @@ serve(async (req) => {
     })
 
     if (!userInfoResponse.ok) {
-      console.error('[exchange-google-token] Failed to fetch user info:', userInfoResponse.status)
       throw new Error('Failed to fetch user information')
     }
 
     const userInfo: UserInfo = await userInfoResponse.json()
-    console.log('[exchange-google-token] User info received:', userInfo.email)
 
     // Calculate token expiration time
     const expiresAt = new Date()
@@ -147,8 +134,6 @@ serve(async (req) => {
       google_email: userInfo.email
     }
 
-    console.log('[exchange-google-token] Storing credentials in database...')
-
     // Store credentials in Supabase database
     const { error: dbError } = await supabase
       .from('google_credentials')
@@ -157,11 +142,8 @@ serve(async (req) => {
       })
 
     if (dbError) {
-      console.error('[exchange-google-token] Database error:', dbError)
       throw new Error('Failed to store credentials')
     }
-
-    console.log('[exchange-google-token] Credentials stored successfully')
 
     // Return success response
     const response = {
@@ -183,7 +165,6 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('[exchange-google-token] Error:', error.message)
     
     const errorResponse = {
       success: false,

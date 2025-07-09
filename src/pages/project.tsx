@@ -148,7 +148,6 @@ const ProjectDashboard = ({ projectId }: ProjectDashboardProps) => {
           </Card>
 
           {/* Project Meetings Card */}
-          <ProjectMeetingsCard projectId={projectId} />
         </div>
       </div>
     </div>

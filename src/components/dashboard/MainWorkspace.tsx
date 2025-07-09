@@ -5,6 +5,7 @@ import QuickActions from './QuickActions';
 import DataFeed from './DataFeed';
 import FeedItemDetail from './FeedItemDetail';
 import ProjectDashboard from '@/pages/project';
+import MeetingsPage from '@/pages/meetings';
 
 const MainWorkspace = ({ 
   activeProjectId, 
@@ -18,6 +19,10 @@ const MainWorkspace = ({
       return <FeedItemDetail id={activeFeedItemId} onBack={() => setActiveFeedItemId(null)} />;
     }
     return <DataFeed onSelect={setActiveFeedItemId} />;
+  }
+  
+  if (activeCenterPanel === 'meetings') {
+    return <MeetingsPage />;
   }
   
   if (activeProjectId) {
