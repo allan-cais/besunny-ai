@@ -115,7 +115,7 @@ export const calendarService = {
     const { error } = await supabase
       .from('meetings')
       .update({
-        project_id: projectId,
+        project_id: projectId === '' ? null : projectId,
         updated_at: new Date().toISOString(),
       })
       .eq('id', meetingId);

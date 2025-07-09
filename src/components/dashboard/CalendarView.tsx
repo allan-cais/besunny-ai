@@ -2,8 +2,15 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { 
   Calendar, 
   Video, 
@@ -17,12 +24,14 @@ import {
 import { Meeting } from '@/lib/calendar';
 import { apiKeyService } from '@/lib/api-keys';
 import { calendarService } from '@/lib/calendar';
+import { Project } from '@/lib/supabase';
 
 interface CalendarViewProps {
   meetings: Meeting[];
   onSyncCalendar: () => void;
   syncing: boolean;
   onMeetingUpdate: () => void;
+  projects?: Project[];
 }
 
 type ViewMode = 'day' | 'week' | 'month';
@@ -36,12 +45,14 @@ const CalendarView: React.FC<CalendarViewProps> = ({
   meetings, 
   onSyncCalendar, 
   syncing, 
-  onMeetingUpdate 
+  onMeetingUpdate,
+  projects = []
 }) => {
   const [viewMode, setViewMode] = useState<ViewMode>('week');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
   const [sendingBot, setSendingBot] = useState<string | null>(null);
+  const [updatingProject, setUpdatingProject] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const initialLoad = useRef(true);
 
@@ -127,8 +138,49 @@ const CalendarView: React.FC<CalendarViewProps> = ({
            !sendingBot;
   };
 
+  const handleProjectChange = async (meetingId: string, projectId: string) => {
+    try {
+      setUpdatingProject(meetingId);
+      await calendarService.associateMeetingWithProject(meetingId, projectId);
+      
+      // Update the local selectedMeeting state to reflect the change immediately
+      if (selectedMeeting && selectedMeeting.id === meetingId) {
+        setSelectedMeeting({
+          ...selectedMeeting,
+          project_id: projectId === 'none' ? undefined : projectId
+        });
+      }
+      
+      onMeetingUpdate(); // Refresh the meetings list
+    } catch (error) {
+      console.error('Failed to associate meeting with project:', error);
+    } finally {
+      setUpdatingProject(null);
+    }
+  };
+
+  // Update selectedMeeting when meetings list changes to keep it in sync
+  useEffect(() => {
+    if (selectedMeeting) {
+      const updatedMeeting = meetings.find(m => m.id === selectedMeeting.id);
+      if (updatedMeeting && updatedMeeting !== selectedMeeting) {
+        setSelectedMeeting(updatedMeeting);
+      }
+    }
+  }, [meetings, selectedMeeting]);
+
+
+
   const formatTime = (dateTime: string) => {
     const date = new Date(dateTime);
+    return date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+  };
+
+  const formatTimeFromDate = (date: Date) => {
     return date.toLocaleTimeString('en-US', {
       hour: 'numeric',
       minute: '2-digit',
@@ -207,7 +259,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
           return (
             <div key={hour} className="flex border-b border-gray-200 dark:border-gray-700 min-h-[60px]">
               <div className="w-16 p-2 text-xs text-gray-500 border-r border-gray-200 dark:border-gray-700">
-                {formatTime(new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), hour))}
+                {formatTimeFromDate(new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), hour))}
               </div>
               <div className="flex-1 p-1">
                 {timeSlotMeetings.map(meeting => (
@@ -246,7 +298,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
         {hours.map(hour => (
           <div key={hour} className="flex border-b border-gray-200 dark:border-gray-700 min-h-[60px]">
             <div className="w-16 p-2 text-xs text-gray-500 border-r border-gray-200 dark:border-gray-700">
-              {formatTime(new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), hour))}
+              {formatTimeFromDate(new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), hour))}
             </div>
             {weekDays.map((day, i) => {
               const timeSlotMeetings = getMeetingsForTimeSlot(day, hour);
@@ -338,7 +390,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
               <Calendar className="w-5 h-5 text-blue-600 dark:text-blue-400" />
             </div>
             <div>
-              <CardTitle className="text-base font-bold">CALENDAR</CardTitle>
+              <CardTitle className="text-base font-bold font-mono uppercase tracking-wide">CALENDAR</CardTitle>
             </div>
           </div>
           <div className="flex items-center space-x-2">
@@ -401,7 +453,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
           <TabsContent value="day">
             <CardContent>
               <div className="mb-4">
-                <h2 className="text-lg font-semibold">{formatDate(currentDate)}</h2>
+                <h2 className="text-lg font-semibold font-mono uppercase tracking-wide">{formatDate(currentDate)}</h2>
               </div>
               <DayView />
             </CardContent>
@@ -409,7 +461,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
           <TabsContent value="week">
             <CardContent>
               <div className="mb-4">
-                <h2 className="text-lg font-semibold">{`${formatDate(getWeekDays()[0])} - ${formatDate(getWeekDays()[6])}`}</h2>
+                <h2 className="text-lg font-semibold font-mono uppercase tracking-wide">{`${formatDate(getWeekDays()[0])} - ${formatDate(getWeekDays()[6])}`}</h2>
               </div>
               <WeekView />
             </CardContent>
@@ -417,7 +469,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
           <TabsContent value="month">
             <CardContent>
               <div className="mb-4">
-                <h2 className="text-lg font-semibold">{currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</h2>
+                <h2 className="text-lg font-semibold font-mono uppercase tracking-wide">{currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</h2>
               </div>
               <MonthView />
             </CardContent>
@@ -425,14 +477,19 @@ const CalendarView: React.FC<CalendarViewProps> = ({
         </Tabs>
       </CardHeader>
       <Dialog open={!!selectedMeeting} onOpenChange={() => setSelectedMeeting(null)}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="sm:max-w-[480px] bg-stone-100 dark:bg-zinc-800 border border-[#4a5565] dark:border-zinc-700 font-mono text-xs">
           <DialogHeader>
-            <DialogTitle>{selectedMeeting?.title}</DialogTitle>
+            <DialogTitle className="text-[#4a5565] dark:text-zinc-50 font-mono text-sm font-bold">
+              {selectedMeeting?.title}
+            </DialogTitle>
+            <DialogDescription className="text-gray-600 dark:text-gray-400 font-mono text-xs">
+              Meeting details and project association
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="flex items-center space-x-2">
               <Clock className="w-4 h-4 text-gray-500" />
-              <span className="text-sm">
+              <span className="text-sm text-[#4a5565] dark:text-zinc-50">
                 {selectedMeeting && `${formatTime(selectedMeeting.start_time)} - ${formatTime(selectedMeeting.end_time)}`}
               </span>
             </div>
@@ -441,7 +498,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
             </div>
             {selectedMeeting?.description && (
               <div>
-                <h4 className="font-medium text-sm mb-2">Description</h4>
+                <h4 className="font-medium text-sm mb-2 text-[#4a5565] dark:text-zinc-50">Description</h4>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
                   {stripHtml(selectedMeeting.description)}
                 </p>
@@ -449,7 +506,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
             )}
             {selectedMeeting?.meeting_url && (
               <div>
-                <h4 className="font-medium text-sm mb-2">Meeting URL</h4>
+                <h4 className="font-medium text-sm mb-2 text-[#4a5565] dark:text-zinc-50">Meeting URL</h4>
                 <div className="flex items-center space-x-2">
                   <Video className="w-4 h-4 text-gray-500" />
                   <span className="text-sm text-blue-600 dark:text-blue-400 truncate">
@@ -458,13 +515,51 @@ const CalendarView: React.FC<CalendarViewProps> = ({
                 </div>
               </div>
             )}
+            
+            {/* Project Selection */}
+            <div>
+              <h4 className="font-medium text-sm mb-2 text-[#4a5565] dark:text-zinc-50">ASSOCIATED PROJECT</h4>
+              <Select 
+                value={selectedMeeting?.project_id ? selectedMeeting.project_id : 'none'} 
+                onValueChange={(projectId) => selectedMeeting && handleProjectChange(selectedMeeting.id, projectId === 'none' ? '' : projectId)}
+                disabled={updatingProject === selectedMeeting?.id}
+              >
+                <SelectTrigger className="w-full bg-white dark:bg-zinc-700 border border-[#4a5565] dark:border-zinc-700 text-xs font-mono">
+                  <SelectValue placeholder="Select a project..." />
+                </SelectTrigger>
+                <SelectContent className="bg-stone-100 dark:bg-zinc-800 border border-[#4a5565] dark:border-zinc-700 font-mono text-xs">
+                  <SelectItem 
+                    value="none"
+                    className="text-[#4a5565] dark:text-zinc-50 hover:bg-stone-300 dark:hover:bg-zinc-700 focus:bg-stone-300 dark:focus:bg-zinc-700"
+                  >
+                    No Project
+                  </SelectItem>
+                  {projects.map((project) => (
+                    <SelectItem 
+                      key={project.id} 
+                      value={project.id}
+                      className="text-[#4a5565] dark:text-zinc-50 hover:bg-stone-300 dark:hover:bg-zinc-700 focus:bg-stone-300 dark:focus:bg-zinc-700"
+                    >
+                      {project.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {updatingProject === selectedMeeting?.id && (
+                <div className="flex items-center space-x-2 mt-2 text-xs text-gray-500">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  <span>Updating project...</span>
+                </div>
+              )}
+            </div>
+            
             <div className="flex space-x-2 pt-4">
               {selectedMeeting && canSendBot(selectedMeeting) && (
                 <Button
                   onClick={() => selectedMeeting && sendBotToMeeting(selectedMeeting)}
                   disabled={sendingBot === selectedMeeting?.id}
                   size="sm"
-                  className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
+                  className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-mono text-xs"
                 >
                   {sendingBot === selectedMeeting?.id ? (
                     <>
@@ -484,6 +579,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
                   variant="outline"
                   size="sm"
                   onClick={() => window.open(selectedMeeting.meeting_url, '_blank')}
+                  className="font-mono text-xs border border-[#4a5565] dark:border-zinc-700 bg-stone-100 dark:bg-zinc-800 text-[#4a5565] dark:text-zinc-50 hover:bg-stone-300 dark:hover:bg-zinc-700"
                 >
                   <ExternalLink className="w-4 h-4" />
                 </Button>

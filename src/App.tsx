@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/providers/AuthProvider";
 import { ThemeProvider } from "@/providers/ThemeProvider";
 import Index from "./pages/index";
+import DashboardLayout from "./components/layout/DashboardLayout";
 import Dashboard from "./pages/dashboard";
 import AuthPage from "./pages/auth";
 import IntegrationsPage from "./pages/integrations";
@@ -32,18 +33,22 @@ const App = () => (
                 path="/dashboard" 
                 element={
                   <ProtectedRoute>
-                    <Dashboard />
+                    <DashboardLayout />
                   </ProtectedRoute>
                 } 
-              />
+              >
+                <Route index element={<Dashboard />} />
+              </Route>
               <Route 
                 path="/integrations" 
                 element={
                   <ProtectedRoute>
-                    <IntegrationsPage />
+                    <DashboardLayout />
                   </ProtectedRoute>
                 } 
-              />
+              >
+                <Route index element={<IntegrationsPage />} />
+              </Route>
               <Route 
                 path="/oauth/callback" 
                 element={
@@ -54,18 +59,22 @@ const App = () => (
                 path="/project/:projectId" 
                 element={
                   <ProtectedRoute>
-                    <ProjectDashboard />
+                    <DashboardLayout />
                   </ProtectedRoute>
                 } 
-              />
+              >
+                <Route index element={<ProjectDashboard />} />
+              </Route>
               <Route 
                 path="/meetings" 
                 element={
                   <ProtectedRoute>
-                    <MeetingsPage />
+                    <DashboardLayout />
                   </ProtectedRoute>
                 } 
-              />
+              >
+                <Route index element={<MeetingsPage />} />
+              </Route>
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

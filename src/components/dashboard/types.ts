@@ -35,6 +35,7 @@ export interface NavigationSidebarProps {
   onDeleteChat: (chatId: string) => void;
   onRenameProject: (projectId: string, newName: string, newDescription: string) => void;
   onDeleteProject: (projectId: string) => void;
+  activeNavItem: string;
 }
 
 export interface MainWorkspaceProps {
@@ -43,4 +44,5 @@ export interface MainWorkspaceProps {
   setActiveCenterPanel: (panel: string) => void;
   activeFeedItemId: string | null;
   setActiveFeedItemId: (id: string | null) => void;
+  projects: any[];
 } 

@@ -53,8 +53,8 @@ const MainWorkspace = ({
       {/* Workspace Header */}
       <div className="p-4 flex items-center">
         <div>
-          <span className="text-xs font-medium">WORKSPACE</span>
-          <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          <span className="text-xs font-medium font-mono uppercase tracking-wide">WORKSPACE</span>
+          <div className="mt-1 text-xs text-gray-500 dark:text-gray-400 font-mono">
             ~/sunny.ai/dashboard
           </div>
         </div>
@@ -63,9 +63,9 @@ const MainWorkspace = ({
       <div className="flex-1 p-8 pt-4">
         <div className="max-w-4xl mx-auto space-y-8">
           <div className="text-center space-y-4">
-            <h1 className="text-2xl font-bold">Welcome to Workspace</h1>
+            <h1 className="text-2xl font-bold font-mono">Welcome to Workspace</h1>
             <div className="w-24 h-px bg-[#4a5565] dark:bg-zinc-700 mx-auto"></div>
-            <p className="text-gray-600 dark:text-gray-400 text-sm">
+            <p className="text-gray-600 dark:text-gray-400 text-sm font-mono">
               Your intelligent development environment
             </p>
           </div>

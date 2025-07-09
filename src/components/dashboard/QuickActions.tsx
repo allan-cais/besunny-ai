@@ -9,7 +9,7 @@ const QuickActions = () => {
 
   return (
     <div className="space-y-4">
-      <h3 className="text-base font-bold">QUICK ACTIONS</h3>
+      <h3 className="text-base font-bold font-mono uppercase tracking-wide">QUICK ACTIONS</h3>
       <div className="grid grid-cols-2 gap-4">
         {actions.map((action, index) => (
           <Button 

@@ -325,236 +325,220 @@ const IntegrationsPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-stone-100 dark:bg-zinc-800 text-[#4a5565] dark:text-zinc-50 font-mono">
-      <header className="border-b border-[#4a5565] dark:border-zinc-700 bg-stone-100 dark:bg-zinc-800 px-4 py-4">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Button
-              variant="ghost"
-              onClick={() => navigate('/dashboard')}
-              className="font-mono text-xs border border-[#4a5565] dark:border-zinc-700 hover:bg-[#4a5565] hover:text-stone-100 dark:hover:bg-zinc-50 dark:hover:text-zinc-900 transition-colors"
-            >
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              BACK TO DASHBOARD
-            </Button>
-            <div>
-              <h1 className="text-xl font-bold">INTEGRATIONS</h1>
-              <p className="text-xs text-gray-600 dark:text-gray-400">
-                Connect your accounts and services
-              </p>
+    <div className="flex-1 flex flex-col overflow-hidden p-6">
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold text-[#4a5565] dark:text-zinc-50">INTEGRATIONS</h1>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+          Connect your accounts and services to enhance your project intelligence
+        </p>
+      </div>
+
+      {/* Error Alert */}
+      {error && (
+        <Alert className="mb-6 border-red-500 bg-red-50 dark:bg-red-900/20">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription className="text-red-800 dark:text-red-200">
+            {error}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Success Alert */}
+      {success && (
+        <Alert className="mb-6 border-green-500 bg-green-50 dark:bg-green-900/20">
+          <CheckCircle className="h-4 w-4" />
+          <AlertDescription className="text-green-800 dark:text-green-200">
+            {success}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Scope Mismatch Warning */}
+      {googleStatus?.connected && googleStatus?.scopeMismatch && (
+        <Alert className="mb-6 border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription className="text-yellow-800 dark:text-yellow-200">
+            <strong>Scope Update Required:</strong> Your Google integration was connected with different permissions than currently requested. Click "RECONNECT" to update your permissions with the latest scopes.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Google Integration Card */}
+      <Card className="bg-white dark:bg-zinc-900 border border-[#4a5565] dark:border-zinc-700 mb-8">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center">
+                <img src="https://www.gstatic.com/marketing-cms/assets/images/d5/dc/cfe9ce8b4425b410b49b7f2dd3f3/g.webp=s96-fcrop64=1,00000000ffffffff-rw" alt="Google Logo" className="w-7 h-7" />
+              </div>
+              <div>
+                <CardTitle className="text-base font-bold">GOOGLE WORKSPACE</CardTitle>
+                <CardDescription className="text-xs text-gray-600 dark:text-gray-400">
+                  Connect Gmail, Google Drive, and Calendar for comprehensive data integration
+                </CardDescription>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              {googleStatus?.connected ? (
+                <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400">
+                  <CheckCircle className="w-3 h-3 mr-1" />
+                  CONNECTED
+                </Badge>
+              ) : (
+                <Badge variant="secondary" className="bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400">
+                  <XCircle className="w-3 h-3 mr-1" />
+                  NOT CONNECTED
+                </Badge>
+              )}
             </div>
           </div>
-        </div>
-      </header>
-
-      <main className="max-w-6xl mx-auto px-4 py-8">
-        {/* Error Alert */}
-        {error && (
-          <Alert className="mb-6 border-red-500 bg-red-50 dark:bg-red-900/20">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription className="text-red-800 dark:text-red-200">
-              {error}
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {/* Success Alert */}
-        {success && (
-          <Alert className="mb-6 border-green-500 bg-green-50 dark:bg-green-900/20">
-            <CheckCircle className="h-4 w-4" />
-            <AlertDescription className="text-green-800 dark:text-green-200">
-              {success}
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {/* Scope Mismatch Warning */}
-        {googleStatus?.connected && googleStatus?.scopeMismatch && (
-          <Alert className="mb-6 border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription className="text-yellow-800 dark:text-yellow-200">
-              <strong>Scope Update Required:</strong> Your Google integration was connected with different permissions than currently requested. Click "RECONNECT" to update your permissions with the latest scopes.
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {/* Google Integration Card */}
-        <Card className="bg-white dark:bg-zinc-900 border border-[#4a5565] dark:border-zinc-700 mb-8">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center">
-                  <img src="https://www.gstatic.com/marketing-cms/assets/images/d5/dc/cfe9ce8b4425b410b49b7f2dd3f3/g.webp=s96-fcrop64=1,00000000ffffffff-rw" alt="Google Logo" className="w-7 h-7" />
-                </div>
-                <div>
-                  <CardTitle className="text-base font-bold">GOOGLE WORKSPACE</CardTitle>
-                  <CardDescription className="text-xs text-gray-600 dark:text-gray-400">
-                    Connect Gmail, Google Drive, and Calendar for comprehensive data integration
-                  </CardDescription>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                {googleStatus?.connected ? (
-                  <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400">
-                    <CheckCircle className="w-3 h-3 mr-1" />
-                    CONNECTED
-                  </Badge>
-                ) : (
-                  <Badge variant="secondary" className="bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400">
-                    <XCircle className="w-3 h-3 mr-1" />
-                    NOT CONNECTED
-                  </Badge>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin mr-2" />
+              <span className="text-sm">Loading status...</span>
+            </div>
+          ) : connecting ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin mr-2" />
+              <span className="text-sm">Connecting to Google...</span>
+            </div>
+          ) : googleStatus?.connected ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {googleStatus.email && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-gray-600 dark:text-gray-400">CONNECTED EMAIL</p>
+                    <p className="text-sm font-mono">{googleStatus.email}</p>
+                  </div>
+                )}
+                {googleStatus.expiresAt && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-gray-600 dark:text-gray-400">EXPIRES AT</p>
+                    <p className="text-sm font-mono">{formatExpiryDate(googleStatus.expiresAt)}</p>
+                  </div>
                 )}
               </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin mr-2" />
-                <span className="text-sm">Loading status...</span>
-              </div>
-            ) : connecting ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin mr-2" />
-                <span className="text-sm">Connecting to Google...</span>
-              </div>
-            ) : googleStatus?.connected ? (
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {googleStatus.email && (
-                    <div className="space-y-2">
-                      <p className="text-xs font-medium text-gray-600 dark:text-gray-400">CONNECTED EMAIL</p>
-                      <p className="text-sm font-mono">{googleStatus.email}</p>
-                    </div>
-                  )}
-                  {googleStatus.expiresAt && (
-                    <div className="space-y-2">
-                      <p className="text-xs font-medium text-gray-600 dark:text-gray-400">EXPIRES AT</p>
-                      <p className="text-sm font-mono">{formatExpiryDate(googleStatus.expiresAt)}</p>
-                    </div>
-                  )}
-                </div>
-                
-                <Separator className="bg-[#4a5565] dark:bg-zinc-700" />
-                
-                <div className="space-y-3">
-                  <h4 className="text-sm font-bold">ACCESS PERMISSIONS</h4>
-                  <div className="space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <Mail className="w-4 h-4 text-green-600 dark:text-green-400" />
-                      <span className="text-xs">Gmail (Read, Modify & Send)</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <HardDrive className="w-4 h-4 text-green-600 dark:text-green-400" />
-                      <span className="text-xs">Google Drive (Full Access)</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Calendar className="w-4 h-4 text-green-600 dark:text-green-400" />
-                      <span className="text-xs">Google Calendar (Full Access)</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Users className="w-4 h-4 text-green-600 dark:text-green-400" />
-                      <span className="text-xs">Google Account Email (userinfo.email)</span>
-                    </div>
+              
+              <Separator className="bg-[#4a5565] dark:bg-zinc-700" />
+              
+              <div className="space-y-3">
+                <h4 className="text-sm font-bold">ACCESS PERMISSIONS</h4>
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <Mail className="w-4 h-4 text-green-600 dark:text-green-400" />
+                    <span className="text-xs">Gmail (Read, Modify & Send)</span>
                   </div>
-                  <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
-                    <p className="text-xs text-blue-800 dark:text-blue-200">
-                      <strong>Note:</strong> Only the above permissions are requested. If you've updated scopes in Google Cloud Console, click "RECONNECT" to refresh your permissions with the new scopes.
-                    </p>
+                  <div className="flex items-center space-x-2">
+                    <HardDrive className="w-4 h-4 text-green-600 dark:text-green-400" />
+                    <span className="text-xs">Google Drive (Full Access)</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Calendar className="w-4 h-4 text-green-600 dark:text-green-400" />
+                    <span className="text-xs">Google Calendar (Full Access)</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Users className="w-4 h-4 text-green-600 dark:text-green-400" />
+                    <span className="text-xs">Google Account Email (userinfo.email)</span>
                   </div>
                 </div>
+                <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
+                  <p className="text-xs text-blue-800 dark:text-blue-200">
+                    <strong>Note:</strong> Only the above permissions are requested. If you've updated scopes in Google Cloud Console, click "RECONNECT" to refresh your permissions with the new scopes.
+                  </p>
+                </div>
+              </div>
 
-                <div className="flex items-center space-x-3 pt-4">
-                  <Button
-                    variant="outline"
-                    onClick={handleGoogleDisconnect}
-                    disabled={disconnecting}
-                    className="font-mono text-xs border-red-500 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-                  >
-                    {disconnecting ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        DISCONNECTING...
-                      </>
-                    ) : (
-                      <>
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        DISCONNECT
-                      </>
-                    )}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={handleGoogleConnect}
-                    disabled={connecting}
-                    className="font-mono text-xs border-blue-500 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                  >
-                    {connecting ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        RECONNECTING...
-                      </>
-                    ) : (
-                      <>
-                        <RefreshCw className="mr-2 h-4 w-4" />
-                        RECONNECT (UPDATE SCOPES)
-                      </>
-                    )}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={loadGoogleStatus}
-                    className="font-mono text-xs border border-[#4a5565] dark:border-zinc-700 hover:bg-[#4a5565] hover:text-stone-100 dark:hover:bg-zinc-50 dark:hover:text-zinc-900 transition-colors"
-                  >
-                    <RefreshCw className="mr-2 h-4 w-4" />
-                    REFRESH STATUS
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-12">
+              <div className="flex items-center space-x-3 pt-4">
                 <Button
-                  onClick={handleGoogleConnect}
-                  className="font-mono text-xs bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-md shadow-md"
-                  size="lg"
+                  variant="outline"
+                  onClick={handleGoogleDisconnect}
+                  disabled={disconnecting}
+                  className="font-mono text-xs border-red-500 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
                 >
-                  <Mail className="mr-2 h-4 w-4" />
-                  CONNECT GOOGLE ACCOUNT
+                  {disconnecting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      DISCONNECTING...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      DISCONNECT
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleGoogleConnect}
+                  disabled={connecting}
+                  className="font-mono text-xs border-blue-500 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                >
+                  {connecting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      RECONNECTING...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      RECONNECT (UPDATE SCOPES)
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={loadGoogleStatus}
+                  className="font-mono text-xs border border-[#4a5565] dark:border-zinc-700 hover:bg-[#4a5565] hover:text-stone-100 dark:hover:bg-zinc-50 dark:hover:text-zinc-900 transition-colors"
+                >
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  REFRESH STATUS
                 </Button>
               </div>
-            )}
-          </CardContent>
-        </Card>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-12">
+              <Button
+                onClick={handleGoogleConnect}
+                className="font-mono text-xs bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-md shadow-md"
+                size="lg"
+              >
+                <Mail className="mr-2 h-4 w-4" />
+                CONNECT GOOGLE ACCOUNT
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-        {/* Attendee Integration Card - Hidden for now, using master API key */}
-        {/* <AttendeeIntegration onStatusChange={setAttendeeStatus} /> */}
+      {/* Attendee Integration Card - Hidden for now, using master API key */}
+      {/* <AttendeeIntegration onStatusChange={setAttendeeStatus} /> */}
 
-        {/* Other Integrations */}
-        <div className="mt-8">
-          <h2 className="text-lg font-bold mb-4">COMING SOON</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className="opacity-60">
-              <CardHeader>
-                <CardTitle>OUTLOOK</CardTitle>
-                <CardDescription>Microsoft 365 integration</CardDescription>
-              </CardHeader>
-            </Card>
-            <Card className="opacity-60">
-              <CardHeader>
-                <CardTitle>DROPBOX</CardTitle>
-                <CardDescription>File storage integration</CardDescription>
-              </CardHeader>
-            </Card>
-            <Card className="opacity-60">
-              <CardHeader>
-                <CardTitle>SLACK</CardTitle>
-                <CardDescription>Team communication integration</CardDescription>
-              </CardHeader>
-            </Card>
-          </div>
+      {/* Other Integrations */}
+      <div className="mt-8">
+        <h2 className="text-lg font-bold mb-4">COMING SOON</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="opacity-60">
+            <CardHeader>
+              <CardTitle>OUTLOOK</CardTitle>
+              <CardDescription>Microsoft 365 integration</CardDescription>
+            </CardHeader>
+          </Card>
+          <Card className="opacity-60">
+            <CardHeader>
+              <CardTitle>DROPBOX</CardTitle>
+              <CardDescription>File storage integration</CardDescription>
+            </CardHeader>
+          </Card>
+          <Card className="opacity-60">
+            <CardHeader>
+              <CardTitle>SLACK</CardTitle>
+              <CardDescription>Team communication integration</CardDescription>
+            </CardHeader>
+          </Card>
         </div>
-      </main>
+      </div>
     </div>
   );
 };

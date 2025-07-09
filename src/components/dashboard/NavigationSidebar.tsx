@@ -53,7 +53,8 @@ const NavigationSidebar = ({
   onRenameChat,
   onDeleteChat,
   onRenameProject,
-  onDeleteProject
+  onDeleteProject,
+  activeNavItem
 }: NavigationSidebarProps) => {
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -66,17 +67,17 @@ const NavigationSidebar = ({
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
   const navItems = [
-    { icon: Home, label: "Home", active: true },
+    { icon: Home, label: "Home", active: activeNavItem === "Home" },
     { 
       icon: FileText, 
       label: "Projects", 
-      active: false,
+      active: activeNavItem === "Projects",
       subItems: projects.map(p => p.name)
     },
-    { icon: Calendar, label: "Meetings", active: false },
-    { icon: Database, label: "Data", active: false },
+    { icon: Calendar, label: "Meetings", active: activeNavItem === "Meetings" },
+    { icon: Database, label: "Data", active: activeNavItem === "Data" },
     { icon: Terminal, label: "Playbooks", active: false },
-    { icon: Settings, label: "Settings", active: false },
+    { icon: Settings, label: "Settings", active: activeNavItem === "Settings" },
   ];
 
   const handleRenameClick = (chat: DashboardChatSession) => {
@@ -140,8 +141,8 @@ const NavigationSidebar = ({
     <>
       <div className={`relative transition-all duration-300 ease-in-out ${
         isCollapsed ? 'w-16' : 'w-64'
-      } border-r border-[#4a5565] dark:border-zinc-700 bg-stone-100 dark:bg-zinc-800`}>
-        <div className="p-2">
+      } border-r border-[#4a5565] dark:border-zinc-700 bg-stone-100 dark:bg-zinc-800 pt-4`}>
+        <div className="p-2 pt-0">
           {/* Regular Navigation Items */}
           {navItems.map((item, index) => (
             <div key={index} className="mb-1">
@@ -154,7 +155,7 @@ const NavigationSidebar = ({
                 `}
                 onClick={() => onNavItemClick(item)}
               >
-                <div className="flex items-center">
+                <div className="flex items-center font-mono text-xs">
                   <item.icon className="w-4 h-4 mr-3" />
                   {!isCollapsed && item.label}
                 </div>
@@ -222,7 +223,7 @@ const NavigationSidebar = ({
 
           {/* Chats Section */}
           <div className="mt-6">
-            <div className="px-3 py-2 text-xs font-mono text-gray-600 dark:text-gray-400">
+            <div className="px-3 py-2 text-xs font-mono text-gray-600 dark:text-gray-400 uppercase tracking-wide">
               Chats
             </div>
             <div className="pl-4 space-y-1">

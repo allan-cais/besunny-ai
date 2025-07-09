@@ -356,10 +356,10 @@ const AIAssistant = ({
           <div className="h-full border-l border-[#4a5565] dark:border-zinc-700 bg-stone-100 dark:bg-zinc-800 flex flex-col">
             {/* Chat Header */}
             <div className="p-3 border-b border-[#4a5565] dark:border-zinc-700 flex-shrink-0">
-              <div className="text-sm font-bold">
+              <div className="text-sm font-bold font-mono uppercase tracking-wide">
                 Chat Session
               </div>
-              <div className="text-xs text-gray-500">
+              <div className="text-xs text-gray-500 font-mono">
                 {activeChatId}
               </div>
             </div>
@@ -369,12 +369,12 @@ const AIAssistant = ({
               <div className="space-y-4">
                 {messages.map((message) => (
                   <div key={message.id} className={`space-y-2`}>
-                    <div className={`text-xs font-bold ${
+                    <div className={`text-xs font-bold font-mono uppercase tracking-wide ${
                       message.role === 'user' ? 'text-right' : 'text-left'
                     }`}>
                       {message.role === 'user' ? 'USER' : 'ASSISTANT'}
                     </div>
-                    <div className={`p-2 text-xs whitespace-pre-wrap break-words ${
+                    <div className={`p-2 text-xs font-mono whitespace-pre-wrap break-words ${
                       message.role === 'user' 
                         ? 'border border-[#4a5565] bg-[#4a5565] text-stone-100 ml-8' 
                         : 'text-[#4a5565] dark:text-zinc-50 mr-8'
@@ -403,17 +403,16 @@ const AIAssistant = ({
                         handleSendMessage();
                       }
                     }}
-                    placeholder="Type message..."
-                    className="w-full bg-transparent border border-[#4a5565] dark:border-zinc-700 font-mono text-xs resize-none p-2 overflow-hidden"
+                    className="w-full resize-none border border-[#4a5565] dark:border-zinc-700 rounded-md bg-white dark:bg-zinc-900 px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#4a5565] dark:focus:ring-zinc-700"
                     rows={1}
-                    disabled={isLoading}
+                    placeholder="Type your message..."
                   />
                 </div>
                 <Button
+                  type="button"
                   onClick={handleSendMessage}
-                  size="icon"
                   disabled={isLoading || !chatMessage.trim()}
-                  className="border border-[#4a5565] bg-stone-100 text-[#4a5565] hover:bg-[#4a5565] hover:text-stone-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50 dark:hover:bg-zinc-50 dark:hover:text-zinc-900 w-8 h-8 flex-shrink-0 disabled:opacity-50"
+                  className="p-2 h-8 w-8 flex items-center justify-center border border-[#4a5565] dark:border-zinc-700 bg-[#4a5565] dark:bg-zinc-700 text-stone-100 dark:text-zinc-50 rounded-md hover:bg-[#3a4555] dark:hover:bg-zinc-600 transition-colors font-mono text-xs"
                 >
                   <Send className="w-4 h-4" />
                 </Button>

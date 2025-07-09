@@ -3,9 +3,14 @@ import CalendarView from '@/components/dashboard/CalendarView';
 import { calendarService, Meeting } from '@/lib/calendar';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CheckCircle, AlertCircle } from 'lucide-react';
+import { useSupabase } from '@/hooks/use-supabase';
+import { useAuth } from '@/providers/AuthProvider';
 
 const MeetingsPage: React.FC = () => {
+  const { user } = useAuth();
+  const { getProjectsForUser } = useSupabase();
   const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -13,7 +18,19 @@ const MeetingsPage: React.FC = () => {
 
   useEffect(() => {
     loadMeetings();
-  }, []);
+    loadProjects();
+  }, [user?.id]);
+
+  const loadProjects = async () => {
+    if (!user?.id) return;
+    
+    try {
+      const userProjects = await getProjectsForUser(user.id);
+      setProjects(userProjects);
+    } catch (error) {
+      console.error('Error loading user projects:', error);
+    }
+  };
 
   const loadMeetings = async () => {
     try {
@@ -51,7 +68,7 @@ const MeetingsPage: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col flex-1 w-full h-full">
+    <>
       {error && (
         <Alert className="mb-4 border-red-500 bg-red-50 dark:bg-red-900/20">
           <AlertCircle className="h-4 w-4" />
@@ -69,8 +86,9 @@ const MeetingsPage: React.FC = () => {
         onSyncCalendar={syncCalendarEvents}
         syncing={syncing}
         onMeetingUpdate={handleMeetingUpdate}
+        projects={projects}
       />
-    </div>
+    </>
   );
 };
 
