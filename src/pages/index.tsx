@@ -10,7 +10,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-white text-black font-mono flex items-center justify-center">
-      <div className="w-[70vw] max-w-[90rem] mx-auto px-4 py-8 font-sans">
+      <div className="max-w-[90rem] mx-auto px-4 py-8 font-sans">
         <div className="text-center space-y-8">
           <div className="space-y-4">
             <h1 className="text-6xl font-bold tracking-tight">sunny.ai</h1>

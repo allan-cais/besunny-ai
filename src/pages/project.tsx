@@ -65,7 +65,7 @@ const ProjectDashboard = () => {
   }
 
   return (
-    <div className="w-[70vw] max-w-[90rem] mx-auto px-4 py-8 font-sans">
+    <div className="flex-1 max-w-[90rem] mx-auto px-4 py-8 font-sans">
       <PageHeader title="PROJECT" path={`~/sunny.ai/project/${projectId || ''}`} />
       <div className="flex-1">
         <div className="space-y-8">
