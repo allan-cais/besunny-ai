@@ -197,8 +197,8 @@ const DashboardLayout = () => {
       return;
     }
     if (item.label === 'Data') {
-      navigate('/dashboard?panel=data');
-      setActiveCenterPanel('data');
+      navigate('/data');
+      setActiveCenterPanel('');
       setActiveProjectId(null);
       setActiveFeedItemId(null);
       return;
@@ -263,6 +263,9 @@ const DashboardLayout = () => {
         return 'Data';
       }
       return 'Home';
+    }
+    if (pathname === '/data') {
+      return 'Data';
     }
     if (pathname === '/meetings') {
       return 'Meetings';

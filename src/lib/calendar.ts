@@ -15,7 +15,8 @@ export interface Meeting {
   bot_chat_message?: string;
   transcript?: string;
   transcript_url?: string;
-  status: 'pending' | 'bot_scheduled' | 'bot_joined' | 'transcribing' | 'completed' | 'failed' | 'accepted' | 'declined' | 'tentative' | 'needsAction';
+  event_status: 'accepted' | 'declined' | 'tentative' | 'needsAction';
+  bot_status: 'pending' | 'bot_scheduled' | 'bot_joined' | 'transcribing' | 'completed' | 'failed';
   created_at: string;
   updated_at: string;
 }
@@ -35,8 +36,21 @@ export interface Bot {
 }
 
 export const calendarService = {
-  // Fetch calendar events and sync with meetings table
-  async syncCalendarEvents(projectId?: string): Promise<{ meetings: Meeting[]; total_events: number; meetings_with_urls: number }> {
+  // Initial sync: Today forward only (for bot functionality)
+  async initialSync(projectId?: string): Promise<{ 
+    meetings: Meeting[]; 
+    total_events: number; 
+    meetings_with_urls: number;
+    new_meetings: number;
+    updated_meetings: number;
+    deleted_meetings: number;
+    sync_range: {
+      start_date: string;
+      end_date: string;
+      days_past: number;
+      days_future: number;
+    };
+  }> {
     const session = (await supabase.auth.getSession()).data.session;
     if (!session) throw new Error('Not authenticated');
     
@@ -44,6 +58,9 @@ export const calendarService = {
     if (projectId) {
       url.searchParams.set('project_id', projectId);
     }
+    // Initial sync: 0 days past (today only), 60 days future
+    url.searchParams.set('days_past', '0');
+    url.searchParams.set('days_future', '60');
     
     const response = await fetch(url.toString(), {
       method: 'GET',
@@ -55,6 +72,127 @@ export const calendarService = {
     const result = await response.json();
     if (!result.ok) throw new Error(result.error || 'Failed to sync calendar events');
     return result;
+  },
+
+  // Full sync: Historical data + future (for complete database)
+  async fullSync(projectId?: string, daysPast: number = 365, daysFuture: number = 60): Promise<{ 
+    meetings: Meeting[]; 
+    total_events: number; 
+    meetings_with_urls: number;
+    new_meetings: number;
+    updated_meetings: number;
+    deleted_meetings: number;
+    sync_range: {
+      start_date: string;
+      end_date: string;
+      days_past: number;
+      days_future: number;
+    };
+  }> {
+    const session = (await supabase.auth.getSession()).data.session;
+    if (!session) throw new Error('Not authenticated');
+    
+    const url = new URL(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-calendar/events`);
+    if (projectId) {
+      url.searchParams.set('project_id', projectId);
+    }
+    url.searchParams.set('days_past', daysPast.toString());
+    url.searchParams.set('days_future', daysFuture.toString());
+    
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`,
+      },
+    });
+    
+    const result = await response.json();
+    if (!result.ok) throw new Error(result.error || 'Failed to sync calendar events');
+    return result;
+  },
+
+  // Setup real-time webhook sync
+  async setupWebhookSync(): Promise<{
+    ok: boolean;
+    webhook_id?: string;
+    resource_id?: string;
+    expiration?: number;
+    error?: string;
+  }> {
+    const session = (await supabase.auth.getSession()).data.session;
+    if (!session) throw new Error('Not authenticated');
+    
+    const url = new URL(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-calendar-webhook/setup`);
+    
+    const response = await fetch(url.toString(), {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ userId: session.user.id }),
+    });
+    
+    const result = await response.json();
+    return result;
+  },
+
+  // Get current week meetings (for UI display)
+  async getCurrentWeekMeetings(): Promise<Meeting[]> {
+    const session = (await supabase.auth.getSession()).data.session;
+    if (!session) throw new Error('Not authenticated');
+    
+    const now = new Date();
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay()); // Start of current week (Sunday)
+    startOfWeek.setHours(0, 0, 0, 0);
+    
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 7); // End of current week
+    endOfWeek.setHours(23, 59, 59, 999);
+    
+    const { data: meetings, error } = await supabase
+      .from('meetings')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .gte('start_time', startOfWeek.toISOString())
+      .lte('start_time', endOfWeek.toISOString())
+      .order('start_time', { ascending: true });
+    
+    if (error) throw error;
+    return meetings || [];
+  },
+
+  // Get sync status and logs
+  async getSyncStatus(): Promise<{
+    webhook_active: boolean;
+    last_sync?: string;
+    sync_logs: any[];
+  }> {
+    const session = (await supabase.auth.getSession()).data.session;
+    if (!session) throw new Error('Not authenticated');
+    
+    // Get webhook status
+    const { data: webhook } = await supabase
+      .from('calendar_webhooks')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .eq('is_active', true)
+      .maybeSingle();
+    
+    // Get recent sync logs
+    const { data: syncLogs } = await supabase
+      .from('calendar_sync_logs')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .order('created_at', { ascending: false })
+      .limit(10);
+    
+    return {
+      webhook_active: !!webhook,
+      last_sync: webhook?.last_sync_at,
+      sync_logs: syncLogs || [],
+    };
   },
 
   // Get meetings for a specific project
@@ -96,12 +234,12 @@ export const calendarService = {
     return result.meetings || [];
   },
 
-  // Update meeting status
-  async updateMeetingStatus(meetingId: string, status: Meeting['status'], attendeeBotId?: string): Promise<void> {
+  // Update bot status
+  async updateBotStatus(meetingId: string, botStatus: Meeting['bot_status'], attendeeBotId?: string): Promise<void> {
     const { error } = await supabase
       .from('meetings')
       .update({
-        status,
+        bot_status: botStatus,
         attendee_bot_id: attendeeBotId,
         updated_at: new Date().toISOString(),
       })
@@ -109,6 +247,8 @@ export const calendarService = {
     
     if (error) throw error;
   },
+
+
 
   // Associate a meeting with a project
   async associateMeetingWithProject(meetingId: string, projectId: string): Promise<void> {

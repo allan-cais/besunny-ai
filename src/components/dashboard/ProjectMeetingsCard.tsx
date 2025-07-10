@@ -64,7 +64,7 @@ const ProjectMeetingsCard: React.FC<ProjectMeetingsCardProps> = ({ projectId }) 
       setError(null);
       setSuccess(null);
       
-      const result = await calendarService.syncCalendarEvents(projectId);
+      const result = await calendarService.initialSync(projectId);
       setSuccess(`Synced ${result.meetings_with_urls} meetings with video URLs from ${result.total_events} total events`);
       
       // Reload meetings after sync
@@ -95,8 +95,8 @@ const ProjectMeetingsCard: React.FC<ProjectMeetingsCardProps> = ({ projectId }) 
         },
       });
 
-      // Update meeting status to bot_scheduled
-      await calendarService.updateMeetingStatus(
+      // Update bot status to bot_scheduled
+      await calendarService.updateBotStatus(
         meeting.id, 
         'bot_scheduled', 
         result.id || result.bot_id
@@ -125,8 +125,8 @@ const ProjectMeetingsCard: React.FC<ProjectMeetingsCardProps> = ({ projectId }) 
     });
   };
 
-  const getStatusBadge = (status: Meeting['status']) => {
-    switch (status) {
+  const getEventStatusBadge = (eventStatus: Meeting['event_status']) => {
+    switch (eventStatus) {
       case 'accepted':
         return <Badge variant="secondary" className="bg-green-100 text-green-800">Attending</Badge>;
       case 'declined':
@@ -135,8 +135,15 @@ const ProjectMeetingsCard: React.FC<ProjectMeetingsCardProps> = ({ projectId }) 
         return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">Tentative</Badge>;
       case 'needsAction':
         return <Badge variant="secondary" className="bg-gray-100 text-gray-800">Invited</Badge>;
+      default:
+        return <Badge variant="secondary">Unknown</Badge>;
+    }
+  };
+
+  const getBotStatusBadge = (botStatus: Meeting['bot_status']) => {
+    switch (botStatus) {
       case 'pending':
-        return <Badge variant="secondary" className="bg-gray-100 text-gray-800">Pending</Badge>;
+        return <Badge variant="secondary" className="bg-gray-100 text-gray-800">No Bot</Badge>;
       case 'bot_scheduled':
         return <Badge variant="secondary" className="bg-blue-100 text-blue-800">Bot Scheduled</Badge>;
       case 'bot_joined':
@@ -154,12 +161,12 @@ const ProjectMeetingsCard: React.FC<ProjectMeetingsCardProps> = ({ projectId }) 
 
   const canSendBot = (meeting: Meeting) => {
     return meeting.meeting_url && 
-           (meeting.status === 'pending' || meeting.status === 'accepted') && 
+           (meeting.bot_status === 'pending') && 
            !sendingBot;
   };
 
   return (
-    <Card className="bg-white dark:bg-zinc-900 border border-[#4a5565] dark:border-zinc-700 mb-8">
+    <Card className="mb-8">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
@@ -238,7 +245,8 @@ const ProjectMeetingsCard: React.FC<ProjectMeetingsCardProps> = ({ projectId }) 
                         <Clock className="w-3 h-3 mr-1" />
                         {formatDateTime(meeting.start_time)}
                       </div>
-                      {getStatusBadge(meeting.status)}
+                      {getEventStatusBadge(meeting.event_status)}
+                      {getBotStatusBadge(meeting.bot_status)}
                     </div>
                   </div>
                   <div className="flex items-center space-x-2">

@@ -1,9 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import React, { useState, useEffect } from 'react';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select,
   SelectContent,
@@ -17,9 +16,7 @@ import {
   Clock, 
   Send, 
   Loader2,
-  ExternalLink,
-  ChevronLeft,
-  ChevronRight
+  ExternalLink
 } from 'lucide-react';
 import { Meeting } from '@/lib/calendar';
 import { apiKeyService } from '@/lib/api-keys';
@@ -28,13 +25,9 @@ import { Project } from '@/lib/supabase';
 
 interface CalendarViewProps {
   meetings: Meeting[];
-  onSyncCalendar: () => void;
-  syncing: boolean;
   onMeetingUpdate: () => void;
   projects?: Project[];
 }
-
-type ViewMode = 'day' | 'week' | 'month';
 
 function stripHtml(html: string): string {
   if (!html) return '';
@@ -43,45 +36,15 @@ function stripHtml(html: string): string {
 
 const CalendarView: React.FC<CalendarViewProps> = ({ 
   meetings, 
-  onSyncCalendar, 
-  syncing, 
   onMeetingUpdate,
   projects = []
 }) => {
-  const [viewMode, setViewMode] = useState<ViewMode>('week');
-  const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
   const [sendingBot, setSendingBot] = useState<string | null>(null);
   const [updatingProject, setUpdatingProject] = useState<string | null>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const initialLoad = useRef(true);
 
-  // Auto-scroll to noon (12pm) for Day/Week views on initial load and when clicking Today
-  useEffect(() => {
-    if ((viewMode === 'day' || viewMode === 'week') && scrollRef.current) {
-      // Only scroll on initial load or when currentDate is today
-      if (initialLoad.current || isToday(currentDate)) {
-        requestAnimationFrame(() => {
-          if (scrollRef.current) {
-            scrollRef.current.scrollTop = 12 * 60;
-          }
-        });
-      }
-      initialLoad.current = false;
-    }
-  }, [viewMode, currentDate]);
-
-  function isToday(date: Date) {
-    const now = new Date();
-    return (
-      date.getDate() === now.getDate() &&
-      date.getMonth() === now.getMonth() &&
-      date.getFullYear() === now.getFullYear()
-    );
-  }
-
-  const getStatusBadge = (status: Meeting['status']) => {
-    switch (status) {
+  const getEventStatusBadge = (eventStatus: Meeting['event_status']) => {
+    switch (eventStatus) {
       case 'accepted':
         return <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">Attending</Badge>;
       case 'declined':
@@ -90,8 +53,15 @@ const CalendarView: React.FC<CalendarViewProps> = ({
         return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 text-xs">Tentative</Badge>;
       case 'needsAction':
         return <Badge variant="secondary" className="bg-gray-100 text-gray-800 text-xs">Invited</Badge>;
+      default:
+        return <Badge variant="secondary" className="text-xs">Unknown</Badge>;
+    }
+  };
+
+  const getBotStatusBadge = (botStatus: Meeting['bot_status']) => {
+    switch (botStatus) {
       case 'pending':
-        return <Badge variant="secondary" className="bg-gray-100 text-gray-800 text-xs">Pending</Badge>;
+        return <Badge variant="secondary" className="bg-gray-100 text-gray-800 text-xs">No Bot</Badge>;
       case 'bot_scheduled':
         return <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-xs">Bot Scheduled</Badge>;
       case 'bot_joined':
@@ -118,7 +88,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
           message: meeting.bot_chat_message || 'Hi, I\'m here to transcribe this meeting!',
         },
       });
-      await calendarService.updateMeetingStatus(
+      await calendarService.updateBotStatus(
         meeting.id, 
         'bot_scheduled', 
         result.id || result.bot_id
@@ -134,7 +104,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
   const canSendBot = (meeting?: Meeting | null) => {
     if (!meeting) return false;
     return meeting.meeting_url && 
-           (meeting.status === 'pending' || meeting.status === 'accepted') && 
+           (meeting.bot_status === 'pending') && 
            !sendingBot;
   };
 
@@ -142,24 +112,20 @@ const CalendarView: React.FC<CalendarViewProps> = ({
     try {
       setUpdatingProject(meetingId);
       await calendarService.associateMeetingWithProject(meetingId, projectId);
-      
-      // Update the local selectedMeeting state to reflect the change immediately
       if (selectedMeeting && selectedMeeting.id === meetingId) {
         setSelectedMeeting({
           ...selectedMeeting,
           project_id: projectId === 'none' ? undefined : projectId
         });
       }
-      
-      onMeetingUpdate(); // Refresh the meetings list
+      onMeetingUpdate();
     } catch (error) {
-      console.error('Failed to associate meeting with project:', error);
+      // console.error('Failed to associate meeting with project:', error);
     } finally {
       setUpdatingProject(null);
     }
   };
 
-  // Update selectedMeeting when meetings list changes to keep it in sync
   useEffect(() => {
     if (selectedMeeting) {
       const updatedMeeting = meetings.find(m => m.id === selectedMeeting.id);
@@ -168,8 +134,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({
       }
     }
   }, [meetings, selectedMeeting]);
-
-
 
   const formatTime = (dateTime: string) => {
     const date = new Date(dateTime);
@@ -180,302 +144,95 @@ const CalendarView: React.FC<CalendarViewProps> = ({
     });
   };
 
-  const formatTimeFromDate = (date: Date) => {
-    return date.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    });
-  };
+  // Sort all meetings by start time
+  const sortedMeetings = [...meetings].sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
 
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
-
-  const getWeekDays = () => {
-    const days = [];
-    const startOfWeek = new Date(currentDate);
-    startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
-    for (let i = 0; i < 7; i++) {
-      const day = new Date(startOfWeek);
-      day.setDate(startOfWeek.getDate() + i);
-      days.push(day);
-    }
-    return days;
-  };
-
-  const getMonthDays = () => {
-    const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
-    const firstDay = new Date(year, month, 1);
-    const startDate = new Date(firstDay);
-    startDate.setDate(firstDay.getDate() - firstDay.getDay());
-    const days = [];
-    for (let i = 0; i < 42; i++) {
-      const day = new Date(startDate);
-      day.setDate(startDate.getDate() + i);
-      days.push(day);
-    }
-    return days;
-  };
-
-  const getMeetingsForDate = (date: Date) => {
-    return meetings.filter(meeting => {
-      const meetingDate = new Date(meeting.start_time);
-      return meetingDate.toDateString() === date.toDateString();
-    });
-  };
-
-  const getMeetingsForTimeSlot = (date: Date, hour: number) => {
-    return meetings.filter(meeting => {
-      const meetingDate = new Date(meeting.start_time);
-      return meetingDate.toDateString() === date.toDateString() && 
-             meetingDate.getHours() === hour;
-    });
-  };
-
-  const navigateDate = (direction: 'prev' | 'next') => {
-    const newDate = new Date(currentDate);
-    if (viewMode === 'day') {
-      newDate.setDate(currentDate.getDate() + (direction === 'next' ? 1 : -1));
-    } else if (viewMode === 'week') {
-      newDate.setDate(currentDate.getDate() + (direction === 'next' ? 7 : -7));
-    } else if (viewMode === 'month') {
-      newDate.setMonth(currentDate.getMonth() + (direction === 'next' ? 1 : -1));
-    }
-    setCurrentDate(newDate);
-  };
-
-  const DayView = () => {
-    const hours = Array.from({ length: 24 }, (_, i) => i); // 0 to 23 (all hours)
-    return (
-      <div ref={scrollRef} className="h-[600px] overflow-y-auto">
-        {hours.map(hour => {
-          const timeSlotMeetings = getMeetingsForTimeSlot(currentDate, hour);
+  return (
+    <div>
+      <h1 className="text-2xl font-bold font-mono uppercase tracking-wide text-[#2d3748] dark:text-zinc-50 mb-6">Meetings</h1>
+      <div className="space-y-6">
+        {sortedMeetings.length === 0 && (
+          <div className="text-center text-gray-400 py-12 font-mono">No meetings scheduled.</div>
+        )}
+        {sortedMeetings.map(meeting => {
+          const project = projects.find(p => p.id === meeting.project_id);
           return (
-            <div key={hour} className="flex border-b border-gray-200 dark:border-gray-700 min-h-[60px]">
-              <div className="w-16 p-2 text-xs text-gray-500 border-r border-gray-200 dark:border-gray-700">
-                {formatTimeFromDate(new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), hour))}
-              </div>
-              <div className="flex-1 p-1">
-                {timeSlotMeetings.map(meeting => (
-                  <div
-                    key={meeting.id}
-                    className="bg-blue-100 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-700 rounded p-2 mb-1 cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-900/40"
-                    onClick={() => setSelectedMeeting(meeting)}
-                  >
-                    <div className="font-medium truncate">{meeting.title}</div>
-                    <div className="text-gray-600 dark:text-gray-400">
-                      {formatTime(meeting.start_time)}
-                    </div>
+            <Card key={meeting.id} className="cursor-pointer font-mono" onClick={() => setSelectedMeeting(meeting)}>
+              <CardHeader className="flex flex-row items-center justify-between pb-2 font-mono">
+                <div>
+                  <CardTitle className="text-base font-bold font-mono text-[#2d3748] dark:text-zinc-50">
+                    {meeting.title}
+                  </CardTitle>
+                  <CardDescription className="text-xs text-gray-600 dark:text-gray-400 font-mono">
+                    {formatTime(meeting.start_time)} - {formatTime(meeting.end_time)}
+                  </CardDescription>
+                </div>
+                <div className="flex flex-col items-end space-y-1 font-mono">
+                  {getEventStatusBadge(meeting.event_status)}
+                  {getBotStatusBadge(meeting.bot_status)}
+                  {project && (
+                    <Badge variant="outline" className="text-xs mt-1 font-mono">{project.name}</Badge>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0 font-mono">
+                {meeting.description && (
+                  <div className="text-sm text-gray-600 dark:text-gray-300 mb-2 font-mono">
+                    {stripHtml(meeting.description)}
                   </div>
-                ))}
-              </div>
-            </div>
+                )}
+                <div className="flex items-center space-x-2 mt-2 font-mono">
+                  {meeting.meeting_url && canSendBot(meeting) && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={e => {
+                        e.stopPropagation();
+                        sendBotToMeeting(meeting);
+                      }}
+                      disabled={sendingBot === meeting.id}
+                      className="font-mono"
+                    >
+                      {sendingBot === meeting.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Send className="w-4 h-4" />
+                      )}
+                    </Button>
+                  )}
+                  {meeting.meeting_url && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={e => {
+                        e.stopPropagation();
+                        window.open(meeting.meeting_url, '_blank');
+                      }}
+                      className="font-mono"
+                    >
+                      <Video className="w-4 h-4" />
+                    </Button>
+                  )}
+                  {meeting.transcript_url && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={e => {
+                        e.stopPropagation();
+                        window.open(meeting.transcript_url, '_blank');
+                      }}
+                      className="font-mono"
+                    >
+                      Transcript
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           );
         })}
       </div>
-    );
-  };
-
-  const WeekView = () => {
-    const hours = Array.from({ length: 24 }, (_, i) => i); // 0 to 23 (all hours)
-    const weekDays = getWeekDays();
-    return (
-      <div ref={scrollRef} className="h-[600px] overflow-y-auto">
-        <div className="flex">
-          <div className="w-16" />
-          {weekDays.map((day, i) => (
-            <div key={i} className="flex-1 text-center text-xs font-medium py-2">
-              {formatDate(day)}
-            </div>
-          ))}
-        </div>
-        {hours.map(hour => (
-          <div key={hour} className="flex border-b border-gray-200 dark:border-gray-700 min-h-[60px]">
-            <div className="w-16 p-2 text-xs text-gray-500 border-r border-gray-200 dark:border-gray-700">
-              {formatTimeFromDate(new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), hour))}
-            </div>
-            {weekDays.map((day, i) => {
-              const timeSlotMeetings = getMeetingsForTimeSlot(day, hour);
-              return (
-                <div key={i} className="flex-1 p-1">
-                  {timeSlotMeetings.map(meeting => (
-                    <div
-                      key={meeting.id}
-                      className="bg-blue-100 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-700 rounded p-2 mb-1 cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-900/40"
-                      onClick={() => setSelectedMeeting(meeting)}
-                    >
-                      <div className="font-medium truncate">{meeting.title}</div>
-                      <div className="text-gray-600 dark:text-gray-400">
-                        {formatTime(meeting.start_time)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              );
-            })}
-          </div>
-        ))}
-      </div>
-    );
-  };
-
-  const MonthView = () => {
-    const monthDays = getMonthDays();
-    const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    return (
-      <div>
-        <div className="grid grid-cols-7 gap-1 mb-2">
-          {weekDays.map(day => (
-            <div key={day} className="p-2 text-center text-sm font-medium text-gray-500">
-              {day}
-            </div>
-          ))}
-        </div>
-        <div className="grid grid-cols-7 gap-1">
-          {monthDays.map((day, index) => {
-            const dayMeetings = getMeetingsForDate(day);
-            const isCurrentMonth = day.getMonth() === currentDate.getMonth();
-            const isToday = day.toDateString() === new Date().toDateString();
-            return (
-              <div
-                key={index}
-                className={`min-h-[100px] p-2 border border-gray-200 dark:border-gray-700 ${
-                  isCurrentMonth ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800'
-                } ${isToday ? 'ring-2 ring-blue-500' : ''}`}
-              >
-                <div className={`text-sm font-medium mb-1 ${
-                  isCurrentMonth ? 'text-gray-900 dark:text-gray-100' : 'text-gray-400'
-                }`}>
-                  {day.getDate()}
-                </div>
-                <div className="space-y-1">
-                  {dayMeetings.slice(0, 3).map(meeting => (
-                    <div
-                      key={meeting.id}
-                      className="bg-blue-100 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-700 rounded p-1 cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-900/40 text-xs"
-                      onClick={() => setSelectedMeeting(meeting)}
-                    >
-                      <div className="font-medium truncate">{meeting.title}</div>
-                      <div className="text-gray-600 dark:text-gray-400">
-                        {formatTime(meeting.start_time)}
-                      </div>
-                    </div>
-                  ))}
-                  {dayMeetings.length > 3 && (
-                    <div className="text-xs text-gray-500">
-                      +{dayMeetings.length - 3} more
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
-
-  return (
-    <Card className="bg-white dark:bg-zinc-900 border border-[#4a5565] dark:border-zinc-700 w-full mx-auto max-w-6xl px-4 md:px-8 mt-8">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center">
-              <Calendar className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-            </div>
-            <div>
-              <CardTitle className="text-base font-bold font-mono uppercase tracking-wide">CALENDAR</CardTitle>
-            </div>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigateDate('prev')}
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setCurrentDate(new Date());
-                // Scroll to noon (12pm) after setting date
-                requestAnimationFrame(() => {
-                  if (scrollRef.current) {
-                    scrollRef.current.scrollTop = 12 * 60;
-                  }
-                });
-              }}
-            >
-              Today
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigateDate('next')}
-            >
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-            <Button
-              onClick={onSyncCalendar}
-              disabled={syncing}
-              variant="outline"
-              size="sm"
-              className="font-mono text-xs"
-            >
-              {syncing ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  SYNCING...
-                </>
-              ) : (
-                <>
-                  <Calendar className="mr-2 h-4 w-4" />
-                  SYNC
-                </>
-              )}
-            </Button>
-          </div>
-        </div>
-        <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as ViewMode)}>
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="day">Day</TabsTrigger>
-            <TabsTrigger value="week">Week</TabsTrigger>
-            <TabsTrigger value="month">Month</TabsTrigger>
-          </TabsList>
-          <TabsContent value="day">
-            <CardContent>
-              <div className="mb-4">
-                <h2 className="text-lg font-semibold font-mono uppercase tracking-wide">{formatDate(currentDate)}</h2>
-              </div>
-              <DayView />
-            </CardContent>
-          </TabsContent>
-          <TabsContent value="week">
-            <CardContent>
-              <div className="mb-4">
-                <h2 className="text-lg font-semibold font-mono uppercase tracking-wide">{`${formatDate(getWeekDays()[0])} - ${formatDate(getWeekDays()[6])}`}</h2>
-              </div>
-              <WeekView />
-            </CardContent>
-          </TabsContent>
-          <TabsContent value="month">
-            <CardContent>
-              <div className="mb-4">
-                <h2 className="text-lg font-semibold font-mono uppercase tracking-wide">{currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</h2>
-              </div>
-              <MonthView />
-            </CardContent>
-          </TabsContent>
-        </Tabs>
-      </CardHeader>
+      {/* Meeting Detail Dialog (unchanged) */}
       <Dialog open={!!selectedMeeting} onOpenChange={() => setSelectedMeeting(null)}>
         <DialogContent className="sm:max-w-[480px] bg-stone-100 dark:bg-zinc-800 border border-[#4a5565] dark:border-zinc-700 font-mono text-xs">
           <DialogHeader>
@@ -486,59 +243,59 @@ const CalendarView: React.FC<CalendarViewProps> = ({
               Meeting details and project association
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-4 font-mono">
             <div className="flex items-center space-x-2">
               <Clock className="w-4 h-4 text-gray-500" />
-              <span className="text-sm text-[#4a5565] dark:text-zinc-50">
+              <span className="text-sm text-[#4a5565] dark:text-zinc-50 font-mono">
                 {selectedMeeting && `${formatTime(selectedMeeting.start_time)} - ${formatTime(selectedMeeting.end_time)}`}
               </span>
             </div>
             <div className="flex items-center space-x-2">
-              {getStatusBadge(selectedMeeting?.status || 'pending')}
+              {selectedMeeting && getEventStatusBadge(selectedMeeting.event_status)}
+              {selectedMeeting && getBotStatusBadge(selectedMeeting.bot_status)}
             </div>
             {selectedMeeting?.description && (
               <div>
-                <h4 className="font-medium text-sm mb-2 text-[#4a5565] dark:text-zinc-50">Description</h4>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+                <h4 className="font-medium text-sm mb-2 text-[#4a5565] dark:text-zinc-50 font-mono">Description</h4>
+                <p className="text-sm text-gray-600 dark:text-gray-400 font-mono">
                   {stripHtml(selectedMeeting.description)}
                 </p>
               </div>
             )}
             {selectedMeeting?.meeting_url && (
               <div>
-                <h4 className="font-medium text-sm mb-2 text-[#4a5565] dark:text-zinc-50">Meeting URL</h4>
+                <h4 className="font-medium text-sm mb-2 text-[#4a5565] dark:text-zinc-50 font-mono">Meeting URL</h4>
                 <div className="flex items-center space-x-2">
                   <Video className="w-4 h-4 text-gray-500" />
-                  <span className="text-sm text-blue-600 dark:text-blue-400 truncate">
+                  <span className="text-sm text-blue-600 dark:text-blue-400 truncate font-mono">
                     {selectedMeeting.meeting_url}
                   </span>
                 </div>
               </div>
             )}
-            
-            {/* Project Selection */}
+            {/* Project Selection (unchanged) */}
             <div>
-              <h4 className="font-medium text-sm mb-2 text-[#4a5565] dark:text-zinc-50">ASSOCIATED PROJECT</h4>
-              <Select 
-                value={selectedMeeting?.project_id ? selectedMeeting.project_id : 'none'} 
-                onValueChange={(projectId) => selectedMeeting && handleProjectChange(selectedMeeting.id, projectId === 'none' ? '' : projectId)}
+              <h4 className="font-medium text-sm mb-2 text-[#4a5565] dark:text-zinc-50 font-mono">ASSOCIATED PROJECT</h4>
+              <Select
+                value={selectedMeeting?.project_id ? selectedMeeting.project_id : 'none'}
+                onValueChange={projectId => selectedMeeting && handleProjectChange(selectedMeeting.id, projectId === 'none' ? '' : projectId)}
                 disabled={updatingProject === selectedMeeting?.id}
               >
                 <SelectTrigger className="w-full bg-white dark:bg-zinc-700 border border-[#4a5565] dark:border-zinc-700 text-xs font-mono">
                   <SelectValue placeholder="Select a project..." />
                 </SelectTrigger>
                 <SelectContent className="bg-stone-100 dark:bg-zinc-800 border border-[#4a5565] dark:border-zinc-700 font-mono text-xs">
-                  <SelectItem 
+                  <SelectItem
                     value="none"
-                    className="text-[#4a5565] dark:text-zinc-50 hover:bg-stone-300 dark:hover:bg-zinc-700 focus:bg-stone-300 dark:focus:bg-zinc-700"
+                    className="text-[#4a5565] dark:text-zinc-50 hover:bg-stone-300 dark:hover:bg-zinc-700 focus:bg-stone-300 dark:focus:bg-zinc-700 font-mono"
                   >
                     No Project
                   </SelectItem>
-                  {projects.map((project) => (
-                    <SelectItem 
-                      key={project.id} 
+                  {projects.map(project => (
+                    <SelectItem
+                      key={project.id}
                       value={project.id}
-                      className="text-[#4a5565] dark:text-zinc-50 hover:bg-stone-300 dark:hover:bg-zinc-700 focus:bg-stone-300 dark:focus:bg-zinc-700"
+                      className="text-[#4a5565] dark:text-zinc-50 hover:bg-stone-300 dark:hover:bg-zinc-700 focus:bg-stone-300 dark:focus:bg-zinc-700 font-mono"
                     >
                       {project.name}
                     </SelectItem>
@@ -546,13 +303,12 @@ const CalendarView: React.FC<CalendarViewProps> = ({
                 </SelectContent>
               </Select>
               {updatingProject === selectedMeeting?.id && (
-                <div className="flex items-center space-x-2 mt-2 text-xs text-gray-500">
+                <div className="flex items-center space-x-2 mt-2 text-xs text-gray-500 font-mono">
                   <Loader2 className="w-3 h-3 animate-spin" />
                   <span>Updating project...</span>
                 </div>
               )}
             </div>
-            
             <div className="flex space-x-2 pt-4">
               {selectedMeeting && canSendBot(selectedMeeting) && (
                 <Button
@@ -588,7 +344,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
           </div>
         </DialogContent>
       </Dialog>
-    </Card>
+    </div>
   );
 };
 

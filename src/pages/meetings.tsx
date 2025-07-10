@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import CalendarView from '@/components/dashboard/CalendarView';
 import { calendarService, Meeting } from '@/lib/calendar';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { CheckCircle, AlertCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { CheckCircle, AlertCircle, RefreshCw, Loader2 } from 'lucide-react';
 import { useSupabase } from '@/hooks/use-supabase';
 import { useAuth } from '@/providers/AuthProvider';
+import PageHeader from '@/components/dashboard/PageHeader';
 
 const MeetingsPage: React.FC = () => {
   const { user } = useAuth();
@@ -12,13 +14,15 @@ const MeetingsPage: React.FC = () => {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [syncing, setSyncing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  // Remove all sync-related state
+  // const [syncing, setSyncing] = useState(false);
+  // const [error, setError] = useState<string | null>(null);
+  // const [success, setSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     loadMeetings();
     loadProjects();
+    // Remove loadSyncStatus();
   }, [user?.id]);
 
   const loadProjects = async () => {
@@ -32,63 +36,41 @@ const MeetingsPage: React.FC = () => {
     }
   };
 
+  // Remove syncStatus state and loadSyncStatus
+
   const loadMeetings = async () => {
     try {
       setLoading(true);
-      setError(null);
-      const loadedMeetings = await calendarService.getUpcomingMeetings();
+      // setError(null);
+      // Load current week meetings for display
+      const loadedMeetings = await calendarService.getCurrentWeekMeetings();
       setMeetings(loadedMeetings);
     } catch (err: any) {
-      setError(err.message || 'Failed to load meetings');
+      // setError(err.message || 'Failed to load meetings');
     } finally {
       setLoading(false);
     }
   };
 
-  const syncCalendarEvents = async () => {
-    try {
-      setSyncing(true);
-      setError(null);
-      setSuccess(null);
-      
-      const result = await calendarService.syncCalendarEvents();
-      setSuccess(`Synced ${result.meetings_with_urls} meetings with video URLs from ${result.total_events} total events`);
-      
-      // Reload meetings after sync
-      await loadMeetings();
-    } catch (err: any) {
-      setError(err.message || 'Failed to sync calendar events');
-    } finally {
-      setSyncing(false);
-    }
-  };
+  // Remove all sync functions (setupRealTimeSync, initialSync, fullSync)
 
   const handleMeetingUpdate = () => {
     loadMeetings();
   };
 
   return (
-    <>
-      {error && (
-        <Alert className="mb-4 border-red-500 bg-red-50 dark:bg-red-900/20">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription className="text-red-800 dark:text-red-200">{error}</AlertDescription>
-        </Alert>
-      )}
-      {success && (
-        <Alert className="mb-4 border-green-500 bg-green-50 dark:bg-green-900/20">
-          <CheckCircle className="h-4 w-4" />
-          <AlertDescription className="text-green-800 dark:text-green-200">{success}</AlertDescription>
-        </Alert>
-      )}
+    <div className="w-[70vw] max-w-[90rem] mx-auto px-4 py-8 font-sans">
+      <div className="flex items-center justify-between mb-6">
+        <PageHeader title="MEETINGS" path="~/sunny.ai/meetings" />
+      </div>
+      {/* Remove sync status, error, and success alerts */}
       <CalendarView
         meetings={meetings}
-        onSyncCalendar={syncCalendarEvents}
-        syncing={syncing}
+        // Remove onSyncCalendar, syncing props
         onMeetingUpdate={handleMeetingUpdate}
         projects={projects}
       />
-    </>
+    </div>
   );
 };
 

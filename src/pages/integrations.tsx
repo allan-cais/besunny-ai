@@ -24,6 +24,7 @@ import {
 import { supabase } from '@/lib/supabase';
 // import AttendeeIntegration from '@/components/integrations/AttendeeIntegration';
 import { ApiKeyStatus } from '@/lib/api-keys';
+import PageHeader from '@/components/dashboard/PageHeader';
 
 interface GoogleIntegrationStatus {
   connected: boolean;
@@ -234,6 +235,15 @@ const IntegrationsPage: React.FC = () => {
         setSuccess(`Successfully connected to Google account: ${result.email}`);
         setError(null);
         await loadGoogleStatus();
+        // Automatically trigger initial sync and real-time sync
+        try {
+          await import('@/lib/calendar').then(async ({ calendarService }) => {
+            await calendarService.initialSync();
+            await calendarService.setupWebhookSync();
+          });
+        } catch (syncError) {
+          // Optionally handle sync error (silent for now)
+        }
         // Remove code/state from URL to prevent re-triggering
         navigate('/integrations', { replace: true });
       } else {
@@ -325,13 +335,8 @@ const IntegrationsPage: React.FC = () => {
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden p-6">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-[#4a5565] dark:text-zinc-50">INTEGRATIONS</h1>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-          Connect your accounts and services to enhance your project intelligence
-        </p>
-      </div>
+    <div className="w-[70vw] max-w-[90rem] mx-auto px-4 py-8 flex-1 flex flex-col overflow-hidden font-sans">
+      <PageHeader title="INTEGRATIONS" path="~/sunny.ai/integrations" />
 
       {/* Error Alert */}
       {error && (
@@ -486,14 +491,6 @@ const IntegrationsPage: React.FC = () => {
                       RECONNECT (UPDATE SCOPES)
                     </>
                   )}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={loadGoogleStatus}
-                  className="font-mono text-xs border border-[#4a5565] dark:border-zinc-700 hover:bg-[#4a5565] hover:text-stone-100 dark:hover:bg-zinc-50 dark:hover:text-zinc-900 transition-colors"
-                >
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  REFRESH STATUS
                 </Button>
               </div>
             </div>

@@ -5,6 +5,7 @@ import { useSupabase } from '@/hooks/use-supabase';
 import {
   MainWorkspace,
 } from '@/components/dashboard';
+import PageHeader from '@/components/dashboard/PageHeader';
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -43,7 +44,7 @@ const Dashboard = () => {
   }, [location.search]);
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="w-[70vw] max-w-[90rem] mx-auto px-4 py-8 font-sans">
       <MainWorkspace
         activeCenterPanel={activeCenterPanel}
         setActiveCenterPanel={setActiveCenterPanel}

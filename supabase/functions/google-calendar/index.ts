@@ -145,13 +145,17 @@ serve(async (req) => {
       const credentials = await getGoogleCredentials(userId);
       const projectId = url.searchParams.get('project_id');
       
-      // Get events from the next 7 days
+      // Get sync range from query params, default to 30 days past and 60 days future
+      const daysPast = parseInt(url.searchParams.get('days_past') || '30');
+      const daysFuture = parseInt(url.searchParams.get('days_future') || '60');
+      
       const now = new Date();
-      const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      const startDate = new Date(now.getTime() - daysPast * 24 * 60 * 60 * 1000);
+      const endDate = new Date(now.getTime() + daysFuture * 24 * 60 * 60 * 1000);
       
       const calendarResponse = await fetch(
         `https://www.googleapis.com/calendar/v3/calendars/primary/events?` +
-        `timeMin=${now.toISOString()}&timeMax=${nextWeek.toISOString()}&singleEvents=true&orderBy=startTime`,
+        `timeMin=${startDate.toISOString()}&timeMax=${endDate.toISOString()}&singleEvents=true&orderBy=startTime`,
         {
           headers: {
             'Authorization': `Bearer ${credentials.access_token}`,
@@ -172,81 +176,122 @@ serve(async (req) => {
       const calendarData = await calendarResponse.json();
       const events = calendarData.items || [];
       
+      // Track which Google Calendar event IDs we've processed
+      const processedEventIds = new Set<string>();
+      
       // Process events and extract meeting URLs
       const meetings = [];
+      let newMeetings = 0;
+      let updatedMeetings = 0;
+      let skippedMeetings = 0;
+      let skippedReasons: string[] = [];
       
       for (const event of events) {
         const meetingUrl = extractMeetingUrl(event);
-        
-        if (meetingUrl) {
-          // Log attendees and creator for debugging
-          console.log('Event:', event.summary, 'Attendees:', event.attendees, 'Creator:', event.creator);
-          // Find the user's attendee status if available
-          let attendeeStatus = 'pending';
-          if (Array.isArray(event.attendees)) {
-            const selfAttendee = event.attendees.find((a: any) => a.self);
-            if (selfAttendee && selfAttendee.responseStatus) {
-              attendeeStatus = selfAttendee.responseStatus; // 'accepted', 'declined', 'tentative', 'needsAction'
-            }
-          } else if (event.creator && event.creator.email === credentials.google_email) {
-            attendeeStatus = 'accepted';
+        if (!meetingUrl) {
+          skippedMeetings++;
+          skippedReasons.push(`Skipped event '${event.summary || event.id}' (no video URL)`);
+          continue;
+        }
+        processedEventIds.add(event.id);
+        // Find the user's attendee status if available
+        let attendeeStatus = 'needsAction';
+        if (Array.isArray(event.attendees)) {
+          const selfAttendee = event.attendees.find((a: any) => a.self);
+          if (selfAttendee && selfAttendee.responseStatus) {
+            attendeeStatus = selfAttendee.responseStatus; // 'accepted', 'declined', 'tentative', 'needsAction'
           }
-          const meeting = {
-            user_id: userId,
-            project_id: projectId,
-            google_calendar_event_id: event.id,
-            title: event.summary || 'Untitled Meeting',
-            description: stripHtml(event.description || ''),
-            meeting_url: meetingUrl,
-            start_time: event.start.dateTime || event.start.date,
-            end_time: event.end.dateTime || event.end.date,
-            status: attendeeStatus,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          };
-          
-          // Check if meeting already exists
-          const { data: existingMeeting } = await supabase
+        } else if (event.creator && event.creator.email === credentials.google_email) {
+          attendeeStatus = 'accepted';
+        }
+        const meeting = {
+          user_id: userId,
+          project_id: projectId,
+          google_calendar_event_id: event.id,
+          title: event.summary || 'Untitled Meeting',
+          description: stripHtml(event.description || ''),
+          meeting_url: meetingUrl,
+          start_time: event.start.dateTime || event.start.date,
+          end_time: event.end.dateTime || event.end.date,
+          event_status: attendeeStatus,
+          bot_status: 'pending',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        // Check if meeting already exists
+        const { data: existingMeeting } = await supabase
+          .from('meetings')
+          .select('id, bot_status, attendee_bot_id')
+          .eq('google_calendar_event_id', event.id)
+          .eq('user_id', userId)
+          .maybeSingle();
+        if (!existingMeeting) {
+          // Insert new meeting
+          const { data: insertedMeeting, error: insertError } = await supabase
             .from('meetings')
-            .select('id')
-            .eq('google_calendar_event_id', event.id)
-            .eq('user_id', userId)
-            .maybeSingle();
-          
-          if (!existingMeeting) {
-            // Insert new meeting
-            const { data: insertedMeeting, error: insertError } = await supabase
-              .from('meetings')
-              .insert(meeting)
-              .select()
-              .single();
-            
-            if (insertError) {
-              // No logging
-            } else {
-              meetings.push(insertedMeeting);
-            }
+            .insert(meeting)
+            .select()
+            .single();
+          if (insertError) {
+            console.error('Failed to insert meeting:', insertError);
           } else {
-            // Update existing meeting
-            const { data: updatedMeeting, error: updateError } = await supabase
-              .from('meetings')
-              .update({
-                title: meeting.title,
-                description: meeting.description,
-                start_time: meeting.start_time,
-                end_time: meeting.end_time,
-                meeting_url: meeting.meeting_url,
-                status: meeting.status,
-                updated_at: new Date().toISOString(),
-              })
-              .eq('id', existingMeeting.id)
-              .select()
-              .single();
-            
-            if (updateError) {
-              // No logging
-            } else {
-              meetings.push(updatedMeeting);
+            meetings.push(insertedMeeting);
+            newMeetings++;
+          }
+        } else {
+          // Update existing meeting, but preserve bot_status and attendee_bot_id
+          const { data: updatedMeeting, error: updateError } = await supabase
+            .from('meetings')
+            .update({
+              title: meeting.title,
+              description: meeting.description,
+              start_time: meeting.start_time,
+              end_time: meeting.end_time,
+              meeting_url: meeting.meeting_url,
+              event_status: meeting.event_status,
+              // Preserve existing bot_status and attendee_bot_id
+              bot_status: existingMeeting.bot_status,
+              attendee_bot_id: existingMeeting.attendee_bot_id,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', existingMeeting.id)
+            .select()
+            .single();
+          if (updateError) {
+            console.error('Failed to update meeting:', updateError);
+          } else {
+            meetings.push(updatedMeeting);
+            updatedMeetings++;
+          }
+        }
+      }
+      // Log skipped meetings and reasons
+      console.log(`Skipped ${skippedMeetings} events. Reasons:`, skippedReasons);
+      
+      // Optional: Clean up meetings that no longer exist in Google Calendar
+      // Only if sync range is large enough to be comprehensive
+      let deletedMeetings = 0;
+      if (daysPast >= 30 && daysFuture >= 30) {
+        const { data: orphanedMeetings, error: orphanError } = await supabase
+          .from('meetings')
+          .select('id, google_calendar_event_id')
+          .eq('user_id', userId)
+          .gte('start_time', startDate.toISOString())
+          .lte('start_time', endDate.toISOString())
+          .not('google_calendar_event_id', 'is', null);
+        
+        if (!orphanError && orphanedMeetings) {
+          for (const orphan of orphanedMeetings) {
+            if (!processedEventIds.has(orphan.google_calendar_event_id)) {
+              // This meeting no longer exists in Google Calendar
+              const { error: deleteError } = await supabase
+                .from('meetings')
+                .delete()
+                .eq('id', orphan.id);
+              
+              if (!deleteError) {
+                deletedMeetings++;
+              }
             }
           }
         }
@@ -257,6 +302,17 @@ serve(async (req) => {
         meetings,
         total_events: events.length,
         meetings_with_urls: meetings.length,
+        new_meetings: newMeetings,
+        updated_meetings: updatedMeetings,
+        deleted_meetings: deletedMeetings || 0,
+        skipped_meetings: skippedMeetings,
+        skipped_reasons: skippedReasons,
+        sync_range: {
+          start_date: startDate.toISOString(),
+          end_date: endDate.toISOString(),
+          days_past: daysPast,
+          days_future: daysFuture
+        }
       }), { status: 200 }));
       
     } catch (e) {
@@ -276,7 +332,6 @@ serve(async (req) => {
         .from('meetings')
         .select('*')
         .eq('user_id', userId)
-        .gte('start_time', new Date().toISOString())
         .order('start_time', { ascending: true });
       
       if (projectId) {

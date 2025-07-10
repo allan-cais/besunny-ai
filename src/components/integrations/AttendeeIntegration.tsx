@@ -118,7 +118,7 @@ const AttendeeIntegration: React.FC<AttendeeIntegrationProps> = ({ onStatusChang
   };
 
   return (
-    <Card className="bg-white dark:bg-zinc-900 border border-[#4a5565] dark:border-zinc-700 mb-8">
+    <Card className="mb-8">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">

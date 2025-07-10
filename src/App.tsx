@@ -15,6 +15,7 @@ import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import ProjectDashboard from "./pages/project";
 import MeetingsPage from "./pages/meetings";
+import DataPage from "./pages/data";
 
 const queryClient = new QueryClient();
 
@@ -74,6 +75,16 @@ const App = () => (
                 } 
               >
                 <Route index element={<MeetingsPage />} />
+              </Route>
+              <Route 
+                path="/data" 
+                element={
+                  <ProtectedRoute>
+                    <DashboardLayout />
+                  </ProtectedRoute>
+                } 
+              >
+                <Route index element={<DataPage />} />
               </Route>
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
