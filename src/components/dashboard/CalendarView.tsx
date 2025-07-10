@@ -144,6 +144,16 @@ const CalendarView: React.FC<CalendarViewProps> = ({
     });
   };
 
+  const formatDate = (dateTime: string) => {
+    const date = new Date(dateTime);
+    return date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  };
+
   // Sort all meetings by start time
   const sortedMeetings = [...meetings].sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
 
@@ -164,7 +174,9 @@ const CalendarView: React.FC<CalendarViewProps> = ({
                     {meeting.title}
                   </CardTitle>
                   <CardDescription className="text-xs text-gray-600 dark:text-gray-400 font-mono">
-                    {formatTime(meeting.start_time)} - {formatTime(meeting.end_time)}
+                    <span>{formatDate(meeting.start_time)}</span>
+                    <span className="mx-1">|</span>
+                    <span>{formatTime(meeting.start_time)} - {formatTime(meeting.end_time)}</span>
                   </CardDescription>
                 </div>
                 <div className="flex flex-col items-end space-y-1 font-mono">

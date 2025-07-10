@@ -125,6 +125,16 @@ const ProjectMeetingsCard: React.FC<ProjectMeetingsCardProps> = ({ projectId }) 
     });
   };
 
+  const formatDate = (dateTime: string) => {
+    const date = new Date(dateTime);
+    return date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  };
+
   const getEventStatusBadge = (eventStatus: Meeting['event_status']) => {
     switch (eventStatus) {
       case 'accepted':
@@ -243,7 +253,9 @@ const ProjectMeetingsCard: React.FC<ProjectMeetingsCardProps> = ({ projectId }) 
                     <div className="flex items-center space-x-4 text-xs text-gray-600 dark:text-gray-400">
                       <div className="flex items-center">
                         <Clock className="w-3 h-3 mr-1" />
-                        {formatDateTime(meeting.start_time)}
+                        <span>{formatDate(meeting.start_time)}</span>
+                        <span className="mx-1">|</span>
+                        <span>{formatDateTime(meeting.start_time)}</span>
                       </div>
                       {getEventStatusBadge(meeting.event_status)}
                       {getBotStatusBadge(meeting.bot_status)}

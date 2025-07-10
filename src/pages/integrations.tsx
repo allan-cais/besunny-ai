@@ -335,8 +335,8 @@ const IntegrationsPage: React.FC = () => {
   }
 
   return (
-    <div className="w-[70vw] max-w-[90rem] mx-auto px-4 py-8 flex-1 flex flex-col overflow-hidden font-sans">
-      <PageHeader title="INTEGRATIONS" path="~/sunny.ai/integrations" />
+    <div className="w-[70vw] max-w-[90rem] mx-auto px-4 py-8 flex-1 flex flex-col overflow-hidden font-mono">
+      <PageHeader title={<span className="font-mono text-lg tracking-wide">INTEGRATIONS</span>} path="~/sunny.ai/integrations" />
 
       {/* Error Alert */}
       {error && (
@@ -377,20 +377,20 @@ const IntegrationsPage: React.FC = () => {
                 <img src="https://www.gstatic.com/marketing-cms/assets/images/d5/dc/cfe9ce8b4425b410b49b7f2dd3f3/g.webp=s96-fcrop64=1,00000000ffffffff-rw" alt="Google Logo" className="w-7 h-7" />
               </div>
               <div>
-                <CardTitle className="text-base font-bold">GOOGLE WORKSPACE</CardTitle>
-                <CardDescription className="text-xs text-gray-600 dark:text-gray-400">
+                <CardTitle className="text-base font-bold font-mono">GOOGLE WORKSPACE</CardTitle>
+                <CardDescription className="text-xs text-gray-600 dark:text-gray-400 font-mono">
                   Connect Gmail, Google Drive, and Calendar for comprehensive data integration
                 </CardDescription>
               </div>
             </div>
             <div className="flex items-center space-x-2">
               {googleStatus?.connected ? (
-                <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400">
+                <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400 font-mono font-bold">
                   <CheckCircle className="w-3 h-3 mr-1" />
                   CONNECTED
                 </Badge>
               ) : (
-                <Badge variant="secondary" className="bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400">
+                <Badge variant="secondary" className="bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400 font-mono font-bold">
                   <XCircle className="w-3 h-3 mr-1" />
                   NOT CONNECTED
                 </Badge>
@@ -414,13 +414,13 @@ const IntegrationsPage: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {googleStatus.email && (
                   <div className="space-y-2">
-                    <p className="text-xs font-medium text-gray-600 dark:text-gray-400">CONNECTED EMAIL</p>
+                    <p className="text-xs font-medium text-gray-600 dark:text-gray-400 font-mono">CONNECTED EMAIL</p>
                     <p className="text-sm font-mono">{googleStatus.email}</p>
                   </div>
                 )}
                 {googleStatus.expiresAt && (
                   <div className="space-y-2">
-                    <p className="text-xs font-medium text-gray-600 dark:text-gray-400">EXPIRES AT</p>
+                    <p className="text-xs font-medium text-gray-600 dark:text-gray-400 font-mono">EXPIRES AT</p>
                     <p className="text-sm font-mono">{formatExpiryDate(googleStatus.expiresAt)}</p>
                   </div>
                 )}
@@ -429,28 +429,29 @@ const IntegrationsPage: React.FC = () => {
               <Separator className="bg-[#4a5565] dark:bg-zinc-700" />
               
               <div className="space-y-3">
-                <h4 className="text-sm font-bold">ACCESS PERMISSIONS</h4>
+                <h4 className="text-sm font-bold font-mono">ACCESS PERMISSIONS</h4>
                 <div className="space-y-2">
                   <div className="flex items-center space-x-2">
                     <Mail className="w-4 h-4 text-green-600 dark:text-green-400" />
-                    <span className="text-xs">Gmail (Read, Modify & Send)</span>
+                    <span className="text-xs font-mono">Gmail (Read, Modify & Send)</span>
                   </div>
                   <div className="flex items-center space-x-2">
                     <HardDrive className="w-4 h-4 text-green-600 dark:text-green-400" />
-                    <span className="text-xs">Google Drive (Full Access)</span>
+                    <span className="text-xs font-mono">Google Drive (Full Access)</span>
                   </div>
                   <div className="flex items-center space-x-2">
                     <Calendar className="w-4 h-4 text-green-600 dark:text-green-400" />
-                    <span className="text-xs">Google Calendar (Full Access)</span>
+                    <span className="text-xs font-mono">Google Calendar (Full Access)</span>
                   </div>
                   <div className="flex items-center space-x-2">
                     <Users className="w-4 h-4 text-green-600 dark:text-green-400" />
-                    <span className="text-xs">Google Account Email (userinfo.email)</span>
+                    <span className="text-xs font-mono">Google Account Email (userinfo.email)</span>
                   </div>
                 </div>
                 <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
-                  <p className="text-xs text-blue-800 dark:text-blue-200">
-                    <strong>Note:</strong> Only the above permissions are requested. If you've updated scopes in Google Cloud Console, click "RECONNECT" to refresh your permissions with the new scopes.
+                  <p className="text-xs text-blue-800 dark:text-blue-200 font-mono">
+                    <span className="font-mono font-bold">Note:</span>
+                    <span className="font-mono"> Only the above permissions are requested. If you've updated scopes in Google Cloud Console, click "RECONNECT" to refresh your permissions with the new scopes.</span>
                   </p>
                 </div>
               </div>
@@ -514,24 +515,24 @@ const IntegrationsPage: React.FC = () => {
 
       {/* Other Integrations */}
       <div className="mt-8">
-        <h2 className="text-lg font-bold mb-4">COMING SOON</h2>
+        <h2 className="text-lg font-bold font-mono mb-4">COMING SOON</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card className="opacity-60">
             <CardHeader>
-              <CardTitle>OUTLOOK</CardTitle>
-              <CardDescription>Microsoft 365 integration</CardDescription>
+              <CardTitle className="font-mono font-bold">OUTLOOK</CardTitle>
+              <CardDescription className="font-mono">Microsoft 365 integration</CardDescription>
             </CardHeader>
           </Card>
           <Card className="opacity-60">
             <CardHeader>
-              <CardTitle>DROPBOX</CardTitle>
-              <CardDescription>File storage integration</CardDescription>
+              <CardTitle className="font-mono font-bold">DROPBOX</CardTitle>
+              <CardDescription className="font-mono">File storage integration</CardDescription>
             </CardHeader>
           </Card>
           <Card className="opacity-60">
             <CardHeader>
-              <CardTitle>SLACK</CardTitle>
-              <CardDescription>Team communication integration</CardDescription>
+              <CardTitle className="font-mono font-bold">SLACK</CardTitle>
+              <CardDescription className="font-mono">Team communication integration</CardDescription>
             </CardHeader>
           </Card>
         </div>
