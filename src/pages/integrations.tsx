@@ -335,7 +335,7 @@ const IntegrationsPage: React.FC = () => {
   }
 
   return (
-    <div className="flex-1 max-w-[90rem] mx-auto px-4 py-8 flex-1 flex flex-col overflow-hidden font-mono">
+    <div className="px-4 py-8 flex-1 flex flex-col overflow-hidden font-mono">
       <PageHeader title={<span className="font-mono text-lg tracking-wide">INTEGRATIONS</span>} path="~/sunny.ai/integrations" />
 
       {/* Error Alert */}

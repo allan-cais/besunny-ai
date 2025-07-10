@@ -308,7 +308,9 @@ const DashboardLayout = () => {
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
           <div className="flex-1 flex overflow-hidden min-w-0">
             <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-              <Outlet />
+              <div className="w-[70%] max-w-[90rem] mx-auto h-full flex flex-col">
+                <Outlet />
+              </div>
             </div>
             <AIAssistant
               isCollapsed={isChatSidebarCollapsed}

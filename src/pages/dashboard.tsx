@@ -44,7 +44,7 @@ const Dashboard = () => {
   }, [location.search]);
 
   return (
-    <div className="flex-1 max-w-[90rem] mx-auto px-4 py-8 font-sans">
+    <div className="px-4 py-8 font-sans">
       <MainWorkspace
         activeCenterPanel={activeCenterPanel}
         setActiveCenterPanel={setActiveCenterPanel}
