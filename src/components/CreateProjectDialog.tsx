@@ -381,7 +381,7 @@ const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
       };
 
       // Send to n8n webhook for project onboarding (optional)
-      const webhookUrl = import.meta.env.VITE_N8N_PROJECT_ONBOARDING_WEBHOOK_URL || import.meta.env.VITE_N8N_WEBHOOK_URL;
+      const webhookUrl = import.meta.env.VITE_N8N_PROJECT_ONBOARDING_WEBHOOK_URL;
       
       if (webhookUrl) {
         try {
