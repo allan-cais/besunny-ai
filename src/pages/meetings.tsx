@@ -131,11 +131,6 @@ const MeetingsPage: React.FC = () => {
                   <span className="font-medium">
                     {webhookStatus.webhook_active ? 'Real-time sync active' : 'Real-time sync inactive'}
                   </span>
-                  {webhookStatus.webhook_expires_at && (
-                    <span className="text-sm text-muted-foreground ml-2">
-                      (Expires: {new Date(webhookStatus.webhook_expires_at).toLocaleDateString()})
-                    </span>
-                  )}
                 </AlertDescription>
               </div>
               {/* <div className="flex space-x-2">
