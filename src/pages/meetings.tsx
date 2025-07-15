@@ -46,8 +46,8 @@ const MeetingsPage: React.FC = () => {
   const loadMeetings = async () => {
     try {
       setLoading(true);
-      // Load current week meetings for display
-      const loadedMeetings = await calendarService.getCurrentWeekMeetings();
+      // Load upcoming meetings only (current and future)
+      const loadedMeetings = await calendarService.getUpcomingMeetings();
       setMeetings(loadedMeetings);
     } catch (err: any) {
       console.error('Failed to load meetings:', err);

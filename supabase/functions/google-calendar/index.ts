@@ -327,10 +327,14 @@ serve(async (req) => {
     try {
       const projectId = url.searchParams.get('project_id');
       
+      // Filter for upcoming meetings only (current time and future)
+      const now = new Date();
+      
       let query = supabase
         .from('meetings')
         .select('*')
         .eq('user_id', userId)
+        .gte('start_time', now.toISOString()) // Only meetings starting from now onwards
         .order('start_time', { ascending: true });
       
       if (projectId) {
