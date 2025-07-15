@@ -19,12 +19,12 @@ const MeetingsPage: React.FC = () => {
     last_sync?: string;
     webhook_expires_at?: string;
   } | null>(null);
-  const [renewingWebhook, setRenewingWebhook] = useState(false);
-  const [webhookError, setWebhookError] = useState<string | null>(null);
-  const [webhookSuccess, setWebhookSuccess] = useState<string | null>(null);
-  const [syncing, setSyncing] = useState(false);
-  const [syncError, setSyncError] = useState<string | null>(null);
-  const [syncSuccess, setSyncSuccess] = useState<string | null>(null);
+  // const [renewingWebhook, setRenewingWebhook] = useState(false);
+  // const [webhookError, setWebhookError] = useState<string | null>(null);
+  // const [webhookSuccess, setWebhookSuccess] = useState<string | null>(null);
+  // const [syncing, setSyncing] = useState(false);
+  // const [syncError, setSyncError] = useState<string | null>(null);
+  // const [syncSuccess, setSyncSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     loadMeetings();
@@ -43,8 +43,6 @@ const MeetingsPage: React.FC = () => {
     }
   };
 
-  // Remove syncStatus state and loadSyncStatus
-
   const loadMeetings = async () => {
     try {
       setLoading(true);
@@ -61,53 +59,52 @@ const MeetingsPage: React.FC = () => {
   const loadWebhookStatus = async () => {
     try {
       const status = await calendarService.getSyncStatus();
-      console.log('Webhook status:', status);
       setWebhookStatus(status);
     } catch (err: any) {
       console.error('Failed to load webhook status:', err);
     }
   };
 
-  const renewWebhook = async () => {
-    try {
-      setRenewingWebhook(true);
-      setWebhookError(null);
-      setWebhookSuccess(null);
+  // const renewWebhook = async () => {
+  //   try {
+  //     setRenewingWebhook(true);
+  //     setWebhookError(null);
+  //     setWebhookSuccess(null);
       
-      const result = await calendarService.renewWebhook();
+  //     const result = await calendarService.renewWebhook();
       
-      if (result.ok) {
-        setWebhookSuccess('Webhook renewed successfully!');
-        await loadWebhookStatus(); // Refresh status
-      } else {
-        setWebhookError(result.error || 'Failed to renew webhook');
-      }
-    } catch (err: any) {
-      setWebhookError(err.message || 'Failed to renew webhook');
-    } finally {
-      setRenewingWebhook(false);
-    }
-  };
+  //     if (result.ok) {
+  //       setWebhookSuccess('Webhook renewed successfully!');
+  //       await loadWebhookStatus(); // Refresh status
+  //     } else {
+  //       setWebhookError(result.error || 'Failed to renew webhook');
+  //     }
+  //   } catch (err: any) {
+  //     setWebhookError(err.message || 'Failed to renew webhook');
+  //   } finally {
+  //     setRenewingWebhook(false);
+  //   }
+  // };
 
-  const performFullSync = async () => {
-    try {
-      setSyncing(true);
-      setSyncError(null);
-      setSyncSuccess(null);
+  // const performFullSync = async () => {
+  //   try {
+  //     setSyncing(true);
+  //     setSyncError(null);
+  //     setSyncSuccess(null);
       
-      // Perform a full sync that includes deletion detection
-      const result = await calendarService.fullSync(undefined, 30, 60);
+  //     // Perform a full sync that includes deletion detection
+  //     const result = await calendarService.fullSync(undefined, 30, 60);
       
-      setSyncSuccess(`Full sync completed! Processed ${result.total_events} events, created ${result.new_meetings} new meetings, updated ${result.updated_meetings} meetings, and deleted ${result.deleted_meetings} orphaned meetings.`);
+  //     setSyncSuccess(`Full sync completed! Processed ${result.total_events} events, created ${result.new_meetings} new meetings, updated ${result.updated_meetings} meetings, and deleted ${result.deleted_meetings} orphaned meetings.`);
       
-      // Reload meetings to show updated list
-      await loadMeetings();
-    } catch (err: any) {
-      setSyncError(err.message || 'Failed to perform full sync');
-    } finally {
-      setSyncing(false);
-    }
-  };
+  //     // Reload meetings to show updated list
+  //     await loadMeetings();
+  //   } catch (err: any) {
+  //     setSyncError(err.message || 'Failed to perform full sync');
+  //   } finally {
+  //     setSyncing(false);
+  //   }
+  // };
 
   const handleMeetingUpdate = () => {
     loadMeetings();
@@ -141,7 +138,7 @@ const MeetingsPage: React.FC = () => {
                   )}
                 </AlertDescription>
               </div>
-              <div className="flex space-x-2">
+              {/* <div className="flex space-x-2">
                 <Button
                   onClick={renewWebhook}
                   disabled={renewingWebhook}
@@ -178,11 +175,11 @@ const MeetingsPage: React.FC = () => {
                     </>
                   )}
                 </Button>
-              </div>
+              </div> */}
             </div>
           </Alert>
           
-          {webhookError && (
+          {/* {webhookError && (
             <Alert className="mt-2 border-red-200 bg-red-50">
               <AlertCircle className="h-4 w-4 text-red-600" />
               <AlertDescription className="text-red-800">{webhookError}</AlertDescription>
@@ -208,7 +205,7 @@ const MeetingsPage: React.FC = () => {
               <CheckCircle className="h-4 w-4 text-green-600" />
               <AlertDescription className="text-green-800">{syncSuccess}</AlertDescription>
             </Alert>
-          )}
+          )} */}
         </div>
       )}
       

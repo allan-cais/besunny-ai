@@ -103,14 +103,12 @@ async function renewWebhook(userId: string): Promise<{ success: boolean; error?:
           }
         );
         
-        if (stopResponse.ok) {
-          console.log(`Stopped existing webhook: ${existingWebhook.webhook_id}`);
-        } else {
-          console.log(`Failed to stop existing webhook: ${stopResponse.status}`);
+        if (!stopResponse.ok) {
+          console.error(`Failed to stop existing webhook: ${stopResponse.status}`);
         }
       }
     } catch (stopError) {
-      console.log('Error stopping existing webhook:', stopError);
+      console.error('Error stopping existing webhook:', stopError);
       // Continue anyway - the new webhook might still work
     }
     
@@ -145,9 +143,7 @@ async function renewWebhook(userId: string): Promise<{ success: boolean; error?:
     
     const webhookData = await webhookResponse.json();
     
-    console.log('Google webhook response:', webhookData);
-    console.log('Expiration value:', webhookData.expiration);
-    console.log('Expiration type:', typeof webhookData.expiration);
+
     
     // Validate expiration value
     if (!webhookData.expiration) {
@@ -173,8 +169,6 @@ async function renewWebhook(userId: string): Promise<{ success: boolean; error?:
       throw new Error(`Failed to parse expiration date: ${dateError.message}`);
     }
     
-    console.log('Parsed expiration date:', expirationDate.toISOString());
-    
     // Store webhook info in database
     const { data: upsertData, error: upsertError } = await supabase
       .from('calendar_webhooks')
@@ -195,8 +189,6 @@ async function renewWebhook(userId: string): Promise<{ success: boolean; error?:
       console.error('Database upsert error:', upsertError);
       throw new Error(`Failed to save webhook to database: ${upsertError.message}`);
     }
-    
-    console.log('Webhook saved to database:', upsertData);
     
     return { success: true, webhook_id: webhookData.id };
   } catch (error) {

@@ -265,8 +265,7 @@ serve(async (req) => {
           }
         }
       }
-      // Log skipped meetings and reasons
-      console.log(`Skipped ${skippedMeetings} events. Reasons:`, skippedReasons);
+
       
       // Optional: Clean up meetings that no longer exist in Google Calendar
       // Only if sync range is large enough to be comprehensive

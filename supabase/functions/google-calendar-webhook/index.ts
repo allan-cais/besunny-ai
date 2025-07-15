@@ -354,9 +354,7 @@ serve(async (req) => {
       
       const webhookData = await webhookResponse.json();
       
-      console.log('Google webhook response:', webhookData);
-      console.log('Expiration value:', webhookData.expiration);
-      console.log('Expiration type:', typeof webhookData.expiration);
+
       
       // Validate expiration value
       if (!webhookData.expiration) {
@@ -381,8 +379,6 @@ serve(async (req) => {
         console.error('Date parsing error:', dateError);
         throw new Error(`Failed to parse expiration date: ${dateError.message}`);
       }
-      
-      console.log('Parsed expiration date:', expirationDate.toISOString());
       
       // Store webhook info in database
       await supabase

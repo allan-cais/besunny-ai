@@ -181,8 +181,6 @@ export const calendarService = {
       .eq('is_active', true)
       .maybeSingle();
     
-    console.log('Webhook query result:', { webhook, webhookError, userId: session.user.id });
-    
     // Get recent sync logs
     const { data: syncLogs } = await supabase
       .from('calendar_sync_logs')
@@ -197,8 +195,6 @@ export const calendarService = {
       webhook_expires_at: webhook?.expiration_time,
       sync_logs: syncLogs || [],
     };
-    
-    console.log('Sync status result:', status);
     return status;
   },
 
