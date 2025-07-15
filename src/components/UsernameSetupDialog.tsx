@@ -142,85 +142,87 @@ const UsernameSetupDialog: React.FC<UsernameSetupDialogProps> = ({ open, onClose
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-[600px] bg-stone-100 dark:bg-zinc-800 border border-[#4a5565] dark:border-zinc-700 font-mono">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold text-center">
-            Set Up Your Personal Project Inbox
+          <DialogTitle className="text-base font-bold text-[#4a5565] dark:text-zinc-300">
+            SET UP YOUR PERSONAL PROJECT INBOX
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6">
           {/* Feature Description */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Mail className="h-5 w-5" />
-                Your Personal Project Inbox
-              </CardTitle>
-              <CardDescription>
-                Every project you create comes with a unique email address you can use to keep everything organized automatically.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Mail className="h-4 w-4 text-[#4a5565] dark:text-zinc-300" />
+              <h3 className="text-sm font-bold text-[#4a5565] dark:text-zinc-300">YOUR PERSONAL PROJECT INBOX</h3>
+            </div>
+            <p className="text-xs text-gray-600 dark:text-gray-400">
+              Your account comes with a unique email address you can use to keep everything organized automatically.
+            </p>
+            
+            <div className="space-y-3">
               <div className="flex items-start gap-3">
-                <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />
+                <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
                 <div>
-                  <p className="font-medium">Automatic Organization</p>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-xs font-bold text-[#4a5565] dark:text-zinc-300">AUTOMATIC ORGANIZATION</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">
                     Simply CC this address on any emails about your project, or share Google Drive files with it.
                   </p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
-                <FileText className="h-5 w-5 text-blue-500 mt-0.5" />
+                <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
                 <div>
-                  <p className="font-medium">Instant Capture</p>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-xs font-bold text-[#4a5565] dark:text-zinc-300">INSTANT CAPTURE</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">
                     Our system will instantly capture, tag, and attach the content to your project workspace.
                   </p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
-                <Users className="h-5 w-5 text-purple-500 mt-0.5" />
+                <Users className="h-4 w-4 text-purple-600 dark:text-purple-400 mt-0.5 flex-shrink-0" />
                 <div>
-                  <p className="font-medium">Searchable Content</p>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-xs font-bold text-[#4a5565] dark:text-zinc-300">SEARCHABLE CONTENT</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">
                     Everything will be saved and searchable—no extra steps required.
                   </p>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
           {/* Username Setup Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="username">Choose Your Username</Label>
+              <Label htmlFor="username" className="text-xs font-bold text-[#4a5565] dark:text-zinc-300">CHOOSE YOUR USERNAME</Label>
               <div className="flex gap-2">
+                <Badge variant="secondary" className="px-3 py-2 text-xs font-mono bg-stone-200 dark:bg-zinc-700 text-[#4a5565] dark:text-zinc-300 border border-[#4a5565] dark:border-zinc-700">
+                  inbound+
+                </Badge>
                 <Input
                   id="username"
                   type="text"
                   placeholder="yourusername"
                   value={username}
                   onChange={handleUsernameChange}
-                  className="flex-1"
+                  className="flex-1 bg-white dark:bg-zinc-900 border border-[#4a5565] dark:border-zinc-700 text-xs font-mono"
                   disabled={isLoading}
                 />
-                <Badge variant="secondary" className="px-3 py-2">
+                <Badge variant="secondary" className="px-3 py-2 text-xs font-mono bg-stone-200 dark:bg-zinc-700 text-[#4a5565] dark:text-zinc-300 border border-[#4a5565] dark:border-zinc-700">
                   @sunny.ai
                 </Badge>
               </div>
               {validationMessage && (
-                <p className="text-sm text-red-500 flex items-center gap-1">
-                  <AlertCircle className="h-4 w-4" />
+                <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3" />
                   {validationMessage}
                 </p>
               )}
-              <div className="bg-amber-50 dark:bg-amber-950 p-3 rounded-lg border border-amber-200 dark:border-amber-800">
-                <p className="text-sm text-amber-800 dark:text-amber-200 flex items-start gap-2">
-                  <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+              <div className="bg-amber-50 dark:bg-amber-950/20 p-3 rounded border border-amber-200 dark:border-amber-800">
+                <p className="text-xs text-amber-800 dark:text-amber-200 flex items-start gap-2">
+                  <AlertCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
                   <span>
-                    <strong>Important:</strong> Your username is permanent and cannot be changed once set. 
+                    <strong>IMPORTANT:</strong> Your username is permanent and cannot be changed once set. 
                     Choose carefully as this will be part of your virtual email address.
                   </span>
                 </p>
@@ -274,16 +276,16 @@ const UsernameSetupDialog: React.FC<UsernameSetupDialogProps> = ({ open, onClose
                 variant="outline"
                 onClick={onClose}
                 disabled={isLoading}
-                className="flex-1"
+                className="flex-1 font-mono text-xs px-3 py-2 h-auto hover:bg-stone-300 dark:hover:bg-zinc-700 focus:bg-stone-300 dark:focus:bg-zinc-700 border border-[#4a5565] dark:border-zinc-700 bg-stone-100 dark:bg-zinc-800 text-[#4a5565] dark:text-zinc-300"
               >
-                Skip for Now
+                SKIP FOR NOW
               </Button>
               <Button
                 type="submit"
                 disabled={!isValid || isLoading}
-                className="flex-1"
+                className="flex-1 font-mono text-xs px-3 py-2 h-auto bg-[#4a5565] dark:bg-zinc-700 hover:bg-[#3a4555] dark:hover:bg-zinc-600 focus:bg-[#3a4555] dark:focus:bg-zinc-600 text-white border border-[#4a5565] dark:border-zinc-700"
               >
-                {isLoading ? 'Setting up...' : 'Set Username'}
+                {isLoading ? 'SETTING UP...' : 'SET USERNAME'}
               </Button>
             </div>
           </form>

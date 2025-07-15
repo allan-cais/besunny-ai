@@ -99,7 +99,7 @@ const VirtualEmailSettings: React.FC = () => {
       <div>
         <h2 className="text-2xl font-bold">Virtual Email Address</h2>
         <p className="text-muted-foreground">
-          Your personal project inbox for automatic content organization
+          Your personal email address for automatic content organization
         </p>
       </div>
 
@@ -130,7 +130,7 @@ const VirtualEmailSettings: React.FC = () => {
                 Your Virtual Email Address
               </CardTitle>
               <CardDescription>
-                Use this address to automatically capture emails and files for your projects
+                Use this address to automatically capture emails and files for your workspace
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -174,9 +174,9 @@ const VirtualEmailSettings: React.FC = () => {
                     </div>
                     <div>
                       <h4 className="font-medium">Email Capture</h4>
-                      <p className="text-sm text-muted-foreground">
-                        CC <code className="bg-muted px-1 rounded text-xs">{virtualEmailAddress}</code> on any project-related emails
-                      </p>
+                                        <p className="text-sm text-muted-foreground">
+                    CC <code className="bg-muted px-1 rounded text-xs">{virtualEmailAddress}</code> on any emails you want to capture
+                  </p>
                     </div>
                   </div>
                 </div>
@@ -204,9 +204,9 @@ const VirtualEmailSettings: React.FC = () => {
                 </h4>
                 <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
                   <li>• Content is automatically captured and tagged</li>
-                  <li>• Files and emails appear in your project workspace</li>
+                  <li>• Files and emails appear in your workspace</li>
+                  <li>• AI determines the best project association</li>
                   <li>• Everything becomes searchable and organized</li>
-                  <li>• No manual steps required</li>
                 </ul>
               </div>
             </CardContent>

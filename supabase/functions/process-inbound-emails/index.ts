@@ -94,10 +94,12 @@ async function createDocumentFromEmail(
   sender: string
 ): Promise<string> {
   // Create a document record
+  // Note: project_id is initially null and will be assigned by the n8n classification agent
+  // based on the content analysis and AI reasoning
   const { data: document, error: docError } = await supabase
     .from('documents')
     .insert({
-      project_id: null, // Will be assigned by n8n classification
+      project_id: null, // Will be assigned by n8n classification agent based on content analysis
       source: 'gmail',
       source_id: gmailMessage.id,
       title: subject || 'No Subject',
@@ -132,6 +134,9 @@ async function sendToN8nWebhook(
   }
   
   try {
+    // Send payload to n8n classification agent
+    // The agent will analyze the content and determine the appropriate project_id
+    // based on AI reasoning and content analysis
     const payload = {
       user_id: userId,
       document_id: documentId,

@@ -4,7 +4,7 @@ This document describes the implementation of virtual inbound email addresses us
 
 ## Overview
 
-The virtual email addresses feature allows each user to have their own unique email address in the format `inbound+{username}@sunny.ai`. When emails are sent to this address, they are automatically processed, stored as documents, and sent to the n8n classification webhook.
+The virtual email addresses feature allows each user to have their own unique email address in the format `inbound+{username}@sunny.ai`. When emails are sent to this address, they are automatically processed, stored as documents, and sent to the n8n classification webhook. The classification agent uses AI reasoning to determine which project the content should be associated with.
 
 ## Architecture
 
@@ -92,8 +92,8 @@ Usernames must:
 
 1. **Extract username:** Parse `inbound+{username}@sunny.ai` format
 2. **Find user:** Lookup user by username in database
-3. **Create document:** Store email metadata in documents table
-4. **Send to n8n:** Forward to classification webhook
+3. **Create document:** Store email metadata in documents table (project_id initially null)
+4. **Send to n8n:** Forward to classification webhook for AI-based project association
 
 ### Security Features
 
