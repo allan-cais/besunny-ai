@@ -17,4 +17,4 @@ jobs:
           curl -X POST \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
             -H "Content-Type: application/json" \
-            "$RENEW_WEBHOOKS_URL" 
+            "${RENEW_WEBHOOKS_URL}" 

@@ -77,6 +77,46 @@ async function renewWebhook(userId: string): Promise<{ success: boolean; error?:
     const credentials = await getGoogleCredentials(userId);
     const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/google-calendar-webhook/notify`;
     
+    // First, try to stop any existing webhook
+    try {
+      const { data: existingWebhook } = await supabase
+        .from('calendar_webhooks')
+        .select('webhook_id, resource_id')
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .maybeSingle();
+      
+      if (existingWebhook?.webhook_id) {
+        // Stop the existing webhook
+        const stopResponse = await fetch(
+          `https://www.googleapis.com/calendar/v3/calendars/primary/events/stop`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${credentials.access_token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              id: existingWebhook.webhook_id,
+              resourceId: existingWebhook.resource_id,
+            }),
+          }
+        );
+        
+        if (stopResponse.ok) {
+          console.log(`Stopped existing webhook: ${existingWebhook.webhook_id}`);
+        } else {
+          console.log(`Failed to stop existing webhook: ${stopResponse.status}`);
+        }
+      }
+    } catch (stopError) {
+      console.log('Error stopping existing webhook:', stopError);
+      // Continue anyway - the new webhook might still work
+    }
+    
+    // Generate a unique channel ID with timestamp
+    const uniqueId = `calendar-webhook-${userId}-${Date.now()}`;
+    
     // Set up the webhook subscription
     const webhookResponse = await fetch(
       'https://www.googleapis.com/calendar/v3/calendars/primary/events/watch',
@@ -87,7 +127,7 @@ async function renewWebhook(userId: string): Promise<{ success: boolean; error?:
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          id: `calendar-webhook-${userId}`,
+          id: uniqueId,
           type: 'web_hook',
           address: webhookUrl,
           params: {

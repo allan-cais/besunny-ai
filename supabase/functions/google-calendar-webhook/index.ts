@@ -336,7 +336,7 @@ serve(async (req) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            id: `calendar-webhook-${userId}`,
+            id: `calendar-webhook-${userId}-${Date.now()}`,
             type: 'web_hook',
             address: webhookUrl,
             params: {
