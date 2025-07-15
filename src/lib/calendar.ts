@@ -174,12 +174,14 @@ export const calendarService = {
     if (!session) throw new Error('Not authenticated');
     
     // Get webhook status
-    const { data: webhook } = await supabase
+    const { data: webhook, error: webhookError } = await supabase
       .from('calendar_webhooks')
       .select('*')
       .eq('user_id', session.user.id)
       .eq('is_active', true)
       .maybeSingle();
+    
+    console.log('Webhook query result:', { webhook, webhookError, userId: session.user.id });
     
     // Get recent sync logs
     const { data: syncLogs } = await supabase
@@ -189,12 +191,15 @@ export const calendarService = {
       .order('created_at', { ascending: false })
       .limit(10);
     
-    return {
+    const status = {
       webhook_active: !!webhook,
       last_sync: webhook?.last_sync_at,
       webhook_expires_at: webhook?.expiration_time,
       sync_logs: syncLogs || [],
     };
+    
+    console.log('Sync status result:', status);
+    return status;
   },
 
   // Renew webhook subscription

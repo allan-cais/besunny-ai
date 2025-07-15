@@ -22,6 +22,9 @@ const MeetingsPage: React.FC = () => {
   const [renewingWebhook, setRenewingWebhook] = useState(false);
   const [webhookError, setWebhookError] = useState<string | null>(null);
   const [webhookSuccess, setWebhookSuccess] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [syncSuccess, setSyncSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     loadMeetings();
@@ -58,6 +61,7 @@ const MeetingsPage: React.FC = () => {
   const loadWebhookStatus = async () => {
     try {
       const status = await calendarService.getSyncStatus();
+      console.log('Webhook status:', status);
       setWebhookStatus(status);
     } catch (err: any) {
       console.error('Failed to load webhook status:', err);
@@ -82,6 +86,26 @@ const MeetingsPage: React.FC = () => {
       setWebhookError(err.message || 'Failed to renew webhook');
     } finally {
       setRenewingWebhook(false);
+    }
+  };
+
+  const performFullSync = async () => {
+    try {
+      setSyncing(true);
+      setSyncError(null);
+      setSyncSuccess(null);
+      
+      // Perform a full sync that includes deletion detection
+      const result = await calendarService.fullSync(undefined, 30, 60);
+      
+      setSyncSuccess(`Full sync completed! Processed ${result.total_events} events, created ${result.new_meetings} new meetings, updated ${result.updated_meetings} meetings, and deleted ${result.deleted_meetings} orphaned meetings.`);
+      
+      // Reload meetings to show updated list
+      await loadMeetings();
+    } catch (err: any) {
+      setSyncError(err.message || 'Failed to perform full sync');
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -117,24 +141,44 @@ const MeetingsPage: React.FC = () => {
                   )}
                 </AlertDescription>
               </div>
-              <Button
-                onClick={renewWebhook}
-                disabled={renewingWebhook}
-                variant="outline"
-                size="sm"
-              >
-                {renewingWebhook ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Renewing...
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw className="mr-2 h-4 w-4" />
-                    Renew Webhook
-                  </>
-                )}
-              </Button>
+              <div className="flex space-x-2">
+                <Button
+                  onClick={renewWebhook}
+                  disabled={renewingWebhook}
+                  variant="outline"
+                  size="sm"
+                >
+                  {renewingWebhook ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Renewing...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      Renew Webhook
+                    </>
+                  )}
+                </Button>
+                <Button
+                  onClick={performFullSync}
+                  disabled={syncing}
+                  variant="outline"
+                  size="sm"
+                >
+                  {syncing ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Syncing...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      Full Sync
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </Alert>
           
@@ -149,6 +193,20 @@ const MeetingsPage: React.FC = () => {
             <Alert className="mt-2 border-green-200 bg-green-50">
               <CheckCircle className="h-4 w-4 text-green-600" />
               <AlertDescription className="text-green-800">{webhookSuccess}</AlertDescription>
+            </Alert>
+          )}
+          
+          {syncError && (
+            <Alert className="mt-2 border-red-200 bg-red-50">
+              <AlertCircle className="h-4 w-4 text-red-600" />
+              <AlertDescription className="text-red-800">{syncError}</AlertDescription>
+            </Alert>
+          )}
+          
+          {syncSuccess && (
+            <Alert className="mt-2 border-green-200 bg-green-50">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <AlertDescription className="text-green-800">{syncSuccess}</AlertDescription>
             </Alert>
           )}
         </div>
