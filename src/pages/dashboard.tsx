@@ -6,6 +6,7 @@ import {
   MainWorkspace,
 } from '@/components/dashboard';
 import PageHeader from '@/components/dashboard/PageHeader';
+import UsernameSetupManager from '@/components/UsernameSetupManager';
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -53,6 +54,7 @@ const Dashboard = () => {
         setActiveFeedItemId={setActiveFeedItemId}
         projects={projects}
       />
+      <UsernameSetupManager />
     </div>
   );
 };

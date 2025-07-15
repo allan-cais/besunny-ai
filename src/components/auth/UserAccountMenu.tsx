@@ -157,7 +157,13 @@ const UserAccountMenu: React.FC = () => {
             <User className="mr-3 h-4 w-4" />
             <span>PROFILE</span>
           </DropdownMenuItem>
-          <DropdownMenuItem className="font-mono text-xs px-3 py-2 h-auto hover:bg-stone-300 dark:hover:bg-zinc-700 focus:bg-stone-300 dark:focus:bg-zinc-700 cursor-pointer">
+          <DropdownMenuItem 
+            onClick={() => {
+              navigate('/settings');
+              setDropdownOpen(false);
+            }}
+            className="font-mono text-xs px-3 py-2 h-auto hover:bg-stone-300 dark:hover:bg-zinc-700 focus:bg-stone-300 dark:focus:bg-zinc-700 cursor-pointer"
+          >
             <Settings className="mr-3 h-4 w-4" />
             <span>SETTINGS</span>
           </DropdownMenuItem>
