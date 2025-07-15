@@ -97,20 +97,20 @@ const VirtualEmailSettings: React.FC = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold">Virtual Email Address</h2>
-        <p className="text-muted-foreground">
+        <h2 className="text-xs font-medium font-mono uppercase tracking-wide">Virtual Email Address</h2>
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 font-mono">
           Your personal email address for automatic content organization
         </p>
       </div>
 
       {!userData?.username ? (
-        <Card>
+        <Card className="border-border bg-card">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-foreground">
               <AlertCircle className="h-5 w-5 text-orange-500" />
               Username Not Set
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-muted-foreground">
               Set up your username to get your personal virtual email address
             </CardDescription>
           </CardHeader>
@@ -123,24 +123,25 @@ const VirtualEmailSettings: React.FC = () => {
       ) : (
         <>
           {/* Virtual Email Address Display */}
-          <Card>
+          <Card className="border-border bg-card">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-foreground">
                 <Mail className="h-5 w-5" />
                 Your Virtual Email Address
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-muted-foreground">
                 Use this address to automatically capture emails and files for your workspace
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center gap-2 p-4 bg-muted rounded-lg">
-                <code className="flex-1 text-lg font-mono">{virtualEmailAddress}</code>
+              <div className="flex items-center gap-2 p-4 bg-muted rounded-lg border border-border">
+                <code className="flex-1 text-lg font-mono text-foreground">{virtualEmailAddress}</code>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={copyToClipboard}
                   disabled={copied}
+                  className="border-border hover:bg-accent hover:text-accent-foreground"
                 >
                   {copied ? (
                     <CheckCircle className="h-4 w-4" />
@@ -151,17 +152,17 @@ const VirtualEmailSettings: React.FC = () => {
               </div>
               
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Badge variant="secondary">Username: {userData.username}</Badge>
-                <Badge variant="outline">Active</Badge>
+                <Badge variant="secondary" className="bg-secondary text-secondary-foreground">Username: {userData.username}</Badge>
+                <Badge variant="outline" className="border-border">Active</Badge>
               </div>
             </CardContent>
           </Card>
 
           {/* Usage Instructions */}
-          <Card>
+          <Card className="border-border bg-card">
             <CardHeader>
-              <CardTitle>How to Use Your Virtual Email</CardTitle>
-              <CardDescription>
+              <CardTitle className="text-foreground">How to Use Your Virtual Email</CardTitle>
+              <CardDescription className="text-muted-foreground">
                 Follow these steps to automatically capture content for your projects
               </CardDescription>
             </CardHeader>
@@ -173,10 +174,10 @@ const VirtualEmailSettings: React.FC = () => {
                       <Mail className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                     </div>
                     <div>
-                      <h4 className="font-medium">Email Capture</h4>
-                                        <p className="text-sm text-muted-foreground">
-                    CC <code className="bg-muted px-1 rounded text-xs">{virtualEmailAddress}</code> on any emails you want to capture
-                  </p>
+                      <h4 className="font-medium text-foreground">Email Capture</h4>
+                      <p className="text-sm text-muted-foreground">
+                        CC <code className="bg-muted px-1 rounded text-xs border border-border">{virtualEmailAddress}</code> on any emails you want to capture
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -187,7 +188,7 @@ const VirtualEmailSettings: React.FC = () => {
                       <FileText className="h-4 w-4 text-green-600 dark:text-green-400" />
                     </div>
                     <div>
-                      <h4 className="font-medium">File Sharing</h4>
+                      <h4 className="font-medium text-foreground">File Sharing</h4>
                       <p className="text-sm text-muted-foreground">
                         Share Google Drive files with this address to automatically capture them
                       </p>
@@ -196,9 +197,9 @@ const VirtualEmailSettings: React.FC = () => {
                 </div>
               </div>
 
-              <Separator />
+              <Separator className="bg-border" />
 
-              <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg">
+              <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
                 <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">
                   What Happens Next?
                 </h4>
@@ -212,22 +213,7 @@ const VirtualEmailSettings: React.FC = () => {
             </CardContent>
           </Card>
 
-          {/* Recent Activity */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Activity</CardTitle>
-              <CardDescription>
-                Track your virtual email usage and captured content
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8 text-muted-foreground">
-                <Mail className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>No recent activity yet</p>
-                <p className="text-sm">Start using your virtual email address to see captured content here</p>
-              </div>
-            </CardContent>
-          </Card>
+
         </>
       )}
 
