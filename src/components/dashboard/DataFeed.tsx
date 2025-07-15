@@ -232,11 +232,11 @@ const DataFeed = () => {
     return (
       <div className="space-y-4">
         {[...Array(6)].map((_, i) => (
-          <Card key={i} className="border-border bg-card">
+          <Card key={i} className="border-[#4a5565] dark:border-zinc-700 bg-white dark:bg-zinc-900">
             <CardContent className="p-4">
-              <div className="h-6 bg-muted animate-pulse rounded mb-2" />
-              <div className="h-4 bg-muted animate-pulse rounded mb-2" />
-              <div className="h-4 bg-muted animate-pulse rounded w-2/3" />
+              <div className="h-6 bg-stone-50 dark:bg-zinc-800 animate-pulse rounded mb-2" />
+              <div className="h-4 bg-stone-50 dark:bg-zinc-800 animate-pulse rounded mb-2" />
+              <div className="h-4 bg-stone-50 dark:bg-zinc-800 animate-pulse rounded w-2/3" />
             </CardContent>
           </Card>
         ))}
@@ -257,12 +257,12 @@ const DataFeed = () => {
       {/* Search and Filters */}
       <div className="flex items-center gap-4">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500 dark:text-gray-400" />
           <Input
             placeholder="Search captured content..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 border-border bg-card"
+            className="pl-10 border-[#4a5565] dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[#4a5565] dark:text-zinc-200 font-mono"
           />
         </div>
         <div className="flex items-center gap-2">
@@ -270,7 +270,10 @@ const DataFeed = () => {
             variant={filterType === 'all' ? 'default' : 'outline'}
             size="sm"
             onClick={() => setFilterType('all')}
-            className="border-border"
+            className={filterType === 'all' 
+              ? "bg-[#4a5565] dark:bg-zinc-700 text-white hover:bg-[#3a4555] dark:hover:bg-zinc-600 font-mono"
+              : "border-[#4a5565] dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[#4a5565] dark:text-zinc-200 hover:bg-stone-50 dark:hover:bg-zinc-800 font-mono"
+            }
           >
             All
           </Button>
@@ -278,7 +281,10 @@ const DataFeed = () => {
             variant={filterType === 'email' ? 'default' : 'outline'}
             size="sm"
             onClick={() => setFilterType('email')}
-            className="border-border"
+            className={filterType === 'email' 
+              ? "bg-[#4a5565] dark:bg-zinc-700 text-white hover:bg-[#3a4555] dark:hover:bg-zinc-600 font-mono"
+              : "border-[#4a5565] dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[#4a5565] dark:text-zinc-200 hover:bg-stone-50 dark:hover:bg-zinc-800 font-mono"
+            }
           >
             <Mail className="h-4 w-4 mr-1" />
             Emails
@@ -287,7 +293,10 @@ const DataFeed = () => {
             variant={filterType === 'drive' ? 'default' : 'outline'}
             size="sm"
             onClick={() => setFilterType('drive')}
-            className="border-border"
+            className={filterType === 'drive' 
+              ? "bg-[#4a5565] dark:bg-zinc-700 text-white hover:bg-[#3a4555] dark:hover:bg-zinc-600 font-mono"
+              : "border-[#4a5565] dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[#4a5565] dark:text-zinc-200 hover:bg-stone-50 dark:hover:bg-zinc-800 font-mono"
+            }
           >
             <FileText className="h-4 w-4 mr-1" />
             Drive Files
@@ -298,53 +307,56 @@ const DataFeed = () => {
       {/* Activity Feed */}
       <div className="space-y-4">
         {filteredActivities.length === 0 ? (
-          <Card className="border-border bg-card">
+          <Card className="border-[#4a5565] dark:border-zinc-700 bg-white dark:bg-zinc-900">
             <CardContent className="p-8 text-center">
-              <Mail className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-              <h3 className="text-lg font-medium text-foreground mb-2">No activity yet</h3>
-              <p className="text-muted-foreground mb-4">
+              <Mail className="h-12 w-12 mx-auto mb-4 text-gray-500 dark:text-gray-400 opacity-50" />
+              <h3 className="text-lg font-medium text-[#4a5565] dark:text-zinc-200 mb-2 font-mono">No activity yet</h3>
+              <p className="text-gray-600 dark:text-gray-400 mb-4 font-mono">
                 Start using your virtual email address to see captured content here
               </p>
-              <Button variant="outline" className="border-border">
+              <Button 
+                variant="outline" 
+                className="border-[#4a5565] dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[#4a5565] dark:text-zinc-200 hover:bg-stone-50 dark:hover:bg-zinc-800 font-mono"
+              >
                 View Settings
               </Button>
             </CardContent>
           </Card>
         ) : (
           filteredActivities.map(activity => (
-            <Card key={activity.id} className="border-border bg-card hover:bg-accent/50 transition-colors">
+            <Card key={activity.id} className="border-[#4a5565] dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-stone-50 dark:hover:bg-zinc-800 transition-colors">
               <CardContent className="p-4">
                 <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0 w-8 h-8 bg-muted rounded-full flex items-center justify-center">
+                  <div className="flex-shrink-0 w-8 h-8 bg-stone-50 dark:bg-zinc-800 rounded-full flex items-center justify-center">
                     {getTypeIcon(activity.type)}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2 mb-1">
-                      <h3 className="font-medium text-foreground truncate">{activity.title}</h3>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <h3 className="font-medium text-[#4a5565] dark:text-zinc-200 truncate font-mono">{activity.title}</h3>
+                      <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 font-mono">
                         <Clock className="h-3 w-3" />
                         {formatTimeAgo(activity.created_at)}
                       </div>
                     </div>
-                    <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 line-clamp-2 font-mono">
                       {activity.summary}
                     </p>
                     <div className="flex items-center gap-2">
-                      <Badge variant="secondary" className="text-xs">
+                      <Badge className="border border-[#4a5565] dark:border-zinc-700 rounded px-2 py-0.5 text-[10px] text-[#4a5565] dark:text-zinc-200 bg-stone-50 dark:bg-zinc-800 uppercase font-mono">
                         {getTypeLabel(activity.type)}
                       </Badge>
                       {activity.sender && (
-                        <Badge variant="outline" className="text-xs border-border">
+                        <Badge className="border border-[#4a5565] dark:border-zinc-700 rounded px-2 py-0.5 text-[10px] text-[#4a5565] dark:text-zinc-200 bg-stone-50 dark:bg-zinc-800 uppercase font-mono">
                           From: {activity.sender}
                         </Badge>
                       )}
                       {activity.file_size && (
-                        <Badge variant="outline" className="text-xs border-border">
+                        <Badge className="border border-[#4a5565] dark:border-zinc-700 rounded px-2 py-0.5 text-[10px] text-[#4a5565] dark:text-zinc-200 bg-stone-50 dark:bg-zinc-800 uppercase font-mono">
                           {activity.file_size}
                         </Badge>
                       )}
                       {!activity.processed && (
-                        <Badge variant="destructive" className="text-xs">
+                        <Badge className="border border-red-500 rounded px-2 py-0.5 text-[10px] text-red-500 bg-red-50 dark:bg-red-950 uppercase font-mono">
                           Processing
                         </Badge>
                       )}
