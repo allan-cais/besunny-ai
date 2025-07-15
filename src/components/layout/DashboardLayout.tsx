@@ -242,14 +242,24 @@ const DashboardLayout = () => {
 
   const deleteProject = async (projectId: string) => {
     try {
+      console.log('DashboardLayout: Starting project deletion for:', projectId);
       await supabaseService.deleteProject(projectId);
-      setProjects(prev => prev.filter(project => project.id !== projectId));
+      console.log('DashboardLayout: Project deleted from database, updating UI');
+      
+      setProjects(prev => {
+        const filtered = prev.filter(project => project.id !== projectId);
+        console.log('DashboardLayout: Updated projects list, new count:', filtered.length);
+        return filtered;
+      });
+      
       if (activeProjectId === projectId) {
+        console.log('DashboardLayout: Deleted project was active, navigating to dashboard');
         setActiveProjectId(null);
         navigate('/dashboard');
       }
     } catch (error) {
-      console.error('Error deleting project:', error);
+      console.error('DashboardLayout: Error deleting project:', error);
+      // You might want to show a toast notification here
     }
   };
 
