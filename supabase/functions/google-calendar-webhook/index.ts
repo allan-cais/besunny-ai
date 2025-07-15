@@ -1,5 +1,5 @@
-import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
+import { serve } from 'std/http/server.ts';
+import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -359,12 +359,13 @@ serve(async (req) => {
         .from('calendar_webhooks')
         .upsert({
           user_id: userId,
+          google_calendar_id: 'primary',
           webhook_id: webhookData.id,
           resource_id: webhookData.resourceId,
-          expiration_time: new Date(webhookData.expiration * 1000).toISOString(),
+          expiration_time: new Date(webhookData.expiration).toISOString(),
           is_active: true,
         }, {
-          onConflict: 'user_id',
+          onConflict: 'user_id,google_calendar_id',
         });
       
       return withCORS(new Response(JSON.stringify({

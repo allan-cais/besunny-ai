@@ -1,5 +1,5 @@
-import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
+import { serve } from 'std/http/server.ts';
+import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -145,19 +145,30 @@ async function renewWebhook(userId: string): Promise<{ success: boolean; error?:
     
     const webhookData = await webhookResponse.json();
     
+    console.log('Google webhook response:', webhookData);
+    
     // Store webhook info in database
-    await supabase
+    const { data: upsertData, error: upsertError } = await supabase
       .from('calendar_webhooks')
       .upsert({
         user_id: userId,
+        google_calendar_id: 'primary',
         webhook_id: webhookData.id,
         resource_id: webhookData.resourceId,
-        expiration_time: new Date(webhookData.expiration * 1000).toISOString(),
+        expiration_time: new Date(webhookData.expiration).toISOString(),
         is_active: true,
         last_sync_at: new Date().toISOString(),
       }, {
-        onConflict: 'user_id',
-      });
+        onConflict: 'user_id,google_calendar_id',
+      })
+      .select();
+    
+    if (upsertError) {
+      console.error('Database upsert error:', upsertError);
+      throw new Error(`Failed to save webhook to database: ${upsertError.message}`);
+    }
+    
+    console.log('Webhook saved to database:', upsertData);
     
     return { success: true, webhook_id: webhookData.id };
   } catch (error) {
