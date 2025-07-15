@@ -66,7 +66,7 @@ interface DataFeedProps {
 }
 
 const DataFeed = ({ onSelect }: DataFeedProps) => (
-  <div className="flex-1 flex flex-col overflow-y-auto">
+  <div className="h-full flex flex-col">
     <div className="mb-8">
       <h1 className="text-xl font-bold font-mono uppercase tracking-wide mb-6">Data Feed</h1>
       <p className="text-sm text-gray-600 dark:text-gray-400 mb-6 font-mono">Browse and manage your connected information sources</p>
@@ -76,7 +76,8 @@ const DataFeed = ({ onSelect }: DataFeedProps) => (
           Date
         </button>
       </div>
-      <div className="space-y-6">
+    </div>
+    <div className="flex-1 overflow-y-auto space-y-6 pr-2">
         {mockFeed.map(item => (
           <Card key={item.id} className="flex flex-col gap-2 p-4">
             <div className="flex items-center justify-between">
@@ -96,7 +97,6 @@ const DataFeed = ({ onSelect }: DataFeedProps) => (
             </div>
           </Card>
         ))}
-      </div>
     </div>
   </div>
 );

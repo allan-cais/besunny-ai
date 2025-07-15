@@ -111,18 +111,18 @@ const MeetingsPage: React.FC = () => {
   };
 
   return (
-    <div className="px-4 py-8 font-sans">
+    <div className="px-4 py-8 font-sans h-full flex flex-col">
       <div className="flex items-center justify-between mb-6">
         <PageHeader title="MEETINGS" path="~/sunny.ai/meetings" />
       </div>
       
-
-      
-      <CalendarView
-        meetings={meetings}
-        onMeetingUpdate={handleMeetingUpdate}
-        projects={projects}
-      />
+      <div className="flex-1 min-h-0">
+        <CalendarView
+          meetings={meetings}
+          onMeetingUpdate={handleMeetingUpdate}
+          projects={projects}
+        />
+      </div>
     </div>
   );
 };
