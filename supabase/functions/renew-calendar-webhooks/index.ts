@@ -146,6 +146,34 @@ async function renewWebhook(userId: string): Promise<{ success: boolean; error?:
     const webhookData = await webhookResponse.json();
     
     console.log('Google webhook response:', webhookData);
+    console.log('Expiration value:', webhookData.expiration);
+    console.log('Expiration type:', typeof webhookData.expiration);
+    
+    // Validate expiration value
+    if (!webhookData.expiration) {
+      throw new Error('No expiration value received from Google API');
+    }
+    
+    // Convert expiration to proper date
+    let expirationDate: Date;
+    try {
+      if (typeof webhookData.expiration === 'number') {
+        expirationDate = new Date(webhookData.expiration);
+      } else if (typeof webhookData.expiration === 'string') {
+        expirationDate = new Date(parseInt(webhookData.expiration));
+      } else {
+        throw new Error(`Unexpected expiration type: ${typeof webhookData.expiration}`);
+      }
+      
+      if (isNaN(expirationDate.getTime())) {
+        throw new Error(`Invalid expiration value: ${webhookData.expiration}`);
+      }
+    } catch (dateError) {
+      console.error('Date parsing error:', dateError);
+      throw new Error(`Failed to parse expiration date: ${dateError.message}`);
+    }
+    
+    console.log('Parsed expiration date:', expirationDate.toISOString());
     
     // Store webhook info in database
     const { data: upsertData, error: upsertError } = await supabase
@@ -155,7 +183,7 @@ async function renewWebhook(userId: string): Promise<{ success: boolean; error?:
         google_calendar_id: 'primary',
         webhook_id: webhookData.id,
         resource_id: webhookData.resourceId,
-        expiration_time: new Date(webhookData.expiration).toISOString(),
+        expiration_time: expirationDate.toISOString(),
         is_active: true,
         last_sync_at: new Date().toISOString(),
       }, {
