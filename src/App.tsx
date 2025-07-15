@@ -11,6 +11,7 @@ import Dashboard from "./pages/dashboard";
 import AuthPage from "./pages/auth";
 import IntegrationsPage from "./pages/integrations";
 import OAuthCallback from "./pages/oauth-callback";
+import OAuthLoginCallback from "./pages/oauth-login-callback";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import ProjectDashboard from "./pages/project";
@@ -54,6 +55,12 @@ const App = () => (
                 path="/oauth/callback" 
                 element={
                   <OAuthCallback />
+                } 
+              />
+              <Route 
+                path="/oauth-login-callback" 
+                element={
+                  <OAuthLoginCallback />
                 } 
               />
               <Route 

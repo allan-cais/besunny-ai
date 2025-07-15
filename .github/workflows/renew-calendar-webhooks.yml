@@ -1,0 +1,20 @@
+# Automatically renew calendar webhooks before they expire
+name: Renew Calendar Webhooks
+
+on:
+  schedule:
+    - cron: '0 0 */6 * *'  # Every 6 days at midnight
+  workflow_dispatch:
+
+jobs:
+  renew-webhooks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call Supabase Edge Function to renew webhooks
+        env:
+          RENEW_WEBHOOKS_URL: ${{ secrets.RENEW_WEBHOOKS_URL }}
+        run: |
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Content-Type: application/json" \
+            "$RENEW_WEBHOOKS_URL" 

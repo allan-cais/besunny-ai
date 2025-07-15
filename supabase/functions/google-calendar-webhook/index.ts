@@ -286,6 +286,12 @@ serve(async (req) => {
             sync_range_end: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
           });
         
+        // Update last_sync_at in webhook record
+        await supabase
+          .from('calendar_webhooks')
+          .update({ last_sync_at: new Date().toISOString() })
+          .eq('user_id', userId);
+        
         return withCORS(new Response(JSON.stringify({
           ok: true,
           processed,

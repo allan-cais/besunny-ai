@@ -112,6 +112,11 @@ const UserAccountMenu: React.FC = () => {
     return user?.user_metadata?.name || user?.email?.split('@')[0] || 'User';
   };
 
+  const getUserProfilePicture = () => {
+    // Check for Google profile picture first, then fallback to avatar_url
+    return user?.user_metadata?.picture || user?.user_metadata?.avatar_url;
+  };
+
   return (
     <>
       <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
@@ -121,7 +126,7 @@ const UserAccountMenu: React.FC = () => {
             className="relative h-8 w-8 rounded-full border border-transparent hover:border-[#4a5565] dark:hover:border-zinc-700 transition-colors"
           >
             <Avatar className="h-8 w-8">
-              <AvatarImage src={user?.user_metadata?.avatar_url} alt={getUserDisplayName()} />
+              <AvatarImage src={getUserProfilePicture()} alt={getUserDisplayName()} />
               <AvatarFallback className="text-xs font-mono bg-stone-200 dark:bg-zinc-700 text-[#4a5565] dark:text-zinc-300">
                 {getUserInitials()}
               </AvatarFallback>
@@ -199,6 +204,19 @@ const UserAccountMenu: React.FC = () => {
                 <AlertDescription className="text-xs">{success}</AlertDescription>
               </Alert>
             )}
+            
+            {/* Profile Picture Display */}
+            {getUserProfilePicture() && (
+              <div className="flex justify-center mb-4">
+                <Avatar className="h-16 w-16">
+                  <AvatarImage src={getUserProfilePicture()} alt={getUserDisplayName()} />
+                  <AvatarFallback className="text-lg font-mono bg-stone-200 dark:bg-zinc-700 text-[#4a5565] dark:text-zinc-300">
+                    {getUserInitials()}
+                  </AvatarFallback>
+                </Avatar>
+              </div>
+            )}
+            
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="name" className="text-right text-xs font-mono text-[#4a5565] dark:text-zinc-300">
                 NAME
@@ -224,6 +242,27 @@ const UserAccountMenu: React.FC = () => {
                 <Mail className="h-4 w-4 text-gray-500 dark:text-gray-400" />
               </div>
             </div>
+            
+            {/* Show provider info if available */}
+            {user?.user_metadata?.provider && (
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label className="text-right text-xs font-mono text-[#4a5565] dark:text-zinc-300">
+                  PROVIDER
+                </Label>
+                <div className="col-span-3 flex items-center space-x-2">
+                  <span className="text-xs font-mono text-gray-600 dark:text-gray-400 capitalize">
+                    {user.user_metadata.provider}
+                  </span>
+                  {user.user_metadata.provider === 'google' && (
+                    <img 
+                      src="https://www.gstatic.com/marketing-cms/assets/images/d5/dc/cfe9ce8b4425b410b49b7f2dd3f3/g.webp=s96-fcrop64=1,00000000ffffffff-rw" 
+                      alt="Google" 
+                      className="w-4 h-4" 
+                    />
+                  )}
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button

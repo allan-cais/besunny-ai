@@ -168,6 +168,7 @@ export const calendarService = {
     webhook_active: boolean;
     last_sync?: string;
     sync_logs: any[];
+    webhook_expires_at?: string;
   }> {
     const session = (await supabase.auth.getSession()).data.session;
     if (!session) throw new Error('Not authenticated');
@@ -191,8 +192,33 @@ export const calendarService = {
     return {
       webhook_active: !!webhook,
       last_sync: webhook?.last_sync_at,
+      webhook_expires_at: webhook?.expiration_time,
       sync_logs: syncLogs || [],
     };
+  },
+
+  // Renew webhook subscription
+  async renewWebhook(): Promise<{
+    ok: boolean;
+    webhook_id?: string;
+    error?: string;
+  }> {
+    const session = (await supabase.auth.getSession()).data.session;
+    if (!session) throw new Error('Not authenticated');
+    
+    const url = new URL(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/renew-calendar-webhooks/renew`);
+    
+    const response = await fetch(url.toString(), {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ userId: session.user.id }),
+    });
+    
+    const result = await response.json();
+    return result;
   },
 
   // Get meetings for a specific project

@@ -31,6 +31,7 @@ interface GoogleIntegrationStatus {
   expiresAt?: string;
   email?: string;
   scopeMismatch?: boolean;
+  isLoginProvider?: boolean;
 }
 
 const IntegrationsPage: React.FC = () => {
@@ -97,6 +98,7 @@ const IntegrationsPage: React.FC = () => {
       setLoading(true);
       setError(null);
       
+      // Check for both integration and login credentials
       const { data: credentials, error } = await supabase
         .from('google_credentials')
         .select('*')
@@ -108,33 +110,48 @@ const IntegrationsPage: React.FC = () => {
       }
       
       if (credentials) {
-        // Check if stored scopes match current requested scopes
-        const currentScopes = [
-          'https://www.googleapis.com/auth/gmail.modify',
-          'https://www.googleapis.com/auth/drive',
-          'https://www.googleapis.com/auth/userinfo.email',
-          'https://www.googleapis.com/auth/calendar'
-        ].join(' ');
+        // Check if this is a login provider or integration
+        const isLoginProvider = credentials.login_provider === true;
         
-        function normalizeScopes(scopeString: string) {
-          return scopeString
-            .split(/\s+/)
-            .filter(Boolean)
-            .filter(scope => scope !== 'openid')
-            .sort()
-            .join(' ');
+        if (isLoginProvider) {
+          // For login providers, show connected status but with limited scope info
+          setGoogleStatus({
+            connected: true,
+            expiresAt: credentials.expires_at,
+            email: credentials.google_email,
+            scopeMismatch: false, // Login providers don't need scope matching
+            isLoginProvider: true
+          });
+        } else {
+          // For integrations, check scope matching
+          const currentScopes = [
+            'https://www.googleapis.com/auth/gmail.modify',
+            'https://www.googleapis.com/auth/drive',
+            'https://www.googleapis.com/auth/userinfo.email',
+            'https://www.googleapis.com/auth/calendar'
+          ].join(' ');
+          
+          function normalizeScopes(scopeString: string) {
+            return scopeString
+              .split(/\s+/)
+              .filter(Boolean)
+              .filter(scope => scope !== 'openid')
+              .sort()
+              .join(' ');
+          }
+          
+          const normalizedStored = normalizeScopes(credentials.scope);
+          const normalizedCurrent = normalizeScopes(currentScopes);
+          const scopeMismatch = normalizedStored !== normalizedCurrent;
+          
+          setGoogleStatus({
+            connected: true,
+            expiresAt: credentials.expires_at,
+            email: credentials.google_email,
+            scopeMismatch,
+            isLoginProvider: false
+          });
         }
-        
-        const normalizedStored = normalizeScopes(credentials.scope);
-        const normalizedCurrent = normalizeScopes(currentScopes);
-        const scopeMismatch = normalizedStored !== normalizedCurrent;
-        
-        setGoogleStatus({
-          connected: true,
-          expiresAt: credentials.expires_at,
-          email: credentials.google_email,
-          scopeMismatch
-        });
       } else {
         setGoogleStatus({ connected: false });
       }
@@ -232,9 +249,25 @@ const IntegrationsPage: React.FC = () => {
       }
 
       if (result.success) {
-        setSuccess(`Successfully connected to Google account: ${result.email}`);
+        const successMessage = result.name && result.picture 
+          ? `Successfully connected to Google account: ${result.email}. Your profile has been updated with your Google information!`
+          : `Successfully connected to Google account: ${result.email}`;
+        
+        setSuccess(successMessage);
         setError(null);
         await loadGoogleStatus();
+        
+        // Refresh user session to get updated profile information
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            // Trigger a session refresh to get updated user metadata
+            await supabase.auth.refreshSession();
+          }
+        } catch (refreshError) {
+          console.warn('Failed to refresh session:', refreshError);
+        }
+        
         // Automatically trigger initial sync and real-time sync
         try {
           await import('@/lib/calendar').then(async ({ calendarService }) => {
@@ -270,9 +303,15 @@ const IntegrationsPage: React.FC = () => {
       // Get current credentials for token revocation
       const { data: credentials } = await supabase
         .from('google_credentials')
-        .select('access_token, refresh_token')
+        .select('access_token, refresh_token, login_provider')
         .eq('user_id', user.id)
         .maybeSingle();
+
+      // Don't allow disconnecting login providers from integrations page
+      if (credentials?.login_provider) {
+        setError('Cannot disconnect login provider from integrations page. Please use your account settings to manage login providers.');
+        return;
+      }
 
       // Revoke tokens at Google (if available)
       if (credentials?.access_token) {
@@ -299,11 +338,12 @@ const IntegrationsPage: React.FC = () => {
         }
       }
 
-      // Delete credentials from database
+      // Delete credentials from database (only integration credentials, not login providers)
       const { error: deleteError } = await supabase
         .from('google_credentials')
         .delete()
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .eq('login_provider', false);
 
       if (deleteError) {
         throw new Error(deleteError.message);
@@ -428,72 +468,117 @@ const IntegrationsPage: React.FC = () => {
               
               <Separator className="bg-[#4a5565] dark:bg-zinc-700" />
               
-              <div className="space-y-3">
-                <h4 className="text-sm font-bold font-mono">ACCESS PERMISSIONS</h4>
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <Mail className="w-4 h-4 text-green-600 dark:text-green-400" />
-                    <span className="text-xs font-mono">Gmail (Read, Modify & Send)</span>
+              {googleStatus.isLoginProvider ? (
+                // Show login provider info
+                <div className="space-y-3">
+                  <h4 className="text-sm font-bold font-mono">LOGIN PROVIDER</h4>
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <Users className="w-4 h-4 text-green-600 dark:text-green-400" />
+                      <span className="text-xs font-mono">Google Account Authentication</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Mail className="w-4 h-4 text-green-600 dark:text-green-400" />
+                      <span className="text-xs font-mono">Email & Profile Access</span>
+                    </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <HardDrive className="w-4 h-4 text-green-600 dark:text-green-400" />
-                    <span className="text-xs font-mono">Google Drive (Full Access)</span>
+                  <div className="mt-3 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md">
+                    <p className="text-xs text-green-800 dark:text-green-200 font-mono">
+                      <span className="font-mono font-bold">Login Account:</span>
+                      <span className="font-mono"> This Google account is used for authentication. To add workspace integration (Gmail, Drive, Calendar), click "ADD WORKSPACE INTEGRATION" below.</span>
+                    </p>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <Calendar className="w-4 h-4 text-green-600 dark:text-green-400" />
-                    <span className="text-xs font-mono">Google Calendar (Full Access)</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Users className="w-4 h-4 text-green-600 dark:text-green-400" />
-                    <span className="text-xs font-mono">Google Account Email (userinfo.email)</span>
+                  
+                  <div className="flex items-center space-x-3 pt-4">
+                    <Button
+                      variant="outline"
+                      onClick={handleGoogleConnect}
+                      disabled={connecting}
+                      className="font-mono text-xs border-blue-500 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                    >
+                      {connecting ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          CONNECTING...
+                        </>
+                      ) : (
+                        <>
+                          <Mail className="mr-2 h-4 w-4" />
+                          ADD WORKSPACE INTEGRATION
+                        </>
+                      )}
+                    </Button>
                   </div>
                 </div>
-                <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
-                  <p className="text-xs text-blue-800 dark:text-blue-200 font-mono">
-                    <span className="font-mono font-bold">Note:</span>
-                    <span className="font-mono"> Only the above permissions are requested. If you've updated scopes in Google Cloud Console, click "RECONNECT" to refresh your permissions with the new scopes.</span>
-                  </p>
-                </div>
-              </div>
+              ) : (
+                // Show integration info
+                <div className="space-y-3">
+                  <h4 className="text-sm font-bold font-mono">ACCESS PERMISSIONS</h4>
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <Mail className="w-4 h-4 text-green-600 dark:text-green-400" />
+                      <span className="text-xs font-mono">Gmail (Read, Modify & Send)</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <HardDrive className="w-4 h-4 text-green-600 dark:text-green-400" />
+                      <span className="text-xs font-mono">Google Drive (Full Access)</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Calendar className="w-4 h-4 text-green-600 dark:text-green-400" />
+                      <span className="text-xs font-mono">Google Calendar (Full Access)</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Users className="w-4 h-4 text-green-600 dark:text-green-400" />
+                      <span className="text-xs font-mono">Google Account Email (userinfo.email)</span>
+                    </div>
+                  </div>
+                  <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
+                    <p className="text-xs text-blue-800 dark:text-blue-200 font-mono">
+                      <span className="font-mono font-bold">Note:</span>
+                      <span className="font-mono"> Only the above permissions are requested. If you've updated scopes in Google Cloud Console, click "RECONNECT" to refresh your permissions with the new scopes.</span>
+                    </p>
+                  </div>
 
-              <div className="flex items-center space-x-3 pt-4">
-                <Button
-                  variant="outline"
-                  onClick={handleGoogleDisconnect}
-                  disabled={disconnecting}
-                  className="font-mono text-xs border-red-500 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-                >
-                  {disconnecting ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      DISCONNECTING...
-                    </>
-                  ) : (
-                    <>
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      DISCONNECT
-                    </>
-                  )}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={handleGoogleConnect}
-                  disabled={connecting}
-                  className="font-mono text-xs border-blue-500 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                >
-                  {connecting ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      RECONNECTING...
-                    </>
-                  ) : (
-                    <>
-                      <RefreshCw className="mr-2 h-4 w-4" />
-                      RECONNECT (UPDATE SCOPES)
-                    </>
-                  )}
-                </Button>
-              </div>
+                  <div className="flex items-center space-x-3 pt-4">
+                    <Button
+                      variant="outline"
+                      onClick={handleGoogleDisconnect}
+                      disabled={disconnecting}
+                      className="font-mono text-xs border-red-500 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                    >
+                      {disconnecting ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          DISCONNECTING...
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          DISCONNECT
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={handleGoogleConnect}
+                      disabled={connecting}
+                      className="font-mono text-xs border-blue-500 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                    >
+                      {connecting ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          RECONNECTING...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="mr-2 h-4 w-4" />
+                          RECONNECT (UPDATE SCOPES)
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-12">

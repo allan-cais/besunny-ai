@@ -22,18 +22,6 @@ interface UserInfo {
   picture?: string
 }
 
-interface GoogleCredentials {
-  user_id: string
-  access_token: string
-  refresh_token?: string
-  token_type: string
-  expires_at: string
-  scope: string
-  google_email: string
-  google_name?: string
-  google_picture?: string
-}
-
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -46,12 +34,6 @@ serve(async (req) => {
       throw new Error('Method not allowed')
     }
 
-    // Get and validate authorization header
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new Error('Missing or invalid authorization header')
-    }
-
     // Initialize Supabase client with service role key
     const supabaseUrl = Deno.env.get('PROJECT_URL')
     const supabaseServiceKey = Deno.env.get('SERVICE_ROLE_KEY')
@@ -61,14 +43,6 @@ serve(async (req) => {
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
-    // Verify the JWT token and get user
-    const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
-    
-    if (authError || !user) {
-      throw new Error('Invalid or expired token')
-    }
 
     // Parse request body
     const { code } = await req.json()
@@ -80,7 +54,7 @@ serve(async (req) => {
     // Get Google OAuth configuration from environment
     const clientId = Deno.env.get('GOOGLE_CLIENT_ID')
     const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET')
-    const redirectUri = Deno.env.get('GOOGLE_REDIRECT_URI')
+    const redirectUri = Deno.env.get('GOOGLE_LOGIN_REDIRECT_URI')
 
     if (!clientId || !clientSecret || !redirectUri) {
       throw new Error('OAuth configuration missing')
@@ -125,67 +99,82 @@ serve(async (req) => {
     const expiresAt = new Date()
     expiresAt.setSeconds(expiresAt.getSeconds() + tokens.expires_in)
 
-    // Prepare credentials for storage
-    const credentials: GoogleCredentials = {
-      user_id: user.id,
-      access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token,
-      token_type: tokens.token_type,
-      expires_at: expiresAt.toISOString(),
-      scope: tokens.scope,
-      google_email: userInfo.email,
-      google_name: userInfo.name,
-      google_picture: userInfo.picture
+    // Check if user already exists with this Google user ID
+    const { data: existingUser, error: lookupError } = await supabase
+      .rpc('get_user_by_google_id', { google_user_id: userInfo.id })
+
+    if (lookupError) {
+      throw new Error('Failed to check existing user')
     }
 
-    // Store credentials in Supabase database
-    const { error: dbError } = await supabase
-      .from('google_credentials')
-      .upsert(credentials, {
-        onConflict: 'user_id'
-      })
+    let userId: string
 
-    if (dbError) {
-      throw new Error('Failed to store credentials')
-    }
-
-    // Update user metadata with Google profile information if not already set
-    // This allows email users to get Google profile picture when they connect Google
-    const currentMetadata = user.user_metadata || {};
-    const updatedMetadata = { ...currentMetadata };
-    
-    // Only update if the user doesn't already have a name or picture from Google
-    if (!currentMetadata.name && userInfo.name) {
-      updatedMetadata.name = userInfo.name;
-    }
-    if (!currentMetadata.picture && userInfo.picture) {
-      updatedMetadata.picture = userInfo.picture;
-    }
-    if (!currentMetadata.provider) {
-      updatedMetadata.provider = 'google';
-    }
-
-    // Update user metadata if we have new information
-    if (JSON.stringify(updatedMetadata) !== JSON.stringify(currentMetadata)) {
-      const { error: updateError } = await supabase.auth.admin.updateUserById(
-        user.id,
-        { user_metadata: updatedMetadata }
-      );
+    if (existingUser && existingUser.length > 0) {
+      // User exists, update their credentials
+      userId = existingUser[0].user_id
       
+      const { error: updateError } = await supabase
+        .from('google_credentials')
+        .update({
+          access_token: tokens.access_token,
+          refresh_token: tokens.refresh_token,
+          token_type: tokens.token_type,
+          expires_at: expiresAt.toISOString(),
+          scope: tokens.scope,
+          google_email: userInfo.email,
+          google_name: userInfo.name,
+          google_picture: userInfo.picture,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', userId)
+        .eq('login_provider', true)
+
       if (updateError) {
-        console.warn('Failed to update user metadata:', updateError);
-        // Don't fail the whole operation if metadata update fails
+        throw new Error('Failed to update user credentials')
       }
+    } else {
+      // Create new user or link existing email account
+      const { data: newUserId, error: createError } = await supabase
+        .rpc('handle_google_oauth_login', {
+          google_user_id: userInfo.id,
+          google_email: userInfo.email,
+          google_name: userInfo.name || '',
+          google_picture: userInfo.picture || '',
+          access_token: tokens.access_token,
+          refresh_token: tokens.refresh_token,
+          token_type: tokens.token_type,
+          expires_at: expiresAt.toISOString(),
+          scope: tokens.scope
+        })
+
+      if (createError) {
+        throw new Error('Failed to create user account')
+      }
+
+      userId = newUserId
     }
 
-    // Return success response
+    // Create a session for the user
+    const { data: session, error: sessionError } = await supabase.auth.admin.createSession({
+      user_id: userId,
+      expires_in: 3600 // 1 hour
+    })
+
+    if (sessionError) {
+      throw new Error('Failed to create session')
+    }
+
+    // Return success response with session
     const response = {
       success: true,
-      email: userInfo.email,
-      name: userInfo.name,
-      picture: userInfo.picture,
-      expires_at: expiresAt.toISOString(),
-      message: 'Google account connected successfully'
+      user: {
+        id: userId,
+        email: userInfo.email,
+        name: userInfo.name,
+        picture: userInfo.picture
+      },
+      session: session.session,
+      message: 'Successfully authenticated with Google'
     }
 
     return new Response(
@@ -200,11 +189,12 @@ serve(async (req) => {
     )
 
   } catch (error) {
+    console.error('Google OAuth login error:', error)
     
     const errorResponse = {
       success: false,
       error: error.message,
-      message: 'Failed to connect Google account'
+      message: 'Failed to authenticate with Google'
     }
 
     return new Response(
