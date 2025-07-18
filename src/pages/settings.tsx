@@ -8,7 +8,7 @@ const SettingsPage: React.FC = () => {
     <div className="px-4 py-8 font-sans">
       <PageHeader 
         title="Settings" 
-        path="/settings" 
+        path="~/sunny.ai/settings" 
       />
 
       <div className="max-w-4xl">

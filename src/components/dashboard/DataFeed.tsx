@@ -9,6 +9,9 @@ import { supabase, Document } from '@/lib/supabase';
 import FileWatchStatus from '@/components/FileWatchStatus';
 import { attendeePollingService } from '@/lib/attendee-polling';
 import TranscriptModal from './TranscriptModal';
+import EmailModal from './EmailModal';
+import DocumentModal from './DocumentModal';
+import ClassificationModal from './ClassificationModal';
 
 interface VirtualEmailActivity {
   id: string;
@@ -34,12 +37,41 @@ const DataFeed = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'email' | 'drive' | 'transcripts'>('all');
   const [selectedTranscript, setSelectedTranscript] = useState<any>(null);
+  const [selectedEmail, setSelectedEmail] = useState<any>(null);
+  const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
+  const [mockDocuments, setMockDocuments] = useState<Document[]>([]);
+  const [projects, setProjects] = useState<any[]>([]);
+  const [classificationActivity, setClassificationActivity] = useState<VirtualEmailActivity | null>(null);
 
   useEffect(() => {
     if (user?.id) {
       loadVirtualEmailActivity();
+      loadProjects();
     }
   }, [user?.id]);
+
+  const loadProjects = async () => {
+    if (!user?.id) return;
+    
+    try {
+      const { data: projectsData, error: projectsError } = await supabase
+        .from('projects')
+        .select('id, name')
+        .eq('created_by', user.id)
+        .order('created_at', { ascending: false });
+
+      if (projectsError) {
+        console.error('Error loading projects:', projectsError);
+        // Use mock project for demo
+        setProjects([{ id: 'mock-project-1', name: 'Summer' }]);
+      } else {
+        setProjects(projectsData || [{ id: 'mock-project-1', name: 'Summer' }]);
+      }
+    } catch (error) {
+      console.error('Error loading projects:', error);
+      setProjects([{ id: 'mock-project-1', name: 'Summer' }]);
+    }
+  };
 
   const loadVirtualEmailActivity = async () => {
     if (!user?.id) return;
@@ -80,7 +112,10 @@ const DataFeed = () => {
 
       if (documentsError) {
         console.error('Error loading documents:', documentsError);
-        setActivities(getMockVirtualEmailActivity());
+        const mockDocs = getMockDocuments();
+        const mockActivities = getMockVirtualEmailActivity();
+        setDocuments(mockDocs);
+        setActivities(mockActivities);
       } else {
         setDocuments(documentsData || []);
         
@@ -122,6 +157,7 @@ const DataFeed = () => {
     } catch (error) {
       console.error('Error loading virtual email activity:', error);
       // Fallback to mock data
+      setDocuments(getMockDocuments());
       setActivities(getMockVirtualEmailActivity());
     } finally {
       setLoading(false);
@@ -143,6 +179,65 @@ const DataFeed = () => {
     return 'document';
   };
 
+  const getMockDocuments = (): Document[] => [
+    {
+      id: '2',
+      project_id: 'mock-project-1',
+      title: 'Q1 Budget Review.xlsx',
+      summary: 'Comprehensive budget analysis for Q1 2025 including revenue projections, expense tracking, and variance analysis.',
+      source: 'google_drive',
+      author: 'Finance Team',
+      created_at: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
+      status: 'active',
+      file_id: 'mock-file-id-2',
+      file_url: 'https://docs.google.com/spreadsheets/d/mock-file-id-2',
+      watch_active: true,
+      last_synced_at: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString()
+    },
+    {
+      id: '3',
+      project_id: 'mock-project-1',
+      title: 'Product Roadmap 2025',
+      summary: 'This document outlines our product vision and planned feature releases for the next 12 months, including timelines and resource allocation.',
+      source: 'google_drive',
+      author: 'Product Team',
+      created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+      status: 'active',
+      file_id: 'mock-file-id-3',
+      file_url: 'https://docs.google.com/document/d/mock-file-id-3',
+      watch_active: true,
+      last_synced_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
+    },
+    {
+      id: '5',
+      project_id: 'mock-project-1',
+      title: 'Marketing Campaign Assets',
+      summary: 'Collection of images, copy, and design files for our upcoming social media campaign. Please review and provide feedback.',
+      source: 'google_drive',
+      author: 'Marketing Team',
+      created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+      status: 'active',
+      file_id: 'mock-file-id-5',
+      file_url: 'https://drive.google.com/drive/folders/mock-file-id-5',
+      watch_active: true,
+      last_synced_at: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString()
+    },
+    {
+      id: '6',
+      project_id: 'mock-project-1',
+      title: 'Board Meeting Presentation',
+      summary: 'Quarterly board meeting presentation covering financial results, strategic initiatives, and upcoming milestones.',
+      source: 'google_drive',
+      author: 'Executive Team',
+      created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+      status: 'active',
+      file_id: 'mock-file-id-6',
+      file_url: 'https://docs.google.com/presentation/d/mock-file-id-6',
+      watch_active: true,
+      last_synced_at: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString()
+    }
+  ];
+
   const getMockVirtualEmailActivity = (): VirtualEmailActivity[] => [
     {
       id: '1',
@@ -152,7 +247,8 @@ const DataFeed = () => {
       source: 'email',
       sender: 'sarah@company.com',
       created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-      processed: true
+      processed: true,
+      project_id: 'mock-project-1'
     },
     {
       id: '2',
@@ -162,7 +258,8 @@ const DataFeed = () => {
       source: 'google_drive',
       file_size: '2.4 MB',
       created_at: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-      processed: true
+      processed: true,
+      project_id: 'mock-project-1'
     },
     {
       id: '3',
@@ -172,7 +269,8 @@ const DataFeed = () => {
       source: 'google_drive',
       file_size: '1.8 MB',
       created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-      processed: true
+      processed: true,
+      project_id: 'mock-project-1'
     },
     {
       id: '4',
@@ -182,7 +280,8 @@ const DataFeed = () => {
       source: 'email',
       sender: 'client@example.com',
       created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-      processed: false
+      processed: true
+      // No project_id - needs classification
     },
     {
       id: '5',
@@ -191,7 +290,8 @@ const DataFeed = () => {
       summary: 'Collection of images, copy, and design files for our upcoming social media campaign. Please review and provide feedback.',
       source: 'google_drive',
       created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-      processed: true
+      processed: true,
+      project_id: 'mock-project-1'
     },
     {
       id: '6',
@@ -202,6 +302,7 @@ const DataFeed = () => {
       file_size: '5.2 MB',
       created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
       processed: true
+      // No project_id - needs classification
     },
     // Demo transcript data
     {
@@ -212,6 +313,7 @@ const DataFeed = () => {
       source: 'attendee_bot',
       created_at: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
       processed: true,
+      project_id: 'mock-project-1',
       transcript_duration_seconds: 3240, // 54 minutes
       transcript_metadata: {
         word_count: 2847,
@@ -545,6 +647,37 @@ Alex Rodriguez: Perfect. Meeting adjourned. Thanks everyone for your input and c
     return `${diffInWeeks} week${diffInWeeks > 1 ? 's' : ''} ago`;
   };
 
+  const getProjectName = (projectId?: string) => {
+    if (!projectId) return null;
+    const project = projects.find(p => p.id === projectId);
+    return project?.name || null;
+  };
+
+  const handleClassify = async (activityId: string, projectId: string) => {
+    try {
+      // Update the activity in the local state
+      setActivities(prevActivities => 
+        prevActivities.map(activity => 
+          activity.id === activityId 
+            ? { ...activity, project_id: projectId }
+            : activity
+        )
+      );
+
+      // In a real implementation, you would also update the database
+      // const { error } = await supabase
+      //   .from('virtual_email_activity')
+      //   .update({ project_id: projectId })
+      //   .eq('id', activityId);
+
+      // if (error) {
+      //   console.error('Error updating project classification:', error);
+      // }
+    } catch (error) {
+      console.error('Error classifying activity:', error);
+    }
+  };
+
   const filteredActivities = activities.filter(activity => {
     const matchesSearch = activity.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          activity.summary.toLowerCase().includes(searchTerm.toLowerCase());
@@ -674,9 +807,25 @@ Alex Rodriguez: Perfect. Meeting adjourned. Thanks everyone for your input and c
             <Card 
               key={activity.id} 
               className="border-[#4a5565] dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-stone-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
-              onClick={() => {
+              onClick={(e) => {
+                // Check if the click was on the "Select Project" badge
+                const target = e.target as HTMLElement;
+                if (target.closest('.select-project-badge')) {
+                  e.stopPropagation();
+                  setClassificationActivity(activity);
+                  return;
+                }
+                
                 if (activity.type === 'meeting_transcript' && activity.rawTranscript) {
                   setSelectedTranscript(activity.rawTranscript);
+                } else if (activity.type === 'email') {
+                  setSelectedEmail(activity);
+                } else if (activity.type === 'document' || activity.type === 'spreadsheet' || activity.type === 'presentation' || activity.type === 'image' || activity.type === 'folder') {
+                  // Find the corresponding document (check both real and mock documents)
+                  const document = documents.find(doc => doc.id === activity.id) || mockDocuments.find(doc => doc.id === activity.id);
+                  if (document) {
+                    setSelectedDocument(document);
+                  }
                 }
               }}
             >
@@ -697,34 +846,50 @@ Alex Rodriguez: Perfect. Meeting adjourned. Thanks everyone for your input and c
                       {activity.summary}
                     </p>
                     <div className="flex items-center gap-2">
-                      <Badge className="border border-[#4a5565] dark:border-zinc-700 rounded px-2 py-0.5 text-[10px] text-[#4a5565] dark:text-zinc-200 bg-stone-50 dark:bg-zinc-800 uppercase font-mono">
-                        {getTypeLabel(activity.type)}
-                      </Badge>
-                      {activity.sender && (
-                        <Badge className="border border-[#4a5565] dark:border-zinc-700 rounded px-2 py-0.5 text-[10px] text-[#4a5565] dark:text-zinc-200 bg-stone-50 dark:bg-zinc-800 uppercase font-mono">
-                          From: {activity.sender}
+                      {/* Project Badge - First */}
+                      {activity.project_id ? (
+                        <Badge className="border border-[#4a5565] dark:border-zinc-700 rounded px-2 py-0.5 text-[10px] text-[#4a5565] dark:text-zinc-200 bg-stone-50 dark:bg-zinc-800 hover:bg-stone-50 dark:hover:bg-zinc-800 uppercase font-mono">
+                          Project {activity.project_id === 'mock-project-1' ? 'Summer' : getProjectName(activity.project_id)}
+                        </Badge>
+                      ) : (
+                        <Badge className="select-project-badge border border-red-500 rounded px-2 py-0.5 text-[10px] text-red-500 bg-red-50 dark:bg-red-950 hover:bg-red-50 dark:hover:bg-red-950 uppercase font-mono cursor-pointer">
+                          Select Project
                         </Badge>
                       )}
-                      {activity.file_size && (
-                        <Badge className="border border-[#4a5565] dark:border-zinc-700 rounded px-2 py-0.5 text-[10px] text-[#4a5565] dark:text-zinc-200 bg-stone-50 dark:bg-zinc-800 uppercase font-mono">
-                          {activity.file_size}
-                        </Badge>
-                      )}
-                      {activity.transcript_duration_seconds && (
-                        <Badge className="border border-[#4a5565] dark:border-zinc-700 rounded px-2 py-0.5 text-[10px] text-[#4a5565] dark:text-zinc-200 bg-stone-50 dark:bg-zinc-800 uppercase font-mono">
-                          {Math.round(activity.transcript_duration_seconds / 60)}min
-                        </Badge>
-                      )}
+                      
+                      {/* Processing Badge - Second */}
                       {!activity.processed && (
-                        <Badge className="border border-red-500 rounded px-2 py-0.5 text-[10px] text-red-500 bg-red-50 dark:bg-red-950 uppercase font-mono">
+                        <Badge className="border border-red-500 rounded px-2 py-0.5 text-[10px] text-red-500 bg-red-50 dark:bg-red-950 hover:bg-red-50 dark:hover:bg-red-950 uppercase font-mono">
                           Processing
                         </Badge>
                       )}
                       
+                      {/* Type Badge */}
+                      <Badge className="border border-[#4a5565] dark:border-zinc-700 rounded px-2 py-0.5 text-[10px] text-[#4a5565] dark:text-zinc-200 bg-stone-50 dark:bg-zinc-800 hover:bg-stone-50 dark:hover:bg-zinc-800 uppercase font-mono">
+                        {getTypeLabel(activity.type)}
+                      </Badge>
+                      
+                      {/* Other Badges */}
+                      {activity.sender && (
+                        <Badge className="border border-[#4a5565] dark:border-zinc-700 rounded px-2 py-0.5 text-[10px] text-[#4a5565] dark:text-zinc-200 bg-stone-50 dark:bg-zinc-800 hover:bg-stone-50 dark:hover:bg-zinc-800 uppercase font-mono">
+                          From: {activity.sender}
+                        </Badge>
+                      )}
+                      {activity.file_size && (
+                        <Badge className="border border-[#4a5565] dark:border-zinc-700 rounded px-2 py-0.5 text-[10px] text-[#4a5565] dark:text-zinc-200 bg-stone-50 dark:bg-zinc-800 hover:bg-stone-50 dark:hover:bg-zinc-800 uppercase font-mono">
+                          {activity.file_size}
+                        </Badge>
+                      )}
+                      {activity.transcript_duration_seconds && (
+                        <Badge className="border border-[#4a5565] dark:border-zinc-700 rounded px-2 py-0.5 text-[10px] text-[#4a5565] dark:text-zinc-200 bg-stone-50 dark:bg-zinc-800 hover:bg-stone-50 dark:hover:bg-zinc-800 uppercase font-mono">
+                          {Math.round(activity.transcript_duration_seconds / 60)}min
+                        </Badge>
+                      )}
+                      
                       {/* File Watch Status for Google Drive files */}
-                      {activity.type !== 'email' && documents.find(doc => doc.id === activity.id) && (
+                      {activity.type !== 'email' && (documents.find(doc => doc.id === activity.id) || mockDocuments.find(doc => doc.id === activity.id)) && (
                         <FileWatchStatus 
-                          document={documents.find(doc => doc.id === activity.id)!} 
+                          document={documents.find(doc => doc.id === activity.id) || mockDocuments.find(doc => doc.id === activity.id)!} 
                           className="ml-auto"
                         />
                       )}
@@ -742,6 +907,29 @@ Alex Rodriguez: Perfect. Meeting adjourned. Thanks everyone for your input and c
         transcript={selectedTranscript} 
         isOpen={!!selectedTranscript}
         onClose={() => setSelectedTranscript(null)} 
+      />
+
+      {/* Email Modal */}
+      <EmailModal 
+        email={selectedEmail} 
+        isOpen={!!selectedEmail}
+        onClose={() => setSelectedEmail(null)} 
+      />
+
+      {/* Document Modal */}
+      <DocumentModal 
+        document={selectedDocument} 
+        isOpen={!!selectedDocument}
+        onClose={() => setSelectedDocument(null)} 
+      />
+
+      {/* Classification Modal */}
+      <ClassificationModal 
+        activity={classificationActivity} 
+        projects={projects}
+        isOpen={!!classificationActivity}
+        onClose={() => setClassificationActivity(null)}
+        onClassify={handleClassify}
       />
     </div>
   );

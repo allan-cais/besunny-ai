@@ -68,11 +68,6 @@ const FileWatchStatus: React.FC<FileWatchStatusProps> = ({ document, className =
 
   return (
     <div className={`flex items-center gap-2 ${className}`}>
-      <Badge variant={statusInfo.variant} className="flex items-center gap-1">
-        <Icon className={`h-3 w-3 ${statusInfo.color}`} />
-        <span className="text-xs">{statusInfo.label}</span>
-      </Badge>
-      
       {document.last_synced_at && (
         <span className="text-xs text-muted-foreground">
           Last synced: {new Date(document.last_synced_at).toLocaleDateString()}

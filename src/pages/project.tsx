@@ -66,7 +66,7 @@ const ProjectDashboard = () => {
 
   return (
     <div className="px-4 py-8 font-sans">
-      <PageHeader title="PROJECT" path={`~/sunny.ai/project/${projectId || ''}`} />
+      <PageHeader title="PROJECT" path={`~/sunny.ai/project/${project?.name?.toLowerCase().replace(/\s+/g, '-') || projectId || ''}`} />
       <div className="flex-1">
         <div className="space-y-8">
           <div className="text-center space-y-4 mb-8">

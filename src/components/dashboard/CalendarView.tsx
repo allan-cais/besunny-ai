@@ -50,15 +50,15 @@ const CalendarView: React.FC<CalendarViewProps> = ({
   const getEventStatusBadge = (eventStatus: Meeting['event_status']) => {
     switch (eventStatus) {
       case 'accepted':
-        return <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">Attending</Badge>;
+        return <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-100 text-xs">Attending</Badge>;
       case 'declined':
-        return <Badge variant="secondary" className="bg-red-100 text-red-800 text-xs">Declined</Badge>;
+        return <Badge variant="secondary" className="bg-red-100 text-red-800 hover:bg-red-100 text-xs">Declined</Badge>;
       case 'tentative':
-        return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 text-xs">Tentative</Badge>;
+        return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100 text-xs">Tentative</Badge>;
       case 'needsAction':
-        return <Badge variant="secondary" className="bg-gray-100 text-gray-800 text-xs">Invited</Badge>;
+        return <Badge variant="secondary" className="bg-gray-100 text-gray-800 hover:bg-gray-100 text-xs">Invited</Badge>;
       default:
-        return <Badge variant="secondary" className="text-xs">Unknown</Badge>;
+        return <Badge variant="secondary" className="hover:bg-secondary text-xs">Unknown</Badge>;
     }
   };
 
@@ -69,32 +69,32 @@ const CalendarView: React.FC<CalendarViewProps> = ({
     switch (bot_status) {
       case 'pending':
         if (auto_scheduled_via_email) {
-          badge = <Badge variant="secondary" className="bg-purple-100 text-purple-800 text-xs">Auto-Scheduled</Badge>;
+          badge = <Badge variant="secondary" className="bg-purple-100 text-purple-800 hover:bg-purple-100 text-xs">Auto-Scheduled</Badge>;
         } else {
-          badge = <Badge variant="secondary" className="bg-gray-100 text-gray-800 text-xs">No Bot</Badge>;
+          badge = <Badge variant="secondary" className="bg-gray-100 text-gray-800 hover:bg-gray-100 text-xs">No Bot</Badge>;
         }
         break;
       case 'bot_scheduled':
         if (bot_deployment_method === 'automatic') {
-          badge = <Badge variant="secondary" className="bg-purple-100 text-purple-800 text-xs">Auto Bot Scheduled</Badge>;
+          badge = <Badge variant="secondary" className="bg-purple-100 text-purple-800 hover:bg-purple-100 text-xs">Auto Bot Scheduled</Badge>;
         } else {
-          badge = <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-xs">Bot Scheduled</Badge>;
+          badge = <Badge variant="secondary" className="bg-blue-100 text-blue-800 hover:bg-blue-100 text-xs">Bot Scheduled</Badge>;
         }
         break;
       case 'bot_joined':
-        badge = <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">Bot Joined</Badge>;
+        badge = <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-100 text-xs">Bot Joined</Badge>;
         break;
       case 'transcribing':
-        badge = <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 text-xs">Transcribing</Badge>;
+        badge = <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100 text-xs">Transcribing</Badge>;
         break;
       case 'completed':
-        badge = <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">Completed</Badge>;
+        badge = <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-100 text-xs">Completed</Badge>;
         break;
       case 'failed':
-        badge = <Badge variant="secondary" className="bg-red-100 text-red-800 text-xs">Failed</Badge>;
+        badge = <Badge variant="secondary" className="bg-red-100 text-red-800 hover:bg-red-100 text-xs">Failed</Badge>;
         break;
       default:
-        badge = <Badge variant="secondary" className="text-xs">Unknown</Badge>;
+        badge = <Badge variant="secondary" className="hover:bg-secondary text-xs">Unknown</Badge>;
     }
     
     return badge;

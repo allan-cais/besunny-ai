@@ -66,24 +66,14 @@ const TranscriptModal: React.FC<TranscriptModalProps> = ({ transcript, isOpen, o
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
         <DialogHeader className="flex-shrink-0">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/20 rounded-lg flex items-center justify-center">
-                <MessageSquare className="w-6 h-6 text-purple-600 dark:text-purple-400" />
-              </div>
-              <div>
-                <DialogTitle className="text-lg font-bold font-mono">{transcript.title}</DialogTitle>
-                <div className="text-xs text-gray-500 font-mono">Meeting Transcript</div>
-              </div>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/20 rounded-lg flex items-center justify-center">
+              <MessageSquare className="w-6 h-6 text-purple-600 dark:text-purple-400" />
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onClose}
-              className="h-8 w-8 p-0"
-            >
-              <X className="h-4 w-4" />
-            </Button>
+            <div>
+              <DialogTitle className="text-lg font-bold font-mono">{transcript.title}</DialogTitle>
+              <div className="text-xs text-gray-500 font-mono">Meeting Transcript</div>
+            </div>
           </div>
         </DialogHeader>
 
@@ -121,11 +111,11 @@ const TranscriptModal: React.FC<TranscriptModalProps> = ({ transcript, isOpen, o
             )}
 
             <div className="flex items-center gap-2">
-              <Badge className="border border-[#4a5565] dark:border-zinc-700 rounded px-2 py-0.5 text-[10px] text-[#4a5565] dark:text-zinc-200 bg-stone-50 dark:bg-zinc-800 uppercase font-mono">
+              <Badge className="border border-[#4a5565] dark:border-zinc-700 rounded px-2 py-0.5 text-[10px] text-[#4a5565] dark:text-zinc-200 bg-stone-50 dark:bg-zinc-800 hover:bg-stone-50 dark:hover:bg-zinc-800 uppercase font-mono">
                 Retrieved: {formatDateTime(transcript.transcript_retrieved_at)}
               </Badge>
               {transcript.transcript_metadata?.word_count && (
-                <Badge className="border border-[#4a5565] dark:border-zinc-700 rounded px-2 py-0.5 text-[10px] text-[#4a5565] dark:text-zinc-200 bg-stone-50 dark:bg-zinc-800 uppercase font-mono">
+                <Badge className="border border-[#4a5565] dark:border-zinc-700 rounded px-2 py-0.5 text-[10px] text-[#4a5565] dark:text-zinc-200 bg-stone-50 dark:bg-zinc-800 hover:bg-stone-50 dark:hover:bg-zinc-800 uppercase font-mono">
                   {transcript.transcript_metadata.word_count} words
                 </Badge>
               )}
