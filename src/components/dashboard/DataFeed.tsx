@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Mail, FileText, Folder, Image, File, Calendar, Clock, Search, Filter } from 'lucide-react';
 import { useAuth } from '@/providers/AuthProvider';
-import { supabase } from '@/lib/supabase';
+import { supabase, Document } from '@/lib/supabase';
+import FileWatchStatus from '@/components/FileWatchStatus';
 
 interface VirtualEmailActivity {
   id: string;
@@ -23,6 +24,7 @@ interface VirtualEmailActivity {
 const DataFeed = () => {
   const { user } = useAuth();
   const [activities, setActivities] = useState<VirtualEmailActivity[]>([]);
+  const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'email' | 'drive'>('all');
@@ -39,40 +41,51 @@ const DataFeed = () => {
     try {
       setLoading(true);
       
-      // Get documents from the documents table that are associated with this user
-      const { data, error } = await supabase
+      // Get documents from the documents table that are associated with this user's projects
+      const { data: documentsData, error: documentsError } = await supabase
         .from('documents')
         .select(`
           id,
           title,
-          content,
-          source_type,
-          source_url,
-          file_size,
+          summary,
+          source,
+          source_id,
+          author,
+          received_at,
+          file_url,
+          status,
+          file_id,
+          last_synced_at,
+          watch_active,
           created_at,
-          processed,
-          project_id,
-          metadata
+          project_id
         `)
-        .eq('user_id', user.id)
+        .in('project_id', (
+          await supabase
+            .from('projects')
+            .select('id')
+            .eq('created_by', user.id)
+        ).data?.map(p => p.id) || [])
         .order('created_at', { ascending: false })
         .limit(50);
 
-      if (error) {
-        console.error('Error loading virtual email activity:', error);
-        // For now, show mock data while the feature is being set up
+      if (documentsError) {
+        console.error('Error loading documents:', documentsError);
         setActivities(getMockVirtualEmailActivity());
       } else {
+        setDocuments(documentsData || []);
+        
         // Transform the data to match our interface
-        const transformedData: VirtualEmailActivity[] = (data || []).map(doc => ({
+        const transformedData: VirtualEmailActivity[] = (documentsData || []).map(doc => ({
           id: doc.id,
-          type: getDocumentType(doc.source_type, doc.metadata),
+          type: getDocumentType(doc.source, doc),
           title: doc.title || 'Untitled Document',
-          summary: doc.content ? doc.content.substring(0, 150) + '...' : 'No content available',
-          source: doc.source_type || 'unknown',
-          file_size: doc.file_size,
+          summary: doc.summary ? doc.summary.substring(0, 150) + '...' : 'No content available',
+          source: doc.source || 'unknown',
+          sender: doc.author,
+          file_size: doc.file_url ? 'Unknown' : undefined,
           created_at: doc.created_at,
-          processed: doc.processed || false,
+          processed: true, // All documents in DB are processed
           project_id: doc.project_id
         }));
         
@@ -87,16 +100,16 @@ const DataFeed = () => {
     }
   };
 
-  const getDocumentType = (sourceType: string, metadata: any): VirtualEmailActivity['type'] => {
-    if (sourceType === 'email') return 'email';
-    if (sourceType === 'gmail') return 'email';
+  const getDocumentType = (source: string, document: Document): VirtualEmailActivity['type'] => {
+    if (source === 'email' || source === 'gmail') return 'email';
     
-    // Check metadata for Google Drive file types
-    if (metadata?.mimeType) {
-      if (metadata.mimeType.includes('spreadsheet')) return 'spreadsheet';
-      if (metadata.mimeType.includes('presentation')) return 'presentation';
-      if (metadata.mimeType.includes('image')) return 'image';
-      if (metadata.mimeType.includes('folder')) return 'folder';
+    // Check if it's a Google Drive file
+    if (document.file_id) {
+      // You could add more sophisticated type detection based on file_id patterns
+      // For now, we'll use a simple heuristic
+      if (document.title?.includes('.xlsx') || document.title?.includes('.csv')) return 'spreadsheet';
+      if (document.title?.includes('.pptx') || document.title?.includes('.key')) return 'presentation';
+      if (document.title?.includes('.jpg') || document.title?.includes('.png') || document.title?.includes('.gif')) return 'image';
     }
     
     return 'document';
@@ -359,6 +372,14 @@ const DataFeed = () => {
                         <Badge className="border border-red-500 rounded px-2 py-0.5 text-[10px] text-red-500 bg-red-50 dark:bg-red-950 uppercase font-mono">
                           Processing
                         </Badge>
+                      )}
+                      
+                      {/* File Watch Status for Google Drive files */}
+                      {activity.type !== 'email' && documents.find(doc => doc.id === activity.id) && (
+                        <FileWatchStatus 
+                          document={documents.find(doc => doc.id === activity.id)!} 
+                          className="ml-auto"
+                        />
                       )}
                     </div>
                   </div>

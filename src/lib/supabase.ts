@@ -49,6 +49,10 @@ export interface Document {
   author?: string;
   received_at?: string;
   file_url?: string;
+  status?: 'active' | 'updated' | 'deleted' | 'error';
+  file_id?: string; // Google Drive file ID
+  last_synced_at?: string;
+  watch_active?: boolean;
   created_at: string;
 }
 
@@ -370,6 +374,40 @@ export const supabaseService = {
     }
 
     return data || [];
+  },
+
+  // Google Drive File Watch operations
+  async subscribeToDriveFile(userId: string, documentId: string, fileId: string): Promise<{ success: boolean; message: string; watch_id?: string }> {
+    const { data, error } = await supabase.functions.invoke('subscribe-to-drive-file', {
+      body: {
+        user_id: userId,
+        document_id: documentId,
+        file_id: fileId,
+      },
+    });
+
+    if (error) {
+      console.error('Error subscribing to drive file:', error);
+      throw error;
+    }
+
+    return data;
+  },
+
+  async updateDocument(documentId: string, updates: Partial<Document>): Promise<Document> {
+    const { data, error } = await supabase
+      .from('documents')
+      .update(updates)
+      .eq('id', documentId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating document:', error);
+      throw error;
+    }
+
+    return data;
   },
 
   // Real-time subscriptions
