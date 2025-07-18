@@ -8,6 +8,7 @@ import { useAuth } from '@/providers/AuthProvider';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import UsernameSetupDialog from './UsernameSetupDialog';
+import AutoScheduleInstructions from '@/components/dashboard/AutoScheduleInstructions';
 
 interface UserData {
   username?: string;
@@ -212,6 +213,9 @@ const VirtualEmailSettings: React.FC = () => {
               </div>
             </CardContent>
           </Card>
+
+          {/* Auto-Schedule Instructions */}
+          <AutoScheduleInstructions />
         </>
       )}
 
