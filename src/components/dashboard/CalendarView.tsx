@@ -105,7 +105,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
     try {
       setSendingBot(meeting.id);
       
-      // Build comprehensive bot options using all available Attendee API features
+      // Build basic bot options - only essential configuration
       const botOptions = {
         // Basic required fields
         meeting_url: meeting.meeting_url,
@@ -128,56 +128,13 @@ const CalendarView: React.FC<CalendarViewProps> = ({
           return joinAtTime.toISOString();
         })(),
         
-        // Transcription settings
-        transcription_settings: configuration?.transcription_settings || {
-          deepgram: {
-            language: configuration?.transcription_language || 'en-US',
-            model: 'nova-2',
-            smart_format: true
-          }
-        },
+        // Basic transcription language (if specified)
+        ...(configuration?.transcription_language && { language: configuration.transcription_language }),
         
-        // Recording settings
-        recording_settings: configuration?.recording_settings || {
-          format: 'mp4',
-          view: 'speaker_view',
-          resolution: '1080p'
-        },
-        
-        // Teams settings
-        teams_settings: configuration?.teams_settings || {
-          use_login: false
-        },
-        
-        // Debug settings
-        debug_settings: configuration?.debug_settings || {
-          create_debug_recording: false
-        },
-        
-        // Automatic leave settings
-        automatic_leave_settings: configuration?.automatic_leave_settings || {
-          leave_after_minutes: 0,
-          leave_when_empty: false
-        },
-        
-        // Webhooks
-        webhooks: configuration?.webhooks || [],
-        
-        // Metadata
-        metadata: {
-          meeting_title: meeting.title,
-          meeting_id: meeting.id,
-          project_id: meeting.project_id,
-          created_via: 'manual_deployment',
-          user_id: meeting.user_id,
-          ...configuration?.metadata
-        },
-        
-        // Deduplication key
-        ...(configuration?.deduplication_key && { deduplication_key: configuration.deduplication_key }),
-        
-        // Custom settings
-        ...configuration?.custom_settings
+        // Advanced features - left as defaults (not included in API call)
+        // transcription_settings, recording_settings, teams_settings, debug_settings,
+        // automatic_leave_settings, webhooks, metadata, deduplication_key, custom_settings
+        // will all use Attendee API defaults
       };
 
       console.log('Sending bot to meeting with comprehensive configuration:', botOptions);
@@ -201,11 +158,11 @@ const CalendarView: React.FC<CalendarViewProps> = ({
         throw new Error('Failed to get bot ID from Attendee API response');
       }
       
-      // Create a bot record in the bots table with comprehensive settings
+      // Create a bot record in the bots table with basic settings
       console.log('Creating bot record...');
       const botRecord = await calendarService.createBot({
         name: configuration?.bot_name || meeting.bot_name || 'Sunny AI Assistant',
-        description: 'Advanced transcription bot with comprehensive configuration',
+        description: 'Basic transcription bot with essential configuration',
         provider: 'attendee',
         provider_bot_id: attendeeBotId,
         settings: {
@@ -215,14 +172,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
           configuration: configuration || {},
           join_at: botOptions.join_at,
           meeting_start_time: meeting.start_time,
-          transcription_settings: botOptions.transcription_settings,
-          recording_settings: botOptions.recording_settings,
-          teams_settings: botOptions.teams_settings,
-          debug_settings: botOptions.debug_settings,
-          automatic_leave_settings: botOptions.automatic_leave_settings,
-          webhooks: botOptions.webhooks,
-          metadata: botOptions.metadata,
-          deduplication_key: botOptions.deduplication_key
+          // Advanced settings not stored - using API defaults
         },
         is_active: true
       });

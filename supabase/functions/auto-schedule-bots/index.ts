@@ -118,7 +118,7 @@ async function autoScheduleBotsForUser(userId: string) {
 
       console.log(`Scheduling bot for meeting ${meeting.id} to join at ${joinAtTime.toISOString()}`);
 
-      // Build comprehensive bot configuration using all available Attendee API features
+      // Build basic bot configuration - only essential options
       const botOptions = {
         // Basic required fields
         meeting_url: meeting.meeting_url,
@@ -130,61 +130,16 @@ async function autoScheduleBotsForUser(userId: string) {
         // Future scheduling
         join_at: joinAtTime.toISOString(),
         
-        // Transcription settings
-        transcription_settings: config.transcription_settings || {
-          deepgram: {
-            language: config.transcription_language || 'en-US',
-            model: 'nova-2',
-            smart_format: true
-          }
-        },
+        // Basic transcription language (if specified)
+        ...(config.transcription_language && { language: config.transcription_language }),
         
-        // Recording settings
-        recording_settings: config.recording_settings || {
-          format: 'mp4',
-          view: 'speaker_view',
-          resolution: '1080p'
-        },
-        
-        // Teams settings
-        teams_settings: config.teams_settings || {
-          use_login: false
-        },
-        
-        // Debug settings
-        debug_settings: config.debug_settings || {
-          create_debug_recording: false
-        },
-        
-        // Automatic leave settings
-        automatic_leave_settings: config.automatic_leave_settings || {
-          leave_after_minutes: 0,
-          leave_when_empty: false
-        },
-        
-        // Webhooks
-        webhooks: config.webhooks || [],
-        
-        // Metadata
-        metadata: {
-          meeting_title: meeting.title,
-          meeting_id: meeting.id,
-          project_id: meeting.project_id,
-          created_via: meeting.auto_scheduled_via_email ? 'auto_scheduling' : 'manual_deployment',
-          user_id: meeting.user_id,
-          auto_scheduled_via_email: meeting.auto_scheduled_via_email,
-          virtual_email_attendee: meeting.virtual_email_attendee,
-          ...config.metadata
-        },
-        
-        // Deduplication key
-        ...(config.deduplication_key && { deduplication_key: config.deduplication_key }),
-        
-        // Custom settings
-        ...config.custom_settings
+        // Advanced features - left as defaults (not included in API call)
+        // transcription_settings, recording_settings, teams_settings, debug_settings,
+        // automatic_leave_settings, webhooks, metadata, deduplication_key, custom_settings
+        // will all use Attendee API defaults
       };
 
-      // Send bot to meeting via Attendee API with comprehensive configuration
+      // Send bot to meeting via Attendee API with basic configuration
       const response = await fetch('https://app.attendee.dev/api/v1/bots', {
         method: 'POST',
         headers: {
@@ -205,13 +160,13 @@ async function autoScheduleBotsForUser(userId: string) {
         throw new Error('No bot ID returned from Attendee API');
       }
 
-      // Create a bot record in the bots table
+      // Create a bot record in the bots table with basic settings
       const { data: botRecord, error: botError } = await supabase
         .from('bots')
         .insert({
           user_id: userId,
           name: config.bot_name,
-          description: 'Auto-created bot for meeting transcription',
+          description: 'Basic auto-created bot for meeting transcription',
           provider: 'attendee',
           provider_bot_id: attendeeBotId,
           settings: {
@@ -220,7 +175,8 @@ async function autoScheduleBotsForUser(userId: string) {
             meeting_id: meeting.id,
             configuration: config,
             join_at: joinAtTime.toISOString(),
-            meeting_start_time: meeting.start_time
+            meeting_start_time: meeting.start_time,
+            // Advanced settings not stored - using API defaults
           },
           is_active: true
         })
