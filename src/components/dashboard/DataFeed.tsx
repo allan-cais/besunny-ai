@@ -61,14 +61,12 @@ const DataFeed = () => {
         .order('created_at', { ascending: false });
 
       if (projectsError) {
-        console.error('Error loading projects:', projectsError);
         // Use mock project for demo
         setProjects([{ id: 'mock-project-1', name: 'Summer' }]);
       } else {
         setProjects(projectsData || [{ id: 'mock-project-1', name: 'Summer' }]);
       }
     } catch (error) {
-      console.error('Error loading projects:', error);
       setProjects([{ id: 'mock-project-1', name: 'Summer' }]);
     }
   };
@@ -111,7 +109,6 @@ const DataFeed = () => {
       const transcriptsData = await attendeePollingService.getMeetingsWithTranscripts();
 
       if (documentsError) {
-        console.error('Error loading documents:', documentsError);
         const mockDocs = getMockDocuments();
         const mockActivities = getMockVirtualEmailActivity();
         setDocuments(mockDocs);
@@ -155,7 +152,6 @@ const DataFeed = () => {
         setActivities(allActivities);
       }
     } catch (error) {
-      console.error('Error loading virtual email activity:', error);
       // Fallback to mock data
       setDocuments(getMockDocuments());
       setActivities(getMockVirtualEmailActivity());
@@ -674,7 +670,7 @@ Alex Rodriguez: Perfect. Meeting adjourned. Thanks everyone for your input and c
       //   console.error('Error updating project classification:', error);
       // }
     } catch (error) {
-      console.error('Error classifying activity:', error);
+      // Handle classification error silently
     }
   };
 

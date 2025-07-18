@@ -385,9 +385,6 @@ const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
       
       if (webhookUrl) {
         try {
-          console.log('Sending webhook to:', webhookUrl);
-          console.log('Webhook payload:', webhookPayload);
-          
           const webhookResponse = await fetch(webhookUrl, {
             method: 'POST',
             headers: {
@@ -396,21 +393,12 @@ const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
             body: JSON.stringify(webhookPayload)
           });
 
-          const responseText = await webhookResponse.text();
-          console.log('Webhook response status:', webhookResponse.status);
-          console.log('Webhook response:', responseText);
-
           if (!webhookResponse.ok) {
-            console.warn('Webhook call failed, but project was created:', webhookResponse.statusText);
-          } else {
-            console.log('Webhook call successful');
+            // Webhook failed but project was created - handle silently
           }
         } catch (webhookError) {
-          console.warn('Webhook call failed (CORS or network error), but project was created:', webhookError);
           // Don't throw error - webhook is optional
         }
-      } else {
-        console.log('No webhook URL configured, skipping webhook call');
       }
 
       // Call the callback

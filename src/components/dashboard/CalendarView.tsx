@@ -137,29 +137,20 @@ const CalendarView: React.FC<CalendarViewProps> = ({
         // will all use Attendee API defaults
       };
 
-      console.log('Sending bot to meeting with comprehensive configuration:', botOptions);
       const result = await apiKeyService.sendBotToMeeting(meeting.meeting_url, botOptions);
-      console.log('Bot deployment result:', result);
       
       // Handle different possible response structures from Attendee API
       let attendeeBotId = null;
       if (result && typeof result === 'object') {
         // Try different possible field names for the bot ID
         attendeeBotId = result.id || result.bot_id || result.botId || result.bot_id;
-        console.log('Trying to extract bot ID from result:', result);
-        console.log('Available keys:', Object.keys(result));
       }
       
-      console.log('Extracted Attendee bot ID:', attendeeBotId);
-      
       if (!attendeeBotId) {
-        console.error('Could not extract bot ID from response:', result);
-        console.error('Response structure:', JSON.stringify(result, null, 2));
         throw new Error('Failed to get bot ID from Attendee API response');
       }
       
       // Create a bot record in the bots table with basic settings
-      console.log('Creating bot record...');
       const botRecord = await calendarService.createBot({
         name: configuration?.bot_name || meeting.bot_name || 'Sunny AI Assistant',
         description: 'Basic transcription bot with essential configuration',
@@ -177,8 +168,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({
         is_active: true
       });
       
-      console.log('Bot record created:', botRecord);
-      
       // Update the meeting with the bot UUID and status
       await calendarService.updateBotStatus(
         meeting.id, 
@@ -194,8 +183,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
       
       onMeetingUpdate();
     } catch (err: any) {
-      console.error('Error sending bot to meeting:', err);
-      // Optionally handle error
+      // Handle error silently
     } finally {
       setSendingBot(null);
     }
@@ -234,7 +222,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
       }
       onMeetingUpdate();
     } catch (error) {
-      // console.error('Failed to associate meeting with project:', error);
+      // Handle error silently
     } finally {
       setUpdatingProject(null);
     }

@@ -49,7 +49,7 @@ const EmailModal: React.FC<EmailModalProps> = ({ email, isOpen, onClose }) => {
       await navigator.clipboard.writeText(content);
       // You could add a toast notification here
     } catch (error) {
-      console.error('Failed to copy email content:', error);
+      // Handle copy error silently
     }
   };
 
