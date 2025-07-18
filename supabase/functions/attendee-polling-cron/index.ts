@@ -85,14 +85,29 @@ async function pollMeeting(meetingId: string) {
     throw new Error('No bot ID associated with meeting');
   }
 
+  // Get the bot record to get the actual Attendee API bot ID
+  const { data: bot, error: botError } = await supabase
+    .from('bots')
+    .select('provider_bot_id')
+    .eq('id', meeting.attendee_bot_id)
+    .single();
+
+  if (botError || !bot) {
+    throw new Error('Bot record not found');
+  }
+
+  if (!bot.provider_bot_id) {
+    throw new Error('No provider bot ID found in bot record');
+  }
+
   // Update last_polled_at
   await supabase
     .from('meetings')
     .update({ last_polled_at: new Date().toISOString() })
     .eq('id', meetingId);
 
-  // Check bot status via Attendee API
-  const botStatusResponse = await fetch(`https://app.attendee.dev/api/v1/bots/${meeting.attendee_bot_id}`, {
+  // Check bot status via Attendee API using the provider_bot_id
+  const botStatusResponse = await fetch(`https://app.attendee.dev/api/v1/bots/${bot.provider_bot_id}`, {
     method: 'GET',
     headers: {
       'Authorization': `Token ${MASTER_ATTENDEE_API_KEY}`,
@@ -138,7 +153,7 @@ async function pollMeeting(meetingId: string) {
   // If meeting is completed, retrieve transcript
   if (newBotStatus === 'completed' && meeting.bot_status !== 'completed') {
     try {
-      const transcriptResult = await retrieveTranscript(meeting.attendee_bot_id);
+      const transcriptResult = await retrieveTranscript(bot.provider_bot_id);
       
       await supabase
         .from('meetings')

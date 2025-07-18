@@ -105,57 +105,143 @@ const CalendarView: React.FC<CalendarViewProps> = ({
     try {
       setSendingBot(meeting.id);
       
-      const botOptions = configuration ? {
-        bot_name: configuration.bot_name,
-        bot_chat_message: {
-          to: configuration.chat_message_recipient,
+      // Build comprehensive bot options using all available Attendee API features
+      const botOptions = {
+        // Basic required fields
+        meeting_url: meeting.meeting_url,
+        bot_name: configuration?.bot_name || meeting.bot_name || 'Sunny AI Assistant',
+        
+        // Chat message configuration
+        bot_chat_message: configuration?.bot_chat_message ? {
+          to: configuration.chat_message_recipient || 'everyone',
           message: configuration.bot_chat_message,
-        },
-        language: configuration.transcription_language,
-        auto_join: configuration.auto_join,
-        recording_enabled: configuration.recording_enabled,
-        ...configuration.custom_settings
-      } : {
-        bot_name: meeting.bot_name || 'Sunny AI Assistant',
-        bot_chat_message: {
+          ...(configuration.to_user_uuid && { to_user_uuid: configuration.to_user_uuid })
+        } : {
           to: 'everyone',
           message: meeting.bot_chat_message || 'Hi, I\'m here to transcribe this meeting!',
         },
+        
+        // Future scheduling
+        join_at: (() => {
+          const meetingStartTime = new Date(meeting.start_time);
+          const joinAtTime = new Date(meetingStartTime.getTime() - 2 * 60 * 1000); // Join 2 minutes before start
+          return joinAtTime.toISOString();
+        })(),
+        
+        // Transcription settings
+        transcription_settings: configuration?.transcription_settings || {
+          deepgram: {
+            language: configuration?.transcription_language || 'en-US',
+            model: 'nova-2',
+            smart_format: true
+          }
+        },
+        
+        // Recording settings
+        recording_settings: configuration?.recording_settings || {
+          format: 'mp4',
+          view: 'speaker_view',
+          resolution: '1080p'
+        },
+        
+        // Teams settings
+        teams_settings: configuration?.teams_settings || {
+          use_login: false
+        },
+        
+        // Debug settings
+        debug_settings: configuration?.debug_settings || {
+          create_debug_recording: false
+        },
+        
+        // Automatic leave settings
+        automatic_leave_settings: configuration?.automatic_leave_settings || {
+          leave_after_minutes: 0,
+          leave_when_empty: false
+        },
+        
+        // Webhooks
+        webhooks: configuration?.webhooks || [],
+        
+        // Metadata
+        metadata: {
+          meeting_title: meeting.title,
+          meeting_id: meeting.id,
+          project_id: meeting.project_id,
+          created_via: 'manual_deployment',
+          user_id: meeting.user_id,
+          ...configuration?.metadata
+        },
+        
+        // Deduplication key
+        ...(configuration?.deduplication_key && { deduplication_key: configuration.deduplication_key }),
+        
+        // Custom settings
+        ...configuration?.custom_settings
       };
 
-      console.log('Sending bot to meeting with options:', botOptions);
+      console.log('Sending bot to meeting with comprehensive configuration:', botOptions);
       const result = await apiKeyService.sendBotToMeeting(meeting.meeting_url, botOptions);
       console.log('Bot deployment result:', result);
       
-      // Store configuration if provided
-      if (configuration) {
-        await calendarService.updateMeeting(meeting.id, {
-          bot_configuration: configuration
-        });
-      }
-      
       // Handle different possible response structures from Attendee API
-      let botId = null;
+      let attendeeBotId = null;
       if (result && typeof result === 'object') {
         // Try different possible field names for the bot ID
-        botId = result.id || result.bot_id || result.botId || result.bot_id;
+        attendeeBotId = result.id || result.bot_id || result.botId || result.bot_id;
         console.log('Trying to extract bot ID from result:', result);
         console.log('Available keys:', Object.keys(result));
       }
       
-      console.log('Extracted bot ID:', botId);
+      console.log('Extracted Attendee bot ID:', attendeeBotId);
       
-      if (!botId) {
+      if (!attendeeBotId) {
         console.error('Could not extract bot ID from response:', result);
         console.error('Response structure:', JSON.stringify(result, null, 2));
         throw new Error('Failed to get bot ID from Attendee API response');
       }
       
+      // Create a bot record in the bots table with comprehensive settings
+      console.log('Creating bot record...');
+      const botRecord = await calendarService.createBot({
+        name: configuration?.bot_name || meeting.bot_name || 'Sunny AI Assistant',
+        description: 'Advanced transcription bot with comprehensive configuration',
+        provider: 'attendee',
+        provider_bot_id: attendeeBotId,
+        settings: {
+          attendee_bot_id: attendeeBotId,
+          created_via: 'manual_deployment',
+          meeting_id: meeting.id,
+          configuration: configuration || {},
+          join_at: botOptions.join_at,
+          meeting_start_time: meeting.start_time,
+          transcription_settings: botOptions.transcription_settings,
+          recording_settings: botOptions.recording_settings,
+          teams_settings: botOptions.teams_settings,
+          debug_settings: botOptions.debug_settings,
+          automatic_leave_settings: botOptions.automatic_leave_settings,
+          webhooks: botOptions.webhooks,
+          metadata: botOptions.metadata,
+          deduplication_key: botOptions.deduplication_key
+        },
+        is_active: true
+      });
+      
+      console.log('Bot record created:', botRecord);
+      
+      // Update the meeting with the bot UUID and status
       await calendarService.updateBotStatus(
         meeting.id, 
         'bot_scheduled', 
-        botId
+        botRecord.id // Use the UUID from the bots table
       );
+      
+      // Also update the deployment method and configuration
+      await calendarService.updateMeeting(meeting.id, {
+        bot_deployment_method: 'manual',
+        bot_configuration: configuration || {}
+      });
+      
       onMeetingUpdate();
     } catch (err: any) {
       console.error('Error sending bot to meeting:', err);

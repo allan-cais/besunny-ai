@@ -172,5 +172,329 @@ serve(async (req) => {
     }
   }
 
+  // Get bot details (GET /bot-details?bot_id=...)
+  if (url.pathname.endsWith('/bot-details') && method === 'GET') {
+    try {
+      const botId = url.searchParams.get('bot_id');
+      if (!botId) return withCORS(new Response(JSON.stringify({ ok: false, error: 'Missing bot_id' }), { status: 400 }));
+      const response = await fetch(`https://app.attendee.dev/api/v1/bots/${botId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Token ${MASTER_ATTENDEE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      const data = await response.json();
+      return withCORS(new Response(JSON.stringify({ ok: response.ok, status: response.status, data }), { status: response.status }));
+    } catch (e) {
+      return withCORS(new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500 }));
+    }
+  }
+
+  // Update scheduled bot (PATCH /update-bot)
+  if (url.pathname.endsWith('/update-bot') && method === 'PATCH') {
+    try {
+      const { bot_id, updates } = await req.json();
+      if (!bot_id) return withCORS(new Response(JSON.stringify({ ok: false, error: 'Missing bot_id' }), { status: 400 }));
+      const response = await fetch(`https://app.attendee.dev/api/v1/bots/${bot_id}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Token ${MASTER_ATTENDEE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updates)
+      });
+      const data = await response.json();
+      return withCORS(new Response(JSON.stringify({ ok: response.ok, status: response.status, data }), { status: response.status }));
+    } catch (e) {
+      return withCORS(new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500 }));
+    }
+  }
+
+  // Delete scheduled bot (DELETE /delete-bot)
+  if (url.pathname.endsWith('/delete-bot') && method === 'DELETE') {
+    try {
+      const { bot_id } = await req.json();
+      if (!bot_id) return withCORS(new Response(JSON.stringify({ ok: false, error: 'Missing bot_id' }), { status: 400 }));
+      const response = await fetch(`https://app.attendee.dev/api/v1/bots/${bot_id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Token ${MASTER_ATTENDEE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      const data = await response.json();
+      return withCORS(new Response(JSON.stringify({ ok: response.ok, status: response.status, data }), { status: response.status }));
+    } catch (e) {
+      return withCORS(new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500 }));
+    }
+  }
+
+  // Get chat messages (GET /chat-messages?bot_id=...)
+  if (url.pathname.endsWith('/chat-messages') && method === 'GET') {
+    try {
+      const botId = url.searchParams.get('bot_id');
+      const cursor = url.searchParams.get('cursor');
+      const updatedAfter = url.searchParams.get('updated_after');
+      if (!botId) return withCORS(new Response(JSON.stringify({ ok: false, error: 'Missing bot_id' }), { status: 400 }));
+      
+      let apiUrl = `https://app.attendee.dev/api/v1/bots/${botId}/chat_messages`;
+      const params = new URLSearchParams();
+      if (cursor) params.append('cursor', cursor);
+      if (updatedAfter) params.append('updated_after', updatedAfter);
+      if (params.toString()) apiUrl += `?${params.toString()}`;
+      
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Token ${MASTER_ATTENDEE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      const data = await response.json();
+      return withCORS(new Response(JSON.stringify({ ok: response.ok, status: response.status, data }), { status: response.status }));
+    } catch (e) {
+      return withCORS(new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500 }));
+    }
+  }
+
+  // Send chat message (POST /send-chat)
+  if (url.pathname.endsWith('/send-chat') && method === 'POST') {
+    try {
+      const { bot_id, message, to, to_user_uuid } = await req.json();
+      if (!bot_id || !message) return withCORS(new Response(JSON.stringify({ ok: false, error: 'Missing bot_id or message' }), { status: 400 }));
+      
+      const body: any = { message, to: to || 'everyone' };
+      if (to_user_uuid) body.to_user_uuid = to_user_uuid;
+      
+      const response = await fetch(`https://app.attendee.dev/api/v1/bots/${bot_id}/send_chat_message`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Token ${MASTER_ATTENDEE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body)
+      });
+      const data = await response.json();
+      return withCORS(new Response(JSON.stringify({ ok: response.ok, status: response.status, data }), { status: response.status }));
+    } catch (e) {
+      return withCORS(new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500 }));
+    }
+  }
+
+  // Output speech (POST /speech)
+  if (url.pathname.endsWith('/speech') && method === 'POST') {
+    try {
+      const { bot_id, text, text_to_speech_settings } = await req.json();
+      if (!bot_id || !text) return withCORS(new Response(JSON.stringify({ ok: false, error: 'Missing bot_id or text' }), { status: 400 }));
+      
+      const response = await fetch(`https://app.attendee.dev/api/v1/bots/${bot_id}/speech`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Token ${MASTER_ATTENDEE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text, text_to_speech_settings })
+      });
+      const data = await response.json();
+      return withCORS(new Response(JSON.stringify({ ok: response.ok, status: response.status, data }), { status: response.status }));
+    } catch (e) {
+      return withCORS(new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500 }));
+    }
+  }
+
+  // Output audio (POST /output-audio)
+  if (url.pathname.endsWith('/output-audio') && method === 'POST') {
+    try {
+      const { bot_id, type, data } = await req.json();
+      if (!bot_id || !type || !data) return withCORS(new Response(JSON.stringify({ ok: false, error: 'Missing bot_id, type, or data' }), { status: 400 }));
+      
+      const response = await fetch(`https://app.attendee.dev/api/v1/bots/${bot_id}/output_audio`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Token ${MASTER_ATTENDEE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ type, data })
+      });
+      const responseData = await response.json();
+      return withCORS(new Response(JSON.stringify({ ok: response.ok, status: response.status, data: responseData }), { status: response.status }));
+    } catch (e) {
+      return withCORS(new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500 }));
+    }
+  }
+
+  // Output image (POST /output-image)
+  if (url.pathname.endsWith('/output-image') && method === 'POST') {
+    try {
+      const { bot_id, type, data } = await req.json();
+      if (!bot_id || !type || !data) return withCORS(new Response(JSON.stringify({ ok: false, error: 'Missing bot_id, type, or data' }), { status: 400 }));
+      
+      const response = await fetch(`https://app.attendee.dev/api/v1/bots/${bot_id}/output_image`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Token ${MASTER_ATTENDEE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ type, data })
+      });
+      const responseData = await response.json();
+      return withCORS(new Response(JSON.stringify({ ok: response.ok, status: response.status, data: responseData }), { status: response.status }));
+    } catch (e) {
+      return withCORS(new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500 }));
+    }
+  }
+
+  // Output video (POST /output-video)
+  if (url.pathname.endsWith('/output-video') && method === 'POST') {
+    try {
+      const { bot_id, url: videoUrl } = await req.json();
+      if (!bot_id || !videoUrl) return withCORS(new Response(JSON.stringify({ ok: false, error: 'Missing bot_id or url' }), { status: 400 }));
+      
+      const response = await fetch(`https://app.attendee.dev/api/v1/bots/${bot_id}/output_video`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Token ${MASTER_ATTENDEE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url: videoUrl })
+      });
+      const data = await response.json();
+      return withCORS(new Response(JSON.stringify({ ok: response.ok, status: response.status, data }), { status: response.status }));
+    } catch (e) {
+      return withCORS(new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500 }));
+    }
+  }
+
+  // Get participant events (GET /participant-events?bot_id=...)
+  if (url.pathname.endsWith('/participant-events') && method === 'GET') {
+    try {
+      const botId = url.searchParams.get('bot_id');
+      const after = url.searchParams.get('after');
+      const before = url.searchParams.get('before');
+      const cursor = url.searchParams.get('cursor');
+      if (!botId) return withCORS(new Response(JSON.stringify({ ok: false, error: 'Missing bot_id' }), { status: 400 }));
+      
+      let apiUrl = `https://app.attendee.dev/api/v1/bots/${botId}/participant_events`;
+      const params = new URLSearchParams();
+      if (after) params.append('after', after);
+      if (before) params.append('before', before);
+      if (cursor) params.append('cursor', cursor);
+      if (params.toString()) apiUrl += `?${params.toString()}`;
+      
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Token ${MASTER_ATTENDEE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      const data = await response.json();
+      return withCORS(new Response(JSON.stringify({ ok: response.ok, status: response.status, data }), { status: response.status }));
+    } catch (e) {
+      return withCORS(new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500 }));
+    }
+  }
+
+  // Pause recording (POST /pause-recording)
+  if (url.pathname.endsWith('/pause-recording') && method === 'POST') {
+    try {
+      const { bot_id } = await req.json();
+      if (!bot_id) return withCORS(new Response(JSON.stringify({ ok: false, error: 'Missing bot_id' }), { status: 400 }));
+      
+      const response = await fetch(`https://app.attendee.dev/api/v1/bots/${bot_id}/pause_recording`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Token ${MASTER_ATTENDEE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      const data = await response.json();
+      return withCORS(new Response(JSON.stringify({ ok: response.ok, status: response.status, data }), { status: response.status }));
+    } catch (e) {
+      return withCORS(new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500 }));
+    }
+  }
+
+  // Resume recording (POST /resume-recording)
+  if (url.pathname.endsWith('/resume-recording') && method === 'POST') {
+    try {
+      const { bot_id } = await req.json();
+      if (!bot_id) return withCORS(new Response(JSON.stringify({ ok: false, error: 'Missing bot_id' }), { status: 400 }));
+      
+      const response = await fetch(`https://app.attendee.dev/api/v1/bots/${bot_id}/resume_recording`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Token ${MASTER_ATTENDEE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      const data = await response.json();
+      return withCORS(new Response(JSON.stringify({ ok: response.ok, status: response.status, data }), { status: response.status }));
+    } catch (e) {
+      return withCORS(new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500 }));
+    }
+  }
+
+  // Get recording URL (GET /recording?bot_id=...)
+  if (url.pathname.endsWith('/recording') && method === 'GET') {
+    try {
+      const botId = url.searchParams.get('bot_id');
+      if (!botId) return withCORS(new Response(JSON.stringify({ ok: false, error: 'Missing bot_id' }), { status: 400 }));
+      
+      const response = await fetch(`https://app.attendee.dev/api/v1/bots/${botId}/recording`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Token ${MASTER_ATTENDEE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      const data = await response.json();
+      return withCORS(new Response(JSON.stringify({ ok: response.ok, status: response.status, data }), { status: response.status }));
+    } catch (e) {
+      return withCORS(new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500 }));
+    }
+  }
+
+  // Leave meeting (POST /leave-meeting)
+  if (url.pathname.endsWith('/leave-meeting') && method === 'POST') {
+    try {
+      const { bot_id } = await req.json();
+      if (!bot_id) return withCORS(new Response(JSON.stringify({ ok: false, error: 'Missing bot_id' }), { status: 400 }));
+      
+      const response = await fetch(`https://app.attendee.dev/api/v1/bots/${bot_id}/leave`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Token ${MASTER_ATTENDEE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      const data = await response.json();
+      return withCORS(new Response(JSON.stringify({ ok: response.ok, status: response.status, data }), { status: response.status }));
+    } catch (e) {
+      return withCORS(new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500 }));
+    }
+  }
+
+  // Delete bot data (POST /delete-data)
+  if (url.pathname.endsWith('/delete-data') && method === 'POST') {
+    try {
+      const { bot_id } = await req.json();
+      if (!bot_id) return withCORS(new Response(JSON.stringify({ ok: false, error: 'Missing bot_id' }), { status: 400 }));
+      
+      const response = await fetch(`https://app.attendee.dev/api/v1/bots/${bot_id}/delete_data`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Token ${MASTER_ATTENDEE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      const data = await response.json();
+      return withCORS(new Response(JSON.stringify({ ok: response.ok, status: response.status, data }), { status: response.status }));
+    } catch (e) {
+      return withCORS(new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500 }));
+    }
+  }
+
   return withCORS(new Response(JSON.stringify({ error: 'Not found' }), { status: 404 }));
 });

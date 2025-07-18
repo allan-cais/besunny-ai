@@ -85,14 +85,12 @@ async function autoScheduleBotsForUser(userId: string) {
     throw new Error('Master Attendee API key not configured');
   }
 
-  // Find meetings that need auto-scheduling
+  // Find meetings that need auto-scheduling (virtual email) OR manual scheduling that are ready
   const { data: meetings, error } = await supabase
     .from('meetings')
     .select('*')
     .eq('user_id', userId)
-    .eq('auto_scheduled_via_email', true)
-    .eq('bot_deployment_method', 'scheduled')
-    .eq('bot_status', 'pending')
+    .or(`and(auto_scheduled_via_email.eq.true,bot_deployment_method.eq.scheduled,bot_status.eq.pending),and(bot_deployment_method.eq.scheduled,bot_status.eq.pending)`)
     .not('meeting_url', 'is', null)
     .gte('start_time', new Date().toISOString());
 
@@ -102,33 +100,98 @@ async function autoScheduleBotsForUser(userId: string) {
   
   for (const meeting of meetings || []) {
     try {
-      // Use default configuration for auto-scheduled bots
-      const defaultConfig = {
+      // Use stored configuration or default configuration
+      const config = meeting.bot_configuration || {
         bot_name: 'Sunny AI Assistant',
         bot_chat_message: {
           to: 'everyone',
           message: 'Hi, I\'m here to transcribe this meeting!',
         },
-        language: 'en-US',
+        transcription_language: 'en-US',
         auto_join: true,
         recording_enabled: true
       };
 
-      // Send bot to meeting via Attendee API
+      // Calculate join time (2 minutes before meeting start)
+      const meetingStartTime = new Date(meeting.start_time);
+      const joinAtTime = new Date(meetingStartTime.getTime() - 2 * 60 * 1000); // 2 minutes before
+
+      console.log(`Scheduling bot for meeting ${meeting.id} to join at ${joinAtTime.toISOString()}`);
+
+      // Build comprehensive bot configuration using all available Attendee API features
+      const botOptions = {
+        // Basic required fields
+        meeting_url: meeting.meeting_url,
+        bot_name: config.bot_name,
+        
+        // Chat message configuration
+        bot_chat_message: config.bot_chat_message,
+        
+        // Future scheduling
+        join_at: joinAtTime.toISOString(),
+        
+        // Transcription settings
+        transcription_settings: config.transcription_settings || {
+          deepgram: {
+            language: config.transcription_language || 'en-US',
+            model: 'nova-2',
+            smart_format: true
+          }
+        },
+        
+        // Recording settings
+        recording_settings: config.recording_settings || {
+          format: 'mp4',
+          view: 'speaker_view',
+          resolution: '1080p'
+        },
+        
+        // Teams settings
+        teams_settings: config.teams_settings || {
+          use_login: false
+        },
+        
+        // Debug settings
+        debug_settings: config.debug_settings || {
+          create_debug_recording: false
+        },
+        
+        // Automatic leave settings
+        automatic_leave_settings: config.automatic_leave_settings || {
+          leave_after_minutes: 0,
+          leave_when_empty: false
+        },
+        
+        // Webhooks
+        webhooks: config.webhooks || [],
+        
+        // Metadata
+        metadata: {
+          meeting_title: meeting.title,
+          meeting_id: meeting.id,
+          project_id: meeting.project_id,
+          created_via: meeting.auto_scheduled_via_email ? 'auto_scheduling' : 'manual_deployment',
+          user_id: meeting.user_id,
+          auto_scheduled_via_email: meeting.auto_scheduled_via_email,
+          virtual_email_attendee: meeting.virtual_email_attendee,
+          ...config.metadata
+        },
+        
+        // Deduplication key
+        ...(config.deduplication_key && { deduplication_key: config.deduplication_key }),
+        
+        // Custom settings
+        ...config.custom_settings
+      };
+
+      // Send bot to meeting via Attendee API with comprehensive configuration
       const response = await fetch('https://app.attendee.dev/api/v1/bots', {
         method: 'POST',
         headers: {
           'Authorization': `Token ${MASTER_ATTENDEE_API_KEY}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          meeting_url: meeting.meeting_url,
-          bot_name: defaultConfig.bot_name,
-          bot_chat_message: defaultConfig.bot_chat_message,
-          language: defaultConfig.language,
-          auto_join: defaultConfig.auto_join,
-          recording_enabled: defaultConfig.recording_enabled
-        })
+        body: JSON.stringify(botOptions)
       });
 
       if (!response.ok) {
@@ -136,52 +199,84 @@ async function autoScheduleBotsForUser(userId: string) {
       }
 
       const botData = await response.json();
-      const botId = botData.id || botData.bot_id;
+      const attendeeBotId = botData.id || botData.bot_id;
 
-      // Update meeting with bot details
+      if (!attendeeBotId) {
+        throw new Error('No bot ID returned from Attendee API');
+      }
+
+      // Create a bot record in the bots table
+      const { data: botRecord, error: botError } = await supabase
+        .from('bots')
+        .insert({
+          user_id: userId,
+          name: config.bot_name,
+          description: 'Auto-created bot for meeting transcription',
+          provider: 'attendee',
+          provider_bot_id: attendeeBotId,
+          settings: {
+            attendee_bot_id: attendeeBotId,
+            created_via: meeting.auto_scheduled_via_email ? 'auto_scheduling' : 'manual_deployment',
+            meeting_id: meeting.id,
+            configuration: config,
+            join_at: joinAtTime.toISOString(),
+            meeting_start_time: meeting.start_time
+          },
+          is_active: true
+        })
+        .select()
+        .single();
+
+      if (botError) {
+        throw new Error(`Failed to create bot record: ${botError.message}`);
+      }
+
+      // Update meeting with bot UUID and status
       await supabase
         .from('meetings')
         .update({
-          attendee_bot_id: botId,
+          attendee_bot_id: botRecord.id, // Use the UUID from the bots table
           bot_status: 'bot_scheduled',
-          bot_deployment_method: 'automatic',
-          bot_configuration: defaultConfig,
+          bot_deployment_method: meeting.auto_scheduled_via_email ? 'automatic' : 'manual',
+          bot_configuration: config,
           updated_at: new Date().toISOString()
         })
         .eq('id', meeting.id);
 
-      // Log the auto-scheduling
+      // Log the deployment
       await supabase
         .from('calendar_sync_logs')
         .insert({
           user_id: userId,
-          sync_type: 'auto_bot_scheduling',
+          sync_type: meeting.auto_scheduled_via_email ? 'auto_bot_scheduling' : 'manual_bot_deployment',
           status: 'completed',
           events_processed: 1,
           meetings_created: 1,
-          error_message: `Auto-scheduled bot for meeting: ${meeting.title}`
+          error_message: `${meeting.auto_scheduled_via_email ? 'Auto-scheduled' : 'Manually deployed'} bot for meeting: ${meeting.title} (joins at ${joinAtTime.toISOString()})`
         });
 
       results.push({
         meetingId: meeting.id,
         title: meeting.title,
-        botId: botId,
-        success: true
+        botId: botRecord.id, // Use the UUID from the bots table
+        success: true,
+        deploymentType: meeting.auto_scheduled_via_email ? 'automatic' : 'manual',
+        joinAt: joinAtTime.toISOString()
       });
 
     } catch (error) {
-      console.error(`Failed to auto-schedule bot for meeting ${meeting.id}:`, error);
+      console.error(`Failed to deploy bot for meeting ${meeting.id}:`, error);
       
       // Log the error
       await supabase
         .from('calendar_sync_logs')
         .insert({
           user_id: userId,
-          sync_type: 'auto_bot_scheduling',
+          sync_type: meeting.auto_scheduled_via_email ? 'auto_bot_scheduling' : 'manual_bot_deployment',
           status: 'failed',
           events_processed: 1,
           meetings_created: 0,
-          error_message: `Failed to auto-schedule bot for meeting ${meeting.title}: ${error.message}`
+          error_message: `Failed to deploy bot for meeting ${meeting.title}: ${error.message}`
         });
 
       results.push({
@@ -195,8 +290,8 @@ async function autoScheduleBotsForUser(userId: string) {
 
   return {
     totalMeetings: meetings?.length || 0,
-    successfulSchedules: results.filter(r => r.success).length,
-    failedSchedules: results.filter(r => !r.success).length,
+    successfulDeployments: results.filter(r => r.success).length,
+    failedDeployments: results.filter(r => !r.success).length,
     results
   };
 } 
