@@ -1,9 +1,8 @@
-name: Attendee Meeting Polling
+name: Attendee Meeting Polling & Auto-Scheduling
 
 on:
   schedule:
-    # Run every 30 seconds (minimum is 5 minutes for GitHub Actions)
-    # We'll run every 5 minutes instead
+    # Run every 5 minutes
     - cron: '*/5 * * * *'
   workflow_dispatch: # Allow manual triggering
 
@@ -23,6 +22,27 @@ jobs:
           -H "Content-Type: application/json" \
           -H "Authorization: Bearer $SERVICE_ROLE_KEY" \
           "$SUPABASE_URL/functions/v1/attendee-polling-cron" \
+          -d '{}'
+      
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        
+  auto-schedule-bots:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Auto-Schedule Bots
+      run: |
+        # Get the Supabase URL and service role key from secrets
+        SUPABASE_URL="${{ secrets.SUPABASE_URL }}"
+        SERVICE_ROLE_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
+        
+        # Call the auto-scheduling function
+        curl -X POST \
+          -H "Content-Type: application/json" \
+          -H "Authorization: Bearer $SERVICE_ROLE_KEY" \
+          "$SUPABASE_URL/functions/v1/auto-schedule-bots/schedule" \
           -d '{}'
       
       env:

@@ -218,10 +218,42 @@ serve(async (req) => {
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };
+        // Check for virtual email attendees
+        const virtualEmailPattern = /inbound\+([^@]+)@sunny\.ai/;
+        let virtualEmailAttendee: string | undefined;
+        let username: string | undefined;
+        
+        if (Array.isArray(event.attendees)) {
+          for (const attendee of event.attendees) {
+            if (virtualEmailPattern.test(attendee.email)) {
+              virtualEmailAttendee = attendee.email;
+              const match = attendee.email.match(virtualEmailPattern);
+              username = match ? match[1] : undefined;
+              break;
+            }
+          }
+        }
+        
+        // If virtual email attendee found, mark for auto-scheduling
+        if (virtualEmailAttendee && username) {
+          // Find the user by username
+          const { data: virtualEmailUser, error: userError } = await supabase
+            .from('users')
+            .select('id')
+            .ilike('email', `%${username}%`)
+            .single();
+          
+          if (!userError && virtualEmailUser && virtualEmailUser.id === userId) {
+            meeting.auto_scheduled_via_email = true;
+            meeting.virtual_email_attendee = virtualEmailAttendee;
+            meeting.bot_deployment_method = 'scheduled';
+          }
+        }
+        
         // Check if meeting already exists
         const { data: existingMeeting } = await supabase
           .from('meetings')
-          .select('id, bot_status, attendee_bot_id')
+          .select('id, bot_status, attendee_bot_id, auto_scheduled_via_email')
           .eq('google_calendar_event_id', event.id)
           .eq('user_id', userId)
           .maybeSingle();
@@ -240,20 +272,29 @@ serve(async (req) => {
           }
         } else {
           // Update existing meeting, but preserve bot_status and attendee_bot_id
+          const updateData: any = {
+            title: meeting.title,
+            description: meeting.description,
+            start_time: meeting.start_time,
+            end_time: meeting.end_time,
+            meeting_url: meeting.meeting_url,
+            event_status: meeting.event_status,
+            // Preserve existing bot_status and attendee_bot_id
+            bot_status: existingMeeting.bot_status,
+            attendee_bot_id: existingMeeting.attendee_bot_id,
+            updated_at: new Date().toISOString(),
+          };
+          
+          // Update virtual email fields if this is a new detection
+          if (meeting.auto_scheduled_via_email && !existingMeeting.auto_scheduled_via_email) {
+            updateData.auto_scheduled_via_email = true;
+            updateData.virtual_email_attendee = meeting.virtual_email_attendee;
+            updateData.bot_deployment_method = 'scheduled';
+          }
+          
           const { data: updatedMeeting, error: updateError } = await supabase
             .from('meetings')
-            .update({
-              title: meeting.title,
-              description: meeting.description,
-              start_time: meeting.start_time,
-              end_time: meeting.end_time,
-              meeting_url: meeting.meeting_url,
-              event_status: meeting.event_status,
-              // Preserve existing bot_status and attendee_bot_id
-              bot_status: existingMeeting.bot_status,
-              attendee_bot_id: existingMeeting.attendee_bot_id,
-              updated_at: new Date().toISOString(),
-            })
+            .update(updateData)
             .eq('id', existingMeeting.id)
             .select()
             .single();
