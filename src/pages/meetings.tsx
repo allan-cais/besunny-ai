@@ -8,6 +8,7 @@ import { useSupabase } from '@/hooks/use-supabase';
 import { useAuth } from '@/providers/AuthProvider';
 import PageHeader from '@/components/dashboard/PageHeader';
 import { useAttendeePolling } from '@/hooks/use-attendee-polling';
+import VirtualEmailInstructions from '@/components/dashboard/VirtualEmailInstructions';
 
 const MeetingsPage: React.FC = () => {
   const { user } = useAuth();
@@ -137,12 +138,18 @@ const MeetingsPage: React.FC = () => {
         <PageHeader title="MEETINGS" path="~/sunny.ai/meetings" />
       </div>
       
-      <div className="flex-1 min-h-0">
-        <CalendarView
-          meetings={meetings}
-          onMeetingUpdate={handleMeetingUpdate}
-          projects={projects}
-        />
+      <div className="flex-1 min-h-0 flex gap-6">
+        <div className="flex-1 min-h-0">
+          <CalendarView
+            meetings={meetings}
+            onMeetingUpdate={handleMeetingUpdate}
+            projects={projects}
+          />
+        </div>
+        
+        <div className="w-80 flex-shrink-0">
+          <VirtualEmailInstructions />
+        </div>
       </div>
     </div>
   );

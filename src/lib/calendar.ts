@@ -25,6 +25,11 @@ export interface Meeting {
   final_transcript_ready?: boolean;
   transcript_metadata?: any;
   bot_configuration?: any;
+  // Auto-scheduling fields
+  bot_deployment_method?: 'manual' | 'automatic' | 'scheduled';
+  auto_scheduled_via_email?: boolean;
+  virtual_email_attendee?: string;
+  auto_bot_notification_sent?: boolean;
   created_at: string;
   updated_at: string;
 }

@@ -62,23 +62,42 @@ const CalendarView: React.FC<CalendarViewProps> = ({
     }
   };
 
-  const getBotStatusBadge = (botStatus: Meeting['bot_status']) => {
-    switch (botStatus) {
+  const getBotStatusBadge = (meeting: Meeting) => {
+    const { bot_status, bot_deployment_method, auto_scheduled_via_email } = meeting;
+    
+    let badge;
+    switch (bot_status) {
       case 'pending':
-        return <Badge variant="secondary" className="bg-gray-100 text-gray-800 text-xs">No Bot</Badge>;
+        if (auto_scheduled_via_email) {
+          badge = <Badge variant="secondary" className="bg-purple-100 text-purple-800 text-xs">Auto-Scheduled</Badge>;
+        } else {
+          badge = <Badge variant="secondary" className="bg-gray-100 text-gray-800 text-xs">No Bot</Badge>;
+        }
+        break;
       case 'bot_scheduled':
-        return <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-xs">Bot Scheduled</Badge>;
+        if (bot_deployment_method === 'automatic') {
+          badge = <Badge variant="secondary" className="bg-purple-100 text-purple-800 text-xs">Auto Bot Scheduled</Badge>;
+        } else {
+          badge = <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-xs">Bot Scheduled</Badge>;
+        }
+        break;
       case 'bot_joined':
-        return <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">Bot Joined</Badge>;
+        badge = <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">Bot Joined</Badge>;
+        break;
       case 'transcribing':
-        return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 text-xs">Transcribing</Badge>;
+        badge = <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 text-xs">Transcribing</Badge>;
+        break;
       case 'completed':
-        return <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">Completed</Badge>;
+        badge = <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">Completed</Badge>;
+        break;
       case 'failed':
-        return <Badge variant="secondary" className="bg-red-100 text-red-800 text-xs">Failed</Badge>;
+        badge = <Badge variant="secondary" className="bg-red-100 text-red-800 text-xs">Failed</Badge>;
+        break;
       default:
-        return <Badge variant="secondary" className="text-xs">Unknown</Badge>;
+        badge = <Badge variant="secondary" className="text-xs">Unknown</Badge>;
     }
+    
+    return badge;
   };
 
   const sendBotToMeeting = async (meeting: Meeting, configuration?: any) => {
@@ -143,6 +162,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
     if (!meeting) return false;
     return meeting.meeting_url && 
            (meeting.bot_status === 'pending') && 
+           !meeting.auto_scheduled_via_email && // Don't show button for auto-scheduled meetings
            !sendingBot;
   };
 
@@ -219,7 +239,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
                 </div>
                 <div className="flex flex-col items-end space-y-1 font-mono">
                   {getEventStatusBadge(meeting.event_status)}
-                  {getBotStatusBadge(meeting.bot_status)}
+                  {getBotStatusBadge(meeting)}
                   {project && (
                     <Badge variant="outline" className="text-xs mt-1 font-mono">{project.name}</Badge>
                   )}
@@ -304,7 +324,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
             </div>
             <div className="flex items-center space-x-2">
               {selectedMeeting && getEventStatusBadge(selectedMeeting.event_status)}
-              {selectedMeeting && getBotStatusBadge(selectedMeeting.bot_status)}
+              {selectedMeeting && getBotStatusBadge(selectedMeeting)}
             </div>
             {selectedMeeting?.description && (
               <div>
