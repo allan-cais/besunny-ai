@@ -19,7 +19,7 @@ export const apiKeyService = {
       },
       body: JSON.stringify({
         meeting_url: meetingUrl,
-        bot_name: options.bot_name || 'Kirit Askuno Bot',
+        bot_name: options.bot_name || 'Sunny AI Assistant',
         ...options
       })
     });

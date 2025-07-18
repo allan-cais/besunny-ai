@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS meetings (
 
   -- Bot integration (optional)
   attendee_bot_id UUID REFERENCES bots(id),
-  bot_name TEXT DEFAULT 'Kirit Notetaker',
+  bot_name TEXT DEFAULT 'Sunny AI Assistant',
   bot_chat_message TEXT DEFAULT 'Hi, I''m here to transcribe this meeting!',
 
   -- Transcript storage

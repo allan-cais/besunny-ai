@@ -38,7 +38,7 @@ interface BotConfigurationModalProps {
 }
 
 const DEFAULT_CONFIGURATION: BotConfiguration = {
-  bot_name: 'Kirit Notetaker',
+  bot_name: 'Sunny AI Assistant',
   bot_chat_message: 'Hi, I\'m here to transcribe this meeting!',
   chat_message_recipient: 'everyone',
   auto_join: true,

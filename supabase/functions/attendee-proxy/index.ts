@@ -111,7 +111,7 @@ serve(async (req) => {
         },
         body: JSON.stringify({
           meeting_url: 'https://zoom.us/j/00000000000',
-          bot_name: 'API Key Test Bot'
+          bot_name: 'Sunny AI Assistant'
         })
       });
       const body = await response.text();

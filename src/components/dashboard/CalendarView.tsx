@@ -97,7 +97,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
         recording_enabled: configuration.recording_enabled,
         ...configuration.custom_settings
       } : {
-        bot_name: meeting.bot_name || 'Kirit Notetaker',
+        bot_name: meeting.bot_name || 'Sunny AI Assistant',
         bot_chat_message: {
           to: 'everyone',
           message: meeting.bot_chat_message || 'Hi, I\'m here to transcribe this meeting!',
