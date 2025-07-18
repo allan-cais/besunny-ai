@@ -131,6 +131,8 @@ serve(async (req) => {
   if (url.pathname.endsWith('/send-bot') && method === 'POST') {
     try {
       const body = await req.json();
+      console.log('Sending bot to Attendee API with body:', body);
+      
       const response = await fetch('https://app.attendee.dev/api/v1/bots', {
         method: 'POST',
         headers: {
@@ -139,9 +141,14 @@ serve(async (req) => {
         },
         body: JSON.stringify(body)
       });
+      
+      console.log('Attendee API response status:', response.status);
       const data = await response.json();
+      console.log('Attendee API response data:', data);
+      
       return withCORS(new Response(JSON.stringify({ ok: response.ok, status: response.status, data }), { status: response.status }));
     } catch (e) {
+      console.error('Error in send-bot:', e);
       return withCORS(new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500 }));
     }
   }

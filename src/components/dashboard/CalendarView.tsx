@@ -123,7 +123,9 @@ const CalendarView: React.FC<CalendarViewProps> = ({
         },
       };
 
+      console.log('Sending bot to meeting with options:', botOptions);
       const result = await apiKeyService.sendBotToMeeting(meeting.meeting_url, botOptions);
+      console.log('Bot deployment result:', result);
       
       // Store configuration if provided
       if (configuration) {
@@ -132,13 +134,31 @@ const CalendarView: React.FC<CalendarViewProps> = ({
         });
       }
       
+      // Handle different possible response structures from Attendee API
+      let botId = null;
+      if (result && typeof result === 'object') {
+        // Try different possible field names for the bot ID
+        botId = result.id || result.bot_id || result.botId || result.bot_id;
+        console.log('Trying to extract bot ID from result:', result);
+        console.log('Available keys:', Object.keys(result));
+      }
+      
+      console.log('Extracted bot ID:', botId);
+      
+      if (!botId) {
+        console.error('Could not extract bot ID from response:', result);
+        console.error('Response structure:', JSON.stringify(result, null, 2));
+        throw new Error('Failed to get bot ID from Attendee API response');
+      }
+      
       await calendarService.updateBotStatus(
         meeting.id, 
         'bot_scheduled', 
-        result.id || result.bot_id
+        botId
       );
       onMeetingUpdate();
     } catch (err: any) {
+      console.error('Error sending bot to meeting:', err);
       // Optionally handle error
     } finally {
       setSendingBot(null);

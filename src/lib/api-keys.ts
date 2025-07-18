@@ -24,7 +24,20 @@ export const apiKeyService = {
       })
     });
     const result = await response.json();
-    if (!result.ok) throw new Error(result.error || 'Failed to send bot');
+    console.log('Attendee proxy response:', result);
+    
+    if (!result.ok) {
+      console.error('Attendee proxy error:', result);
+      throw new Error(result.error || 'Failed to send bot');
+    }
+    
+    // The result.data should contain the Attendee API response
+    if (!result.data) {
+      console.error('No data in response:', result);
+      throw new Error('No data received from Attendee API');
+    }
+    
+    console.log('Attendee API data:', result.data);
     return result.data;
   },
 
