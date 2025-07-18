@@ -3,14 +3,16 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Mail, FileText, Folder, Image, File, Calendar, Clock, Search, Filter } from 'lucide-react';
+import { Mail, FileText, Folder, Image, File, Calendar, Clock, Search, Filter, MessageSquare, Play } from 'lucide-react';
 import { useAuth } from '@/providers/AuthProvider';
 import { supabase, Document } from '@/lib/supabase';
 import FileWatchStatus from '@/components/FileWatchStatus';
+import { attendeePollingService } from '@/lib/attendee-polling';
+import TranscriptModal from './TranscriptModal';
 
 interface VirtualEmailActivity {
   id: string;
-  type: 'email' | 'document' | 'spreadsheet' | 'presentation' | 'image' | 'folder';
+  type: 'email' | 'document' | 'spreadsheet' | 'presentation' | 'image' | 'folder' | 'meeting_transcript';
   title: string;
   summary: string;
   source: string;
@@ -19,6 +21,9 @@ interface VirtualEmailActivity {
   created_at: string;
   processed: boolean;
   project_id?: string;
+  transcript_duration_seconds?: number;
+  transcript_metadata?: any;
+  rawTranscript?: any; // Store the full transcript data for detail view
 }
 
 const DataFeed = () => {
@@ -27,7 +32,8 @@ const DataFeed = () => {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'email' | 'drive'>('all');
+  const [filterType, setFilterType] = useState<'all' | 'email' | 'drive' | 'transcripts'>('all');
+  const [selectedTranscript, setSelectedTranscript] = useState<any>(null);
 
   useEffect(() => {
     if (user?.id) {
@@ -69,14 +75,17 @@ const DataFeed = () => {
         .order('created_at', { ascending: false })
         .limit(50);
 
+      // Get meeting transcripts
+      const transcriptsData = await attendeePollingService.getMeetingsWithTranscripts();
+
       if (documentsError) {
         console.error('Error loading documents:', documentsError);
         setActivities(getMockVirtualEmailActivity());
       } else {
         setDocuments(documentsData || []);
         
-        // Transform the data to match our interface
-        const transformedData: VirtualEmailActivity[] = (documentsData || []).map(doc => ({
+        // Transform documents to match our interface
+        const documentActivities: VirtualEmailActivity[] = (documentsData || []).map(doc => ({
           id: doc.id,
           type: getDocumentType(doc.source, doc),
           title: doc.title || 'Untitled Document',
@@ -88,8 +97,27 @@ const DataFeed = () => {
           processed: true, // All documents in DB are processed
           project_id: doc.project_id
         }));
+
+        // Transform transcripts to match our interface
+        const transcriptActivities: VirtualEmailActivity[] = (transcriptsData || []).map(transcript => ({
+          id: transcript.id,
+          type: 'meeting_transcript',
+          title: `Meeting Transcript: ${transcript.title}`,
+          summary: transcript.transcript_summary || 'No transcript summary available',
+          source: 'attendee_bot',
+          created_at: transcript.transcript_retrieved_at || transcript.created_at,
+          processed: true,
+          project_id: transcript.project_id,
+          transcript_duration_seconds: transcript.transcript_duration_seconds,
+          transcript_metadata: transcript.transcript_metadata,
+          rawTranscript: transcript // Store the full transcript data for detail view
+        }));
         
-        setActivities(transformedData);
+        // Combine and sort by creation date
+        const allActivities = [...documentActivities, ...transcriptActivities]
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        
+        setActivities(allActivities);
       }
     } catch (error) {
       console.error('Error loading virtual email activity:', error);
@@ -174,6 +202,289 @@ const DataFeed = () => {
       file_size: '5.2 MB',
       created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
       processed: true
+    },
+    // Demo transcript data
+    {
+      id: 'demo-transcript-1',
+      type: 'meeting_transcript',
+      title: 'Meeting Transcript: Q1 Budget Review Meeting',
+      summary: 'Discussion covered Q1 budget performance, revenue projections for Q2, and strategic planning for the upcoming quarter. Key decisions made on resource allocation and new project funding.',
+      source: 'attendee_bot',
+      created_at: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
+      processed: true,
+      transcript_duration_seconds: 3240, // 54 minutes
+      transcript_metadata: {
+        word_count: 2847,
+        character_count: 15689,
+        bot_id: 'demo-bot-1'
+      },
+      rawTranscript: {
+        id: 'demo-transcript-1',
+        title: 'Q1 Budget Review Meeting',
+        transcript: `Sarah Johnson: Good morning everyone, welcome to our Q1 budget review meeting. I've prepared a comprehensive overview of our financial performance for the first quarter.
+
+Michael Chen: Thanks Sarah. I've reviewed the preliminary numbers and I'm seeing some interesting trends in our marketing spend.
+
+Sarah Johnson: Yes, let's dive into that. Our marketing budget was 15% over target, but we're seeing a 23% increase in qualified leads, so the ROI is actually quite positive.
+
+Jennifer Davis: I agree, but we need to be careful about maintaining this level of spend in Q2. What's our projection for the next quarter?
+
+Michael Chen: Based on current trends, I'm projecting we'll need about $125,000 for Q2 marketing initiatives. That's about 8% higher than Q1, but we're expecting 30% more leads.
+
+Sarah Johnson: That sounds reasonable. Let's also discuss the new product development budget. We've allocated $200,000 for the mobile app development project.
+
+Jennifer Davis: I have some concerns about that allocation. The development team is saying they need closer to $250,000 to complete all the features we've planned.
+
+Michael Chen: We could potentially reduce scope or extend the timeline. What are the must-have features versus nice-to-have?
+
+Sarah Johnson: Good point. Let me break down the feature list. Must-haves include user authentication, core functionality, and basic reporting. That would bring us down to about $180,000.
+
+Jennifer Davis: That's much more manageable. What about the timeline impact?
+
+Sarah Johnson: We'd be looking at a 2-week delay, pushing the launch from June 15th to July 1st. I think that's acceptable given the budget constraints.
+
+Michael Chen: I agree. The 2-week delay is better than over-extending our budget. Let's also discuss the sales team expansion.
+
+Jennifer Davis: Yes, we've been talking about adding two new sales representatives. The budget impact would be about $180,000 annually, including salary, benefits, and commission structure.
+
+Sarah Johnson: That's a significant investment. What's our expected ROI on that?
+
+Michael Chen: Based on our current sales metrics, each new rep should generate about $500,000 in additional revenue annually. So we're looking at a 2.8x ROI.
+
+Jennifer Davis: That's compelling. I think we should move forward with the sales team expansion. The numbers make sense.
+
+Sarah Johnson: Great. Let's also review our contingency fund. We currently have $50,000 set aside for unexpected expenses.
+
+Michael Chen: I'd recommend increasing that to $75,000 given our expansion plans and the current economic climate.
+
+Jennifer Davis: Agreed. Better to be safe than sorry. What about our technology infrastructure budget?
+
+Sarah Johnson: We've allocated $60,000 for server upgrades and new software licenses. This includes the new CRM system we've been discussing.
+
+Michael Chen: The CRM implementation is critical for our sales team expansion. We need to make sure that's prioritized.
+
+Jennifer Davis: Absolutely. The new reps will need proper tools from day one. Let's also discuss our travel and entertainment budget.
+
+Sarah Johnson: We've set aside $25,000 for client meetings and industry conferences. This includes the annual sales conference in September.
+
+Michael Chen: That seems reasonable. We should also budget for some team building events. Morale is important, especially with the expansion.
+
+Jennifer Davis: Good point. Let's add $10,000 for team events and recognition programs.
+
+Sarah Johnson: Perfect. Now let's talk about our revenue projections for Q2. Based on current pipeline and the new sales hires, I'm projecting $1.2 million in revenue.
+
+Michael Chen: That's a 20% increase from Q1. I think that's achievable, especially with the new sales team members.
+
+Jennifer Davis: I'm a bit more conservative. I'd suggest we plan for $1.1 million to be safe.
+
+Sarah Johnson: That's fair. Let's use $1.1 million as our target and $1.2 million as our stretch goal.
+
+Michael Chen: Sounds good. What about our profit margin targets?
+
+Sarah Johnson: We're targeting 25% net profit margin for Q2, which is consistent with Q1 performance.
+
+Jennifer Davis: That's reasonable. We should also discuss our cash flow projections.
+
+Sarah Johnson: Yes, with the increased spending on marketing and new hires, we need to be careful about cash flow timing.
+
+Michael Chen: I recommend we implement more aggressive payment terms for new clients and follow up on overdue invoices more aggressively.
+
+Jennifer Davis: Agreed. Let's also consider offering early payment discounts to improve cash flow.
+
+Sarah Johnson: Good ideas. Let me summarize the key decisions we've made today:
+
+1. Marketing budget for Q2: $125,000 (8% increase from Q1)
+2. Mobile app development: $180,000 (reduced scope, 2-week delay)
+3. Sales team expansion: $180,000 annually for two new reps
+4. Contingency fund: Increased to $75,000
+5. Technology infrastructure: $60,000 (including new CRM)
+6. Team events: $10,000 additional budget
+7. Q2 revenue target: $1.1 million (stretch goal: $1.2 million)
+8. Profit margin target: 25%
+
+Does everyone agree with these decisions?
+
+Michael Chen: Yes, I'm comfortable with these numbers.
+
+Jennifer Davis: I agree. The budget looks balanced and realistic.
+
+Sarah Johnson: Excellent. I'll prepare the final budget document and circulate it by the end of the week. Any other items we need to discuss?
+
+Michael Chen: I think we've covered everything. Thanks for the comprehensive review, Sarah.
+
+Jennifer Davis: Yes, great meeting everyone. I'll follow up on the CRM implementation timeline.
+
+Sarah Johnson: Perfect. Meeting adjourned. Thanks everyone for your time and input.`,
+        transcript_summary: 'Discussion covered Q1 budget performance, revenue projections for Q2, and strategic planning for the upcoming quarter. Key decisions made on resource allocation and new project funding.',
+        transcript_metadata: {
+          word_count: 2847,
+          character_count: 15689,
+          bot_id: 'demo-bot-1'
+        },
+        transcript_duration_seconds: 3240,
+        transcript_retrieved_at: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
+        start_time: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+        end_time: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
+        meeting_url: 'https://zoom.us/rec/share/demo-meeting-url'
+      }
+    },
+    {
+      id: 'demo-transcript-2',
+      type: 'meeting_transcript',
+      title: 'Meeting Transcript: Product Strategy Session',
+      summary: 'Deep dive into product roadmap planning, feature prioritization, and technical architecture decisions. Team discussed user feedback integration and development timeline adjustments.',
+      source: 'attendee_bot',
+      created_at: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+      processed: true,
+      transcript_duration_seconds: 2700, // 45 minutes
+      transcript_metadata: {
+        word_count: 2156,
+        character_count: 12345,
+        bot_id: 'demo-bot-2'
+      },
+      rawTranscript: {
+        id: 'demo-transcript-2',
+        title: 'Product Strategy Session',
+        transcript: `Alex Rodriguez: Welcome to our product strategy session. Today we're going to dive deep into our roadmap planning and feature prioritization.
+
+Lisa Thompson: Thanks Alex. I've been reviewing the user feedback from our beta release and there are some interesting patterns we should discuss.
+
+David Kim: Yes, I've analyzed the feedback data and I'm seeing strong demand for the mobile app features we've been planning.
+
+Alex Rodriguez: Great. Let's start with the mobile app development. What's our current timeline looking like?
+
+Lisa Thompson: Based on our current development capacity, we're looking at a 6-month timeline for the full feature set. But I think we should consider a phased approach.
+
+David Kim: I agree. We could launch with core features in 3 months and add advanced features in subsequent releases.
+
+Alex Rodriguez: That makes sense. What are the core features we should prioritize?
+
+Lisa Thompson: Based on user feedback, the top priorities are:
+1. User authentication and profile management
+2. Core functionality that mirrors the web app
+3. Offline capability for key features
+4. Push notifications for important updates
+
+David Kim: I'd add real-time collaboration features to that list. Users are specifically asking for that.
+
+Alex Rodriguez: Good point. What's the technical complexity of real-time features?
+
+David Kim: It's moderate complexity. We'll need to implement WebSocket connections and handle conflict resolution for simultaneous edits.
+
+Lisa Thompson: That could add 2-3 weeks to our timeline. Is it worth the delay?
+
+Alex Rodriguez: I think so. Real-time collaboration is a key differentiator for us. Let's include it in the core features.
+
+David Kim: Agreed. Now let's talk about the advanced features for phase 2.
+
+Lisa Thompson: Phase 2 should include:
+- Advanced analytics and reporting
+- Custom integrations with third-party tools
+- Advanced search and filtering
+- Bulk operations and batch processing
+
+Alex Rodriguez: That sounds good. What about our web app improvements? We shouldn't neglect that while focusing on mobile.
+
+David Kim: You're right. We have several web app improvements planned:
+- Performance optimizations
+- UI/UX improvements based on user feedback
+- Enhanced security features
+- Better accessibility compliance
+
+Lisa Thompson: I'd also like to discuss our API development. Third-party integrations are becoming increasingly important.
+
+Alex Rodriguez: Good point. What's our API roadmap looking like?
+
+David Kim: We're planning to release our public API in Q3. This will include:
+- RESTful endpoints for core functionality
+- Webhook support for real-time updates
+- Comprehensive documentation
+- Developer portal with examples
+
+Lisa Thompson: That's ambitious. Do we have the resources to support that timeline?
+
+Alex Rodriguez: We might need to adjust our priorities. Let's focus on the mobile app first, then the API.
+
+David Kim: I agree. Mobile app should be our top priority for the next quarter.
+
+Lisa Thompson: What about user research? Should we conduct more user interviews before finalizing the mobile app features?
+
+Alex Rodriguez: That's a good idea. Let's plan for 10-15 user interviews over the next two weeks.
+
+David Kim: I can help coordinate those interviews. We should focus on power users and potential new users.
+
+Lisa Thompson: Perfect. Now let's discuss our development process. Are we going to use agile sprints?
+
+Alex Rodriguez: Yes, I recommend 2-week sprints with regular demos and feedback sessions.
+
+David Kim: That works for me. We should also implement continuous integration and automated testing.
+
+Lisa Thompson: Absolutely. Quality is crucial, especially for the mobile app launch.
+
+Alex Rodriguez: Let's also discuss our success metrics. How will we measure the success of the mobile app?
+
+David Kim: I suggest we track:
+- User adoption rate
+- Daily active users
+- Feature usage patterns
+- User satisfaction scores
+- App store ratings
+
+Lisa Thompson: Good metrics. We should also track conversion rates from web to mobile.
+
+Alex Rodriguez: Excellent point. Now let's talk about our marketing strategy for the mobile app launch.
+
+David Kim: We should plan for:
+- App store optimization
+- Press release and media outreach
+- Social media campaign
+- Email marketing to existing users
+- Influencer partnerships
+
+Lisa Thompson: That's comprehensive. What's our budget for the launch campaign?
+
+Alex Rodriguez: I'd recommend $50,000 for the initial launch campaign. We can adjust based on early results.
+
+David Kim: That sounds reasonable. Let's also plan for post-launch support and maintenance.
+
+Lisa Thompson: Yes, we'll need to monitor performance, fix bugs, and respond to user feedback quickly.
+
+Alex Rodriguez: Perfect. Let me summarize our key decisions:
+
+1. Mobile app development: 6-month timeline with phased approach
+2. Core features: Authentication, core functionality, offline capability, push notifications, real-time collaboration
+3. Phase 2 features: Analytics, integrations, advanced search, bulk operations
+4. Web app improvements: Performance, UI/UX, security, accessibility
+5. API development: Q3 release with RESTful endpoints and webhooks
+6. Development process: 2-week agile sprints with CI/CD
+7. Success metrics: Adoption rate, DAU, feature usage, satisfaction, ratings
+8. Launch campaign: $50,000 budget with comprehensive marketing strategy
+
+Does everyone agree with this plan?
+
+David Kim: Yes, I'm comfortable with this roadmap.
+
+Lisa Thompson: I agree. It's ambitious but achievable.
+
+Alex Rodriguez: Excellent. I'll prepare the detailed project plan and circulate it by the end of the week. Any other items we need to discuss?
+
+David Kim: I think we've covered everything. Thanks for leading this session, Alex.
+
+Lisa Thompson: Yes, great meeting everyone. I'll start coordinating the user interviews.
+
+Alex Rodriguez: Perfect. Meeting adjourned. Thanks everyone for your input and commitment to this project.`,
+        transcript_summary: 'Deep dive into product roadmap planning, feature prioritization, and technical architecture decisions. Team discussed user feedback integration and development timeline adjustments.',
+        transcript_metadata: {
+          word_count: 2156,
+          character_count: 12345,
+          bot_id: 'demo-bot-2'
+        },
+        transcript_duration_seconds: 2700,
+        transcript_retrieved_at: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+        start_time: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
+        end_time: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+        meeting_url: 'https://teams.microsoft.com/demo-meeting-url'
+      }
     }
   ];
 
@@ -191,6 +502,8 @@ const DataFeed = () => {
         return <Image className="h-4 w-4" />;
       case 'folder':
         return <Folder className="h-4 w-4" />;
+      case 'meeting_transcript':
+        return <MessageSquare className="h-4 w-4" />;
       default:
         return <File className="h-4 w-4" />;
     }
@@ -210,6 +523,8 @@ const DataFeed = () => {
         return 'Image';
       case 'folder':
         return 'Folder';
+      case 'meeting_transcript':
+        return 'Meeting Transcript';
       default:
         return 'File';
     }
@@ -236,10 +551,17 @@ const DataFeed = () => {
     
     const matchesFilter = filterType === 'all' || 
                          (filterType === 'email' && activity.type === 'email') ||
-                         (filterType === 'drive' && activity.type !== 'email');
+                         (filterType === 'drive' && activity.type !== 'email' && activity.type !== 'meeting_transcript') ||
+                         (filterType === 'transcripts' && activity.type === 'meeting_transcript');
     
-    return matchesSearch && matchesFilter;
+    // For transcripts, only show final transcripts (not real-time ones)
+    const isFinalTranscript = activity.type !== 'meeting_transcript' || 
+                             (activity.rawTranscript && activity.rawTranscript.final_transcript_ready !== false);
+    
+    return matchesSearch && matchesFilter && isFinalTranscript;
   });
+
+
 
   if (loading) {
     return (
@@ -314,6 +636,18 @@ const DataFeed = () => {
             <FileText className="h-4 w-4 mr-1" />
             Drive Files
           </Button>
+          <Button
+            variant={filterType === 'transcripts' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setFilterType('transcripts')}
+            className={filterType === 'transcripts' 
+              ? "bg-[#4a5565] dark:bg-zinc-700 text-white hover:bg-[#3a4555] dark:hover:bg-zinc-600 font-mono"
+              : "border-[#4a5565] dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[#4a5565] dark:text-zinc-200 hover:bg-stone-50 dark:hover:bg-zinc-800 font-mono"
+            }
+          >
+            <MessageSquare className="h-4 w-4 mr-1" />
+            Transcripts
+          </Button>
         </div>
       </div>
 
@@ -337,7 +671,15 @@ const DataFeed = () => {
           </Card>
         ) : (
           filteredActivities.map(activity => (
-            <Card key={activity.id} className="border-[#4a5565] dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-stone-50 dark:hover:bg-zinc-800 transition-colors">
+            <Card 
+              key={activity.id} 
+              className="border-[#4a5565] dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-stone-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+              onClick={() => {
+                if (activity.type === 'meeting_transcript' && activity.rawTranscript) {
+                  setSelectedTranscript(activity.rawTranscript);
+                }
+              }}
+            >
               <CardContent className="p-4">
                 <div className="flex items-start gap-3">
                   <div className="flex-shrink-0 w-8 h-8 bg-stone-50 dark:bg-zinc-800 rounded-full flex items-center justify-center">
@@ -368,6 +710,11 @@ const DataFeed = () => {
                           {activity.file_size}
                         </Badge>
                       )}
+                      {activity.transcript_duration_seconds && (
+                        <Badge className="border border-[#4a5565] dark:border-zinc-700 rounded px-2 py-0.5 text-[10px] text-[#4a5565] dark:text-zinc-200 bg-stone-50 dark:bg-zinc-800 uppercase font-mono">
+                          {Math.round(activity.transcript_duration_seconds / 60)}min
+                        </Badge>
+                      )}
                       {!activity.processed && (
                         <Badge className="border border-red-500 rounded px-2 py-0.5 text-[10px] text-red-500 bg-red-50 dark:bg-red-950 uppercase font-mono">
                           Processing
@@ -389,6 +736,13 @@ const DataFeed = () => {
           ))
         )}
       </div>
+
+      {/* Transcript Modal */}
+      <TranscriptModal 
+        transcript={selectedTranscript} 
+        isOpen={!!selectedTranscript}
+        onClose={() => setSelectedTranscript(null)} 
+      />
     </div>
   );
 };

@@ -7,6 +7,7 @@ import { CheckCircle, AlertCircle, RefreshCw, Loader2, Wifi, WifiOff } from 'luc
 import { useSupabase } from '@/hooks/use-supabase';
 import { useAuth } from '@/providers/AuthProvider';
 import PageHeader from '@/components/dashboard/PageHeader';
+import { useAttendeePolling } from '@/hooks/use-attendee-polling';
 
 const MeetingsPage: React.FC = () => {
   const { user } = useAuth();
@@ -19,12 +20,32 @@ const MeetingsPage: React.FC = () => {
     last_sync?: string;
     webhook_expires_at?: string;
   } | null>(null);
+  const [pollingStatus, setPollingStatus] = useState<string | null>(null);
   // const [renewingWebhook, setRenewingWebhook] = useState(false);
   // const [webhookError, setWebhookError] = useState<string | null>(null);
   // const [webhookSuccess, setWebhookSuccess] = useState<string | null>(null);
   // const [syncing, setSyncing] = useState(false);
   // const [syncError, setSyncError] = useState<string | null>(null);
   // const [syncSuccess, setSyncSuccess] = useState<string | null>(null);
+
+  // Set up automatic polling
+  const { pollNow } = useAttendeePolling({
+    enabled: true,
+    intervalMs: 30000, // Poll every 30 seconds
+    onPollingComplete: (results) => {
+      if (results.length > 0) {
+        setPollingStatus(`Polled ${results.length} meetings`);
+        // Reload meetings to show updated status
+        loadMeetings();
+        setTimeout(() => setPollingStatus(null), 3000);
+      }
+    },
+    onError: (error) => {
+      console.error('Polling error:', error);
+      setPollingStatus('Polling failed');
+      setTimeout(() => setPollingStatus(null), 3000);
+    }
+  });
 
   useEffect(() => {
     loadMeetings();

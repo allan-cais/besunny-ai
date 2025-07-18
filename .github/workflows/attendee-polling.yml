@@ -1,0 +1,30 @@
+name: Attendee Meeting Polling
+
+on:
+  schedule:
+    # Run every 30 seconds (minimum is 5 minutes for GitHub Actions)
+    # We'll run every 5 minutes instead
+    - cron: '*/5 * * * *'
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  poll-meetings:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Poll Attendee Meetings
+      run: |
+        # Get the Supabase URL and service role key from secrets
+        SUPABASE_URL="${{ secrets.SUPABASE_URL }}"
+        SERVICE_ROLE_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
+        
+        # Call the polling function
+        curl -X POST \
+          -H "Content-Type: application/json" \
+          -H "Authorization: Bearer $SERVICE_ROLE_KEY" \
+          "$SUPABASE_URL/functions/v1/attendee-polling-cron" \
+          -d '{}'
+      
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }} 

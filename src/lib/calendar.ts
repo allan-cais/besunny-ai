@@ -17,6 +17,14 @@ export interface Meeting {
   transcript_url?: string;
   event_status: 'accepted' | 'declined' | 'tentative' | 'needsAction';
   bot_status: 'pending' | 'bot_scheduled' | 'bot_joined' | 'transcribing' | 'completed' | 'failed';
+  // Real-time transcription fields
+  last_polled_at?: string;
+  next_poll_at?: string;
+  polling_enabled?: boolean;
+  real_time_transcript?: any;
+  final_transcript_ready?: boolean;
+  transcript_metadata?: any;
+  bot_configuration?: any;
   created_at: string;
   updated_at: string;
 }
@@ -268,6 +276,19 @@ export const calendarService = {
       .update({
         bot_status: botStatus,
         attendee_bot_id: attendeeBotId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', meetingId);
+    
+    if (error) throw error;
+  },
+
+  // Update meeting with any fields
+  async updateMeeting(meetingId: string, updates: Partial<Meeting>): Promise<void> {
+    const { error } = await supabase
+      .from('meetings')
+      .update({
+        ...updates,
         updated_at: new Date().toISOString(),
       })
       .eq('id', meetingId);

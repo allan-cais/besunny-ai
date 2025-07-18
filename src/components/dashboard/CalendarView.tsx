@@ -16,12 +16,14 @@ import {
   Clock, 
   Send, 
   Loader2,
-  ExternalLink
+  ExternalLink,
+  Bot
 } from 'lucide-react';
 import { Meeting } from '@/lib/calendar';
 import { apiKeyService } from '@/lib/api-keys';
 import { calendarService } from '@/lib/calendar';
 import { Project } from '@/lib/supabase';
+import BotConfigurationModal from './BotConfigurationModal';
 
 interface CalendarViewProps {
   meetings: Meeting[];
@@ -42,6 +44,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({
   const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
   const [sendingBot, setSendingBot] = useState<string | null>(null);
   const [updatingProject, setUpdatingProject] = useState<string | null>(null);
+  const [configModalOpen, setConfigModalOpen] = useState(false);
+  const [meetingForConfig, setMeetingForConfig] = useState<Meeting | null>(null);
 
   const getEventStatusBadge = (eventStatus: Meeting['event_status']) => {
     switch (eventStatus) {
@@ -77,17 +81,38 @@ const CalendarView: React.FC<CalendarViewProps> = ({
     }
   };
 
-  const sendBotToMeeting = async (meeting: Meeting) => {
+  const sendBotToMeeting = async (meeting: Meeting, configuration?: any) => {
     if (!meeting.meeting_url) return;
     try {
       setSendingBot(meeting.id);
-      const result = await apiKeyService.sendBotToMeeting(meeting.meeting_url, {
+      
+      const botOptions = configuration ? {
+        bot_name: configuration.bot_name,
+        bot_chat_message: {
+          to: configuration.chat_message_recipient,
+          message: configuration.bot_chat_message,
+        },
+        language: configuration.transcription_language,
+        auto_join: configuration.auto_join,
+        recording_enabled: configuration.recording_enabled,
+        ...configuration.custom_settings
+      } : {
         bot_name: meeting.bot_name || 'Kirit Notetaker',
         bot_chat_message: {
           to: 'everyone',
           message: meeting.bot_chat_message || 'Hi, I\'m here to transcribe this meeting!',
         },
-      });
+      };
+
+      const result = await apiKeyService.sendBotToMeeting(meeting.meeting_url, botOptions);
+      
+      // Store configuration if provided
+      if (configuration) {
+        await calendarService.updateMeeting(meeting.id, {
+          bot_configuration: configuration
+        });
+      }
+      
       await calendarService.updateBotStatus(
         meeting.id, 
         'bot_scheduled', 
@@ -98,6 +123,19 @@ const CalendarView: React.FC<CalendarViewProps> = ({
       // Optionally handle error
     } finally {
       setSendingBot(null);
+    }
+  };
+
+  const handleConfigureAndDeploy = (meeting: Meeting) => {
+    setMeetingForConfig(meeting);
+    setConfigModalOpen(true);
+  };
+
+  const handleDeployWithConfiguration = async (configuration: any) => {
+    if (meetingForConfig) {
+      await sendBotToMeeting(meetingForConfig, configuration);
+      setConfigModalOpen(false);
+      setMeetingForConfig(null);
     }
   };
 
@@ -200,7 +238,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
                       variant="outline"
                       onClick={e => {
                         e.stopPropagation();
-                        sendBotToMeeting(meeting);
+                        handleConfigureAndDeploy(meeting);
                       }}
                       disabled={sendingBot === meeting.id}
                       className="font-mono"
@@ -208,8 +246,9 @@ const CalendarView: React.FC<CalendarViewProps> = ({
                       {sendingBot === meeting.id ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
                       ) : (
-                        <Send className="w-4 h-4" />
+                        <Bot className="w-4 h-4" />
                       )}
+                      <span className="ml-1">Deploy Bot</span>
                     </Button>
                   )}
                   {meeting.meeting_url && (
@@ -223,6 +262,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
                       className="font-mono"
                     >
                       <Video className="w-4 h-4" />
+                      <span className="ml-1">Join Meeting</span>
                     </Button>
                   )}
                   {meeting.transcript_url && (
@@ -356,6 +396,15 @@ const CalendarView: React.FC<CalendarViewProps> = ({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Bot Configuration Modal */}
+      <BotConfigurationModal
+        meeting={meetingForConfig}
+        open={configModalOpen}
+        onOpenChange={setConfigModalOpen}
+        onDeploy={handleDeployWithConfiguration}
+        deploying={sendingBot === meetingForConfig?.id}
+      />
     </div>
   );
 };
