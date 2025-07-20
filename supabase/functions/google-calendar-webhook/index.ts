@@ -217,10 +217,15 @@ serve(async (req) => {
     try {
       const body = await req.json();
       
-      console.log('Received webhook notification:', JSON.stringify(body, null, 2));
+      console.log('=== WEBHOOK NOTIFICATION RECEIVED ===');
+      console.log('Timestamp:', new Date().toISOString());
+      console.log('URL:', req.url);
+      console.log('Headers:', Object.fromEntries(req.headers.entries()));
+      console.log('Body:', JSON.stringify(body, null, 2));
       
       // Handle different notification types
       if (body.state === 'sync') {
+        console.log('Processing MANUAL sync request');
         // This is a manual sync request (not a real webhook)
         const userId = body.userId;
         const resourceId = body.resourceId;
@@ -294,6 +299,8 @@ serve(async (req) => {
           .update({ last_sync_at: new Date().toISOString() })
           .eq('user_id', userId);
         
+        console.log(`Manual sync completed: ${processed} processed, ${created} created, ${updated} updated`);
+        
         return withCORS(new Response(JSON.stringify({
           ok: true,
           processed,
@@ -303,6 +310,7 @@ serve(async (req) => {
         }), { status: 200 }));
         
       } else {
+        console.log('Processing REAL Google Calendar webhook notification');
         // This is a real Google Calendar webhook notification
         // Google Calendar webhooks send a simple notification when events change
         // We need to extract the user ID from the webhook params or headers
@@ -313,35 +321,54 @@ serve(async (req) => {
         // Check if userId is in the body (from our custom params)
         if (body.userId) {
           userId = body.userId;
+          console.log('Found userId in body:', userId);
         }
         
         // Check if userId is in query params (from webhook URL)
         const urlParams = new URL(req.url).searchParams;
         if (urlParams.get('userId')) {
           userId = urlParams.get('userId');
+          console.log('Found userId in URL params:', userId);
         }
         
         // If we can't find userId, we need to look it up from the webhook record
         if (!userId) {
+          console.log('No userId found in body or URL params, looking up from database...');
           // Get the webhook URL to extract user info
           const webhookUrl = req.url;
           console.log('Webhook URL:', webhookUrl);
           
           // Try to find the webhook record by matching the URL pattern
           // This is a fallback - ideally userId should be passed in params
-          const { data: webhook } = await supabase
+          const { data: webhook, error: webhookError } = await supabase
             .from('calendar_webhooks')
-            .select('user_id')
+            .select('user_id, webhook_id, resource_id')
             .eq('is_active', true)
             .maybeSingle();
           
+          if (webhookError) {
+            console.error('Error looking up webhook:', webhookError);
+          }
+          
           if (webhook) {
             userId = webhook.user_id;
+            console.log('Found userId from database lookup:', userId);
           }
         }
         
         if (!userId) {
           console.error('Could not determine userId from webhook notification');
+          // Log this as a failed webhook for debugging
+          await supabase
+            .from('calendar_sync_logs')
+            .insert({
+              user_id: null,
+              sync_type: 'webhook',
+              status: 'failed',
+              error_message: 'Could not determine userId from webhook notification',
+              events_processed: 0,
+            });
+          
           return withCORS(new Response(JSON.stringify({ 
             ok: true, 
             message: 'Webhook received but userId not found' 
@@ -366,11 +393,15 @@ serve(async (req) => {
         );
         
         if (!calendarResponse.ok) {
-          throw new Error(`Calendar API error: ${calendarResponse.status}`);
+          const errorText = await calendarResponse.text();
+          console.error('Calendar API error:', calendarResponse.status, errorText);
+          throw new Error(`Calendar API error: ${calendarResponse.status} - ${errorText}`);
         }
         
         const calendarData = await calendarResponse.json();
         const events = calendarData.items || [];
+        
+        console.log(`Found ${events.length} events in calendar, ${events.filter(e => extractMeetingUrl(e)).length} with meeting URLs`);
         
         let processed = 0;
         let created = 0;
@@ -416,7 +447,7 @@ serve(async (req) => {
           .update({ last_sync_at: new Date().toISOString() })
           .eq('user_id', userId);
         
-        console.log(`Webhook sync completed: ${processed} processed, ${created} created, ${updated} updated`);
+        console.log(`Real webhook sync completed: ${processed} processed, ${created} created, ${updated} updated`);
         
         return withCORS(new Response(JSON.stringify({
           ok: true,
@@ -429,6 +460,22 @@ serve(async (req) => {
       
     } catch (error) {
       console.error('Webhook processing error:', error);
+      
+      // Log the error for debugging
+      try {
+        await supabase
+          .from('calendar_sync_logs')
+          .insert({
+            user_id: null,
+            sync_type: 'webhook',
+            status: 'failed',
+            error_message: error.message || String(error),
+            events_processed: 0,
+          });
+      } catch (logError) {
+        console.error('Failed to log webhook error:', logError);
+      }
+      
       return withCORS(new Response(JSON.stringify({
         ok: false,
         error: error.message || String(error),

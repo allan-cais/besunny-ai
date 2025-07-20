@@ -120,8 +120,56 @@ async function testWebhookSync() {
   }
 }
 
+// Comprehensive webhook connectivity test
+async function testWebhookConnectivity() {
+  console.log('=== Webhook Connectivity Test ===');
+  
+  try {
+    // Test 1: Get detailed webhook status
+    console.log('1. Getting detailed webhook status...');
+    const connectivityStatus = await calendarService.testWebhookConnectivity();
+    console.log('Connectivity status:', connectivityStatus);
+    
+    // Test 2: Check for recent errors
+    console.log('2. Checking for recent errors...');
+    if (connectivityStatus.recent_errors.length > 0) {
+      console.log('Recent errors found:', connectivityStatus.recent_errors);
+    } else {
+      console.log('No recent errors found');
+    }
+    
+    // Test 3: Check webhook URL
+    console.log('3. Webhook URL:', connectivityStatus.webhook_url);
+    
+    // Test 4: Check connectivity test result
+    console.log('4. Connectivity test result:', connectivityStatus.connectivity_test ? 'PASSED' : 'FAILED');
+    
+    // Test 5: Check sync log patterns
+    console.log('5. Recent sync activity:');
+    const recentLogs = connectivityStatus.sync_logs.slice(0, 5);
+    recentLogs.forEach(log => {
+      console.log(`  ${log.created_at} - ${log.sync_type} sync: ${log.status} (${log.events_processed} events, ${log.meetings_created} created, ${log.meetings_updated} updated)`);
+      if (log.error_message) {
+        console.log(`    Error: ${log.error_message}`);
+      }
+    });
+    
+    // Test 6: Simulate webhook notification
+    console.log('6. Testing webhook notification simulation...');
+    const simulationResult = await calendarService.simulateWebhookNotification();
+    console.log('Simulation result:', simulationResult);
+    
+    console.log('=== Connectivity Test Complete ===');
+    
+  } catch (error) {
+    console.error('Connectivity test failed:', error);
+  }
+}
+
 // Run the tests
-console.log('Running calendar sync tests...');
+console.log('Running comprehensive webhook diagnostics...');
+await testWebhookConnectivity();
+console.log('\nRunning calendar sync tests...');
 await testCalendarSync();
 console.log('\nRunning webhook sync tests...');
 await testWebhookSync(); 

@@ -474,4 +474,58 @@ export const calendarService = {
     const result = await response.json();
     return result;
   },
+
+  // Test webhook connectivity and get detailed status
+  async testWebhookConnectivity(): Promise<{
+    webhook_active: boolean;
+    webhook_url?: string;
+    last_sync?: string;
+    sync_logs: any[];
+    recent_errors: any[];
+    webhook_expires_at?: string;
+    connectivity_test?: boolean;
+  }> {
+    const session = (await supabase.auth.getSession()).data.session;
+    if (!session) throw new Error('Not authenticated');
+    
+    // Get webhook status
+    const { data: webhook, error: webhookError } = await supabase
+      .from('calendar_webhooks')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .eq('is_active', true)
+      .maybeSingle();
+    
+    // Get recent sync logs
+    const { data: syncLogs } = await supabase
+      .from('calendar_sync_logs')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .order('created_at', { ascending: false })
+      .limit(20);
+    
+    // Get recent errors
+    const recentErrors = syncLogs?.filter(log => log.status === 'failed') || [];
+    
+    // Test webhook connectivity by sending a test notification
+    let connectivityTest = false;
+    try {
+      const testResult = await this.simulateWebhookNotification();
+      connectivityTest = testResult.ok;
+    } catch (error) {
+      console.error('Webhook connectivity test failed:', error);
+    }
+    
+    const status = {
+      webhook_active: !!webhook,
+      webhook_url: webhook ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-calendar-webhook/notify?userId=${session.user.id}` : undefined,
+      last_sync: syncLogs?.find(log => log.status === 'completed')?.created_at || webhook?.last_sync_at,
+      sync_logs: syncLogs || [],
+      recent_errors: recentErrors,
+      webhook_expires_at: webhook?.expiration_time,
+      connectivity_test: connectivityTest,
+    };
+    
+    return status;
+  },
 }; 

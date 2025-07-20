@@ -28,6 +28,8 @@ const MeetingsPage: React.FC = () => {
   const [syncSuccess, setSyncSuccess] = useState<string | null>(null);
   const [renewingWebhook, setRenewingWebhook] = useState(false);
   const [webhookSyncing, setWebhookSyncing] = useState(false);
+  const [testingConnectivity, setTestingConnectivity] = useState(false);
+  const [connectivityResult, setConnectivityResult] = useState<any>(null);
 
   // Set up automatic polling
   const { pollNow } = useAttendeePolling({
@@ -182,6 +184,35 @@ const MeetingsPage: React.FC = () => {
     }
   };
 
+  const testWebhookConnectivity = async () => {
+    try {
+      setTestingConnectivity(true);
+      setSyncError(null);
+      setSyncSuccess(null);
+      setConnectivityResult(null);
+      
+      console.log('Testing webhook connectivity...');
+      
+      const result = await calendarService.testWebhookConnectivity();
+      
+      console.log('Connectivity test result:', result);
+      setConnectivityResult(result);
+      
+      if (result.connectivity_test) {
+        setSyncSuccess('Webhook connectivity test PASSED! The webhook endpoint is working correctly.');
+      } else {
+        setSyncError('Webhook connectivity test FAILED! The webhook endpoint is not responding correctly.');
+      }
+      
+      await loadWebhookStatus(); // Refresh webhook status
+    } catch (err: any) {
+      console.error('Connectivity test error:', err);
+      setSyncError(err.message || 'Failed to test webhook connectivity');
+    } finally {
+      setTestingConnectivity(false);
+    }
+  };
+
   const handleMeetingUpdate = () => {
     loadMeetings();
   };
@@ -264,6 +295,22 @@ const MeetingsPage: React.FC = () => {
               {webhookSyncing ? 'Webhook Syncing...' : 'Webhook Sync'}
             </Button>
           )}
+
+          {/* Webhook Connectivity Test Button */}
+          <Button
+            onClick={testWebhookConnectivity}
+            disabled={testingConnectivity}
+            variant="outline"
+            size="sm"
+            className="flex items-center gap-2"
+          >
+            {testingConnectivity ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <CheckCircle className="h-4 w-4" />
+            )}
+            {testingConnectivity ? 'Testing...' : 'Test Connectivity'}
+          </Button>
 
           {/* Webhook Setup/Renew Button */}
           {(!webhookStatus?.webhook_active || isWebhookExpired()) ? (
@@ -348,6 +395,34 @@ const MeetingsPage: React.FC = () => {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Connectivity Test Results */}
+      {connectivityResult && (
+        <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+          <div className="text-sm">
+            <h4 className="font-semibold text-blue-800 mb-2">Webhook Connectivity Test Results</h4>
+            <div className="space-y-1 text-blue-700">
+              <div><strong>Webhook Active:</strong> {connectivityResult.webhook_active ? 'Yes' : 'No'}</div>
+              <div><strong>Connectivity Test:</strong> {connectivityResult.connectivity_test ? 'PASSED' : 'FAILED'}</div>
+              {connectivityResult.webhook_url && (
+                <div><strong>Webhook URL:</strong> <code className="text-xs">{connectivityResult.webhook_url}</code></div>
+              )}
+              {connectivityResult.recent_errors.length > 0 && (
+                <div>
+                  <strong>Recent Errors:</strong>
+                  <div className="mt-1 space-y-1">
+                    {connectivityResult.recent_errors.slice(0, 3).map((error: any, index: number) => (
+                      <div key={index} className="text-xs text-red-600">
+                        {formatDate(error.created_at)} - {error.error_message}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
