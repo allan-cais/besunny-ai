@@ -202,9 +202,15 @@ export const calendarService = {
       .order('created_at', { ascending: false })
       .limit(10);
     
+    // Get the most recent successful sync time from logs
+    const lastSuccessfulSync = syncLogs?.find(log => 
+      log.status === 'completed' && 
+      (log.sync_type === 'webhook' || log.sync_type === 'manual' || log.sync_type === 'initial')
+    );
+    
     const status = {
       webhook_active: !!webhook,
-      last_sync: webhook?.last_sync_at,
+      last_sync: lastSuccessfulSync?.created_at || webhook?.last_sync_at,
       webhook_expires_at: webhook?.expiration_time,
       sync_logs: syncLogs || [],
     };
