@@ -475,6 +475,34 @@ export const calendarService = {
     return result;
   },
 
+  // Test webhook notification specifically (for debugging real-time sync)
+  async testWebhookNotification(): Promise<{
+    ok: boolean;
+    message?: string;
+    timestamp?: string;
+    error?: string;
+  }> {
+    const session = (await supabase.auth.getSession()).data.session;
+    if (!session) throw new Error('Not authenticated');
+    
+    const url = new URL(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-calendar-webhook/notify`);
+    
+    const response = await fetch(url.toString(), {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        state: 'test',
+        userId: session.user.id,
+      }),
+    });
+    
+    const result = await response.json();
+    return result;
+  },
+
   // Test webhook connectivity and get detailed status
   async testWebhookConnectivity(): Promise<{
     webhook_active: boolean;

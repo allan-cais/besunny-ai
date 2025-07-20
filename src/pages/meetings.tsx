@@ -30,6 +30,7 @@ const MeetingsPage: React.FC = () => {
   const [webhookSyncing, setWebhookSyncing] = useState(false);
   const [testingConnectivity, setTestingConnectivity] = useState(false);
   const [connectivityResult, setConnectivityResult] = useState<any>(null);
+  const [testingWebhookNotification, setTestingWebhookNotification] = useState(false);
 
   // Set up automatic polling
   const { pollNow } = useAttendeePolling({
@@ -213,6 +214,32 @@ const MeetingsPage: React.FC = () => {
     }
   };
 
+  const testWebhookNotification = async () => {
+    try {
+      setTestingWebhookNotification(true);
+      setSyncError(null);
+      setSyncSuccess(null);
+      
+      console.log('Testing webhook notification...');
+      
+      const result = await calendarService.testWebhookNotification();
+      
+      console.log('Webhook notification test result:', result);
+      
+      if (result.ok) {
+        setSyncSuccess(`Test webhook notification sent successfully! Timestamp: ${result.timestamp}`);
+        await loadWebhookStatus(); // Refresh webhook status to show the test log
+      } else {
+        setSyncError(result.error || 'Failed to send test webhook notification');
+      }
+    } catch (err: any) {
+      console.error('Webhook notification test error:', err);
+      setSyncError(err.message || 'Failed to test webhook notification');
+    } finally {
+      setTestingWebhookNotification(false);
+    }
+  };
+
   const handleMeetingUpdate = () => {
     loadMeetings();
   };
@@ -310,6 +337,22 @@ const MeetingsPage: React.FC = () => {
               <CheckCircle className="h-4 w-4" />
             )}
             {testingConnectivity ? 'Testing...' : 'Test Connectivity'}
+          </Button>
+
+          {/* Test Webhook Notification Button */}
+          <Button
+            onClick={testWebhookNotification}
+            disabled={testingWebhookNotification}
+            variant="outline"
+            size="sm"
+            className="flex items-center gap-2"
+          >
+            {testingWebhookNotification ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <AlertCircle className="h-4 w-4" />
+            )}
+            {testingWebhookNotification ? 'Testing...' : 'Test Notification'}
           </Button>
 
           {/* Webhook Setup/Renew Button */}

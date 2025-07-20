@@ -309,6 +309,36 @@ serve(async (req) => {
           errors,
         }), { status: 200 }));
         
+      } else if (body.state === 'test') {
+        console.log('Processing TEST webhook notification');
+        // This is a test webhook notification
+        const userId = body.userId;
+        
+        if (!userId) {
+          return withCORS(new Response(JSON.stringify({ error: 'Missing userId' }), { status: 400 }));
+        }
+        
+        console.log('Test webhook received for user:', userId);
+        
+        // Log the test webhook
+        await supabase
+          .from('calendar_sync_logs')
+          .insert({
+            user_id: userId,
+            sync_type: 'webhook_test',
+            status: 'completed',
+            events_processed: 0,
+            meetings_created: 0,
+            meetings_updated: 0,
+            notes: 'Test webhook notification received successfully',
+          });
+        
+        return withCORS(new Response(JSON.stringify({
+          ok: true,
+          message: 'Test webhook received successfully',
+          timestamp: new Date().toISOString(),
+        }), { status: 200 }));
+        
       } else {
         console.log('Processing REAL Google Calendar webhook notification');
         // This is a real Google Calendar webhook notification
