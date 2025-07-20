@@ -401,5 +401,85 @@ serve(async (req) => {
     }
   }
 
+  // Get raw calendar events (GET /raw-events) - for debugging
+  if (url.pathname.endsWith('/raw-events') && method === 'GET') {
+    try {
+      const credentials = await getGoogleCredentials(userId);
+      
+      // Get sync range from query params, default to 7 days past and 60 days future
+      const daysPast = parseInt(url.searchParams.get('days_past') || '7');
+      const daysFuture = parseInt(url.searchParams.get('days_future') || '60');
+      
+      const now = new Date();
+      const startDate = new Date(now.getTime() - daysPast * 24 * 60 * 60 * 1000);
+      const endDate = new Date(now.getTime() + daysFuture * 24 * 60 * 60 * 1000);
+      
+      const calendarResponse = await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/primary/events?` +
+        `timeMin=${startDate.toISOString()}&timeMax=${endDate.toISOString()}&singleEvents=true&orderBy=startTime`,
+        {
+          headers: {
+            'Authorization': `Bearer ${credentials.access_token}`,
+          },
+        }
+      );
+      
+      if (!calendarResponse.ok) {
+        const errorBody = await calendarResponse.text();
+        const errorMsg = `Calendar API error: ${calendarResponse.status}`;
+        return withCORS(new Response(JSON.stringify({
+          ok: false,
+          error: errorMsg,
+          google_error: errorBody
+        }), { status: 500 }));
+      }
+      
+      const calendarData = await calendarResponse.json();
+      const events = calendarData.items || [];
+      
+      // Filter events with meeting URLs for easier debugging
+      const eventsWithUrls = events.filter((event: any) => {
+        const meetingUrl = extractMeetingUrl(event);
+        return !!meetingUrl;
+      });
+      
+      return withCORS(new Response(JSON.stringify({
+        ok: true,
+        total_events: events.length,
+        events_with_urls: eventsWithUrls.length,
+        events: events.map((event: any) => ({
+          id: event.id,
+          summary: event.summary,
+          start: event.start,
+          end: event.end,
+          description: event.description,
+          attendees: event.attendees,
+          meeting_url: extractMeetingUrl(event),
+          htmlLink: event.htmlLink,
+        })),
+        events_with_urls_only: eventsWithUrls.map((event: any) => ({
+          id: event.id,
+          summary: event.summary,
+          start: event.start,
+          end: event.end,
+          meeting_url: extractMeetingUrl(event),
+          htmlLink: event.htmlLink,
+        })),
+        sync_range: {
+          start_date: startDate.toISOString(),
+          end_date: endDate.toISOString(),
+          days_past: daysPast,
+          days_future: daysFuture
+        }
+      }), { status: 200 }));
+      
+    } catch (e) {
+      return withCORS(new Response(JSON.stringify({
+        ok: false,
+        error: e.message || String(e),
+      }), { status: 500 }));
+    }
+  }
+
   return withCORS(new Response(JSON.stringify({ error: 'Not found' }), { status: 404 }));
 }); 

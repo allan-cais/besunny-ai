@@ -382,4 +382,90 @@ export const calendarService = {
     
     if (error) throw error;
   },
+
+  // Manually trigger webhook sync to catch up on missed meetings
+  async triggerWebhookSync(): Promise<{
+    ok: boolean;
+    processed?: number;
+    created?: number;
+    updated?: number;
+    errors?: number;
+    error?: string;
+  }> {
+    const session = (await supabase.auth.getSession()).data.session;
+    if (!session) throw new Error('Not authenticated');
+    
+    const url = new URL(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-calendar-webhook/notify`);
+    
+    const response = await fetch(url.toString(), {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        state: 'sync',
+        userId: session.user.id,
+        resourceId: 'manual-trigger',
+      }),
+    });
+    
+    const result = await response.json();
+    return result;
+  },
+
+  // Get raw calendar events from Google (for debugging)
+  async getRawCalendarEvents(daysPast: number = 7, daysFuture: number = 60): Promise<{
+    ok: boolean;
+    events?: any[];
+    error?: string;
+  }> {
+    const session = (await supabase.auth.getSession()).data.session;
+    if (!session) throw new Error('Not authenticated');
+    
+    const url = new URL(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-calendar/raw-events`);
+    url.searchParams.set('days_past', daysPast.toString());
+    url.searchParams.set('days_future', daysFuture.toString());
+    
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`,
+      },
+    });
+    
+    const result = await response.json();
+    return result;
+  },
+
+  // Simulate a webhook notification (for testing real-time sync)
+  async simulateWebhookNotification(): Promise<{
+    ok: boolean;
+    processed?: number;
+    created?: number;
+    updated?: number;
+    errors?: number;
+    error?: string;
+  }> {
+    const session = (await supabase.auth.getSession()).data.session;
+    if (!session) throw new Error('Not authenticated');
+    
+    const url = new URL(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-calendar-webhook/notify`);
+    url.searchParams.set('userId', session.user.id);
+    
+    const response = await fetch(url.toString(), {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        // Simulate a real webhook notification (no state: 'sync')
+        timestamp: new Date().toISOString(),
+      }),
+    });
+    
+    const result = await response.json();
+    return result;
+  },
 }; 

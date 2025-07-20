@@ -217,9 +217,11 @@ serve(async (req) => {
     try {
       const body = await req.json();
       
+      console.log('Received webhook notification:', JSON.stringify(body, null, 2));
+      
       // Handle different notification types
       if (body.state === 'sync') {
-        // This is a sync notification - process the changed events
+        // This is a manual sync request (not a real webhook)
         const userId = body.userId;
         const resourceId = body.resourceId;
         
@@ -233,7 +235,7 @@ serve(async (req) => {
         // Get the changed events from Google Calendar
         const calendarResponse = await fetch(
           `https://www.googleapis.com/calendar/v3/calendars/primary/events?` +
-          `timeMin=${new Date().toISOString()}&singleEvents=true&orderBy=startTime`,
+          `timeMin=${new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()}&timeMax=${new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString()}&singleEvents=true&orderBy=startTime`,
           {
             headers: {
               'Authorization': `Bearer ${credentials.access_token}`,
@@ -282,8 +284,8 @@ serve(async (req) => {
             events_processed: processed,
             meetings_created: created,
             meetings_updated: updated,
-            sync_range_start: new Date().toISOString(),
-            sync_range_end: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+            sync_range_start: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+            sync_range_end: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
           });
         
         // Update last_sync_at in webhook record
@@ -301,8 +303,128 @@ serve(async (req) => {
         }), { status: 200 }));
         
       } else {
-        // Handle other notification types (calendar list changes, etc.)
-        return withCORS(new Response(JSON.stringify({ ok: true, message: 'Notification received' }), { status: 200 }));
+        // This is a real Google Calendar webhook notification
+        // Google Calendar webhooks send a simple notification when events change
+        // We need to extract the user ID from the webhook params or headers
+        
+        // Try to get user ID from different possible sources
+        let userId = null;
+        
+        // Check if userId is in the body (from our custom params)
+        if (body.userId) {
+          userId = body.userId;
+        }
+        
+        // Check if userId is in query params (from webhook URL)
+        const urlParams = new URL(req.url).searchParams;
+        if (urlParams.get('userId')) {
+          userId = urlParams.get('userId');
+        }
+        
+        // If we can't find userId, we need to look it up from the webhook record
+        if (!userId) {
+          // Get the webhook URL to extract user info
+          const webhookUrl = req.url;
+          console.log('Webhook URL:', webhookUrl);
+          
+          // Try to find the webhook record by matching the URL pattern
+          // This is a fallback - ideally userId should be passed in params
+          const { data: webhook } = await supabase
+            .from('calendar_webhooks')
+            .select('user_id')
+            .eq('is_active', true)
+            .maybeSingle();
+          
+          if (webhook) {
+            userId = webhook.user_id;
+          }
+        }
+        
+        if (!userId) {
+          console.error('Could not determine userId from webhook notification');
+          return withCORS(new Response(JSON.stringify({ 
+            ok: true, 
+            message: 'Webhook received but userId not found' 
+          }), { status: 200 }));
+        }
+        
+        console.log('Processing real webhook notification for user:', userId);
+        
+        // Get user's Google credentials
+        const credentials = await getGoogleCredentials(userId);
+        
+        // For real webhooks, we should use incremental sync with syncToken if available
+        // But for now, let's do a full sync to catch any missed events
+        const calendarResponse = await fetch(
+          `https://www.googleapis.com/calendar/v3/calendars/primary/events?` +
+          `timeMin=${new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()}&timeMax=${new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString()}&singleEvents=true&orderBy=startTime`,
+          {
+            headers: {
+              'Authorization': `Bearer ${credentials.access_token}`,
+            },
+          }
+        );
+        
+        if (!calendarResponse.ok) {
+          throw new Error(`Calendar API error: ${calendarResponse.status}`);
+        }
+        
+        const calendarData = await calendarResponse.json();
+        const events = calendarData.items || [];
+        
+        let processed = 0;
+        let created = 0;
+        let updated = 0;
+        let errors = 0;
+        
+        // Process each event
+        for (const event of events) {
+          try {
+            const result = await processCalendarEvent(event, userId, credentials);
+            processed++;
+            
+            if (result.action === 'created') {
+              created++;
+            } else if (result.action === 'updated') {
+              updated++;
+            } else if (result.action.startsWith('error')) {
+              errors++;
+            }
+          } catch (error) {
+            console.error('Error processing event:', error);
+            errors++;
+          }
+        }
+        
+        // Log the sync operation
+        await supabase
+          .from('calendar_sync_logs')
+          .insert({
+            user_id: userId,
+            sync_type: 'webhook',
+            status: 'completed',
+            events_processed: processed,
+            meetings_created: created,
+            meetings_updated: updated,
+            sync_range_start: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+            sync_range_end: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
+          });
+        
+        // Update last_sync_at in webhook record
+        await supabase
+          .from('calendar_webhooks')
+          .update({ last_sync_at: new Date().toISOString() })
+          .eq('user_id', userId);
+        
+        console.log(`Webhook sync completed: ${processed} processed, ${created} created, ${updated} updated`);
+        
+        return withCORS(new Response(JSON.stringify({
+          ok: true,
+          processed,
+          created,
+          updated,
+          errors,
+        }), { status: 200 }));
       }
       
     } catch (error) {
@@ -324,7 +446,7 @@ serve(async (req) => {
       }
       
       const credentials = await getGoogleCredentials(userId);
-      const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/google-calendar-webhook/notify`;
+      const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/google-calendar-webhook/notify?userId=${userId}`;
       
       // Set up the webhook subscription
       const webhookResponse = await fetch(

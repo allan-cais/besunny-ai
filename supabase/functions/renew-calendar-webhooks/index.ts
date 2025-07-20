@@ -75,7 +75,7 @@ async function getGoogleCredentials(userId: string): Promise<any> {
 async function renewWebhook(userId: string): Promise<{ success: boolean; error?: string; webhook_id?: string }> {
   try {
     const credentials = await getGoogleCredentials(userId);
-    const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/google-calendar-webhook/notify`;
+    const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/google-calendar-webhook/notify?userId=${userId}`;
     
     // First, try to stop any existing webhook
     try {
