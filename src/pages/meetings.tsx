@@ -568,78 +568,12 @@ const MeetingsPage: React.FC = () => {
         )}
       </div>
 
-      {/* Scrollable Content */}
+            {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto">
-        {/* Meetings List */}
-        <div className="space-y-4">
-        {loading ? (
-          <div className="flex items-center justify-center h-32">
-            <Loader2 className="h-8 w-8 animate-spin" />
-          </div>
-        ) : meetings.length === 0 ? (
-          <Card className="border-[#4a5565] dark:border-zinc-700 bg-white dark:bg-zinc-900">
-            <CardContent className="p-8 text-center">
-              <Calendar className="h-12 w-12 mx-auto mb-4 text-gray-500 dark:text-gray-400 opacity-50" />
-              <h3 className="text-lg font-medium text-[#4a5565] dark:text-zinc-200 mb-2 font-mono">No meetings found</h3>
-              <p className="text-gray-600 dark:text-gray-400 mb-4 font-mono">
-                Your calendar meetings will appear here once synced.
-              </p>
-              <Button 
-                onClick={performManualSync}
-                variant="outline" 
-                className="border-[#4a5565] dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[#4a5565] dark:text-zinc-200 hover:bg-stone-50 dark:hover:bg-zinc-800 font-mono"
-              >
-                Sync Calendar
-              </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          meetings.map((meeting) => (
-            <Card 
-              key={meeting.id} 
-              className="border-[#4a5565] dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-stone-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
-              onClick={() => setSelectedMeeting(meeting)}
-            >
-              <CardContent className="p-4">
-                <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0 w-8 h-8 bg-stone-50 dark:bg-zinc-800 rounded-full flex items-center justify-center">
-                    <Calendar className="h-4 w-4 text-[#4a5565] dark:text-zinc-200" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2 mb-1">
-                      <h3 className="font-medium text-[#4a5565] dark:text-zinc-200 truncate font-mono">{meeting.title}</h3>
-                      <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 font-mono">
-                        <Clock className="h-3 w-3" />
-                        {formatDate(meeting.start_time)}
-                      </div>
-                    </div>
-                    {meeting.description && (
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 line-clamp-2 font-mono">
-                        {stripHtml(meeting.description)}
-                      </p>
-                    )}
-                    <div className="flex items-center gap-2">
-                      {/* Event Status Badge */}
-                      {getEventStatusBadge(meeting.event_status)}
-                      
-                      {/* Bot Status Badge */}
-                      {meeting.bot_status && getBotStatusBadge(meeting)}
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
-      </div>
-
-        {/* Calendar View */}
-        <div className="mt-8">
-          <CalendarView 
-            meetings={meetings}
-            onMeetingUpdate={handleMeetingUpdate}
-          />
-        </div>
+        <CalendarView 
+          meetings={meetings}
+          onMeetingUpdate={handleMeetingUpdate}
+        />
       </div>
 
       {/* Meeting Detail Dialog */}
