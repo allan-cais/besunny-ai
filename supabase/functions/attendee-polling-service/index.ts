@@ -208,9 +208,11 @@ async function pollMeeting(meetingId: string) {
   const botData = await botStatusResponse.json();
   console.log(`📊 Raw API response data:`, JSON.stringify(botData, null, 2));
 
-  const newBotStatus = mapAttendeeStatusToBotStatus(botData.status);
+  // Use 'state' field instead of 'status' field from the API response
+  const attendeeStatus = botData.state || botData.status;
+  const newBotStatus = mapAttendeeStatusToBotStatus(attendeeStatus);
   console.log(`🔄 Status mapping:`, {
-    attendee_status: botData.status,
+    attendee_status: attendeeStatus,
     mapped_status: newBotStatus,
     previous_status: meeting.bot_status
   });
@@ -375,6 +377,7 @@ function mapAttendeeStatusToBotStatus(attendeeStatus: string): string {
       return 'transcribing';
     case 'completed':
     case 'finished':
+    case 'ended': // Add support for "ended" state
       return 'completed';
     case 'failed':
     case 'error':
