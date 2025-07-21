@@ -3,7 +3,7 @@ import CalendarView from '@/components/dashboard/CalendarView';
 import { calendarService, Meeting } from '@/lib/calendar';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, AlertCircle, RefreshCw, Loader2, Wifi, WifiOff, Calendar, Clock, AlertTriangle, Play, Eye, Square, Download } from 'lucide-react';
+import { CheckCircle, AlertCircle, RefreshCw, Loader2, Wifi, WifiOff, Calendar, Clock, AlertTriangle, Play, Eye, Square, Download, Bug } from 'lucide-react';
 import { useAuth } from '@/providers/AuthProvider';
 import PageHeader from '@/components/dashboard/PageHeader';
 import { useAttendeePolling } from '@/hooks/use-attendee-polling';
@@ -428,15 +428,46 @@ const MeetingsPage: React.FC = () => {
       }
 
       // Get current webhook to check sync token
-      const { data: webhook } = await supabase
+      const { data: webhook, error: webhookError } = await supabase
         .from('calendar_webhooks')
-        .select('sync_token')
+        .select('sync_token, webhook_id, is_active')
         .eq('user_id', session.user.id)
         .eq('google_calendar_id', 'primary')
         .eq('is_active', true)
-        .single();
+        .maybeSingle();
 
-      if (webhook?.sync_token) {
+      if (webhookError) {
+        console.error('Error fetching webhook:', webhookError);
+        setSyncError('Error fetching webhook status');
+        return;
+      }
+
+      if (!webhook) {
+        setSyncError('No active webhook found. Please setup watch first.');
+        return;
+      }
+
+      console.log('Current webhook status:', webhook);
+
+      if (!webhook.sync_token) {
+        // If no sync token, we need to do an initial sync first
+        console.log('No sync token found, performing initial sync...');
+        const initialResult = await calendarService.performInitialSync(session.user.id);
+        if (initialResult.success && initialResult.sync_token) {
+          // Now try incremental sync with the new sync token
+          const result = await calendarService.performIncrementalSync(session.user.id, initialResult.sync_token);
+          if (result.success) {
+            setSyncSuccess(`Force sync completed! Initial sync + incremental sync processed.`);
+            await loadWebhookStatus();
+          } else {
+            setSyncError(`Force sync failed: ${result.error}`);
+          }
+        } else {
+          setSyncError(`Initial sync failed: ${initialResult.error}`);
+        }
+      } else {
+        // We have a sync token, do incremental sync
+        console.log('Found sync token, performing incremental sync...');
         const result = await calendarService.performIncrementalSync(session.user.id, webhook.sync_token);
         if (result.success) {
           setSyncSuccess(`Force sync completed! Processed events with new sync token.`);
@@ -444,11 +475,54 @@ const MeetingsPage: React.FC = () => {
         } else {
           setSyncError(`Force sync failed: ${result.error}`);
         }
-      } else {
-        setSyncError('No active sync token found. Please setup watch first.');
       }
     } catch (err: any) {
+      console.error('Force sync error:', err);
       setSyncError(err.message || 'Failed to force sync');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDebugWebhook = async () => {
+    try {
+      setLoading(true);
+      setSyncError(null);
+      setSyncSuccess(null);
+      
+      const session = (await supabase.auth.getSession()).data.session;
+      if (!session?.user?.id) {
+        setSyncError('Not authenticated');
+        return;
+      }
+
+      // Get all webhook records for this user
+      const { data: webhooks, error } = await supabase
+        .from('calendar_webhooks')
+        .select('*')
+        .eq('user_id', session.user.id);
+
+      if (error) {
+        console.error('Error fetching webhooks:', error);
+        setSyncError('Error fetching webhook data');
+        return;
+      }
+
+      console.log('All webhook records for user:', webhooks);
+      
+      if (webhooks && webhooks.length > 0) {
+        const activeWebhook = webhooks.find(w => w.is_active);
+        if (activeWebhook) {
+          setSyncSuccess(`Found active webhook: ${activeWebhook.webhook_id}. Sync token: ${activeWebhook.sync_token ? 'Present' : 'Missing'}`);
+        } else {
+          setSyncError('No active webhook found');
+        }
+      } else {
+        setSyncError('No webhook records found');
+      }
+    } catch (err: any) {
+      console.error('Debug webhook error:', err);
+      setSyncError(err.message || 'Failed to debug webhook');
     } finally {
       setLoading(false);
     }
@@ -733,7 +807,7 @@ const MeetingsPage: React.FC = () => {
             </Button>
           </div>
           
-          <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-5">
             <Button
               onClick={performManualSync}
               disabled={loading}
@@ -772,6 +846,16 @@ const MeetingsPage: React.FC = () => {
             >
               {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
               Force Sync
+            </Button>
+
+            <Button
+              onClick={handleDebugWebhook}
+              disabled={loading}
+              className="w-full"
+              variant="outline"
+            >
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Bug className="mr-2 h-4 w-4" />}
+              Debug Webhook
             </Button>
           </div>
         </CardContent>
