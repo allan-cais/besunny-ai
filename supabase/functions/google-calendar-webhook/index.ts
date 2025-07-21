@@ -482,7 +482,7 @@ serve(async (req) => {
             try {
               const response = await fetch(
                 `https://www.googleapis.com/calendar/v3/calendars/primary/events?` +
-                `syncToken=${webhook.sync_token}&singleEvents=true&orderBy=startTime&showDeleted=true`,
+                `syncToken=${webhook.sync_token}&singleEvents=true&showDeleted=true`,
                 {
                   headers: {
                     'Authorization': `Bearer ${credentials.access_token}`,

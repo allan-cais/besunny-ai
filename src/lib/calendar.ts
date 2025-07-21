@@ -1137,7 +1137,7 @@ export const calendarService = {
 
       const response = await fetch(
         `https://www.googleapis.com/calendar/v3/calendars/primary/events?` +
-        `syncToken=${syncToken}&singleEvents=true&orderBy=startTime&showDeleted=true`,
+        `syncToken=${syncToken}&singleEvents=true&showDeleted=true`,
         {
           headers: {
             'Authorization': `Bearer ${credentials.access_token}`,
