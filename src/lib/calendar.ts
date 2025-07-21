@@ -764,6 +764,8 @@ export const calendarService = {
       // If no nextSyncToken was returned, we need to get one by making a sync token request
       if (!nextSyncToken) {
         console.log('No nextSyncToken returned, requesting sync token...');
+        
+        // Try first approach: empty sync token request
         const syncTokenResponse = await fetch(
           `https://www.googleapis.com/calendar/v3/calendars/primary/events?` +
           `singleEvents=true&syncToken=`,
@@ -778,12 +780,36 @@ export const calendarService = {
           const syncTokenData = await syncTokenResponse.json();
           const syncToken = syncTokenData.nextSyncToken;
           console.log('Got sync token from sync token request:', syncToken);
-          return { success: true, sync_token: syncToken };
-        } else {
-          const errorText = await syncTokenResponse.text();
-          console.error('Failed to get sync token:', syncTokenResponse.status, errorText);
-          return { success: false, error: `Failed to get sync token: ${syncTokenResponse.status} - ${errorText}` };
+          
+          if (syncToken) {
+            return { success: true, sync_token: syncToken };
+          }
         }
+        
+        // If first approach didn't work, try second approach: make a small change and get sync token
+        console.log('First approach failed, trying alternative method...');
+        const alternativeResponse = await fetch(
+          `https://www.googleapis.com/calendar/v3/calendars/primary/events?` +
+          `timeMin=${encodeURIComponent(new Date().toISOString())}&timeMax=${encodeURIComponent(new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString())}&singleEvents=true`,
+          {
+            headers: {
+              'Authorization': `Bearer ${credentials.access_token}`,
+            },
+          }
+        );
+        
+        if (alternativeResponse.ok) {
+          const alternativeData = await alternativeResponse.json();
+          const alternativeSyncToken = alternativeData.nextSyncToken;
+          console.log('Got sync token from alternative request:', alternativeSyncToken);
+          
+          if (alternativeSyncToken) {
+            return { success: true, sync_token: alternativeSyncToken };
+          }
+        }
+        
+        console.log('Both approaches failed to get sync token');
+        return { success: false, error: 'Unable to get sync token. This can happen when there are no recent changes to sync. Try making a small change to your calendar and try again.' };
       }
 
       return { success: true, sync_token: nextSyncToken };
