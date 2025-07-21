@@ -768,6 +768,10 @@ export const calendarService = {
             }
           }
 
+          // Clean up orphaned meetings that no longer exist in Google Calendar
+          const existingEventIds = new Set(events.map(event => event.id));
+          const cleanupResult = await this.cleanupOrphanedMeetings(userId, existingEventIds);
+
           // Log the initial sync
           await supabase
             .from('calendar_sync_logs')
@@ -778,8 +782,7 @@ export const calendarService = {
               events_processed: processed,
               meetings_created: created,
               meetings_updated: updated,
-              sync_range_start: timeMin,
-              sync_range_end: timeMax,
+              meetings_deleted: cleanupResult.deleted + cleanupResult.cancelled,
             });
 
           // If no nextSyncToken was returned, we need to get one by making a sync token request
@@ -861,6 +864,10 @@ export const calendarService = {
         }
       }
 
+      // Clean up orphaned meetings that no longer exist in Google Calendar
+      const existingEventIds = new Set(events.map(event => event.id));
+      const cleanupResult = await this.cleanupOrphanedMeetings(userId, existingEventIds);
+
       // Log the initial sync
       await supabase
         .from('calendar_sync_logs')
@@ -871,8 +878,7 @@ export const calendarService = {
           events_processed: processed,
           meetings_created: created,
           meetings_updated: updated,
-          sync_range_start: timeMin,
-          sync_range_end: timeMax,
+          meetings_deleted: cleanupResult.deleted + cleanupResult.cancelled,
         });
 
       // If no nextSyncToken was returned, we need to get one by making a sync token request
@@ -1396,6 +1402,86 @@ export const calendarService = {
     } catch (error) {
       console.error('Error handling deleted event:', error);
       return { success: false, error: error.message || String(error) };
+    }
+  },
+
+  // Clean up orphaned meetings that no longer exist in Google Calendar
+  async cleanupOrphanedMeetings(userId: string, existingEventIds: Set<string>): Promise<{ deleted: number; cancelled: number; error?: string }> {
+    try {
+      console.log('Cleaning up orphaned meetings for user:', userId);
+      
+      // Get all meetings for this user that have google_calendar_event_id
+      const { data: meetings, error: findError } = await supabase
+        .from('meetings')
+        .select('id, google_calendar_event_id, title, bot_status, attendee_bot_id')
+        .eq('user_id', userId)
+        .not('google_calendar_event_id', 'is', null);
+      
+      if (findError) {
+        console.error('Error finding meetings for cleanup:', findError);
+        return { deleted: 0, cancelled: 0, error: findError.message };
+      }
+      
+      if (!meetings || meetings.length === 0) {
+        console.log('No meetings found for cleanup');
+        return { deleted: 0, cancelled: 0 };
+      }
+      
+      let deleted = 0;
+      let cancelled = 0;
+      
+      for (const meeting of meetings) {
+        // Check if this meeting's Google Calendar event still exists
+        if (!existingEventIds.has(meeting.google_calendar_event_id)) {
+          console.log(`Found orphaned meeting: ${meeting.title} (${meeting.google_calendar_event_id})`);
+          
+          // Check if meeting has active bot or transcript
+          const hasActiveBot = meeting.bot_status === 'bot_joined' || meeting.bot_status === 'transcribing';
+          const hasBot = meeting.attendee_bot_id !== null;
+          
+          if (hasActiveBot || hasBot) {
+            console.log('Meeting has bot, marking as cancelled instead of deleting');
+            
+            // Update meeting status to cancelled instead of deleting
+            const { error: updateError } = await supabase
+              .from('meetings')
+              .update({
+                event_status: 'declined',
+                bot_status: 'failed',
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', meeting.id);
+            
+            if (updateError) {
+              console.error('Error updating cancelled meeting:', updateError);
+              continue;
+            }
+            
+            cancelled++;
+          } else {
+            console.log('Deleting orphaned meeting without bot');
+            
+            // Delete meeting if no active bot
+            const { error: deleteError } = await supabase
+              .from('meetings')
+              .delete()
+              .eq('id', meeting.id);
+            
+            if (deleteError) {
+              console.error('Error deleting orphaned meeting:', deleteError);
+              continue;
+            }
+            
+            deleted++;
+          }
+        }
+      }
+      
+      console.log(`Cleanup completed: ${deleted} deleted, ${cancelled} cancelled`);
+      return { deleted, cancelled };
+    } catch (error) {
+      console.error('Error cleaning up orphaned meetings:', error);
+      return { deleted: 0, cancelled: 0, error: error.message || String(error) };
     }
   },
 
