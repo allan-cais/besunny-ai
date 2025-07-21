@@ -326,7 +326,11 @@ const MeetingsPage: React.FC = () => {
         })(),
         
         // Basic transcription language (if specified)
-        ...(configuration?.transcription_language && { language: configuration.transcription_language }),
+        ...(configuration?.transcription_language && { 
+          transcription_settings: {
+            language: configuration.transcription_language
+          }
+        }),
       };
 
       const result = await apiKeyService.sendBotToMeeting(meeting.meeting_url, botOptions);

@@ -88,7 +88,9 @@ export const virtualEmailBotScheduling: VirtualEmailBotScheduling = {
           to: 'everyone',
           message: 'Hi, I\'m here to transcribe this meeting!',
         },
-        language: 'en-US',
+        transcription_settings: {
+          language: 'en-US'
+        },
         auto_join: true,
         recording_enabled: true
       };

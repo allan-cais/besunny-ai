@@ -134,7 +134,11 @@ async function autoScheduleBotsForUser(userId: string) {
         join_at: joinAtTime.toISOString(),
         
         // Basic transcription language (if specified)
-        ...(config.transcription_language && { language: config.transcription_language }),
+        ...(config.transcription_language && { 
+          transcription_settings: {
+            language: config.transcription_language
+          }
+        }),
         
         // Advanced features - left as defaults (not included in API call)
         // transcription_settings, recording_settings, teams_settings, debug_settings,

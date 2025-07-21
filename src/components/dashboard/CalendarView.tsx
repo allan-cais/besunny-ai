@@ -126,7 +126,11 @@ const CalendarView: React.FC<CalendarViewProps> = ({
         })(),
         
         // Basic transcription language (if specified)
-        ...(configuration?.transcription_language && { language: configuration.transcription_language }),
+        ...(configuration?.transcription_language && { 
+          transcription_settings: {
+            language: configuration.transcription_language
+          }
+        }),
         
         // Advanced features - left as defaults (not included in API call)
         // transcription_settings, recording_settings, teams_settings, debug_settings,
