@@ -38,6 +38,16 @@ serve(async (req) => {
   const url = new URL(req.url);
   const method = req.method;
 
+  // Main endpoint - poll all meetings
+  if (url.pathname.endsWith('/attendee-polling-service') && method === 'POST') {
+    try {
+      const result = await pollAllMeetings();
+      return withCORS(new Response(JSON.stringify({ success: true, result }), { status: 200 }));
+    } catch (error) {
+      return withCORS(new Response(JSON.stringify({ error: error.message }), { status: 500 }));
+    }
+  }
+
   // Manual polling trigger (for testing)
   if (url.pathname.endsWith('/poll-now') && method === 'POST') {
     const userId = getUserIdFromAuth(req);

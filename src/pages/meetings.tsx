@@ -15,7 +15,7 @@ import { supabase } from '@/lib/supabase';
 import BotConfigurationModal from '@/components/dashboard/BotConfigurationModal';
 import { apiKeyService } from '@/lib/api-keys';
 import { attendeePollingService } from '@/lib/attendee-polling';
-// import PollingDebugPanel from '@/components/dashboard/PollingDebugPanel';
+import PollingDebugPanel from '@/components/dashboard/PollingDebugPanel';
 
 const MeetingsPage: React.FC = () => {
   const { user } = useAuth();
@@ -467,9 +467,9 @@ const MeetingsPage: React.FC = () => {
       />
 
       {/* Polling Debug Panel - Temporary for debugging */}
-      {/* <div className="mt-8">
+      <div className="mt-8">
         <PollingDebugPanel />
-      </div> */}
+      </div>
     </div>
   );
 };

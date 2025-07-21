@@ -27,8 +27,8 @@ jobs:
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
         SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       run: |
-        # Call the existing edge function
-        curl -X POST "${{ secrets.SUPABASE_URL }}/functions/v1/attendee-polling-cron" \
+        # Call the attendee polling service edge function
+        curl -X POST "${{ secrets.SUPABASE_URL }}/functions/v1/attendee-polling-service" \
           -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
           -H "Content-Type: application/json" \
           -d '{}'
