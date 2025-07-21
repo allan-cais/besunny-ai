@@ -119,7 +119,7 @@ async function autoScheduleBotsForUser(userId: string) {
       console.log(`Scheduling bot for meeting ${meeting.id} to join at ${joinAtTime.toISOString()}`);
 
       // Build basic bot configuration - only essential options
-      const botOptions = {
+      const botOptions: any = {
         // Basic required fields
         meeting_url: meeting.meeting_url,
         bot_name: config.bot_name,
@@ -133,18 +133,18 @@ async function autoScheduleBotsForUser(userId: string) {
         // Future scheduling
         join_at: joinAtTime.toISOString(),
         
-        // Basic transcription language (if specified)
-        ...(config.transcription_language && { 
-          transcription_settings: {
-            language: config.transcription_language
-          }
-        }),
-        
         // Advanced features - left as defaults (not included in API call)
         // transcription_settings, recording_settings, teams_settings, debug_settings,
         // automatic_leave_settings, webhooks, metadata, deduplication_key, custom_settings
         // will all use Attendee API defaults
       };
+      
+      // Add transcription settings if language is specified
+      if (config.transcription_language) {
+        botOptions.transcription_settings = {
+          language: config.transcription_language
+        };
+      }
 
       // Send bot to meeting via Attendee API with basic configuration
       const response = await fetch('https://app.attendee.dev/api/v1/bots', {

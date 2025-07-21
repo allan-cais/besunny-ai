@@ -106,7 +106,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
       setSendingBot(meeting.id);
       
       // Build basic bot options - only essential configuration
-      const botOptions = {
+      const botOptions: any = {
         // Basic required fields
         meeting_url: meeting.meeting_url,
         bot_name: configuration?.bot_name || meeting.bot_name || 'Sunny AI Assistant',
@@ -125,18 +125,18 @@ const CalendarView: React.FC<CalendarViewProps> = ({
           return joinAtTime.toISOString();
         })(),
         
-        // Basic transcription language (if specified)
-        ...(configuration?.transcription_language && { 
-          transcription_settings: {
-            language: configuration.transcription_language
-          }
-        }),
-        
         // Advanced features - left as defaults (not included in API call)
         // transcription_settings, recording_settings, teams_settings, debug_settings,
         // automatic_leave_settings, webhooks, metadata, deduplication_key, custom_settings
         // will all use Attendee API defaults
       };
+      
+      // Add transcription settings if language is specified
+      if (configuration?.transcription_language) {
+        botOptions.transcription_settings = {
+          language: configuration.transcription_language
+        };
+      }
 
       const result = await apiKeyService.sendBotToMeeting(meeting.meeting_url, botOptions);
       

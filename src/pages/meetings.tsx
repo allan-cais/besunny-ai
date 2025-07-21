@@ -306,7 +306,7 @@ const MeetingsPage: React.FC = () => {
       setSendingBot(meeting.id);
       
       // Build basic bot options - only essential configuration
-      const botOptions = {
+      const botOptions: any = {
         // Basic required fields
         meeting_url: meeting.meeting_url,
         bot_name: configuration?.bot_name || meeting.bot_name || 'Sunny AI Assistant',
@@ -324,14 +324,14 @@ const MeetingsPage: React.FC = () => {
           const joinAtTime = new Date(meetingStartTime.getTime() - 2 * 60 * 1000); // Join 2 minutes before start
           return joinAtTime.toISOString();
         })(),
-        
-        // Basic transcription language (if specified)
-        ...(configuration?.transcription_language && { 
-          transcription_settings: {
-            language: configuration.transcription_language
-          }
-        }),
       };
+      
+      // Add transcription settings if language is specified
+      if (configuration?.transcription_language) {
+        botOptions.transcription_settings = {
+          language: configuration.transcription_language
+        };
+      }
 
       const result = await apiKeyService.sendBotToMeeting(meeting.meeting_url, botOptions);
       
