@@ -34,7 +34,7 @@ const MeetingsPage: React.FC = () => {
 
   // Set up automatic polling
   const { pollNow } = useAttendeePolling({
-    enabled: true,
+    enabled: true, // Re-enabled now that database fields are fixed
     intervalMs: 30000, // Poll every 30 seconds
     onPollingComplete: (results) => {
       if (results.length > 0) {
