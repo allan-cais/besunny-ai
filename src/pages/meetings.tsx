@@ -312,13 +312,10 @@ const MeetingsPage: React.FC = () => {
         bot_name: configuration?.bot_name || meeting.bot_name || 'Sunny AI Assistant',
         
         // Chat message configuration
-        bot_chat_message: configuration?.bot_chat_message ? {
-          to: configuration.chat_message_recipient || 'everyone',
-          message: configuration.bot_chat_message,
-          ...(configuration.to_user_uuid && { to_user_uuid: configuration.to_user_uuid })
-        } : {
-          to: 'everyone',
-          message: meeting.bot_chat_message || 'Hi, I\'m here to transcribe this meeting!',
+        bot_chat_message: {
+          to: configuration?.chat_message_recipient || 'everyone',
+          message: configuration?.bot_chat_message || meeting.bot_chat_message || 'Hi, I\'m here to transcribe this meeting!',
+          ...(configuration?.to_user_uuid && { to_user_uuid: configuration.to_user_uuid })
         },
         
         // Future scheduling
@@ -377,6 +374,7 @@ const MeetingsPage: React.FC = () => {
       
       handleMeetingUpdate();
     } catch (err: any) {
+      console.error('Error sending bot to meeting:', err);
       // Handle error silently
     } finally {
       setSendingBot(null);

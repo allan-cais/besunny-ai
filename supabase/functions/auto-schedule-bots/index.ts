@@ -125,7 +125,10 @@ async function autoScheduleBotsForUser(userId: string) {
         bot_name: config.bot_name,
         
         // Chat message configuration
-        bot_chat_message: config.bot_chat_message,
+        bot_chat_message: {
+          to: config.bot_chat_message?.to || 'everyone',
+          message: config.bot_chat_message?.message || 'Hi, I\'m here to transcribe this meeting!',
+        },
         
         // Future scheduling
         join_at: joinAtTime.toISOString(),

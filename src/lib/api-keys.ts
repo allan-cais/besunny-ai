@@ -11,23 +11,59 @@ export const apiKeyService = {
   async sendBotToMeeting(meetingUrl: string, options: any = {}): Promise<any> {
     const session = (await supabase.auth.getSession()).data.session;
     if (!session) throw new Error('Not authenticated');
+    
+    // Validate required fields
+    if (!meetingUrl) {
+      throw new Error('Meeting URL is required');
+    }
+    
+    // Ensure bot_chat_message is properly formatted
+    const payload = {
+      meeting_url: meetingUrl,
+      ...options
+    };
+    
+    // Validate bot_chat_message structure
+    if (payload.bot_chat_message && typeof payload.bot_chat_message === 'object') {
+      if (!payload.bot_chat_message.message) {
+        throw new Error('bot_chat_message.message is required');
+      }
+      if (!payload.bot_chat_message.to) {
+        payload.bot_chat_message.to = 'everyone';
+      }
+    } else {
+      // Set default bot_chat_message if not provided
+      payload.bot_chat_message = {
+        to: 'everyone',
+        message: 'Hi, I\'m here to transcribe this meeting!'
+      };
+    }
+    
+    console.log('Sending bot to meeting with payload:', payload);
+    
     const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/attendee-proxy/send-bot`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${session.access_token}`,
       },
-      body: JSON.stringify({
-        meeting_url: meetingUrl,
-        ...options
-      })
+      body: JSON.stringify(payload)
     });
     const result = await response.json();
     console.log('Attendee proxy response:', result);
     
     if (!result.ok) {
       console.error('Attendee proxy error:', result);
-      throw new Error(result.error || 'Failed to send bot');
+      // Try to extract more detailed error information
+      if (result.data && result.data.non_field_errors) {
+        throw new Error(`Attendee API validation error: ${result.data.non_field_errors.join(', ')}`);
+      } else if (result.data && result.data.error) {
+        throw new Error(`Attendee API error: ${result.data.error}`);
+      } else if (result.error) {
+        throw new Error(result.error);
+      } else {
+        throw new Error('Failed to send bot');
+      }
     }
     
     // The result.data should contain the Attendee API response

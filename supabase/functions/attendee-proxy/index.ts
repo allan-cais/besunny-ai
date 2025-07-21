@@ -111,7 +111,11 @@ serve(async (req) => {
         },
         body: JSON.stringify({
           meeting_url: 'https://zoom.us/j/00000000000',
-          bot_name: 'Sunny AI Assistant'
+          bot_name: 'Sunny AI Assistant',
+          bot_chat_message: {
+            to: 'everyone',
+            message: 'Hi, I\'m here to transcribe this meeting!'
+          }
         })
       });
       const body = await response.text();
