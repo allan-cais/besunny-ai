@@ -722,6 +722,120 @@ export const calendarService = {
 
       if (!response.ok) {
         const errorText = await response.text();
+        
+        // If we get a 401, the token might be invalid even if it's not expired
+        if (response.status === 401) {
+          console.log('Got 401 error, token might be invalid. Attempting token refresh...');
+          
+          // Force a token refresh
+          const refreshedCredentials = await getGoogleCredentials(userId);
+          
+          // Retry the request with the refreshed token
+          const retryResponse = await fetch(
+            `https://www.googleapis.com/calendar/v3/calendars/primary/events?` +
+            `timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&orderBy=startTime`,
+            {
+              headers: {
+                'Authorization': `Bearer ${refreshedCredentials.access_token}`,
+              },
+            }
+          );
+          
+          if (!retryResponse.ok) {
+            const retryErrorText = await retryResponse.text();
+            throw new Error(`Calendar API error after token refresh: ${retryResponse.status} - ${retryErrorText}`);
+          }
+          
+          const retryData = await retryResponse.json();
+          const events = retryData.items || [];
+          const nextSyncToken = retryData.nextSyncToken;
+          
+          console.log(`Initial sync (retry) found ${events.length} events, nextSyncToken: ${nextSyncToken}`);
+          
+          // Process events and continue with the rest of the function...
+          let processed = 0;
+          let created = 0;
+          let updated = 0;
+
+          for (const event of events) {
+            const result = await this.processCalendarEvent(event, userId, refreshedCredentials);
+            processed++;
+            
+            if (result.action === 'created') {
+              created++;
+            } else if (result.action === 'updated') {
+              updated++;
+            }
+          }
+
+          // Log the initial sync
+          await supabase
+            .from('calendar_sync_logs')
+            .insert({
+              user_id: userId,
+              sync_type: 'initial',
+              status: 'completed',
+              events_processed: processed,
+              meetings_created: created,
+              meetings_updated: updated,
+              sync_range_start: timeMin,
+              sync_range_end: timeMax,
+            });
+
+          // If no nextSyncToken was returned, we need to get one by making a sync token request
+          if (!nextSyncToken) {
+            console.log('No nextSyncToken returned, requesting sync token...');
+            
+            // Try first approach: empty sync token request
+            const syncTokenResponse = await fetch(
+              `https://www.googleapis.com/calendar/v3/calendars/primary/events?` +
+              `singleEvents=true&syncToken=`,
+              {
+                headers: {
+                  'Authorization': `Bearer ${refreshedCredentials.access_token}`,
+                },
+              }
+            );
+            
+            if (syncTokenResponse.ok) {
+              const syncTokenData = await syncTokenResponse.json();
+              const syncToken = syncTokenData.nextSyncToken;
+              console.log('Got sync token from sync token request:', syncToken);
+              
+              if (syncToken) {
+                return { success: true, sync_token: syncToken };
+              }
+            }
+            
+            // If first approach didn't work, try second approach: make a small change and get sync token
+            console.log('First approach failed, trying alternative method...');
+            const alternativeResponse = await fetch(
+              `https://www.googleapis.com/calendar/v3/calendars/primary/events?` +
+              `timeMin=${encodeURIComponent(new Date().toISOString())}&timeMax=${encodeURIComponent(new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString())}&singleEvents=true`,
+              {
+                headers: {
+                  'Authorization': `Bearer ${refreshedCredentials.access_token}`,
+                },
+              }
+            );
+            
+            if (alternativeResponse.ok) {
+              const alternativeData = await alternativeResponse.json();
+              const alternativeSyncToken = alternativeData.nextSyncToken;
+              console.log('Got sync token from alternative request:', alternativeSyncToken);
+              
+              if (alternativeSyncToken) {
+                return { success: true, sync_token: alternativeSyncToken };
+              }
+            }
+            
+            console.log('Both approaches failed to get sync token');
+            return { success: false, error: 'Unable to get sync token. This can happen when there are no recent changes to sync. Try making a small change to your calendar and try again.' };
+          }
+
+          return { success: true, sync_token: nextSyncToken };
+        }
+        
         throw new Error(`Calendar API error: ${response.status} - ${errorText}`);
       }
 
