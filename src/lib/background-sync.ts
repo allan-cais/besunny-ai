@@ -4,20 +4,33 @@ import { calendarService } from './calendar';
 class BackgroundSyncService {
   private syncInterval: NodeJS.Timeout | null = null;
   private isRunning = false;
+  private currentUserId: string | null = null;
+  private disabled = false; // Temporary disable flag
 
-  async initialize() {
-    if (this.isRunning) return;
+  async initialize(userId?: string) {
+    if (this.isRunning || this.disabled) return;
     
+    this.currentUserId = userId || null;
     this.isRunning = true;
-    console.log('Background sync service initialized');
+    console.log('Background sync service initialized for user:', userId);
     
-    // Check for users who need calendar sync setup
-    await this.checkAndSetupCalendarSync();
+    // Wait a bit before running the first check to avoid blocking page load
+    setTimeout(async () => {
+      try {
+        await this.checkAndSetupCalendarSync();
+      } catch (error) {
+        console.error('Background sync initial check failed:', error);
+      }
+    }, 2000); // Wait 2 seconds
     
     // Set up periodic checks
     this.syncInterval = setInterval(async () => {
-      await this.checkAndSetupCalendarSync();
-      await this.renewExpiringWebhooks();
+      try {
+        await this.checkAndSetupCalendarSync();
+        await this.renewExpiringWebhooks();
+      } catch (error) {
+        console.error('Background sync periodic check failed:', error);
+      }
     }, 5 * 60 * 1000); // Check every 5 minutes
   }
 
@@ -27,37 +40,54 @@ class BackgroundSyncService {
       this.syncInterval = null;
     }
     this.isRunning = false;
+    this.currentUserId = null;
     console.log('Background sync service stopped');
   }
 
   private async checkAndSetupCalendarSync() {
     try {
-      // Find users with Google credentials but no active webhook
-      const { data: users, error } = await supabase
+      // Only check for the current user
+      if (!this.currentUserId) {
+        return;
+      }
+
+      // Check if current user has Google credentials
+      const { data: credentials, error: credentialsError } = await supabase
         .from('google_credentials')
         .select('user_id')
-        .not('user_id', 'in', `(
-          SELECT user_id FROM calendar_webhooks WHERE is_active = true
-        )`);
+        .eq('user_id', this.currentUserId)
+        .maybeSingle();
 
-      if (error) {
-        console.error('Error checking for users needing calendar sync:', error);
+      if (credentialsError) {
+        console.error('Error checking Google credentials:', credentialsError);
         return;
       }
 
-      if (!users || users.length === 0) {
+      if (!credentials) {
+        return; // User doesn't have Google credentials
+      }
+
+      // Check if user has active webhook
+      const { data: webhook, error: webhookError } = await supabase
+        .from('calendar_webhooks')
+        .select('user_id')
+        .eq('user_id', this.currentUserId)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (webhookError) {
+        console.error('Error checking webhook status:', webhookError);
         return;
       }
 
-      console.log(`Found ${users.length} users needing calendar sync setup`);
-
-      // Set up calendar sync for each user
-      for (const user of users) {
+      // If no active webhook, set up calendar sync
+      if (!webhook) {
+        console.log('Setting up calendar sync for current user');
         try {
-          await calendarService.initializeCalendarSync(user.user_id);
-          console.log(`Calendar sync set up for user: ${user.user_id}`);
+          await calendarService.initializeCalendarSync(this.currentUserId);
+          console.log('Calendar sync set up successfully');
         } catch (error) {
-          console.error(`Failed to set up calendar sync for user ${user.user_id}:`, error);
+          console.error('Failed to set up calendar sync:', error);
         }
       }
     } catch (error) {
@@ -67,35 +97,40 @@ class BackgroundSyncService {
 
   private async renewExpiringWebhooks() {
     try {
-      // Find webhooks expiring in the next 24 hours
+      // Only check for the current user
+      if (!this.currentUserId) {
+        return;
+      }
+
+      // Find webhook expiring in the next 24 hours for current user
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
 
-      const { data: expiringWebhooks, error } = await supabase
+      const { data: webhook, error } = await supabase
         .from('calendar_webhooks')
-        .select('user_id, webhook_id')
+        .select('user_id, webhook_id, expiration_time')
+        .eq('user_id', this.currentUserId)
         .eq('is_active', true)
-        .lt('expiration_time', tomorrow.toISOString());
+        .lt('expiration_time', tomorrow.toISOString())
+        .maybeSingle();
 
       if (error) {
-        console.error('Error checking for expiring webhooks:', error);
+        console.error('Error checking for expiring webhook:', error);
         return;
       }
 
-      if (!expiringWebhooks || expiringWebhooks.length === 0) {
-        return;
+      if (!webhook) {
+        return; // No expiring webhook
       }
 
-      console.log(`Found ${expiringWebhooks.length} webhooks expiring soon`);
+      console.log('Found expiring webhook, renewing...');
 
-      // Renew each expiring webhook
-      for (const webhook of expiringWebhooks) {
-        try {
-          await calendarService.renewWatch(webhook.user_id);
-          console.log(`Webhook renewed for user: ${webhook.user_id}`);
-        } catch (error) {
-          console.error(`Failed to renew webhook for user ${webhook.user_id}:`, error);
-        }
+      // Renew the expiring webhook
+      try {
+        await calendarService.renewWatch(this.currentUserId);
+        console.log('Webhook renewed successfully');
+      } catch (error) {
+        console.error('Failed to renew webhook:', error);
       }
     } catch (error) {
       console.error('Error in renewExpiringWebhooks:', error);
@@ -112,6 +147,22 @@ class BackgroundSyncService {
       throw error;
     }
   }
+
+  // Temporary disable method
+  disable() {
+    this.disabled = true;
+    this.stop();
+    console.log('Background sync service disabled');
+  }
+
+  // Re-enable method
+  enable() {
+    this.disabled = false;
+    console.log('Background sync service enabled');
+  }
 }
 
-export const backgroundSyncService = new BackgroundSyncService(); 
+export const backgroundSyncService = new BackgroundSyncService();
+
+// Temporarily disable background sync to prevent blocking
+backgroundSyncService.disable(); 

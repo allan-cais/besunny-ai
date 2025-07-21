@@ -65,7 +65,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Initialize background sync when user is authenticated
       if (session?.user) {
         try {
-          await backgroundSyncService.initialize();
+          await backgroundSyncService.initialize(session.user.id);
         } catch (error) {
           console.error('Failed to initialize background sync:', error);
         }
