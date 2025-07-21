@@ -180,11 +180,16 @@ const MeetingsPage: React.FC = () => {
       setSyncError(null);
       setSyncSuccess(null);
       
-      // Call Attendee API to get all scheduled bots
-      const response = await fetch('https://app.attendee.dev/api/v1/bots', {
+      // Call Attendee API through our edge function to get all scheduled bots
+      const session = (await supabase.auth.getSession()).data.session;
+      if (!session) {
+        throw new Error('Not authenticated');
+      }
+      
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/attendee-proxy/list-bots`, {
         method: 'GET',
         headers: {
-          'Authorization': `Token ${import.meta.env.VITE_ATTENDEE_API_KEY}`,
+          'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
         },
       });
@@ -193,8 +198,12 @@ const MeetingsPage: React.FC = () => {
         throw new Error(`Attendee API error: ${response.status}`);
       }
       
-      const botsData = await response.json();
-      const scheduledBots = botsData.results || botsData || [];
+      const result = await response.json();
+      if (!result.ok) {
+        throw new Error(result.error || 'Failed to get bots from Attendee API');
+      }
+      
+      const scheduledBots = result.data || [];
       
       console.log('Attendee API bots:', scheduledBots);
       
@@ -486,78 +495,83 @@ const MeetingsPage: React.FC = () => {
 
   return (
     <div className="px-4 py-8 font-sans h-full flex flex-col">
-      <div className="flex items-center justify-between mb-6">
-        <PageHeader title="MEETINGS" path="~/sunny.ai/meetings" />
-        
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2">
-          {/* Sync Attendee Bots Button */}
-          <Button
-            onClick={syncAttendeeBots}
-            disabled={syncing}
-            variant="outline"
-            size="sm"
-            className="flex items-center gap-2 border-[#4a5565] dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[#4a5565] dark:text-zinc-200 hover:bg-stone-50 dark:hover:bg-zinc-800 font-mono"
-          >
-            {syncing ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4" />
-            )}
-            {syncing ? 'Syncing...' : 'Sync Attendee Bots'}
-          </Button>
+      {/* Fixed Header */}
+      <div className="flex-shrink-0">
+        <div className="flex items-center justify-between mb-6">
+          <PageHeader title="MEETINGS" path="~/sunny.ai/meetings" />
           
-          {/* Refresh Bot Statuses Button */}
-          <Button
-            onClick={refreshBotStatuses}
-            disabled={syncing}
-            variant="outline"
-            size="sm"
-            className="flex items-center gap-2 border-[#4a5565] dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[#4a5565] dark:text-zinc-200 hover:bg-stone-50 dark:hover:bg-zinc-800 font-mono"
-          >
-            {syncing ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4" />
-            )}
-            {syncing ? 'Refreshing...' : 'Refresh Bot Status'}
-          </Button>
-          
-          {/* Manual Sync Button */}
-          <Button
-            onClick={performManualSync}
-            disabled={syncing}
-            variant="outline"
-            size="sm"
-            className="flex items-center gap-2 border-[#4a5565] dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[#4a5565] dark:text-zinc-200 hover:bg-stone-50 dark:hover:bg-zinc-800 font-mono"
-          >
-            {syncing ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4" />
-            )}
-            {syncing ? 'Syncing...' : 'Sync Calendar'}
-          </Button>
+          {/* Action Buttons */}
+          <div className="flex items-center gap-2">
+            {/* Sync Attendee Bots Button */}
+            <Button
+              onClick={syncAttendeeBots}
+              disabled={syncing}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2 border-[#4a5565] dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[#4a5565] dark:text-zinc-200 hover:bg-stone-50 dark:hover:bg-zinc-800 font-mono"
+            >
+              {syncing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              {syncing ? 'Syncing...' : 'Sync Attendee Bots'}
+            </Button>
+            
+            {/* Refresh Bot Statuses Button */}
+            <Button
+              onClick={refreshBotStatuses}
+              disabled={syncing}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2 border-[#4a5565] dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[#4a5565] dark:text-zinc-200 hover:bg-stone-50 dark:hover:bg-zinc-800 font-mono"
+            >
+              {syncing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              {syncing ? 'Refreshing...' : 'Refresh Bot Status'}
+            </Button>
+            
+            {/* Manual Sync Button */}
+            <Button
+              onClick={performManualSync}
+              disabled={syncing}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2 border-[#4a5565] dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[#4a5565] dark:text-zinc-200 hover:bg-stone-50 dark:hover:bg-zinc-800 font-mono"
+            >
+              {syncing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              {syncing ? 'Syncing...' : 'Sync Calendar'}
+            </Button>
+          </div>
         </div>
+
+        {/* Sync Status Messages */}
+        {syncError && (
+          <Alert className="mb-4" variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>{syncError}</AlertDescription>
+          </Alert>
+        )}
+
+        {syncSuccess && (
+          <Alert className="mb-4">
+            <Calendar className="h-4 w-4" />
+            <AlertDescription>{syncSuccess}</AlertDescription>
+          </Alert>
+        )}
       </div>
 
-      {/* Sync Status Messages */}
-      {syncError && (
-        <Alert className="mb-4" variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>{syncError}</AlertDescription>
-        </Alert>
-      )}
-
-      {syncSuccess && (
-        <Alert className="mb-4">
-          <Calendar className="h-4 w-4" />
-          <AlertDescription>{syncSuccess}</AlertDescription>
-        </Alert>
-      )}
-
-      {/* Meetings List */}
-      <div className="space-y-4">
+      {/* Scrollable Content */}
+      <div className="flex-1 overflow-y-auto">
+        {/* Meetings List */}
+        <div className="space-y-4">
         {loading ? (
           <div className="flex items-center justify-center h-32">
             <Loader2 className="h-8 w-8 animate-spin" />
@@ -619,12 +633,13 @@ const MeetingsPage: React.FC = () => {
         )}
       </div>
 
-      {/* Calendar View */}
-      <div className="mt-8">
-        <CalendarView 
-          meetings={meetings}
-          onMeetingUpdate={handleMeetingUpdate}
-        />
+        {/* Calendar View */}
+        <div className="mt-8">
+          <CalendarView 
+            meetings={meetings}
+            onMeetingUpdate={handleMeetingUpdate}
+          />
+        </div>
       </div>
 
       {/* Meeting Detail Dialog */}

@@ -172,6 +172,28 @@ serve(async (req) => {
     }
   }
 
+  // List all bots (GET /list-bots)
+  if (url.pathname.endsWith('/list-bots') && method === 'GET') {
+    try {
+      const response = await fetch('https://app.attendee.dev/api/v1/bots', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Token ${MASTER_ATTENDEE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Attendee API error: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      return withCORS(new Response(JSON.stringify({ ok: true, data }), { status: 200 }));
+    } catch (e) {
+      return withCORS(new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500 }));
+    }
+  }
+
   // Get bot details (GET /bot-details?bot_id=...)
   if (url.pathname.endsWith('/bot-details') && method === 'GET') {
     try {
