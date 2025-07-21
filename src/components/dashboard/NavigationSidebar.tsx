@@ -76,8 +76,8 @@ const NavigationSidebar = ({
     },
     { icon: Calendar, label: "Meetings", active: activeNavItem === "Meetings" },
     { icon: Database, label: "Data", active: activeNavItem === "Data" },
-    { icon: Terminal, label: "Playbooks", active: false },
-    { icon: Settings, label: "Settings", active: activeNavItem === "Settings" },
+    // { icon: Terminal, label: "Playbooks", active: false },
+    // { icon: Settings, label: "Settings", active: activeNavItem === "Settings" },
   ];
 
   const handleRenameClick = (chat: DashboardChatSession) => {
