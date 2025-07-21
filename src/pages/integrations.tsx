@@ -268,14 +268,13 @@ const IntegrationsPage: React.FC = () => {
           console.warn('Failed to refresh session:', refreshError);
         }
         
-        // Automatically trigger initial sync and real-time sync
+        // Automatically set up calendar sync
         try {
-          await import('@/lib/calendar').then(async ({ calendarService }) => {
-            await calendarService.initialSync();
-            await calendarService.setupWebhookSync();
-          });
+          const { calendarService } = await import('@/lib/calendar');
+          await calendarService.initializeCalendarSync(user.id);
         } catch (syncError) {
-          // Optionally handle sync error (silent for now)
+          console.error('Calendar sync setup failed:', syncError);
+          // Continue anyway - sync can be set up later
         }
         // Remove code/state from URL to prevent re-triggering
         navigate('/integrations', { replace: true });

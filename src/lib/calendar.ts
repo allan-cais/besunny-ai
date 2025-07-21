@@ -1126,13 +1126,20 @@ export const calendarService = {
   },
 
   // Perform incremental sync using sync token
-  async performIncrementalSync(userId: string, syncToken: string): Promise<{ success: boolean; error?: string; next_sync_token?: string }> {
+  async performIncrementalSync(userId: string, syncToken?: string): Promise<{ success: boolean; error?: string; next_sync_token?: string }> {
     try {
       console.log('Performing incremental sync for user:', userId);
       
       const credentials = await getGoogleCredentials(userId);
       if (!credentials) {
         return { success: false, error: 'No Google credentials found' };
+      }
+
+      // If no sync token provided, do a full sync
+      if (!syncToken) {
+        console.log('No sync token provided, performing full sync');
+        const fullSyncResult = await this.performInitialSync(userId);
+        return fullSyncResult;
       }
 
       const response = await fetch(

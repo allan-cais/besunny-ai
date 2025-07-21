@@ -56,10 +56,21 @@ const OAuthLoginCallback: React.FC = () => {
           }
 
           setStatus('success');
-          setMessage('Successfully authenticated! Redirecting to dashboard...');
+          setMessage('Successfully authenticated! Setting up calendar sync...');
+          
+          // Set up automatic calendar sync
+          try {
+            const { calendarService } = await import('@/lib/calendar');
+            await calendarService.initializeCalendarSync(result.session.user.id);
+            setMessage('Calendar sync configured! Redirecting to dashboard...');
+          } catch (syncError) {
+            console.error('Calendar sync setup failed:', syncError);
+            // Continue anyway - sync can be set up later
+            setMessage('Authentication successful! Redirecting to dashboard...');
+          }
           
           // Redirect to dashboard after a short delay
-          setTimeout(() => navigate('/dashboard'), 1500);
+          setTimeout(() => navigate('/dashboard'), 2000);
         } else {
           throw new Error(result.message || 'Authentication failed');
         }
