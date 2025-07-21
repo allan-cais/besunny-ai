@@ -324,7 +324,7 @@ export const calendarService = {
     
     const status = {
       webhook_active: !!webhook,
-      last_sync: lastSuccessfulSync?.created_at || webhook?.last_sync_at,
+      last_sync: lastSuccessfulSync?.created_at || webhook?.updated_at,
       webhook_expires_at: webhook?.expiration_time,
       sync_logs: syncLogs || [],
     };
@@ -674,7 +674,7 @@ export const calendarService = {
     const status = {
       webhook_active: !!webhook,
       webhook_url: webhook ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-calendar-webhook/notify?userId=${session.user.id}` : undefined,
-      last_sync: syncLogs?.find(log => log.status === 'completed')?.created_at || webhook?.last_sync_at,
+      last_sync: syncLogs?.find(log => log.status === 'completed')?.created_at || webhook?.updated_at,
       sync_logs: syncLogs || [],
       recent_errors: recentErrors,
       webhook_expires_at: webhook?.expiration_time,
@@ -1038,7 +1038,6 @@ export const calendarService = {
           expiration_time: expirationDate.toISOString(),
           sync_token: syncToken,
           is_active: true,
-          last_sync_at: new Date().toISOString(),
         })
         .eq('user_id', userId)
         .eq('google_calendar_id', 'primary');
@@ -1577,7 +1576,7 @@ export const calendarService = {
       return {
         webhook_active: webhook.is_active,
         webhook_url: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-calendar-webhook/notify?userId=${userId}`,
-        last_sync: webhook.last_sync_at,
+        last_sync: webhook.updated_at,
         sync_logs: syncLogs || [],
         recent_errors: recentErrors || [],
         expiration_time: webhook.expiration_time,

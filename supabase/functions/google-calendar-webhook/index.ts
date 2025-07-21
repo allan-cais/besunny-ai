@@ -366,10 +366,10 @@ serve(async (req) => {
             sync_range_end: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
           });
         
-        // Update last_sync_at in webhook record
+        // Update webhook record (updated_at will be automatically updated by trigger)
         await supabase
           .from('calendar_webhooks')
-          .update({ last_sync_at: new Date().toISOString() })
+          .update({ is_active: true })
           .eq('user_id', userId);
         
         console.log(`Manual sync completed: ${processed} processed, ${created} created, ${updated} updated`);
@@ -538,8 +538,7 @@ serve(async (req) => {
                 await supabase
                   .from('calendar_webhooks')
                   .update({ 
-                    sync_token: nextSyncToken,
-                    last_sync_at: new Date().toISOString()
+                    sync_token: nextSyncToken
                   })
                   .eq('user_id', userId);
                 
@@ -625,8 +624,7 @@ serve(async (req) => {
             await supabase
               .from('calendar_webhooks')
               .update({ 
-                sync_token: nextSyncToken,
-                last_sync_at: new Date().toISOString()
+                sync_token: nextSyncToken
               })
               .eq('user_id', userId);
             

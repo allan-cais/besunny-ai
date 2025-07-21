@@ -177,7 +177,6 @@ async function renewWebhook(userId: string): Promise<{ success: boolean; error?:
         resource_id: webhookData.resourceId,
         expiration_time: expirationDate.toISOString(),
         is_active: true,
-        last_sync_at: new Date().toISOString(),
       })
       .eq('user_id', userId)
       .eq('google_calendar_id', 'primary')

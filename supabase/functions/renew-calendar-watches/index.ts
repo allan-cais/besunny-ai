@@ -186,7 +186,6 @@ async function setupNewWatch(userId: string, syncToken?: string): Promise<{ succ
           expiration_time: expirationDate.toISOString(),
           sync_token: syncToken,
           is_active: true,
-          last_sync_at: new Date().toISOString(),
         })
         .eq('user_id', userId)
         .eq('google_calendar_id', 'primary');
