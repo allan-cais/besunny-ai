@@ -139,12 +139,8 @@ async function autoScheduleBotsForUser(userId: string) {
         // will all use Attendee API defaults
       };
       
-      // Add transcription settings if language is specified
-      if (config.transcription_language) {
-        botOptions.transcription_settings = {
-          language: config.transcription_language
-        };
-      }
+      // Note: transcription_settings.language is not supported by Attendee API
+      // Language will use API defaults
 
       // Send bot to meeting via Attendee API with basic configuration
       const response = await fetch('https://app.attendee.dev/api/v1/bots', {

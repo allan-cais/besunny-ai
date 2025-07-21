@@ -131,12 +131,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({
         // will all use Attendee API defaults
       };
       
-      // Add transcription settings if language is specified
-      if (configuration?.transcription_language) {
-        botOptions.transcription_settings = {
-          language: configuration.transcription_language
-        };
-      }
+      // Note: transcription_settings.language is not supported by Attendee API
+      // Language will use API defaults
 
       const result = await apiKeyService.sendBotToMeeting(meeting.meeting_url, botOptions);
       

@@ -54,11 +54,17 @@ export const apiKeyService = {
     
     if (!result.ok) {
       console.error('Attendee proxy error:', result);
+      console.error('Full error response data:', JSON.stringify(result.data, null, 2));
+      
       // Try to extract more detailed error information
       if (result.data && result.data.non_field_errors) {
         throw new Error(`Attendee API validation error: ${result.data.non_field_errors.join(', ')}`);
       } else if (result.data && result.data.error) {
         throw new Error(`Attendee API error: ${result.data.error}`);
+      } else if (result.data && typeof result.data === 'object') {
+        // Log all keys in the data object to help debug
+        console.error('Error data keys:', Object.keys(result.data));
+        throw new Error(`Attendee API error: ${JSON.stringify(result.data)}`);
       } else if (result.error) {
         throw new Error(result.error);
       } else {

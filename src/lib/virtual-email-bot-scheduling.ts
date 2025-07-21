@@ -88,9 +88,8 @@ export const virtualEmailBotScheduling: VirtualEmailBotScheduling = {
           to: 'everyone',
           message: 'Hi, I\'m here to transcribe this meeting!',
         },
-        transcription_settings: {
-          language: 'en-US'
-        },
+        // Note: transcription_settings.language is not supported by Attendee API
+        // Language will use API defaults
         auto_join: true,
         recording_enabled: true
       };
