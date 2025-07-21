@@ -309,8 +309,13 @@ const MeetingsPage: React.FC = () => {
       // First, get a sync token by doing initial sync
       console.log('Getting sync token via initial sync...');
       const initialResult = await calendarService.performInitialSync(session.user.id);
-      if (!initialResult.success || !initialResult.sync_token) {
-        setSyncError(`Failed to get sync token: ${initialResult.error}`);
+      if (!initialResult.success) {
+        setSyncError(`Failed to perform initial sync: ${initialResult.error}`);
+        return;
+      }
+
+      if (!initialResult.sync_token) {
+        setSyncError('Failed to get sync token. Incremental sync requires a sync token to work properly. Please try again.');
         return;
       }
 

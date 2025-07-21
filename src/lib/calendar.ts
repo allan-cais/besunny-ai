@@ -761,6 +761,31 @@ export const calendarService = {
           sync_range_end: timeMax,
         });
 
+      // If no nextSyncToken was returned, we need to get one by making a sync token request
+      if (!nextSyncToken) {
+        console.log('No nextSyncToken returned, requesting sync token...');
+        const syncTokenResponse = await fetch(
+          `https://www.googleapis.com/calendar/v3/calendars/primary/events?` +
+          `timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}&singleEvents=true&orderBy=startTime&syncToken=`,
+          {
+            headers: {
+              'Authorization': `Bearer ${credentials.access_token}`,
+            },
+          }
+        );
+        
+        if (syncTokenResponse.ok) {
+          const syncTokenData = await syncTokenResponse.json();
+          const syncToken = syncTokenData.nextSyncToken;
+          console.log('Got sync token from sync token request:', syncToken);
+          return { success: true, sync_token: syncToken };
+        } else {
+          const errorText = await syncTokenResponse.text();
+          console.error('Failed to get sync token:', syncTokenResponse.status, errorText);
+          return { success: false, error: `Failed to get sync token: ${syncTokenResponse.status} - ${errorText}` };
+        }
+      }
+
       return { success: true, sync_token: nextSyncToken };
     } catch (error) {
       console.error('Initial sync error:', error);
@@ -1093,7 +1118,6 @@ export const calendarService = {
       end_time: event.end.dateTime || event.end.date,
       event_status: attendeeStatus,
       bot_status: 'pending',
-      updated_at: new Date().toISOString(),
     };
     
     // Check if meeting already exists
@@ -1108,10 +1132,7 @@ export const calendarService = {
       // Update existing meeting
       const { error: updateError } = await supabase
         .from('meetings')
-        .update({
-          ...meeting,
-          id: existingMeeting.id, // Keep existing ID
-        })
+        .update(meeting)
         .eq('id', existingMeeting.id);
       
       if (updateError) {
