@@ -28,6 +28,7 @@ import BotConfigurationModal from './BotConfigurationModal';
 interface CalendarViewProps {
   meetings: Meeting[];
   onMeetingUpdate: () => void;
+  onMeetingStateUpdate?: (meetingId: string, updates: Partial<Meeting>) => void;
   projects?: Project[];
 }
 
@@ -39,6 +40,7 @@ function stripHtml(html: string): string {
 const CalendarView: React.FC<CalendarViewProps> = ({ 
   meetings, 
   onMeetingUpdate,
+  onMeetingStateUpdate,
   projects = []
 }) => {
   const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
@@ -65,36 +67,38 @@ const CalendarView: React.FC<CalendarViewProps> = ({
   const getBotStatusBadge = (meeting: Meeting) => {
     const { bot_status, bot_deployment_method, auto_scheduled_via_email } = meeting;
     
+    // Don't show any badge if there's no bot (bot_status is null/undefined or 'pending' without auto_scheduled_via_email)
+    if (!bot_status || bot_status === 'pending') {
+      if (auto_scheduled_via_email) {
+        return <Button size="sm" variant="outline" className="font-mono bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100">Auto-Scheduled</Button>;
+      } else {
+        return null; // No badge for meetings without bots
+      }
+    }
+    
     let badge;
     switch (bot_status) {
-      case 'pending':
-        if (auto_scheduled_via_email) {
-          badge = <Badge variant="secondary" className="bg-purple-100 text-purple-800 hover:bg-purple-100 text-xs">Auto-Scheduled</Badge>;
-        } else {
-          badge = <Badge variant="secondary" className="bg-gray-100 text-gray-800 hover:bg-gray-100 text-xs">No Bot</Badge>;
-        }
-        break;
       case 'bot_scheduled':
         if (bot_deployment_method === 'automatic') {
-          badge = <Badge variant="secondary" className="bg-purple-100 text-purple-800 hover:bg-purple-100 text-xs">Auto Bot Scheduled</Badge>;
+          badge = <Button size="sm" variant="outline" className="font-mono bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100">Auto Bot Scheduled</Button>;
         } else {
-          badge = <Badge variant="secondary" className="bg-blue-100 text-blue-800 hover:bg-blue-100 text-xs">Bot Scheduled</Badge>;
+          badge = <Button size="sm" variant="outline" className="font-mono bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100">Bot Scheduled</Button>;
         }
         break;
       case 'bot_joined':
-        badge = <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-100 text-xs">Bot Joined</Badge>;
+        badge = <Button size="sm" variant="outline" className="font-mono bg-green-50 text-green-700 border-green-200 hover:bg-green-100">Bot Joined</Button>;
         break;
       case 'transcribing':
-        badge = <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100 text-xs">Transcribing</Badge>;
+        badge = <Button size="sm" variant="outline" className="font-mono bg-yellow-50 text-yellow-700 border-yellow-200 hover:bg-yellow-100">Transcribing</Button>;
         break;
       case 'completed':
-        badge = <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-100 text-xs">Completed</Badge>;
+        badge = <Button size="sm" variant="outline" className="font-mono bg-green-50 text-green-700 border-green-200 hover:bg-green-100">Completed</Button>;
         break;
       case 'failed':
-        badge = <Badge variant="secondary" className="bg-red-100 text-red-800 hover:bg-red-100 text-xs">Failed</Badge>;
+        badge = <Button size="sm" variant="outline" className="font-mono bg-red-50 text-red-700 border-red-200 hover:bg-red-100">Failed</Button>;
         break;
       default:
-        badge = <Badge variant="secondary" className="hover:bg-secondary text-xs">Unknown</Badge>;
+        badge = <Button size="sm" variant="outline" className="font-mono">Unknown</Button>;
     }
     
     return badge;
@@ -178,6 +182,17 @@ const CalendarView: React.FC<CalendarViewProps> = ({
         bot_configuration: configuration || {},
         polling_enabled: true
       });
+      
+      // Immediately update the local state to show the new bot status
+      if (onMeetingStateUpdate) {
+        onMeetingStateUpdate(meeting.id, {
+          bot_status: 'bot_scheduled',
+          attendee_bot_id: botRecord.id,
+          bot_deployment_method: 'manual',
+          bot_configuration: configuration || {},
+          polling_enabled: true
+        });
+      }
       
       onMeetingUpdate();
     } catch (err: any) {
@@ -282,7 +297,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({
                 </div>
                 <div className="flex flex-col items-end space-y-1 font-mono">
                   {getEventStatusBadge(meeting.event_status)}
-                  {getBotStatusBadge(meeting)}
                   {project && (
                     <Badge variant="outline" className="text-xs mt-1 font-mono">{project.name}</Badge>
                   )}
@@ -295,7 +309,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
                   </div>
                 )}
                 <div className="flex items-center space-x-2 mt-2 font-mono">
-                  {meeting.meeting_url && canSendBot(meeting) && (
+                  {meeting.meeting_url && canSendBot(meeting) ? (
                     <Button
                       size="sm"
                       variant="outline"
@@ -313,6 +327,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({
                       )}
                       <span className="ml-1">Deploy Bot</span>
                     </Button>
+                  ) : (
+                    getBotStatusBadge(meeting)
                   )}
                   {meeting.meeting_url && (
                     <Button

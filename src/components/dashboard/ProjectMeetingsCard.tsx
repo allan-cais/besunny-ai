@@ -151,21 +151,24 @@ const ProjectMeetingsCard: React.FC<ProjectMeetingsCardProps> = ({ projectId }) 
   };
 
   const getBotStatusBadge = (botStatus: Meeting['bot_status']) => {
+    // Don't show any badge if there's no bot (bot_status is null/undefined or 'pending')
+    if (!botStatus || botStatus === 'pending') {
+      return null; // No badge for meetings without bots
+    }
+    
     switch (botStatus) {
-      case 'pending':
-        return <Badge variant="secondary" className="bg-gray-100 text-gray-800">No Bot</Badge>;
       case 'bot_scheduled':
-        return <Badge variant="secondary" className="bg-blue-100 text-blue-800">Bot Scheduled</Badge>;
+        return <Button size="sm" variant="outline" className="font-mono text-xs bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100">Bot Scheduled</Button>;
       case 'bot_joined':
-        return <Badge variant="secondary" className="bg-green-100 text-green-800">Bot Joined</Badge>;
+        return <Button size="sm" variant="outline" className="font-mono text-xs bg-green-50 text-green-700 border-green-200 hover:bg-green-100">Bot Joined</Button>;
       case 'transcribing':
-        return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">Transcribing</Badge>;
+        return <Button size="sm" variant="outline" className="font-mono text-xs bg-yellow-50 text-yellow-700 border-yellow-200 hover:bg-yellow-100">Transcribing</Button>;
       case 'completed':
-        return <Badge variant="secondary" className="bg-green-100 text-green-800">Completed</Badge>;
+        return <Button size="sm" variant="outline" className="font-mono text-xs bg-green-50 text-green-700 border-green-200 hover:bg-green-100">Completed</Button>;
       case 'failed':
-        return <Badge variant="secondary" className="bg-red-100 text-red-800">Failed</Badge>;
+        return <Button size="sm" variant="outline" className="font-mono text-xs bg-red-50 text-red-700 border-red-200 hover:bg-red-100">Failed</Button>;
       default:
-        return <Badge variant="secondary">Unknown</Badge>;
+        return <Button size="sm" variant="outline" className="font-mono text-xs">Unknown</Button>;
     }
   };
 
@@ -258,11 +261,10 @@ const ProjectMeetingsCard: React.FC<ProjectMeetingsCardProps> = ({ projectId }) 
                         <span>{formatDateTime(meeting.start_time)}</span>
                       </div>
                       {getEventStatusBadge(meeting.event_status)}
-                      {getBotStatusBadge(meeting.bot_status)}
                     </div>
                   </div>
                   <div className="flex items-center space-x-2">
-                    {canSendBot(meeting) && (
+                    {canSendBot(meeting) ? (
                       <Button
                         onClick={() => sendBotToMeeting(meeting)}
                         disabled={sendingBot === meeting.id}
@@ -281,6 +283,8 @@ const ProjectMeetingsCard: React.FC<ProjectMeetingsCardProps> = ({ projectId }) 
                           </>
                         )}
                       </Button>
+                    ) : (
+                      getBotStatusBadge(meeting.bot_status)
                     )}
                     {meeting.meeting_url && (
                       <Button

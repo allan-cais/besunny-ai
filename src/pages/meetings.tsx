@@ -293,6 +293,16 @@ const MeetingsPage: React.FC = () => {
     loadMeetings();
   };
 
+  const updateMeetingInState = (meetingId: string, updates: Partial<Meeting>) => {
+    setMeetings(prevMeetings => 
+      prevMeetings.map(meeting => 
+        meeting.id === meetingId 
+          ? { ...meeting, ...updates }
+          : meeting
+      )
+    );
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       weekday: 'short',
@@ -306,13 +316,16 @@ const MeetingsPage: React.FC = () => {
   const getBotStatusBadge = (meeting: Meeting) => {
     const { bot_status, bot_deployment_method, auto_scheduled_via_email } = meeting;
     
+    // Don't show any badge if there's no bot (bot_status is null/undefined or 'pending' without auto_scheduled_via_email)
+    if (!bot_status || bot_status === 'pending') {
+      if (auto_scheduled_via_email) {
+        return <Badge className="border border-purple-500 rounded px-2 py-0.5 text-[10px] text-purple-500 bg-purple-50 dark:bg-purple-950 hover:bg-purple-50 dark:hover:bg-purple-950 uppercase font-mono">Auto-Scheduled</Badge>;
+      } else {
+        return null; // No badge for meetings without bots
+      }
+    }
+    
     switch (bot_status) {
-      case 'pending':
-        if (auto_scheduled_via_email) {
-          return <Badge className="border border-purple-500 rounded px-2 py-0.5 text-[10px] text-purple-500 bg-purple-50 dark:bg-purple-950 hover:bg-purple-50 dark:hover:bg-purple-950 uppercase font-mono">Auto-Scheduled</Badge>;
-        } else {
-          return <Badge className="border border-[#4a5565] dark:border-zinc-700 rounded px-2 py-0.5 text-[10px] text-[#4a5565] dark:text-zinc-200 bg-stone-50 dark:bg-zinc-800 hover:bg-stone-50 dark:hover:bg-zinc-800 uppercase font-mono">No Bot</Badge>;
-        }
       case 'bot_scheduled':
         if (bot_deployment_method === 'automatic') {
           return <Badge className="border border-purple-500 rounded px-2 py-0.5 text-[10px] text-purple-500 bg-purple-50 dark:bg-purple-950 hover:bg-purple-50 dark:hover:bg-purple-950 uppercase font-mono">Auto Bot Scheduled</Badge>;
@@ -416,6 +429,15 @@ const MeetingsPage: React.FC = () => {
       
       // Also update the deployment method, configuration, and enable polling
       await calendarService.updateMeeting(meeting.id, {
+        bot_deployment_method: 'manual',
+        bot_configuration: configuration || {},
+        polling_enabled: true
+      });
+      
+      // Immediately update the local state to show the new bot status
+      updateMeetingInState(meeting.id, {
+        bot_status: 'bot_scheduled',
+        attendee_bot_id: botRecord.id,
         bot_deployment_method: 'manual',
         bot_configuration: configuration || {},
         polling_enabled: true
@@ -571,6 +593,7 @@ const MeetingsPage: React.FC = () => {
         <CalendarView 
           meetings={meetings}
           onMeetingUpdate={handleMeetingUpdate}
+          onMeetingStateUpdate={updateMeetingInState}
         />
       </div>
 
