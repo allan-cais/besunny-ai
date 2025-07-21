@@ -15,7 +15,7 @@ import { supabase } from '@/lib/supabase';
 import BotConfigurationModal from '@/components/dashboard/BotConfigurationModal';
 import { apiKeyService } from '@/lib/api-keys';
 import { attendeePollingService } from '@/lib/attendee-polling';
-import PollingDebugPanel from '@/components/dashboard/PollingDebugPanel';
+// import PollingDebugPanel from '@/components/dashboard/PollingDebugPanel';
 
 const MeetingsPage: React.FC = () => {
   const { user } = useAuth();
@@ -61,7 +61,6 @@ const MeetingsPage: React.FC = () => {
           filter: `user_id=eq.${user?.id}`,
         },
         (payload) => {
-          console.log('Meetings table change:', payload);
           
           if (payload.eventType === 'UPDATE' && payload.new) {
             // Update the specific meeting in the local state
@@ -114,14 +113,6 @@ const MeetingsPage: React.FC = () => {
       setLoading(true);
       // Load upcoming meetings only (current and future)
       const loadedMeetings = await calendarService.getUpcomingMeetings();
-      console.log('Loaded meetings:', loadedMeetings.map(m => ({
-        id: m.id,
-        title: m.title,
-        bot_status: m.bot_status,
-        attendee_bot_id: m.attendee_bot_id,
-        bot_deployment_method: m.bot_deployment_method,
-        auto_scheduled_via_email: m.auto_scheduled_via_email
-      })));
       setMeetings(loadedMeetings);
     } catch (err: any) {
       console.error('Failed to load meetings:', err);
@@ -476,9 +467,9 @@ const MeetingsPage: React.FC = () => {
       />
 
       {/* Polling Debug Panel - Temporary for debugging */}
-      <div className="mt-8">
+      {/* <div className="mt-8">
         <PollingDebugPanel />
-      </div>
+      </div> */}
     </div>
   );
 };

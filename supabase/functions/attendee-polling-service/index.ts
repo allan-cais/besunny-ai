@@ -221,13 +221,34 @@ async function pollMeeting(meetingId: string) {
   if (newBotStatus !== meeting.bot_status) {
     console.log(`🔄 Updating bot status from "${meeting.bot_status}" to "${newBotStatus}"`);
     
-    await supabase
+    const { data: updateData, error: updateError } = await supabase
       .from('meetings')
       .update({ 
         bot_status: newBotStatus,
         updated_at: new Date().toISOString()
       })
-      .eq('id', meetingId);
+      .eq('id', meetingId)
+      .select('id, bot_status, updated_at'); // Select to verify the update
+    
+    if (updateError) {
+      console.error(`❌ Failed to update bot status:`, updateError);
+      throw new Error(`Database update failed: ${updateError.message}`);
+    }
+    
+    console.log(`✅ Bot status update result:`, updateData);
+    
+    // Verify the update by fetching the meeting again
+    const { data: verifyData, error: verifyError } = await supabase
+      .from('meetings')
+      .select('id, bot_status, updated_at')
+      .eq('id', meetingId)
+      .single();
+    
+    if (verifyError) {
+      console.error(`❌ Failed to verify update:`, verifyError);
+    } else {
+      console.log(`🔍 Verification - Current bot status in DB:`, verifyData);
+    }
     
     console.log(`✅ Bot status updated successfully`);
   } else {
@@ -272,7 +293,8 @@ async function pollMeeting(meetingId: string) {
         .update({
           transcript: transcriptResult.transcript,
           transcript_url: transcriptResult.transcript_url,
-          transcript_metadata: transcriptResult.metadata,
+          transcript_metadata: transcriptResult.metadata, // Store metadata with participants info
+          real_time_transcript: transcriptResult.transcript_data, // Store full raw transcript data
           transcript_summary: transcriptResult.summary,
           transcript_duration_seconds: transcriptResult.duration_seconds,
           transcript_retrieved_at: new Date().toISOString(),
@@ -282,6 +304,19 @@ async function pollMeeting(meetingId: string) {
         .eq('id', meetingId);
 
       console.log(`✅ Final transcript saved to database`);
+
+      // Verify the transcript update
+      const { data: transcriptVerifyData, error: transcriptVerifyError } = await supabase
+        .from('meetings')
+        .select('id, bot_status, transcript_retrieved_at, final_transcript_ready')
+        .eq('id', meetingId)
+        .single();
+      
+      if (transcriptVerifyError) {
+        console.error(`❌ Failed to verify transcript update:`, transcriptVerifyError);
+      } else {
+        console.log(`🔍 Transcript verification - Current state in DB:`, transcriptVerifyData);
+      }
 
       return {
         status: 'completed',
@@ -332,32 +367,80 @@ async function retrieveTranscript(botId: string) {
   const transcriptData = await transcriptResponse.json();
   console.log(`📊 Raw transcript API response:`, JSON.stringify(transcriptData, null, 2));
   
-  // Extract transcript text
-  const transcript = transcriptData.transcript || transcriptData.text || '';
+  // Handle the transcript data format from Attendee API
+  // The API returns an array of transcript entries with speaker information
+  let transcript = '';
+  let participants = new Set<string>();
+  let totalDuration = 0;
+  let wordCount = 0;
+  let characterCount = 0;
   
-  // Generate a simple summary (first 200 characters)
-  const summary = transcript.length > 200 ? transcript.substring(0, 200) + '...' : transcript;
+  if (Array.isArray(transcriptData)) {
+    // Process each transcript entry
+    transcriptData.forEach((entry: any) => {
+      if (entry.transcription?.transcript) {
+        const speakerName = entry.speaker_name || 'Unknown Speaker';
+        const timestamp = new Date(entry.timestamp_ms).toISOString();
+        const duration = entry.duration_ms || 0;
+        
+        // Add speaker to participants set
+        participants.add(speakerName);
+        
+        // Add to transcript with speaker and timestamp
+        transcript += `[${timestamp}] ${speakerName}: ${entry.transcription.transcript}\n`;
+        
+        // Update counts
+        const words = entry.transcription.transcript.split(' ').length;
+        wordCount += words;
+        characterCount += entry.transcription.transcript.length;
+        totalDuration += duration;
+      }
+    });
+  } else if (transcriptData.transcript) {
+    // Fallback for simple transcript format
+    transcript = transcriptData.transcript;
+    wordCount = transcript.split(' ').length;
+    characterCount = transcript.length;
+    totalDuration = transcriptData.duration || 0;
+  }
   
-  // Calculate duration if available
-  const duration_seconds = transcriptData.duration || transcriptData.duration_seconds || null;
+  // Generate a summary from the first few entries
+  let summary = '';
+  if (Array.isArray(transcriptData) && transcriptData.length > 0) {
+    const firstEntries = transcriptData.slice(0, 3);
+    summary = firstEntries
+      .map((entry: any) => `${entry.speaker_name || 'Unknown'}: ${entry.transcription?.transcript || ''}`)
+      .join(' ');
+    if (summary.length > 200) {
+      summary = summary.substring(0, 200) + '...';
+    }
+  } else {
+    summary = transcript.length > 200 ? transcript.substring(0, 200) + '...' : transcript;
+  }
 
   const result = {
     transcript,
     transcript_url: `https://app.attendee.dev/bots/${botId}/transcript`,
+    transcript_data: transcriptData, // Store the full raw transcript data
     metadata: {
       bot_id: botId,
       retrieved_at: new Date().toISOString(),
-      word_count: transcript.split(' ').length,
-      character_count: transcript.length
+      word_count: wordCount,
+      character_count: characterCount,
+      duration_seconds: Math.round(totalDuration / 1000),
+      participants: Array.from(participants),
+      entry_count: Array.isArray(transcriptData) ? transcriptData.length : 1
     },
     summary,
-    duration_seconds
+    duration_seconds: Math.round(totalDuration / 1000)
   };
 
   console.log(`✅ Transcript processed:`, {
     word_count: result.metadata.word_count,
     character_count: result.metadata.character_count,
     duration_seconds: result.duration_seconds,
+    participants: result.metadata.participants,
+    entry_count: result.metadata.entry_count,
     summary_length: result.summary.length
   });
 
