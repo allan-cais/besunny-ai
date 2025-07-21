@@ -24,6 +24,8 @@ import { apiKeyService } from '@/lib/api-keys';
 import { calendarService } from '@/lib/calendar';
 import { Project } from '@/lib/supabase';
 import BotConfigurationModal from './BotConfigurationModal';
+import { useAuth } from '@/providers/AuthProvider';
+import { supabase } from '@/lib/supabase';
 
 interface CalendarViewProps {
   meetings: Meeting[];
@@ -43,11 +45,52 @@ const CalendarView: React.FC<CalendarViewProps> = ({
   onMeetingStateUpdate,
   projects = []
 }) => {
+  const { user } = useAuth();
   const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
   const [sendingBot, setSendingBot] = useState<string | null>(null);
   const [updatingProject, setUpdatingProject] = useState<string | null>(null);
   const [configModalOpen, setConfigModalOpen] = useState(false);
   const [meetingForConfig, setMeetingForConfig] = useState<Meeting | null>(null);
+
+  // Set up real-time subscription to meetings table for immediate UI updates
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel('calendar_meetings_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'meetings',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log('Calendar meetings table change:', payload);
+          
+          if (payload.eventType === 'UPDATE' && payload.new) {
+            // Update the specific meeting in the local state
+            const updatedMeeting = payload.new as Meeting;
+            
+            // Update selected meeting if it's the one that changed
+            if (selectedMeeting && selectedMeeting.id === updatedMeeting.id) {
+              setSelectedMeeting(updatedMeeting);
+            }
+            
+            // Update meeting for config if it's the one that changed
+            if (meetingForConfig && meetingForConfig.id === updatedMeeting.id) {
+              setMeetingForConfig(updatedMeeting);
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, selectedMeeting?.id, meetingForConfig?.id]);
 
   const getEventStatusBadge = (eventStatus: Meeting['event_status']) => {
     switch (eventStatus) {

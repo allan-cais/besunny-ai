@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/lib/supabase';
 import BotConfigurationModal from '@/components/dashboard/BotConfigurationModal';
 import { apiKeyService } from '@/lib/api-keys';
+import { attendeePollingService } from '@/lib/attendee-polling';
 
 const MeetingsPage: React.FC = () => {
   const { user } = useAuth();
@@ -49,6 +50,46 @@ const MeetingsPage: React.FC = () => {
   useEffect(() => {
     loadMeetings();
     loadProjects();
+    
+    // Set up real-time subscription to meetings table
+    const channel = supabase
+      .channel('meetings_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'meetings',
+          filter: `user_id=eq.${user?.id}`,
+        },
+        (payload) => {
+          console.log('Meetings table change:', payload);
+          
+          if (payload.eventType === 'UPDATE' && payload.new) {
+            // Update the specific meeting in the local state
+            setMeetings(prevMeetings => 
+              prevMeetings.map(meeting => 
+                meeting.id === payload.new.id 
+                  ? { ...meeting, ...payload.new }
+                  : meeting
+              )
+            );
+          } else if (payload.eventType === 'INSERT' && payload.new) {
+            // Add new meeting to the local state
+            setMeetings(prevMeetings => [...prevMeetings, payload.new]);
+          } else if (payload.eventType === 'DELETE' && payload.old) {
+            // Remove deleted meeting from the local state
+            setMeetings(prevMeetings => 
+              prevMeetings.filter(meeting => meeting.id !== payload.old.id)
+            );
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user?.id]);
 
   const loadProjects = async () => {

@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { useAuth } from '@/providers/AuthProvider';
+import { supabase } from '@/lib/supabase';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -29,6 +31,7 @@ function stripHtml(html: string): string {
 }
 
 const ProjectMeetingsCard: React.FC<ProjectMeetingsCardProps> = ({ projectId }) => {
+  const { user } = useAuth();
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -38,7 +41,53 @@ const ProjectMeetingsCard: React.FC<ProjectMeetingsCardProps> = ({ projectId }) 
 
   useEffect(() => {
     loadMeetings();
-  }, [projectId]);
+    
+    // Set up real-time subscription to meetings table
+    if (user?.id) {
+      const channel = supabase
+        .channel('project_meetings_changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'meetings',
+            filter: projectId 
+              ? `and(user_id.eq.${user.id},project_id.eq.${projectId})`
+              : `user_id=eq.${user.id}`,
+          },
+          (payload) => {
+            console.log('Project meetings table change:', payload);
+            
+            if (payload.eventType === 'UPDATE' && payload.new) {
+              // Update the specific meeting in the local state
+              const updatedMeeting = payload.new as Meeting;
+              setMeetings(prevMeetings => 
+                prevMeetings.map(meeting => 
+                  meeting.id === updatedMeeting.id 
+                    ? { ...meeting, ...updatedMeeting }
+                    : meeting
+                )
+              );
+            } else if (payload.eventType === 'INSERT' && payload.new) {
+              // Add new meeting to the local state
+              const newMeeting = payload.new as Meeting;
+              setMeetings(prevMeetings => [...prevMeetings, newMeeting]);
+            } else if (payload.eventType === 'DELETE' && payload.old) {
+              // Remove deleted meeting from the local state
+              setMeetings(prevMeetings => 
+                prevMeetings.filter(meeting => meeting.id !== payload.old.id)
+              );
+            }
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [projectId, user?.id]);
 
   const loadMeetings = async () => {
     try {
