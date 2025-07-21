@@ -516,6 +516,37 @@ const MeetingsPage: React.FC = () => {
         const activeWebhook = webhooks.find(w => w.is_active);
         if (activeWebhook) {
           setSyncSuccess(`Found active webhook: ${activeWebhook.webhook_id}. Sync token: ${activeWebhook.sync_token ? 'Present' : 'Missing'}`);
+          
+          // Test the webhook manually
+          console.log('Testing webhook manually...');
+          const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-calendar-webhook/notify?userId=${session.user.id}`;
+          console.log('Webhook URL:', webhookUrl);
+          
+          try {
+            const response = await fetch(webhookUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+              },
+              body: JSON.stringify({
+                test: 'manual',
+                timestamp: new Date().toISOString()
+              })
+            });
+            
+            const result = await response.text();
+            console.log('Webhook test response:', response.status, result);
+            
+            if (response.ok) {
+              setSyncSuccess(`Webhook test successful! Status: ${response.status}`);
+            } else {
+              setSyncError(`Webhook test failed: ${response.status} - ${result}`);
+            }
+          } catch (webhookError) {
+            console.error('Webhook test error:', webhookError);
+            setSyncError(`Webhook test error: ${webhookError}`);
+          }
         } else {
           setSyncError('No active webhook found');
         }
