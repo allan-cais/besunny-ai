@@ -1498,7 +1498,7 @@ export const calendarService = {
   // Test Google Calendar API access
   async testCalendarAccess(userId: string): Promise<{ success: boolean; error?: string }> {
     try {
-      console.log('Testing calendar access for user:', userId);
+      // Testing calendar access for user
       
       const credentials = await getGoogleCredentials(userId);
       if (!credentials) {
@@ -1521,7 +1521,7 @@ export const calendarService = {
         return { success: false, error: `Calendar API test failed: ${response.status} - ${errorText}` };
       }
 
-      console.log('Calendar API access test successful');
+              // Calendar API access test successful
       return { success: true };
     } catch (error) {
       console.error('Calendar access test error:', error);
