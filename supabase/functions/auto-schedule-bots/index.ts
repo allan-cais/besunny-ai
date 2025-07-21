@@ -190,7 +190,7 @@ async function autoScheduleBotsForUser(userId: string) {
         throw new Error(`Failed to create bot record: ${botError.message}`);
       }
 
-      // Update meeting with bot UUID and status
+      // Update meeting with bot UUID, status, and enable polling
       await supabase
         .from('meetings')
         .update({
@@ -198,6 +198,7 @@ async function autoScheduleBotsForUser(userId: string) {
           bot_status: 'bot_scheduled',
           bot_deployment_method: meeting.auto_scheduled_via_email ? 'automatic' : 'manual',
           bot_configuration: config,
+          polling_enabled: true,
           updated_at: new Date().toISOString()
         })
         .eq('id', meeting.id);

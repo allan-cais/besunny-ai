@@ -174,6 +174,54 @@ const MeetingsPage: React.FC = () => {
     }
   };
 
+  const enablePollingForAllMeetings = async () => {
+    try {
+      setSyncing(true);
+      setSyncError(null);
+      setSyncSuccess(null);
+      
+      // Get all meetings with bots that might have polling disabled
+      const { data: meetingsWithBots, error } = await supabase
+        .from('meetings')
+        .select('id, title, attendee_bot_id, bot_status, polling_enabled')
+        .not('attendee_bot_id', 'is', null)
+        .in('bot_status', ['bot_scheduled', 'bot_joined', 'transcribing']);
+      
+      if (error) {
+        throw error;
+      }
+      
+      if (meetingsWithBots && meetingsWithBots.length > 0) {
+        // Enable polling for all meetings with bots
+        const { error: updateError } = await supabase
+          .from('meetings')
+          .update({ polling_enabled: true })
+          .in('id', meetingsWithBots.map(m => m.id));
+        
+        if (updateError) {
+          throw updateError;
+        }
+        
+        setSyncSuccess(`Enabled polling for ${meetingsWithBots.length} meetings with bots`);
+      } else {
+        setSyncSuccess('No meetings with scheduled bots found');
+      }
+      
+      // Reload meetings to show updated statuses
+      loadMeetings();
+    } catch (err: any) {
+      console.error('Enable polling error:', err);
+      setSyncError(err.message || 'Failed to enable polling');
+    } finally {
+      setSyncing(false);
+      // Clear success/error messages after 3 seconds
+      setTimeout(() => {
+        setSyncSuccess(null);
+        setSyncError(null);
+      }, 3000);
+    }
+  };
+
   const syncAttendeeBots = async () => {
     try {
       setSyncing(true);
@@ -366,10 +414,11 @@ const MeetingsPage: React.FC = () => {
         botRecord.id // Use the UUID from the bots table
       );
       
-      // Also update the deployment method and configuration
+      // Also update the deployment method, configuration, and enable polling
       await calendarService.updateMeeting(meeting.id, {
         bot_deployment_method: 'manual',
-        bot_configuration: configuration || {}
+        bot_configuration: configuration || {},
+        polling_enabled: true
       });
       
       handleMeetingUpdate();
@@ -465,6 +514,22 @@ const MeetingsPage: React.FC = () => {
                 <RefreshCw className="h-4 w-4" />
               )}
               {syncing ? 'Refreshing...' : 'Refresh Bot Status'}
+            </Button>
+            
+            {/* Enable Polling Button */}
+            <Button
+              onClick={enablePollingForAllMeetings}
+              disabled={syncing}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2 border-[#4a5565] dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[#4a5565] dark:text-zinc-200 hover:bg-stone-50 dark:hover:bg-zinc-800 font-mono"
+            >
+              {syncing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              {syncing ? 'Enabling...' : 'Enable Polling'}
             </Button>
             
             {/* Manual Sync Button */}

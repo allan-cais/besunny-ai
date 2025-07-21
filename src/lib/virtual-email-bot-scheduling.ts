@@ -97,7 +97,7 @@ export const virtualEmailBotScheduling: VirtualEmailBotScheduling = {
       // Send bot to meeting
       const result = await apiKeyService.sendBotToMeeting(meeting.meeting_url, defaultConfig);
       
-      // Update meeting with bot details
+      // Update meeting with bot details and enable polling
       await supabase
         .from('meetings')
         .update({
@@ -105,6 +105,7 @@ export const virtualEmailBotScheduling: VirtualEmailBotScheduling = {
           bot_status: 'bot_scheduled',
           bot_deployment_method: 'automatic',
           bot_configuration: defaultConfig,
+          polling_enabled: true,
           updated_at: new Date().toISOString()
         })
         .eq('id', meetingId);

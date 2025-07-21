@@ -1270,16 +1270,25 @@ export const calendarService = {
     // Check if meeting already exists
     const { data: existingMeeting } = await supabase
       .from('meetings')
-      .select('id, bot_status, attendee_bot_id')
+      .select('id, bot_status, attendee_bot_id, polling_enabled, bot_configuration, bot_deployment_method, auto_scheduled_via_email, virtual_email_attendee')
       .eq('google_calendar_event_id', event.id)
       .eq('user_id', userId)
       .maybeSingle();
     
     if (existingMeeting) {
-      // Update existing meeting
+      // Update existing meeting, but preserve bot-related fields
       const { error: updateError } = await supabase
         .from('meetings')
-        .update(meeting)
+        .update({
+          ...meeting,
+          bot_status: existingMeeting.bot_status,
+          attendee_bot_id: existingMeeting.attendee_bot_id,
+          polling_enabled: existingMeeting.polling_enabled,
+          bot_configuration: existingMeeting.bot_configuration,
+          bot_deployment_method: existingMeeting.bot_deployment_method,
+          auto_scheduled_via_email: existingMeeting.auto_scheduled_via_email,
+          virtual_email_attendee: existingMeeting.virtual_email_attendee,
+        })
         .eq('id', existingMeeting.id);
       
       if (updateError) {
