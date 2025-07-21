@@ -94,23 +94,36 @@ serve(async (req) => {
 });
 
 async function pollAllMeetings() {
+  console.log(`🚀 Starting to poll all meetings`);
+  
   const { data: meetings, error } = await supabase.rpc('get_meetings_for_polling');
-  if (error) throw error;
+  if (error) {
+    console.error(`❌ Error getting meetings for polling:`, error);
+    throw error;
+  }
+
+  console.log(`📋 Found ${meetings?.length || 0} meetings to poll:`, meetings?.map(m => ({ id: m.id, title: m.title, status: m.bot_status })));
 
   const results = [];
   for (const meeting of meetings || []) {
     try {
+      console.log(`🔄 Polling meeting: ${meeting.id} (${meeting.title})`);
       const result = await pollMeeting(meeting.id);
       results.push({ meetingId: meeting.id, ...result });
+      console.log(`✅ Successfully polled meeting: ${meeting.id}`);
     } catch (error) {
+      console.error(`❌ Error polling meeting ${meeting.id}:`, error);
       results.push({ meetingId: meeting.id, error: error.message });
     }
   }
 
+  console.log(`🏁 Completed polling all meetings. Results:`, results);
   return results;
 }
 
 async function pollMeeting(meetingId: string) {
+  console.log(`🔍 Starting to poll meeting: ${meetingId}`);
+  
   // Get meeting details
   const { data: meeting, error: meetingError } = await supabase
     .from('meetings')
@@ -119,10 +132,20 @@ async function pollMeeting(meetingId: string) {
     .single();
 
   if (meetingError || !meeting) {
+    console.error(`❌ Meeting not found: ${meetingId}`, meetingError);
     throw new Error('Meeting not found');
   }
 
+  console.log(`📋 Meeting details:`, {
+    id: meeting.id,
+    title: meeting.title,
+    current_bot_status: meeting.bot_status,
+    attendee_bot_id: meeting.attendee_bot_id,
+    polling_enabled: meeting.polling_enabled
+  });
+
   if (!meeting.attendee_bot_id) {
+    console.error(`❌ No bot ID associated with meeting: ${meetingId}`);
     throw new Error('No bot ID associated with meeting');
   }
 
@@ -134,12 +157,19 @@ async function pollMeeting(meetingId: string) {
     .single();
 
   if (botError || !bot) {
+    console.error(`❌ Bot record not found for bot ID: ${meeting.attendee_bot_id}`, botError);
     throw new Error('Bot record not found');
   }
 
   if (!bot.provider_bot_id) {
+    console.error(`❌ No provider bot ID found in bot record: ${meeting.attendee_bot_id}`);
     throw new Error('No provider bot ID found in bot record');
   }
+
+  console.log(`🤖 Bot details:`, {
+    bot_id: meeting.attendee_bot_id,
+    provider_bot_id: bot.provider_bot_id
+  });
 
   // Update last_polled_at and set next poll time
   await supabase
@@ -150,7 +180,11 @@ async function pollMeeting(meetingId: string) {
     })
     .eq('id', meetingId);
 
+  console.log(`⏰ Updated polling timestamps for meeting: ${meetingId}`);
+
   // Check bot status via Attendee API using the provider_bot_id
+  console.log(`🌐 Making API call to Attendee API for bot: ${bot.provider_bot_id}`);
+  
   const botStatusResponse = await fetch(`https://app.attendee.dev/api/v1/bots/${bot.provider_bot_id}`, {
     method: 'GET',
     headers: {
@@ -159,15 +193,32 @@ async function pollMeeting(meetingId: string) {
     },
   });
 
+  console.log(`📡 API Response status: ${botStatusResponse.status} ${botStatusResponse.statusText}`);
+
   if (!botStatusResponse.ok) {
-    throw new Error(`Failed to get bot status: ${botStatusResponse.status}`);
+    const errorText = await botStatusResponse.text();
+    console.error(`❌ Failed to get bot status:`, {
+      status: botStatusResponse.status,
+      statusText: botStatusResponse.statusText,
+      error: errorText
+    });
+    throw new Error(`Failed to get bot status: ${botStatusResponse.status} - ${errorText}`);
   }
 
   const botData = await botStatusResponse.json();
+  console.log(`📊 Raw API response data:`, JSON.stringify(botData, null, 2));
+
   const newBotStatus = mapAttendeeStatusToBotStatus(botData.status);
+  console.log(`🔄 Status mapping:`, {
+    attendee_status: botData.status,
+    mapped_status: newBotStatus,
+    previous_status: meeting.bot_status
+  });
 
   // Update bot status if it changed
   if (newBotStatus !== meeting.bot_status) {
+    console.log(`🔄 Updating bot status from "${meeting.bot_status}" to "${newBotStatus}"`);
+    
     await supabase
       .from('meetings')
       .update({ 
@@ -175,10 +226,16 @@ async function pollMeeting(meetingId: string) {
         updated_at: new Date().toISOString()
       })
       .eq('id', meetingId);
+    
+    console.log(`✅ Bot status updated successfully`);
+  } else {
+    console.log(`ℹ️ Bot status unchanged: ${newBotStatus}`);
   }
 
   // If bot is transcribing, capture real-time transcript
   if (newBotStatus === 'transcribing' && botData.transcript) {
+    console.log(`📝 Capturing real-time transcript`);
+    
     const realTimeTranscript = {
       timestamp: new Date().toISOString(),
       text: botData.transcript,
@@ -192,12 +249,21 @@ async function pollMeeting(meetingId: string) {
         updated_at: new Date().toISOString()
       })
       .eq('id', meetingId);
+    
+    console.log(`✅ Real-time transcript captured`);
   }
 
   // If meeting is completed, retrieve transcript
   if (newBotStatus === 'completed' && meeting.bot_status !== 'completed') {
+    console.log(`🎯 Meeting completed! Retrieving final transcript`);
+    
     try {
       const transcriptResult = await retrieveTranscript(bot.provider_bot_id);
+      console.log(`📄 Transcript retrieved:`, {
+        word_count: transcriptResult.metadata.word_count,
+        character_count: transcriptResult.metadata.character_count,
+        duration_seconds: transcriptResult.duration_seconds
+      });
       
       await supabase
         .from('meetings')
@@ -213,13 +279,15 @@ async function pollMeeting(meetingId: string) {
         })
         .eq('id', meetingId);
 
+      console.log(`✅ Final transcript saved to database`);
+
       return {
         status: 'completed',
         transcript_retrieved: true,
         transcript_summary: transcriptResult.summary
       };
     } catch (error) {
-      console.error('Failed to retrieve transcript:', error);
+      console.error('❌ Failed to retrieve transcript:', error);
       return {
         status: 'completed',
         transcript_retrieved: false,
@@ -228,6 +296,7 @@ async function pollMeeting(meetingId: string) {
     }
   }
 
+  console.log(`✅ Polling completed for meeting: ${meetingId}`);
   return {
     status: newBotStatus,
     transcript_retrieved: false
@@ -235,6 +304,8 @@ async function pollMeeting(meetingId: string) {
 }
 
 async function retrieveTranscript(botId: string) {
+  console.log(`📄 Retrieving transcript for bot: ${botId}`);
+  
   // Get transcript from Attendee API
   const transcriptResponse = await fetch(`https://app.attendee.dev/api/v1/bots/${botId}/transcript`, {
     method: 'GET',
@@ -244,11 +315,20 @@ async function retrieveTranscript(botId: string) {
     },
   });
 
+  console.log(`📡 Transcript API Response status: ${transcriptResponse.status} ${transcriptResponse.statusText}`);
+
   if (!transcriptResponse.ok) {
-    throw new Error(`Failed to get transcript: ${transcriptResponse.status}`);
+    const errorText = await transcriptResponse.text();
+    console.error(`❌ Failed to get transcript:`, {
+      status: transcriptResponse.status,
+      statusText: transcriptResponse.statusText,
+      error: errorText
+    });
+    throw new Error(`Failed to get transcript: ${transcriptResponse.status} - ${errorText}`);
   }
 
   const transcriptData = await transcriptResponse.json();
+  console.log(`📊 Raw transcript API response:`, JSON.stringify(transcriptData, null, 2));
   
   // Extract transcript text
   const transcript = transcriptData.transcript || transcriptData.text || '';
@@ -259,7 +339,7 @@ async function retrieveTranscript(botId: string) {
   // Calculate duration if available
   const duration_seconds = transcriptData.duration || transcriptData.duration_seconds || null;
 
-  return {
+  const result = {
     transcript,
     transcript_url: `https://app.attendee.dev/bots/${botId}/transcript`,
     metadata: {
@@ -271,6 +351,15 @@ async function retrieveTranscript(botId: string) {
     summary,
     duration_seconds
   };
+
+  console.log(`✅ Transcript processed:`, {
+    word_count: result.metadata.word_count,
+    character_count: result.metadata.character_count,
+    duration_seconds: result.duration_seconds,
+    summary_length: result.summary.length
+  });
+
+  return result;
 }
 
 function mapAttendeeStatusToBotStatus(attendeeStatus: string): string {
