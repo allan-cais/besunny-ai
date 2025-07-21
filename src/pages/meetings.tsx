@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import CalendarView from '@/components/dashboard/CalendarView';
 import { calendarService, Meeting } from '@/lib/calendar';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+
 import { Button } from '@/components/ui/button';
-import { RefreshCw, Loader2, Calendar, Clock, AlertTriangle } from 'lucide-react';
+import { Calendar, Clock, Loader2 } from 'lucide-react';
 import { useAuth } from '@/providers/AuthProvider';
 import PageHeader from '@/components/dashboard/PageHeader';
 import { useAttendeePolling } from '@/hooks/use-attendee-polling';
@@ -21,9 +21,6 @@ const MeetingsPage: React.FC = () => {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [syncing, setSyncing] = useState(false);
-  const [syncError, setSyncError] = useState<string | null>(null);
-  const [syncSuccess, setSyncSuccess] = useState<string | null>(null);
   
   // Modal states
   const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
@@ -67,16 +64,18 @@ const MeetingsPage: React.FC = () => {
           
           if (payload.eventType === 'UPDATE' && payload.new) {
             // Update the specific meeting in the local state
+            const updatedMeeting = payload.new as Meeting;
             setMeetings(prevMeetings => 
               prevMeetings.map(meeting => 
-                meeting.id === payload.new.id 
-                  ? { ...meeting, ...payload.new }
+                meeting.id === updatedMeeting.id 
+                  ? { ...meeting, ...updatedMeeting }
                   : meeting
               )
             );
           } else if (payload.eventType === 'INSERT' && payload.new) {
             // Add new meeting to the local state
-            setMeetings(prevMeetings => [...prevMeetings, payload.new]);
+            const newMeeting = payload.new as Meeting;
+            setMeetings(prevMeetings => [...prevMeetings, newMeeting]);
           } else if (payload.eventType === 'DELETE' && payload.old) {
             // Remove deleted meeting from the local state
             setMeetings(prevMeetings => 
@@ -130,205 +129,7 @@ const MeetingsPage: React.FC = () => {
     }
   };
 
-  const performManualSync = async () => {
-    try {
-      setSyncing(true);
-      setSyncError(null);
-      setSyncSuccess(null);
-      
-      const session = (await supabase.auth.getSession()).data.session;
-      if (!session?.user?.id) {
-        setSyncError('Not authenticated');
-        return;
-      }
 
-      // Perform a manual sync
-      const result = await calendarService.performIncrementalSync(session.user.id, '');
-      
-      if (result.success) {
-        setSyncSuccess('Calendar synced successfully');
-        // Reload meetings to show any updates
-        loadMeetings();
-      } else {
-        setSyncError(result.error || 'Sync failed');
-      }
-    } catch (err: any) {
-      console.error('Manual sync error:', err);
-      setSyncError(err.message || 'Failed to sync calendar');
-    } finally {
-      setSyncing(false);
-      // Clear success/error messages after 3 seconds
-      setTimeout(() => {
-        setSyncSuccess(null);
-        setSyncError(null);
-      }, 3000);
-    }
-  };
-
-  const refreshBotStatuses = async () => {
-    try {
-      setSyncing(true);
-      setSyncError(null);
-      setSyncSuccess(null);
-      
-      // Get meetings that have bots scheduled but might need status updates
-      const { data: meetingsWithBots, error } = await supabase
-        .from('meetings')
-        .select('id, attendee_bot_id, bot_status')
-        .not('attendee_bot_id', 'is', null)
-        .in('bot_status', ['bot_scheduled', 'bot_joined', 'transcribing']);
-      
-      if (error) {
-        throw error;
-      }
-      
-      if (meetingsWithBots && meetingsWithBots.length > 0) {
-        // Trigger polling for these meetings
-        const { error: pollingError } = await supabase.functions.invoke('attendee-polling-service', {
-          body: { 
-            action: 'poll_meetings',
-            meeting_ids: meetingsWithBots.map(m => m.id)
-          }
-        });
-        
-        if (pollingError) {
-          console.warn('Polling error:', pollingError);
-        }
-        
-        setSyncSuccess(`Refreshed status for ${meetingsWithBots.length} meetings with bots`);
-      } else {
-        setSyncSuccess('No meetings with scheduled bots found');
-      }
-      
-      // Reload meetings to show updated statuses
-      loadMeetings();
-    } catch (err: any) {
-      console.error('Refresh bot statuses error:', err);
-      setSyncError(err.message || 'Failed to refresh bot statuses');
-    } finally {
-      setSyncing(false);
-      // Clear success/error messages after 3 seconds
-      setTimeout(() => {
-        setSyncSuccess(null);
-        setSyncError(null);
-      }, 3000);
-    }
-  };
-
-  const enablePollingForAllMeetings = async () => {
-    try {
-      setSyncing(true);
-      setSyncError(null);
-      setSyncSuccess(null);
-      
-      // Get all meetings with bots that might have polling disabled
-      const { data: meetingsWithBots, error } = await supabase
-        .from('meetings')
-        .select('id, title, attendee_bot_id, bot_status, polling_enabled')
-        .not('attendee_bot_id', 'is', null)
-        .in('bot_status', ['bot_scheduled', 'bot_joined', 'transcribing']);
-      
-      if (error) {
-        throw error;
-      }
-      
-      if (meetingsWithBots && meetingsWithBots.length > 0) {
-        // Enable polling for all meetings with bots
-        const { error: updateError } = await supabase
-          .from('meetings')
-          .update({ polling_enabled: true })
-          .in('id', meetingsWithBots.map(m => m.id));
-        
-        if (updateError) {
-          throw updateError;
-        }
-        
-        setSyncSuccess(`Enabled polling for ${meetingsWithBots.length} meetings with bots`);
-      } else {
-        setSyncSuccess('No meetings with scheduled bots found');
-      }
-      
-      // Reload meetings to show updated statuses
-      loadMeetings();
-    } catch (err: any) {
-      console.error('Enable polling error:', err);
-      setSyncError(err.message || 'Failed to enable polling');
-    } finally {
-      setSyncing(false);
-      // Clear success/error messages after 3 seconds
-      setTimeout(() => {
-        setSyncSuccess(null);
-        setSyncError(null);
-      }, 3000);
-    }
-  };
-
-  const syncAttendeeBots = async () => {
-    try {
-      setSyncing(true);
-      setSyncError(null);
-      setSyncSuccess(null);
-      
-      // Instead of trying to list all bots, let's focus on meetings that might have bots
-      // Get all meetings for the current user
-      const { data: userMeetings, error: meetingsError } = await supabase
-        .from('meetings')
-        .select('id, title, meeting_url, bot_status, attendee_bot_id, bot_deployment_method, auto_scheduled_via_email')
-        .eq('user_id', user?.id)
-        .not('meeting_url', 'is', null);
-      
-      if (meetingsError) {
-        throw meetingsError;
-      }
-      
-      console.log('User meetings:', userMeetings);
-      
-      // For now, let's just refresh the status of meetings that already have bot IDs
-      let updatedCount = 0;
-      
-      for (const meeting of userMeetings || []) {
-        if (meeting.attendee_bot_id) {
-          try {
-            // Get bot details to check current status
-            const session = (await supabase.auth.getSession()).data.session;
-            if (!session) continue;
-            
-            const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/attendee-proxy/bot-details?bot_id=${meeting.attendee_bot_id}`, {
-              method: 'GET',
-              headers: {
-                'Authorization': `Bearer ${session.access_token}`,
-                'Content-Type': 'application/json',
-              },
-            });
-            
-            if (response.ok) {
-              const result = await response.json();
-              if (result.ok && result.data) {
-                console.log(`Bot ${meeting.attendee_bot_id} status:`, result.data.status);
-                updatedCount++;
-              }
-            }
-          } catch (error) {
-            console.warn(`Failed to get status for bot ${meeting.attendee_bot_id}:`, error);
-          }
-        }
-      }
-      
-      
-      // Reload meetings to show updated statuses
-      loadMeetings();
-    } catch (err: any) {
-      console.error('Sync Attendee bots error:', err);
-      setSyncError(err.message || 'Failed to sync Attendee bots');
-    } finally {
-      setSyncing(false);
-      // Clear success/error messages after 3 seconds
-      setTimeout(() => {
-        setSyncSuccess(null);
-        setSyncError(null);
-      }, 3000);
-    }
-  };
 
   const handleMeetingUpdate = () => {
     loadMeetings();
@@ -542,91 +343,9 @@ const MeetingsPage: React.FC = () => {
     <div className="px-4 py-8 font-sans h-full flex flex-col">
       {/* Fixed Header */}
       <div className="flex-shrink-0">
-        <div className="flex items-center justify-between mb-6">
+        <div className="mb-6">
           <PageHeader title="MEETINGS" path="~/sunny.ai/meetings" />
-          
-          {/* Action Buttons */}
-          <div className="flex items-center gap-2">
-            {/* Sync Attendee Bots Button */}
-            <Button
-              onClick={syncAttendeeBots}
-              disabled={syncing}
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2 border-[#4a5565] dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[#4a5565] dark:text-zinc-200 hover:bg-stone-50 dark:hover:bg-zinc-800 font-mono"
-            >
-              {syncing ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4" />
-              )}
-              {syncing ? 'Syncing...' : 'Sync Attendee Bots'}
-            </Button>
-            
-            {/* Refresh Bot Statuses Button */}
-            <Button
-              onClick={refreshBotStatuses}
-              disabled={syncing}
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2 border-[#4a5565] dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[#4a5565] dark:text-zinc-200 hover:bg-stone-50 dark:hover:bg-zinc-800 font-mono"
-            >
-              {syncing ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4" />
-              )}
-              {syncing ? 'Refreshing...' : 'Refresh Bot Status'}
-            </Button>
-            
-            {/* Enable Polling Button */}
-            <Button
-              onClick={enablePollingForAllMeetings}
-              disabled={syncing}
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2 border-[#4a5565] dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[#4a5565] dark:text-zinc-200 hover:bg-stone-50 dark:hover:bg-zinc-800 font-mono"
-            >
-              {syncing ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4" />
-              )}
-              {syncing ? 'Enabling...' : 'Enable Polling'}
-            </Button>
-            
-            {/* Manual Sync Button */}
-            <Button
-              onClick={performManualSync}
-              disabled={syncing}
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2 border-[#4a5565] dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[#4a5565] dark:text-zinc-200 hover:bg-stone-50 dark:hover:bg-zinc-800 font-mono"
-            >
-              {syncing ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4" />
-              )}
-              {syncing ? 'Syncing...' : 'Sync Calendar'}
-            </Button>
-          </div>
         </div>
-
-        {/* Sync Status Messages */}
-        {syncError && (
-          <Alert className="mb-4" variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>{syncError}</AlertDescription>
-          </Alert>
-        )}
-
-        {syncSuccess && (
-          <Alert className="mb-4">
-            <Calendar className="h-4 w-4" />
-            <AlertDescription>{syncSuccess}</AlertDescription>
-          </Alert>
-        )}
       </div>
 
             {/* Scrollable Content */}
