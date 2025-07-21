@@ -169,20 +169,18 @@ async function renewWebhook(userId: string): Promise<{ success: boolean; error?:
       throw new Error(`Failed to parse expiration date: ${dateError.message}`);
     }
     
-    // Store webhook info in database
+    // Store webhook info in database - use update to preserve created_at
     const { data: upsertData, error: upsertError } = await supabase
       .from('calendar_webhooks')
-      .upsert({
-        user_id: userId,
-        google_calendar_id: 'primary',
+      .update({
         webhook_id: webhookData.id,
         resource_id: webhookData.resourceId,
         expiration_time: expirationDate.toISOString(),
         is_active: true,
         last_sync_at: new Date().toISOString(),
-      }, {
-        onConflict: 'user_id,google_calendar_id',
       })
+      .eq('user_id', userId)
+      .eq('google_calendar_id', 'primary')
       .select();
     
     if (upsertError) {
