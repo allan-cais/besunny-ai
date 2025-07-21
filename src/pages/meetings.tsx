@@ -389,6 +389,32 @@ const MeetingsPage: React.FC = () => {
     }
   };
 
+  const handleTestCalendarAccess = async () => {
+    try {
+      setLoading(true);
+      setSyncError(null);
+      setSyncSuccess(null);
+      
+      const session = (await supabase.auth.getSession()).data.session;
+      if (!session?.user?.id) {
+        setSyncError('Not authenticated');
+        return;
+      }
+
+      const result = await calendarService.testCalendarAccess(session.user.id);
+      
+      if (result.success) {
+        setSyncSuccess('Calendar access test successful! Your Google credentials are valid.');
+      } else {
+        setSyncError(`Calendar access test failed: ${result.error}`);
+      }
+    } catch (err: any) {
+      setSyncError(err.message || 'Failed to test calendar access');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="px-4 py-8 font-sans h-full flex flex-col">
       <div className="flex items-center justify-between mb-6">
@@ -668,7 +694,7 @@ const MeetingsPage: React.FC = () => {
             </Button>
           </div>
           
-          <div className="grid gap-2 md:grid-cols-2">
+          <div className="grid gap-2 md:grid-cols-3">
             <Button
               onClick={performManualSync}
               disabled={loading}
@@ -687,6 +713,16 @@ const MeetingsPage: React.FC = () => {
             >
               {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wifi className="mr-2 h-4 w-4" />}
               Test Connectivity
+            </Button>
+
+            <Button
+              onClick={handleTestCalendarAccess}
+              disabled={loading}
+              className="w-full"
+              variant="secondary"
+            >
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
+              Test Calendar Access
             </Button>
           </div>
         </CardContent>

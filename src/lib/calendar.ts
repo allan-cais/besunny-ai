@@ -64,6 +64,8 @@ async function getGoogleCredentials(userId: string): Promise<any> {
       throw new Error('Token expired and no refresh token available');
     }
     
+    console.log('Token expired, attempting refresh...');
+    
     // Refresh the token
     const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
@@ -79,10 +81,13 @@ async function getGoogleCredentials(userId: string): Promise<any> {
     });
     
     if (!refreshResponse.ok) {
-      throw new Error('Failed to refresh Google token');
+      const errorText = await refreshResponse.text();
+      console.error('Token refresh failed:', refreshResponse.status, errorText);
+      throw new Error(`Failed to refresh Google token: ${refreshResponse.status} - ${errorText}`);
     }
     
     const refreshData = await refreshResponse.json();
+    console.log('Token refreshed successfully');
     
     // Update the credentials in the database
     const { error: updateError } = await supabase
@@ -94,6 +99,7 @@ async function getGoogleCredentials(userId: string): Promise<any> {
       .eq('user_id', userId);
     
     if (updateError) {
+      console.error('Failed to update token in database:', updateError);
       throw new Error('Failed to update refreshed token');
     }
     
@@ -104,6 +110,7 @@ async function getGoogleCredentials(userId: string): Promise<any> {
     };
   }
   
+  console.log('Token is still valid, expires at:', data.expires_at);
   return data;
 }
 
@@ -766,7 +773,16 @@ export const calendarService = {
     try {
       console.log('Setting up calendar watch for user:', userId);
       
-      const credentials = await getGoogleCredentials(userId);
+      // First, ensure we have valid credentials
+      let credentials;
+      try {
+        credentials = await getGoogleCredentials(userId);
+        console.log('Credentials obtained successfully');
+      } catch (credError) {
+        console.error('Failed to get valid credentials:', credError);
+        return { success: false, error: `Authentication failed: ${credError.message}. Please reconnect your Google account.` };
+      }
+      
       if (!credentials) {
         return { success: false, error: 'No Google credentials found' };
       }
@@ -1108,6 +1124,40 @@ export const calendarService = {
       }
       
       return { action: 'created', meetingId: newMeeting.id };
+    }
+  },
+
+  // Test Google Calendar API access
+  async testCalendarAccess(userId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      console.log('Testing calendar access for user:', userId);
+      
+      const credentials = await getGoogleCredentials(userId);
+      if (!credentials) {
+        return { success: false, error: 'No Google credentials found' };
+      }
+
+      // Test with a simple calendar API call
+      const response = await fetch(
+        'https://www.googleapis.com/calendar/v3/calendars/primary',
+        {
+          headers: {
+            'Authorization': `Bearer ${credentials.access_token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Calendar API test failed:', response.status, errorText);
+        return { success: false, error: `Calendar API test failed: ${response.status} - ${errorText}` };
+      }
+
+      console.log('Calendar API access test successful');
+      return { success: true };
+    } catch (error) {
+      console.error('Calendar access test error:', error);
+      return { success: false, error: error.message || String(error) };
     }
   },
 
