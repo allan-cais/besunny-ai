@@ -306,10 +306,19 @@ const MeetingsPage: React.FC = () => {
         return;
       }
 
-      const result = await calendarService.setupWatch(session.user.id);
+      // First, get a sync token by doing initial sync
+      console.log('Getting sync token via initial sync...');
+      const initialResult = await calendarService.performInitialSync(session.user.id);
+      if (!initialResult.success || !initialResult.sync_token) {
+        setSyncError(`Failed to get sync token: ${initialResult.error}`);
+        return;
+      }
+
+      console.log('Got sync token, setting up watch...');
+      const result = await calendarService.setupWatch(session.user.id, initialResult.sync_token);
       
       if (result.success) {
-        setSyncSuccess(`Watch setup successfully! Webhook ID: ${result.webhook_id}`);
+        setSyncSuccess(`Watch setup successfully! Webhook ID: ${result.webhook_id} with sync token.`);
         await loadWebhookStatus();
       } else {
         setSyncError(`Failed to setup watch: ${result.error}`);
