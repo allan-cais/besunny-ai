@@ -609,7 +609,7 @@ const MeetingsPage: React.FC = () => {
                   onClick={() => window.open(selectedMeeting.meeting_url, '_blank')}
                   className="font-mono text-xs border border-[#4a5565] dark:border-zinc-700 bg-stone-100 dark:bg-zinc-800 text-[#4a5565] dark:text-zinc-50 hover:bg-stone-300 dark:hover:bg-zinc-700"
                 >
-                  Join
+                  Join Meeting
                 </Button>
               )}
             </div>
