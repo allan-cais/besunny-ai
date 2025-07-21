@@ -1,0 +1,45 @@
+name: Attendee Bot Polling Cron
+
+on:
+  schedule:
+    # Run every 2 minutes
+    - cron: '*/2 * * * *'
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  poll-attendee-bots:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run polling cron job
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      run: |
+        # Call the existing edge function
+        curl -X POST "${{ secrets.SUPABASE_URL }}/functions/v1/attendee-polling-cron" \
+          -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+          -H "Content-Type: application/json" \
+          -d '{}'
+
+    - name: Handle failure
+      if: failure()
+      run: |
+        echo "Polling cron job failed"
+        # You could add notification logic here (Slack, email, etc.)
+
+    - name: Handle success
+      if: success()
+      run: |
+        echo "Polling cron job completed successfully" 

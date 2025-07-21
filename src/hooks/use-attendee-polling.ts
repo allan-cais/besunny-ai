@@ -20,7 +20,9 @@ export const useAttendeePolling = (options: UseAttendeePollingOptions = {}) => {
 
     try {
       isPollingRef.current = true;
+      console.log('Starting polling for user:', user.id);
       const results = await attendeePollingService.pollAllMeetings();
+      console.log('Polling results:', results);
       onPollingComplete?.(results);
     } catch (error) {
       console.error('Error polling meetings:', error);

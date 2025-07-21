@@ -141,10 +141,13 @@ async function pollMeeting(meetingId: string) {
     throw new Error('No provider bot ID found in bot record');
   }
 
-  // Update last_polled_at
+  // Update last_polled_at and set next poll time
   await supabase
     .from('meetings')
-    .update({ last_polled_at: new Date().toISOString() })
+    .update({ 
+      last_polled_at: new Date().toISOString(),
+      next_poll_at: new Date(Date.now() + 2 * 60 * 1000).toISOString() // Poll again in 2 minutes
+    })
     .eq('id', meetingId);
 
   // Check bot status via Attendee API using the provider_bot_id
