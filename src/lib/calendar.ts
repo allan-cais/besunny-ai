@@ -380,18 +380,31 @@ export const calendarService = {
     const session = (await supabase.auth.getSession()).data.session;
     if (!session) throw new Error('Not authenticated');
     
-    const url = new URL(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-calendar/meetings`);
+    // Filter for upcoming meetings only (current time and future)
+    const now = new Date();
     
-    const response = await fetch(url.toString(), {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${session.access_token}`,
-      },
-    });
+    const { data: meetings, error } = await supabase
+      .from('meetings')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .gte('start_time', now.toISOString()) // Only meetings starting from now onwards
+      .order('start_time', { ascending: true });
     
-    const result = await response.json();
-    if (!result.ok) throw new Error(result.error || 'Failed to get upcoming meetings');
-    return result.meetings || [];
+    if (error) {
+      console.error('Error fetching upcoming meetings:', error);
+      throw error;
+    }
+    
+    console.log('Fetched upcoming meetings:', meetings?.map(m => ({
+      id: m.id,
+      title: m.title,
+      bot_status: m.bot_status,
+      attendee_bot_id: m.attendee_bot_id,
+      bot_deployment_method: m.bot_deployment_method,
+      auto_scheduled_via_email: m.auto_scheduled_via_email
+    })));
+    
+    return meetings || [];
   },
 
   // Update bot status
