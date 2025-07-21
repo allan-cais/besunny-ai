@@ -1,5 +1,112 @@
 import { supabase } from './supabase';
 
+// Utility functions
+function extractMeetingUrl(event: any): string | null {
+  // Check for Google Meet URL in conferenceData
+  if (event.conferenceData?.entryPoints) {
+    const meetEntry = event.conferenceData.entryPoints.find(
+      (entry: any) => entry.entryPointType === 'video'
+    );
+    if (meetEntry?.uri) {
+      return meetEntry.uri;
+    }
+  }
+  
+  // Check for Google Meet URL in description
+  if (event.description) {
+    const meetRegex = /https:\/\/meet\.google\.com\/[a-z-]+/i;
+    const match = event.description.match(meetRegex);
+    if (match) {
+      return match[0];
+    }
+  }
+  
+  // Check for other video conferencing URLs
+  const videoUrls = [
+    /https:\/\/zoom\.us\/j\/\d+/i,
+    /https:\/\/teams\.microsoft\.com\/l\/meetup-join\/[^\\s]+/i,
+    /https:\/\/meet\.google\.com\/[a-z-]+/i,
+  ];
+  
+  if (event.description) {
+    for (const regex of videoUrls) {
+      const match = event.description.match(regex);
+      if (match) {
+        return match[0];
+      }
+    }
+  }
+  
+  return null;
+}
+
+function stripHtml(html: string): string {
+  if (!html) return '';
+  const tmp = html.replace(/<[^>]+>/g, ' ');
+  return tmp.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, ' ').trim();
+}
+
+// Get Google credentials from database
+async function getGoogleCredentials(userId: string): Promise<any> {
+  const { data, error } = await supabase
+    .from('google_credentials')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle();
+  
+  if (error || !data) {
+    throw new Error('Google credentials not found');
+  }
+  
+  // Check if token is expired and refresh if needed
+  if (new Date(data.expires_at) <= new Date()) {
+    if (!data.refresh_token) {
+      throw new Error('Token expired and no refresh token available');
+    }
+    
+    // Refresh the token
+    const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID!,
+        client_secret: import.meta.env.VITE_GOOGLE_CLIENT_SECRET!,
+        refresh_token: data.refresh_token,
+        grant_type: 'refresh_token',
+      }),
+    });
+    
+    if (!refreshResponse.ok) {
+      throw new Error('Failed to refresh Google token');
+    }
+    
+    const refreshData = await refreshResponse.json();
+    
+    // Update the credentials in the database
+    const { error: updateError } = await supabase
+      .from('google_credentials')
+      .update({
+        access_token: refreshData.access_token,
+        expires_at: new Date(Date.now() + refreshData.expires_in * 1000).toISOString(),
+      })
+      .eq('user_id', userId);
+    
+    if (updateError) {
+      throw new Error('Failed to update refreshed token');
+    }
+    
+    return {
+      ...data,
+      access_token: refreshData.access_token,
+      expires_at: new Date(Date.now() + refreshData.expires_in * 1000).toISOString(),
+    };
+  }
+  
+  return data;
+}
+
 export interface Meeting {
   id: string;
   user_id: string;
@@ -555,5 +662,496 @@ export const calendarService = {
     };
     
     return status;
+  },
+
+  // Enhanced calendar service with watch functionality
+  async initializeCalendarSync(userId: string): Promise<{ success: boolean; error?: string; webhook_id?: string }> {
+    try {
+      console.log('Initializing calendar sync for user:', userId);
+      
+      // Step 1: Get initial sync token
+      const initialSyncResult = await this.performInitialSync(userId);
+      if (!initialSyncResult.success) {
+        return { success: false, error: `Initial sync failed: ${initialSyncResult.error}` };
+      }
+      
+      // Step 2: Set up watch with sync token
+      const watchResult = await this.setupWatch(userId, initialSyncResult.sync_token);
+      if (!watchResult.success) {
+        return { success: false, error: `Watch setup failed: ${watchResult.error}` };
+      }
+      
+      console.log('Calendar sync initialized successfully');
+      return { success: true, webhook_id: watchResult.webhook_id };
+    } catch (error) {
+      console.error('Calendar sync initialization error:', error);
+      return { success: false, error: error.message || String(error) };
+    }
+  },
+
+  // Perform initial sync to get baseline state and sync token
+  async performInitialSync(userId: string): Promise<{ success: boolean; error?: string; sync_token?: string }> {
+    try {
+      console.log('Performing initial sync for user:', userId);
+      
+      const credentials = await getGoogleCredentials(userId);
+      if (!credentials) {
+        return { success: false, error: 'No Google credentials found' };
+      }
+
+      // Get events from the past 7 days to future 60 days
+      const timeMin = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const timeMax = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString();
+      
+      const response = await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/primary/events?` +
+        `timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&orderBy=startTime`,
+        {
+          headers: {
+            'Authorization': `Bearer ${credentials.access_token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Calendar API error: ${response.status} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      const events = data.items || [];
+      const nextSyncToken = data.nextSyncToken;
+      
+      console.log(`Initial sync found ${events.length} events, nextSyncToken: ${nextSyncToken}`);
+
+      // Process events and store in database
+      let processed = 0;
+      let created = 0;
+      let updated = 0;
+
+      for (const event of events) {
+        const result = await this.processCalendarEvent(event, userId, credentials);
+        processed++;
+        
+        if (result.action === 'created') {
+          created++;
+        } else if (result.action === 'updated') {
+          updated++;
+        }
+      }
+
+      // Log the initial sync
+      await supabase
+        .from('calendar_sync_logs')
+        .insert({
+          user_id: userId,
+          sync_type: 'initial',
+          status: 'completed',
+          events_processed: processed,
+          meetings_created: created,
+          meetings_updated: updated,
+          sync_range_start: timeMin,
+          sync_range_end: timeMax,
+        });
+
+      return { success: true, sync_token: nextSyncToken };
+    } catch (error) {
+      console.error('Initial sync error:', error);
+      return { success: false, error: error.message || String(error) };
+    }
+  },
+
+  // Set up Google Calendar watch with sync token
+  async setupWatch(userId: string, syncToken?: string): Promise<{ success: boolean; error?: string; webhook_id?: string }> {
+    try {
+      console.log('Setting up calendar watch for user:', userId);
+      
+      const credentials = await getGoogleCredentials(userId);
+      if (!credentials) {
+        return { success: false, error: 'No Google credentials found' };
+      }
+
+      const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-calendar-webhook/notify?userId=${userId}`;
+      const channelId = `calendar-watch-${userId}-${Date.now()}`;
+      const expiration = Date.now() + (7 * 24 * 60 * 60 * 1000); // 7 days
+
+      const watchRequest: any = {
+        id: channelId,
+        type: 'web_hook',
+        address: webhookUrl,
+        params: {
+          userId: userId,
+        },
+        expiration: expiration,
+      };
+
+      // Add sync token if available for incremental sync
+      if (syncToken) {
+        watchRequest.params.syncToken = syncToken;
+      }
+
+      const response = await fetch(
+        'https://www.googleapis.com/calendar/v3/calendars/primary/events/watch',
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${credentials.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(watchRequest),
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Watch setup failed: ${response.status} - ${errorText}`);
+      }
+
+      const watchData = await response.json();
+      console.log('Watch setup response:', watchData);
+
+      // Store watch info in database
+      const { error: dbError } = await supabase
+        .from('calendar_webhooks')
+        .upsert({
+          user_id: userId,
+          google_calendar_id: 'primary',
+          webhook_id: watchData.id,
+          resource_id: watchData.resourceId,
+          expiration_time: new Date(watchData.expiration).toISOString(),
+          sync_token: syncToken,
+          is_active: true,
+          last_sync_at: new Date().toISOString(),
+        }, {
+          onConflict: 'user_id,google_calendar_id',
+        });
+
+      if (dbError) {
+        console.error('Database error storing watch:', dbError);
+        return { success: false, error: `Database error: ${dbError.message}` };
+      }
+
+      console.log('Calendar watch setup successfully');
+      return { success: true, webhook_id: watchData.id };
+    } catch (error) {
+      console.error('Watch setup error:', error);
+      return { success: false, error: error.message || String(error) };
+    }
+  },
+
+  // Renew existing watch before expiration
+  async renewWatch(userId: string): Promise<{ success: boolean; error?: string; webhook_id?: string }> {
+    try {
+      console.log('Renewing calendar watch for user:', userId);
+      
+      // Get current watch info
+      const { data: webhook, error: fetchError } = await supabase
+        .from('calendar_webhooks')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('google_calendar_id', 'primary')
+        .eq('is_active', true)
+        .single();
+
+      if (fetchError || !webhook) {
+        console.log('No active watch found, setting up new one');
+        return await this.setupWatch(userId);
+      }
+
+      // Check if renewal is needed (renew if expires within 24 hours)
+      const expirationTime = new Date(webhook.expiration_time).getTime();
+      const now = Date.now();
+      const renewalThreshold = 24 * 60 * 60 * 1000; // 24 hours
+
+      if (expirationTime - now > renewalThreshold) {
+        console.log('Watch not expiring soon, no renewal needed');
+        return { success: true, webhook_id: webhook.webhook_id };
+      }
+
+      // Stop existing watch
+      await this.stopWatch(userId, webhook.webhook_id);
+
+      // Set up new watch with current sync token
+      return await this.setupWatch(userId, webhook.sync_token);
+    } catch (error) {
+      console.error('Watch renewal error:', error);
+      return { success: false, error: error.message || String(error) };
+    }
+  },
+
+  // Stop existing watch
+  async stopWatch(userId: string, webhookId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      console.log('Stopping calendar watch:', webhookId);
+      
+      const credentials = await getGoogleCredentials(userId);
+      if (!credentials) {
+        return { success: false, error: 'No Google credentials found' };
+      }
+
+      const response = await fetch(
+        'https://www.googleapis.com/calendar/v3/channels/stop',
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${credentials.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            id: webhookId,
+            resourceId: webhookId, // Use webhookId as resourceId for stop
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.warn(`Failed to stop watch: ${response.status} - ${errorText}`);
+        // Don't throw error, just log warning
+      }
+
+      // Mark as inactive in database
+      await supabase
+        .from('calendar_webhooks')
+        .update({ is_active: false })
+        .eq('user_id', userId)
+        .eq('webhook_id', webhookId);
+
+      console.log('Calendar watch stopped successfully');
+      return { success: true };
+    } catch (error) {
+      console.error('Stop watch error:', error);
+      return { success: false, error: error.message || String(error) };
+    }
+  },
+
+  // Perform incremental sync using sync token
+  async performIncrementalSync(userId: string, syncToken: string): Promise<{ success: boolean; error?: string; next_sync_token?: string }> {
+    try {
+      console.log('Performing incremental sync for user:', userId);
+      
+      const credentials = await getGoogleCredentials(userId);
+      if (!credentials) {
+        return { success: false, error: 'No Google credentials found' };
+      }
+
+      const response = await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/primary/events?` +
+        `syncToken=${syncToken}&singleEvents=true&orderBy=startTime`,
+        {
+          headers: {
+            'Authorization': `Bearer ${credentials.access_token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        
+        // If sync token is invalid, we need to do a full sync
+        if (response.status === 410) {
+          console.log('Sync token invalid, performing full sync');
+          const fullSyncResult = await this.performInitialSync(userId);
+          if (fullSyncResult.success) {
+            // Update webhook with new sync token
+            await supabase
+              .from('calendar_webhooks')
+              .update({ sync_token: fullSyncResult.sync_token })
+              .eq('user_id', userId);
+          }
+          return fullSyncResult;
+        }
+        
+        throw new Error(`Calendar API error: ${response.status} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      const events = data.items || [];
+      const nextSyncToken = data.nextSyncToken;
+      
+      console.log(`Incremental sync found ${events.length} events, nextSyncToken: ${nextSyncToken}`);
+
+      // Process events
+      let processed = 0;
+      let created = 0;
+      let updated = 0;
+      let deleted = 0;
+
+      for (const event of events) {
+        const result = await this.processCalendarEvent(event, userId, credentials);
+        processed++;
+        
+        if (result.action === 'created') {
+          created++;
+        } else if (result.action === 'updated') {
+          updated++;
+        } else if (result.action === 'deleted') {
+          deleted++;
+        }
+      }
+
+      // Log the incremental sync
+      await supabase
+        .from('calendar_sync_logs')
+        .insert({
+          user_id: userId,
+          sync_type: 'incremental',
+          status: 'completed',
+          events_processed: processed,
+          meetings_created: created,
+          meetings_updated: updated,
+          meetings_deleted: deleted,
+        });
+
+      // Update sync token in database
+      await supabase
+        .from('calendar_webhooks')
+        .update({ 
+          sync_token: nextSyncToken,
+          last_sync_at: new Date().toISOString()
+        })
+        .eq('user_id', userId);
+
+      return { success: true, next_sync_token: nextSyncToken };
+    } catch (error) {
+      console.error('Incremental sync error:', error);
+      return { success: false, error: error.message || String(error) };
+    }
+  },
+
+  // Process individual calendar event
+  async processCalendarEvent(event: any, userId: string, credentials: any): Promise<{ action: string; meetingId?: string }> {
+    const meetingUrl = extractMeetingUrl(event);
+    
+    if (!meetingUrl) {
+      return { action: 'skipped_no_url' };
+    }
+    
+    // Determine attendee status
+    let attendeeStatus = 'needsAction';
+    if (Array.isArray(event.attendees)) {
+      const selfAttendee = event.attendees.find((a: any) => a.self);
+      if (selfAttendee && selfAttendee.responseStatus) {
+        attendeeStatus = selfAttendee.responseStatus;
+      }
+    } else if (event.creator && event.creator.email === credentials.google_email) {
+      attendeeStatus = 'accepted';
+    }
+    
+    const meeting = {
+      user_id: userId,
+      google_calendar_event_id: event.id,
+      title: event.summary || 'Untitled Meeting',
+      description: stripHtml(event.description || ''),
+      meeting_url: meetingUrl,
+      start_time: event.start.dateTime || event.start.date,
+      end_time: event.end.dateTime || event.end.date,
+      event_status: attendeeStatus,
+      bot_status: 'pending',
+      updated_at: new Date().toISOString(),
+    };
+    
+    // Check if meeting already exists
+    const { data: existingMeeting } = await supabase
+      .from('meetings')
+      .select('id, bot_status, attendee_bot_id')
+      .eq('google_calendar_event_id', event.id)
+      .eq('user_id', userId)
+      .maybeSingle();
+    
+    if (existingMeeting) {
+      // Update existing meeting
+      const { error: updateError } = await supabase
+        .from('meetings')
+        .update({
+          ...meeting,
+          id: existingMeeting.id, // Keep existing ID
+        })
+        .eq('id', existingMeeting.id);
+      
+      if (updateError) {
+        console.error('Error updating meeting:', updateError);
+        return { action: 'error_update', meetingId: existingMeeting.id };
+      }
+      
+      return { action: 'updated', meetingId: existingMeeting.id };
+    } else {
+      // Create new meeting
+      const { data: newMeeting, error: insertError } = await supabase
+        .from('meetings')
+        .insert(meeting)
+        .select('id')
+        .single();
+      
+      if (insertError) {
+        console.error('Error creating meeting:', insertError);
+        return { action: 'error_create' };
+      }
+      
+      return { action: 'created', meetingId: newMeeting.id };
+    }
+  },
+
+  // Get watch status and sync information
+  async getWatchStatus(userId: string): Promise<{
+    webhook_active: boolean;
+    webhook_url?: string;
+    last_sync?: string;
+    sync_logs: any[];
+    recent_errors: any[];
+    expiration_time?: string;
+    sync_token?: string;
+  }> {
+    try {
+      const { data: webhook, error: webhookError } = await supabase
+        .from('calendar_webhooks')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('google_calendar_id', 'primary')
+        .eq('is_active', true)
+        .single();
+
+      if (webhookError || !webhook) {
+        return {
+          webhook_active: false,
+          sync_logs: [],
+          recent_errors: [],
+        };
+      }
+
+      // Get recent sync logs
+      const { data: syncLogs } = await supabase
+        .from('calendar_sync_logs')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      // Get recent errors
+      const { data: recentErrors } = await supabase
+        .from('calendar_sync_logs')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('status', 'failed')
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      return {
+        webhook_active: webhook.is_active,
+        webhook_url: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-calendar-webhook/notify?userId=${userId}`,
+        last_sync: webhook.last_sync_at,
+        sync_logs: syncLogs || [],
+        recent_errors: recentErrors || [],
+        expiration_time: webhook.expiration_time,
+        sync_token: webhook.sync_token,
+      };
+    } catch (error) {
+      console.error('Error getting watch status:', error);
+      return {
+        webhook_active: false,
+        sync_logs: [],
+        recent_errors: [],
+      };
+    }
   },
 }; 

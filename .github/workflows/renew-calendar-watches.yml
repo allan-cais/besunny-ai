@@ -1,0 +1,16 @@
+name: Renew Calendar Watches
+on:
+  schedule:
+    - cron: '0 */12 * * *'  # Every 12 hours
+  workflow_dispatch:        # Manual trigger
+
+jobs:
+  renew-watches:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Renew Google Calendar Watches
+        run: |
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Content-Type: application/json" \
+            https://${{ secrets.SUPABASE_URL }}/functions/v1/renew-calendar-watches 

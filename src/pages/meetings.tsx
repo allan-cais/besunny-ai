@@ -3,16 +3,16 @@ import CalendarView from '@/components/dashboard/CalendarView';
 import { calendarService, Meeting } from '@/lib/calendar';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, AlertCircle, RefreshCw, Loader2, Wifi, WifiOff, Calendar } from 'lucide-react';
-import { useSupabase } from '@/hooks/use-supabase';
+import { CheckCircle, AlertCircle, RefreshCw, Loader2, Wifi, WifiOff, Calendar, Clock, AlertTriangle, Play, Eye, Square, Download } from 'lucide-react';
 import { useAuth } from '@/providers/AuthProvider';
 import PageHeader from '@/components/dashboard/PageHeader';
 import { useAttendeePolling } from '@/hooks/use-attendee-polling';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { supabase } from '@/lib/supabase';
 
 const MeetingsPage: React.FC = () => {
   const { user } = useAuth();
-  const { getProjectsForUser } = useSupabase();
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -61,8 +61,14 @@ const MeetingsPage: React.FC = () => {
     if (!user?.id) return;
     
     try {
-      const userProjects = await getProjectsForUser(user.id);
-      setProjects(userProjects);
+      const userProjects = await supabase
+        .from('projects')
+        .select('*')
+        .eq('user_id', user.id);
+
+      if (userProjects.data) {
+        setProjects(userProjects.data);
+      }
     } catch (error) {
       console.error('Error loading user projects:', error);
     }
@@ -261,6 +267,128 @@ const MeetingsPage: React.FC = () => {
     return expiresAt <= oneDayFromNow;
   };
 
+  const handleInitializeSync = async () => {
+    try {
+      setLoading(true);
+      setSyncError(null);
+      setSyncSuccess(null);
+      
+      const session = (await supabase.auth.getSession()).data.session;
+      if (!session?.user?.id) {
+        setSyncError('Not authenticated');
+        return;
+      }
+
+      const result = await calendarService.initializeCalendarSync(session.user.id);
+      
+      if (result.success) {
+        setSyncSuccess(`Calendar sync initialized successfully! Webhook ID: ${result.webhook_id}`);
+        await loadWebhookStatus();
+      } else {
+        setSyncError(`Failed to initialize sync: ${result.error}`);
+      }
+    } catch (err: any) {
+      setSyncError(err.message || 'Failed to initialize calendar sync');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSetupWatch = async () => {
+    try {
+      setLoading(true);
+      setSyncError(null);
+      setSyncSuccess(null);
+      
+      const session = (await supabase.auth.getSession()).data.session;
+      if (!session?.user?.id) {
+        setSyncError('Not authenticated');
+        return;
+      }
+
+      const result = await calendarService.setupWatch(session.user.id);
+      
+      if (result.success) {
+        setSyncSuccess(`Watch setup successfully! Webhook ID: ${result.webhook_id}`);
+        await loadWebhookStatus();
+      } else {
+        setSyncError(`Failed to setup watch: ${result.error}`);
+      }
+    } catch (err: any) {
+      setSyncError(err.message || 'Failed to setup watch');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRenewWatch = async () => {
+    try {
+      setLoading(true);
+      setSyncError(null);
+      setSyncSuccess(null);
+      
+      const session = (await supabase.auth.getSession()).data.session;
+      if (!session?.user?.id) {
+        setSyncError('Not authenticated');
+        return;
+      }
+
+      const result = await calendarService.renewWatch(session.user.id);
+      
+      if (result.success) {
+        setSyncSuccess(`Watch renewed successfully! Webhook ID: ${result.webhook_id}`);
+        await loadWebhookStatus();
+      } else {
+        setSyncError(`Failed to renew watch: ${result.error}`);
+      }
+    } catch (err: any) {
+      setSyncError(err.message || 'Failed to renew watch');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleStopWatch = async () => {
+    try {
+      setLoading(true);
+      setSyncError(null);
+      setSyncSuccess(null);
+      
+      const session = (await supabase.auth.getSession()).data.session;
+      if (!session?.user?.id) {
+        setSyncError('Not authenticated');
+        return;
+      }
+
+      // Get current webhook ID
+      const { data: webhook } = await supabase
+        .from('calendar_webhooks')
+        .select('webhook_id')
+        .eq('user_id', session.user.id)
+        .eq('google_calendar_id', 'primary')
+        .eq('is_active', true)
+        .single();
+
+      if (!webhook?.webhook_id) {
+        setSyncError('No active watch found');
+        return;
+      }
+
+      const result = await calendarService.stopWatch(session.user.id, webhook.webhook_id);
+      
+      if (result.success) {
+        setSyncSuccess('Watch stopped successfully');
+        await loadWebhookStatus();
+      } else {
+        setSyncError(`Failed to stop watch: ${result.error}`);
+      }
+    } catch (err: any) {
+      setSyncError(err.message || 'Failed to stop watch');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="px-4 py-8 font-sans h-full flex flex-col">
       <div className="flex items-center justify-between mb-6">
@@ -412,6 +540,158 @@ const MeetingsPage: React.FC = () => {
         </Alert>
       )}
 
+      {/* Stats Cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Meetings</CardTitle>
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{meetings.length}</div>
+            <p className="text-xs text-muted-foreground">
+              {meetings.filter(m => m.meeting_url).length} with video URLs
+            </p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Sync Status</CardTitle>
+            <RefreshCw className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {webhookStatus?.webhook_active ? (
+                <span className="text-green-600">Active</span>
+              ) : (
+                <span className="text-red-600">Inactive</span>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {webhookStatus?.last_sync ? `Last sync: ${new Date(webhookStatus.last_sync).toLocaleString()}` : 'Never synced'}
+            </p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Watch Expiration</CardTitle>
+            <Clock className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {webhookStatus?.webhook_expires_at ? (
+                <span className={new Date(webhookStatus.webhook_expires_at) < new Date(Date.now() + 24 * 60 * 60 * 1000) ? 'text-red-600' : 'text-green-600'}>
+                  {new Date(webhookStatus.webhook_expires_at).toLocaleDateString()}
+                </span>
+              ) : (
+                <span className="text-gray-500">N/A</span>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {webhookStatus?.webhook_expires_at ? 
+                `${Math.ceil((new Date(webhookStatus.webhook_expires_at).getTime() - Date.now()) / (24 * 60 * 60 * 1000))} days left` : 
+                'No active watch'
+              }
+            </p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Recent Errors</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">
+              {webhookStatus?.sync_logs?.filter((log: any) => log.status === 'failed').length || 0}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {webhookStatus?.sync_logs?.filter((log: any) => log.status === 'failed').length ? 'Sync errors detected' : 'No recent errors'}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Enhanced Sync Controls */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <RefreshCw className="h-5 w-5" />
+            Calendar Sync Controls
+          </CardTitle>
+          <CardDescription>
+            Manage Google Calendar real-time sync and watch functionality
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-4">
+            <Button
+              onClick={handleInitializeSync}
+              disabled={loading}
+              className="w-full"
+              variant="default"
+            >
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
+              Initialize Sync
+            </Button>
+            
+            <Button
+              onClick={handleSetupWatch}
+              disabled={loading}
+              className="w-full"
+              variant="outline"
+            >
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Eye className="mr-2 h-4 w-4" />}
+              Setup Watch
+            </Button>
+            
+            <Button
+              onClick={handleRenewWatch}
+              disabled={loading}
+              className="w-full"
+              variant="outline"
+            >
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+              Renew Watch
+            </Button>
+            
+            <Button
+              onClick={handleStopWatch}
+              disabled={loading}
+              className="w-full"
+              variant="destructive"
+            >
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Square className="mr-2 h-4 w-4" />}
+              Stop Watch
+            </Button>
+          </div>
+          
+          <div className="grid gap-2 md:grid-cols-2">
+            <Button
+              onClick={performManualSync}
+              disabled={loading}
+              className="w-full"
+              variant="secondary"
+            >
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+              Manual Sync
+            </Button>
+            
+            <Button
+              onClick={testWebhookConnectivity}
+              disabled={loading}
+              className="w-full"
+              variant="secondary"
+            >
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wifi className="mr-2 h-4 w-4" />}
+              Test Connectivity
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Webhook Status Details */}
       {webhookStatus && (
         <div className="mb-4 p-3 bg-gray-50 rounded-lg border">
@@ -477,6 +757,84 @@ const MeetingsPage: React.FC = () => {
           projects={projects}
         />
       </div>
+
+      {/* Enhanced Sync Controls */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <RefreshCw className="h-5 w-5" />
+            Calendar Sync Controls
+          </CardTitle>
+          <CardDescription>
+            Manage Google Calendar real-time sync and watch functionality
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-4">
+            <Button
+              onClick={handleInitializeSync}
+              disabled={loading}
+              className="w-full"
+              variant="default"
+            >
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
+              Initialize Sync
+            </Button>
+            
+            <Button
+              onClick={handleSetupWatch}
+              disabled={loading}
+              className="w-full"
+              variant="outline"
+            >
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Eye className="mr-2 h-4 w-4" />}
+              Setup Watch
+            </Button>
+            
+            <Button
+              onClick={handleRenewWatch}
+              disabled={loading}
+              className="w-full"
+              variant="outline"
+            >
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+              Renew Watch
+            </Button>
+            
+            <Button
+              onClick={handleStopWatch}
+              disabled={loading}
+              className="w-full"
+              variant="destructive"
+            >
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Square className="mr-2 h-4 w-4" />}
+              Stop Watch
+            </Button>
+          </div>
+          
+          <div className="grid gap-2 md:grid-cols-2">
+            <Button
+              onClick={performManualSync}
+              disabled={loading}
+              className="w-full"
+              variant="secondary"
+            >
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+              Manual Sync
+            </Button>
+            
+            <Button
+              onClick={testWebhookConnectivity}
+              disabled={loading}
+              className="w-full"
+              variant="secondary"
+            >
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wifi className="mr-2 h-4 w-4" />}
+              Test Connectivity
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
