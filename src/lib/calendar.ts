@@ -766,7 +766,7 @@ export const calendarService = {
         console.log('No nextSyncToken returned, requesting sync token...');
         const syncTokenResponse = await fetch(
           `https://www.googleapis.com/calendar/v3/calendars/primary/events?` +
-          `timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}&singleEvents=true&orderBy=startTime&syncToken=`,
+          `singleEvents=true&orderBy=startTime&syncToken=`,
           {
             headers: {
               'Authorization': `Bearer ${credentials.access_token}`,
