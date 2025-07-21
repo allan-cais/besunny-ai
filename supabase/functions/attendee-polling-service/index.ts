@@ -287,7 +287,7 @@ async function pollMeeting(meetingId: string) {
   }
 
   // If meeting is completed, retrieve transcript
-  if (newBotStatus === 'completed' && meeting.bot_status !== 'completed') {
+  if (newBotStatus === 'completed' && (meeting.bot_status !== 'completed' || !meeting.transcript_retrieved_at)) {
     console.log(`🎯 Meeting completed! Retrieving final transcript`);
     
     try {

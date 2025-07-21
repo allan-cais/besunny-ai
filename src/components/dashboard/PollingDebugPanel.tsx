@@ -119,6 +119,10 @@ const PollingDebugPanel: React.FC = () => {
         return <Badge className="bg-green-100 text-green-800">Ready</Badge>;
       case 'waiting':
         return <Badge className="bg-yellow-100 text-yellow-800">Waiting</Badge>;
+      case 'completed_with_transcript':
+        return <Badge className="bg-purple-100 text-purple-800">Completed</Badge>;
+      case 'completed_needs_transcript':
+        return <Badge className="bg-orange-100 text-orange-800">Needs Transcript</Badge>;
       default:
         return <Badge className="bg-gray-100 text-gray-800">{status}</Badge>;
     }
