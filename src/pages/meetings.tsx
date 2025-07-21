@@ -450,31 +450,19 @@ const MeetingsPage: React.FC = () => {
       console.log('Current webhook status:', webhook);
 
       if (!webhook.sync_token) {
-        // If no sync token, we need to do an initial sync first
-        console.log('No sync token found, performing initial sync...');
-        const initialResult = await calendarService.performInitialSync(session.user.id);
-        if (initialResult.success && initialResult.sync_token) {
-          // Now try incremental sync with the new sync token
-          const result = await calendarService.performIncrementalSync(session.user.id, initialResult.sync_token);
-          if (result.success) {
-            setSyncSuccess(`Force sync completed! Initial sync + incremental sync processed.`);
-            await loadWebhookStatus();
-          } else {
-            setSyncError(`Force sync failed: ${result.error}`);
-          }
-        } else {
-          setSyncError(`Initial sync failed: ${initialResult.error}`);
-        }
+        // No sync token means the watch is not properly set up
+        setSyncError('No sync token found. The watch is not properly configured. Please click "Setup Watch" to establish a proper watch with sync token.');
+        return;
+      }
+
+      // We have a sync token, do incremental sync
+      console.log('Found sync token, performing incremental sync...');
+      const result = await calendarService.performIncrementalSync(session.user.id, webhook.sync_token);
+      if (result.success) {
+        setSyncSuccess(`Force sync completed! Processed events with new sync token.`);
+        await loadWebhookStatus();
       } else {
-        // We have a sync token, do incremental sync
-        console.log('Found sync token, performing incremental sync...');
-        const result = await calendarService.performIncrementalSync(session.user.id, webhook.sync_token);
-        if (result.success) {
-          setSyncSuccess(`Force sync completed! Processed events with new sync token.`);
-          await loadWebhookStatus();
-        } else {
-          setSyncError(`Force sync failed: ${result.error}`);
-        }
+        setSyncError(`Force sync failed: ${result.error}`);
       }
     } catch (err: any) {
       console.error('Force sync error:', err);
