@@ -180,116 +180,51 @@ const MeetingsPage: React.FC = () => {
       setSyncError(null);
       setSyncSuccess(null);
       
-      // Call Attendee API through our edge function to get all scheduled bots
-      const session = (await supabase.auth.getSession()).data.session;
-      if (!session) {
-        throw new Error('Not authenticated');
-      }
-      
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/attendee-proxy/list-bots`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Attendee API error: ${response.status}`);
-      }
-      
-      const result = await response.json();
-      if (!result.ok) {
-        throw new Error(result.error || 'Failed to get bots from Attendee API');
-      }
-      
-      const scheduledBots = result.data || [];
-      
-      console.log('Attendee API bots:', scheduledBots);
-      
+      // Instead of trying to list all bots, let's focus on meetings that might have bots
       // Get all meetings for the current user
       const { data: userMeetings, error: meetingsError } = await supabase
         .from('meetings')
-        .select('id, title, meeting_url, bot_status, attendee_bot_id')
-        .eq('user_id', user?.id);
+        .select('id, title, meeting_url, bot_status, attendee_bot_id, bot_deployment_method, auto_scheduled_via_email')
+        .eq('user_id', user?.id)
+        .not('meeting_url', 'is', null);
       
       if (meetingsError) {
         throw meetingsError;
       }
       
-      let matchedCount = 0;
+      console.log('User meetings:', userMeetings);
+      
+      // For now, let's just refresh the status of meetings that already have bot IDs
       let updatedCount = 0;
       
-      // Match bots to meetings by meeting URL
-      for (const bot of scheduledBots) {
-        if (bot.meeting_url) {
-          // Find meeting with matching URL
-          const matchingMeeting = userMeetings?.find(meeting => 
-            meeting.meeting_url && meeting.meeting_url === bot.meeting_url
-          );
-          
-          if (matchingMeeting) {
-            matchedCount++;
-            console.log(`Matched bot ${bot.id} to meeting ${matchingMeeting.id}: ${matchingMeeting.title}`);
+      for (const meeting of userMeetings || []) {
+        if (meeting.attendee_bot_id) {
+          try {
+            // Get bot details to check current status
+            const session = (await supabase.auth.getSession()).data.session;
+            if (!session) continue;
             
-            // Check if we need to update the meeting
-            const needsUpdate = 
-              matchingMeeting.bot_status === 'pending' || 
-              !matchingMeeting.attendee_bot_id ||
-              matchingMeeting.attendee_bot_id !== bot.id;
+            const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/attendee-proxy/bot-details?bot_id=${meeting.attendee_bot_id}`, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json',
+              },
+            });
             
-            if (needsUpdate) {
-              // Create or update bot record in bots table
-              const { data: botRecord, error: botError } = await supabase
-                .from('bots')
-                .upsert({
-                  user_id: user?.id,
-                  name: bot.bot_name || 'Sunny AI Assistant',
-                  description: 'Bot matched from Attendee API',
-                  provider: 'attendee',
-                  provider_bot_id: bot.id,
-                  settings: {
-                    attendee_bot_id: bot.id,
-                    created_via: 'api_matching',
-                    meeting_id: matchingMeeting.id,
-                    meeting_url: bot.meeting_url,
-                    bot_data: bot
-                  },
-                  is_active: true
-                }, {
-                  onConflict: 'provider_bot_id'
-                })
-                .select()
-                .single();
-              
-              if (botError) {
-                console.warn(`Failed to create/update bot record: ${botError.message}`);
-                continue;
-              }
-              
-              // Update meeting with bot status and ID
-              const { error: meetingError } = await supabase
-                .from('meetings')
-                .update({
-                  attendee_bot_id: botRecord.id,
-                  bot_status: 'bot_scheduled',
-                  bot_deployment_method: 'automatic',
-                  updated_at: new Date().toISOString()
-                })
-                .eq('id', matchingMeeting.id);
-              
-              if (meetingError) {
-                console.warn(`Failed to update meeting: ${meetingError.message}`);
-              } else {
+            if (response.ok) {
+              const result = await response.json();
+              if (result.ok && result.data) {
+                console.log(`Bot ${meeting.attendee_bot_id} status:`, result.data.status);
                 updatedCount++;
-                console.log(`Updated meeting ${matchingMeeting.id} with bot ${bot.id}`);
               }
             }
+          } catch (error) {
+            console.warn(`Failed to get status for bot ${meeting.attendee_bot_id}:`, error);
           }
         }
       }
       
-      setSyncSuccess(`Matched ${matchedCount} bots, updated ${updatedCount} meetings`);
       
       // Reload meetings to show updated statuses
       loadMeetings();

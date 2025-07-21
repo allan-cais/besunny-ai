@@ -175,6 +175,11 @@ serve(async (req) => {
   // List all bots (GET /list-bots)
   if (url.pathname.endsWith('/list-bots') && method === 'GET') {
     try {
+      if (!MASTER_ATTENDEE_API_KEY) {
+        throw new Error('Master Attendee API key not configured');
+      }
+      
+      console.log('Calling Attendee API to list bots...');
       const response = await fetch('https://app.attendee.dev/api/v1/bots', {
         method: 'GET',
         headers: {
@@ -183,13 +188,19 @@ serve(async (req) => {
         },
       });
       
+      console.log('Attendee API response status:', response.status);
+      
       if (!response.ok) {
-        throw new Error(`Attendee API error: ${response.status}`);
+        const errorText = await response.text();
+        console.error('Attendee API error response:', errorText);
+        throw new Error(`Attendee API error: ${response.status} - ${errorText}`);
       }
       
       const data = await response.json();
+      console.log('Attendee API response data:', data);
       return withCORS(new Response(JSON.stringify({ ok: true, data }), { status: 200 }));
     } catch (e) {
+      console.error('Error in list-bots:', e);
       return withCORS(new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500 }));
     }
   }
