@@ -1304,12 +1304,28 @@ export const calendarService = {
       console.log('Handling deleted event:', eventId, 'for user:', userId);
       
       // Find the meeting in our database
-      const { data: meeting, error: findError } = await supabase
+      const { data: meetings, error: findError } = await supabase
         .from('meetings')
         .select('id, title, bot_status')
         .eq('google_calendar_event_id', eventId)
-        .eq('user_id', userId)
-        .maybeSingle();
+        .eq('user_id', userId);
+      
+      if (findError) {
+        console.error('Error finding meeting for deletion:', findError);
+        return { success: false, error: findError.message };
+      }
+      
+      if (!meetings || meetings.length === 0) {
+        console.log('No meeting found for deleted event:', eventId);
+        return { success: true }; // Event not in our database, nothing to delete
+      }
+      
+      // If multiple meetings found, delete all of them (duplicates)
+      if (meetings.length > 1) {
+        console.log(`Found ${meetings.length} duplicate meetings for event ${eventId}, deleting all`);
+      }
+      
+      const meeting = meetings[0]; // Use the first one for status check
       
       if (findError) {
         console.error('Error finding meeting for deletion:', findError);
@@ -1321,11 +1337,14 @@ export const calendarService = {
         return { success: true }; // Event not in our database, nothing to delete
       }
       
-      // Check if meeting has active bot or transcript
-      if (meeting.bot_status === 'bot_joined' || meeting.bot_status === 'transcribing') {
-        console.log('Meeting has active bot, updating status instead of deleting:', meeting.id);
+      // Check if any meeting has active bot or transcript
+      const hasActiveBot = meetings.some(m => m.bot_status === 'bot_joined' || m.bot_status === 'transcribing');
+      
+      if (hasActiveBot) {
+        console.log('Meeting has active bot, updating status instead of deleting');
         
-        // Update meeting status to cancelled instead of deleting
+        // Update all meetings status to cancelled instead of deleting
+        const meetingIds = meetings.map(m => m.id);
         const { error: updateError } = await supabase
           .from('meetings')
           .update({
@@ -1333,29 +1352,30 @@ export const calendarService = {
             bot_status: 'failed',
             updated_at: new Date().toISOString(),
           })
-          .eq('id', meeting.id);
+          .in('id', meetingIds);
         
         if (updateError) {
-          console.error('Error updating cancelled meeting:', updateError);
+          console.error('Error updating cancelled meetings:', updateError);
           return { success: false, error: updateError.message };
         }
         
-        console.log('Meeting marked as cancelled:', meeting.id);
+        console.log('Meetings marked as cancelled:', meetingIds);
         return { success: true };
       }
       
-      // Delete the meeting if no active bot
+      // Delete all meetings if no active bot
+      const meetingIds = meetings.map(m => m.id);
       const { error: deleteError } = await supabase
         .from('meetings')
         .delete()
-        .eq('id', meeting.id);
+        .in('id', meetingIds);
       
       if (deleteError) {
-        console.error('Error deleting meeting:', deleteError);
+        console.error('Error deleting meetings:', deleteError);
         return { success: false, error: deleteError.message };
       }
       
-      console.log('Meeting deleted successfully:', meeting.id, meeting.title);
+      console.log('Meetings deleted successfully:', meetingIds);
       return { success: true };
     } catch (error) {
       console.error('Error handling deleted event:', error);
