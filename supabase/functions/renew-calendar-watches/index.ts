@@ -155,24 +155,43 @@ async function setupNewWatch(userId: string, syncToken?: string): Promise<{ succ
       throw new Error(`Watch setup failed: ${response.status} - ${errorText}`);
     }
 
-    const watchData = await response.json();
-    console.log('Watch setup response:', watchData);
+          const watchData = await response.json();
+      console.log('Watch setup response:', watchData);
 
-    // Store watch info in database
-    const { error: dbError } = await supabase
-      .from('calendar_webhooks')
-      .upsert({
-        user_id: userId,
-        google_calendar_id: 'primary',
-        webhook_id: watchData.id,
-        resource_id: watchData.resourceId,
-        expiration_time: new Date(watchData.expiration).toISOString(),
-        sync_token: syncToken,
-        is_active: true,
-        last_sync_at: new Date().toISOString(),
-      }, {
-        onConflict: 'user_id,google_calendar_id',
-      });
+      // Validate and parse expiration date
+      let expirationDate: Date;
+      try {
+        if (typeof watchData.expiration === 'number') {
+          expirationDate = new Date(watchData.expiration);
+        } else if (typeof watchData.expiration === 'string') {
+          expirationDate = new Date(parseInt(watchData.expiration));
+        } else {
+          throw new Error(`Unexpected expiration type: ${typeof watchData.expiration}`);
+        }
+        
+        if (isNaN(expirationDate.getTime())) {
+          throw new Error(`Invalid expiration value: ${watchData.expiration}`);
+        }
+      } catch (dateError) {
+        console.error('Date parsing error:', dateError);
+        throw new Error(`Failed to parse expiration date: ${dateError.message}`);
+      }
+
+      // Store watch info in database
+      const { error: dbError } = await supabase
+        .from('calendar_webhooks')
+        .upsert({
+          user_id: userId,
+          google_calendar_id: 'primary',
+          webhook_id: watchData.id,
+          resource_id: watchData.resourceId,
+          expiration_time: expirationDate.toISOString(),
+          sync_token: syncToken,
+          is_active: true,
+          last_sync_at: new Date().toISOString(),
+        }, {
+          onConflict: 'user_id,google_calendar_id',
+        });
 
     if (dbError) {
       console.error('Database error storing watch:', dbError);
