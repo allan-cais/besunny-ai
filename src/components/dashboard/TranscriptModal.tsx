@@ -9,13 +9,13 @@ interface TranscriptModalProps {
     id: string;
     title: string;
     transcript: string;
-    transcript_summary: string;
-    transcript_metadata: any;
-    transcript_duration_seconds: number;
-    transcript_retrieved_at: string;
+    transcript_summary?: string;
+    transcript_metadata?: any;
+    transcript_duration_seconds?: number;
+    transcript_retrieved_at?: string;
     meeting_url?: string;
-    start_time: string;
-    end_time: string;
+    start_time?: string;
+    end_time?: string;
   } | null;
   isOpen: boolean;
   onClose: () => void;
@@ -82,18 +82,22 @@ const TranscriptModal: React.FC<TranscriptModalProps> = ({ transcript, isOpen, o
           <div className="bg-stone-50 dark:bg-zinc-800 rounded-lg p-4 space-y-3">
             <h3 className="text-sm font-bold font-mono">MEETING DETAILS</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-gray-500" />
-                <span className="text-sm font-mono">
-                  {formatDateTime(transcript.start_time)} - {formatDateTime(transcript.end_time)}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-gray-500" />
-                <span className="text-sm font-mono">
-                  Duration: {formatDuration(transcript.transcript_duration_seconds)}
-                </span>
-              </div>
+              {transcript.start_time && transcript.end_time && (
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-gray-500" />
+                  <span className="text-sm font-mono">
+                    {formatDateTime(transcript.start_time)} - {formatDateTime(transcript.end_time)}
+                  </span>
+                </div>
+              )}
+              {transcript.transcript_duration_seconds && (
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-gray-500" />
+                  <span className="text-sm font-mono">
+                    Duration: {formatDuration(transcript.transcript_duration_seconds)}
+                  </span>
+                </div>
+              )}
             </div>
             
             {transcript.meeting_url && (
@@ -111,11 +115,13 @@ const TranscriptModal: React.FC<TranscriptModalProps> = ({ transcript, isOpen, o
             )}
 
             <div className="flex items-center gap-2">
-              <Badge className="border border-[#4a5565] dark:border-zinc-700 rounded px-2 py-0.5 text-[10px] text-[#4a5565] dark:text-zinc-200 bg-stone-50 dark:bg-zinc-800 hover:bg-stone-50 dark:hover:bg-zinc-800 uppercase font-mono">
-                Retrieved: {formatDateTime(transcript.transcript_retrieved_at)}
-              </Badge>
+              {transcript.transcript_retrieved_at && (
+                <Badge variant="outline" className="px-2 py-0.5 text-[10px] text-[#4a5565] dark:text-zinc-200 bg-stone-50 dark:bg-zinc-800 uppercase font-mono">
+                  Retrieved: {formatDateTime(transcript.transcript_retrieved_at)}
+                </Badge>
+              )}
               {transcript.transcript_metadata?.word_count && (
-                <Badge className="border border-[#4a5565] dark:border-zinc-700 rounded px-2 py-0.5 text-[10px] text-[#4a5565] dark:text-zinc-200 bg-stone-50 dark:bg-zinc-800 hover:bg-stone-50 dark:hover:bg-zinc-800 uppercase font-mono">
+                <Badge variant="outline" className="px-2 py-0.5 text-[10px] text-[#4a5565] dark:text-zinc-200 bg-stone-50 dark:bg-zinc-800 uppercase font-mono">
                   {transcript.transcript_metadata.word_count} words
                 </Badge>
               )}

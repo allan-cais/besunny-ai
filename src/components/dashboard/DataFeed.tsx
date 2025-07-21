@@ -34,6 +34,7 @@ const DataFeed = () => {
   const [activities, setActivities] = useState<VirtualEmailActivity[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
+  const [transcriptsLoading, setTranscriptsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'email' | 'drive' | 'transcripts'>('all');
   const [selectedTranscript, setSelectedTranscript] = useState<any>(null);
@@ -106,50 +107,66 @@ const DataFeed = () => {
         .limit(50);
 
       // Get meeting transcripts
-      const transcriptsData = await attendeePollingService.getMeetingsWithTranscripts();
+      setTranscriptsLoading(true);
+      try {
+        const transcriptsData = await attendeePollingService.getMeetingsWithTranscripts();
 
-      if (documentsError) {
-        const mockDocs = getMockDocuments();
-        const mockActivities = getMockVirtualEmailActivity();
-        setDocuments(mockDocs);
-        setActivities(mockActivities);
-      } else {
-        setDocuments(documentsData || []);
+        // Transform transcripts to match our interface (always do this regardless of documents success/failure)
+        const transcriptActivities: VirtualEmailActivity[] = (transcriptsData || [])
+          .filter(transcript => transcript.transcript && transcript.transcript.trim().length > 0)
+          .map(transcript => ({
+            id: transcript.id,
+            type: 'meeting_transcript',
+            title: transcript.title ? `Meeting: ${transcript.title}` : 'Untitled Meeting',
+            summary: transcript.transcript_summary || 
+                     (transcript.transcript ? transcript.transcript.substring(0, 150) + '...' : 'No transcript summary available'),
+            source: 'attendee_bot',
+            created_at: transcript.transcript_retrieved_at || transcript.created_at,
+            processed: true,
+            project_id: transcript.project_id,
+            transcript_duration_seconds: transcript.transcript_duration_seconds,
+            transcript_metadata: transcript.transcript_metadata,
+            rawTranscript: transcript // Store the full transcript data for detail view
+          }));
         
-        // Transform documents to match our interface
-        const documentActivities: VirtualEmailActivity[] = (documentsData || []).map(doc => ({
-          id: doc.id,
-          type: getDocumentType(doc.source, doc),
-          title: doc.title || 'Untitled Document',
-          summary: doc.summary ? doc.summary.substring(0, 150) + '...' : 'No content available',
-          source: doc.source || 'unknown',
-          sender: doc.author,
-          file_size: doc.file_url ? 'Unknown' : undefined,
-          created_at: doc.created_at,
-          processed: true, // All documents in DB are processed
-          project_id: doc.project_id
-        }));
-
-        // Transform transcripts to match our interface
-        const transcriptActivities: VirtualEmailActivity[] = (transcriptsData || []).map(transcript => ({
-          id: transcript.id,
-          type: 'meeting_transcript',
-          title: `Meeting Transcript: ${transcript.title}`,
-          summary: transcript.transcript_summary || 'No transcript summary available',
-          source: 'attendee_bot',
-          created_at: transcript.transcript_retrieved_at || transcript.created_at,
-          processed: true,
-          project_id: transcript.project_id,
-          transcript_duration_seconds: transcript.transcript_duration_seconds,
-          transcript_metadata: transcript.transcript_metadata,
-          rawTranscript: transcript // Store the full transcript data for detail view
-        }));
-        
-        // Combine and sort by creation date
-        const allActivities = [...documentActivities, ...transcriptActivities]
-          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-        
-        setActivities(allActivities);
+        if (documentsError) {
+          const mockDocs = getMockDocuments();
+          const mockActivities = getMockVirtualEmailActivity();
+          setDocuments(mockDocs);
+          
+          // Combine mock activities with real transcripts
+          const allActivities = [...mockActivities, ...transcriptActivities]
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+          
+          setActivities(allActivities);
+        } else {
+          setDocuments(documentsData || []);
+          
+          // Transform documents to match our interface
+          const documentActivities: VirtualEmailActivity[] = (documentsData || []).map(doc => ({
+            id: doc.id,
+            type: getDocumentType(doc.source, doc),
+            title: doc.title || 'Untitled Document',
+            summary: doc.summary ? doc.summary.substring(0, 150) + '...' : 'No content available',
+            source: doc.source || 'unknown',
+            sender: doc.author,
+            file_size: doc.file_url ? 'Unknown' : undefined,
+            created_at: doc.created_at,
+            processed: true, // All documents in DB are processed
+            project_id: doc.project_id
+          }));
+          
+          // Combine and sort by creation date
+          const allActivities = [...documentActivities, ...transcriptActivities]
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+          
+          setActivities(allActivities);
+        }
+      } catch (error) {
+        console.error('Error loading transcripts:', error);
+        // Continue with documents only if transcript loading fails
+      } finally {
+        setTranscriptsLoading(false);
       }
     } catch (error) {
       // Fallback to mock data
@@ -683,9 +700,9 @@ Alex Rodriguez: Perfect. Meeting adjourned. Thanks everyone for your input and c
                          (filterType === 'drive' && activity.type !== 'email' && activity.type !== 'meeting_transcript') ||
                          (filterType === 'transcripts' && activity.type === 'meeting_transcript');
     
-    // For transcripts, only show final transcripts (not real-time ones)
+    // For transcripts, only show those with final_transcript_ready === true
     const isFinalTranscript = activity.type !== 'meeting_transcript' || 
-                             (activity.rawTranscript && activity.rawTranscript.final_transcript_ready !== false);
+      (activity.rawTranscript && activity.rawTranscript.final_transcript_ready === true);
     
     return matchesSearch && matchesFilter && isFinalTranscript;
   });
@@ -827,7 +844,11 @@ Alex Rodriguez: Perfect. Meeting adjourned. Thanks everyone for your input and c
             >
               <CardContent className="p-4">
                 <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0 w-8 h-8 bg-stone-50 dark:bg-zinc-800 rounded-full flex items-center justify-center">
+                  <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+                    activity.type === 'meeting_transcript' 
+                      ? 'bg-purple-100 dark:bg-purple-900/20' 
+                      : 'bg-stone-50 dark:bg-zinc-800'
+                  }`}>
                     {getTypeIcon(activity.type)}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -844,41 +865,47 @@ Alex Rodriguez: Perfect. Meeting adjourned. Thanks everyone for your input and c
                     <div className="flex items-center gap-2">
                       {/* Project Badge - First */}
                       {activity.project_id ? (
-                        <Badge className="border border-[#4a5565] dark:border-zinc-700 rounded px-2 py-0.5 text-[10px] text-[#4a5565] dark:text-zinc-200 bg-stone-50 dark:bg-zinc-800 hover:bg-stone-50 dark:hover:bg-zinc-800 uppercase font-mono">
+                        <Badge variant="outline" className="px-2 py-0.5 text-[10px] text-[#4a5565] dark:text-zinc-200 bg-stone-50 dark:bg-zinc-800 uppercase font-mono">
                           Project {activity.project_id === 'mock-project-1' ? 'Summer' : getProjectName(activity.project_id)}
                         </Badge>
                       ) : (
-                        <Badge className="select-project-badge border border-red-500 rounded px-2 py-0.5 text-[10px] text-red-500 bg-red-50 dark:bg-red-950 hover:bg-red-50 dark:hover:bg-red-950 uppercase font-mono cursor-pointer">
+                        <Badge variant="outline" className="select-project-badge px-2 py-0.5 text-[10px] text-red-500 bg-red-50 dark:bg-red-950 uppercase font-mono cursor-pointer">
                           Select Project
                         </Badge>
                       )}
                       
                       {/* Processing Badge - Second */}
                       {!activity.processed && (
-                        <Badge className="border border-red-500 rounded px-2 py-0.5 text-[10px] text-red-500 bg-red-50 dark:bg-red-950 hover:bg-red-50 dark:hover:bg-red-950 uppercase font-mono">
+                        <Badge variant="outline" className="px-2 py-0.5 text-[10px] text-red-500 bg-red-50 dark:bg-red-950 uppercase font-mono">
                           Processing
                         </Badge>
                       )}
                       
                       {/* Type Badge */}
-                      <Badge className="border border-[#4a5565] dark:border-zinc-700 rounded px-2 py-0.5 text-[10px] text-[#4a5565] dark:text-zinc-200 bg-stone-50 dark:bg-zinc-800 hover:bg-stone-50 dark:hover:bg-zinc-800 uppercase font-mono">
+                      <Badge variant="outline" className="px-2 py-0.5 text-[10px] text-[#4a5565] dark:text-zinc-200 bg-stone-50 dark:bg-zinc-800 uppercase font-mono">
                         {getTypeLabel(activity.type)}
                       </Badge>
                       
                       {/* Other Badges */}
                       {activity.sender && (
-                        <Badge className="border border-[#4a5565] dark:border-zinc-700 rounded px-2 py-0.5 text-[10px] text-[#4a5565] dark:text-zinc-200 bg-stone-50 dark:bg-zinc-800 hover:bg-stone-50 dark:hover:bg-zinc-800 uppercase font-mono">
+                        <Badge variant="outline" className="px-2 py-0.5 text-[10px] text-[#4a5565] dark:text-zinc-200 bg-stone-50 dark:bg-zinc-800 uppercase font-mono">
                           From: {activity.sender}
                         </Badge>
                       )}
                       {activity.file_size && (
-                        <Badge className="border border-[#4a5565] dark:border-zinc-700 rounded px-2 py-0.5 text-[10px] text-[#4a5565] dark:text-zinc-200 bg-stone-50 dark:bg-zinc-800 hover:bg-stone-50 dark:hover:bg-zinc-800 uppercase font-mono">
+                        <Badge variant="outline" className="px-2 py-0.5 text-[10px] text-[#4a5565] dark:text-zinc-200 bg-stone-50 dark:bg-zinc-800 uppercase font-mono">
                           {activity.file_size}
                         </Badge>
                       )}
                       {activity.transcript_duration_seconds && (
-                        <Badge className="border border-[#4a5565] dark:border-zinc-700 rounded px-2 py-0.5 text-[10px] text-[#4a5565] dark:text-zinc-200 bg-stone-50 dark:bg-zinc-800 hover:bg-stone-50 dark:hover:bg-zinc-800 uppercase font-mono">
+                        <Badge variant="outline" className="px-2 py-0.5 text-[10px] text-[#4a5565] dark:text-zinc-200 bg-stone-50 dark:bg-zinc-800 uppercase font-mono">
+                          <Clock className="h-3 w-3 mr-1" />
                           {Math.round(activity.transcript_duration_seconds / 60)}min
+                        </Badge>
+                      )}
+                      {activity.transcript_metadata?.word_count && (
+                        <Badge variant="outline" className="px-2 py-0.5 text-[10px] text-[#4a5565] dark:text-zinc-200 bg-stone-50 dark:bg-zinc-800 uppercase font-mono">
+                          {activity.transcript_metadata.word_count} words
                         </Badge>
                       )}
                       

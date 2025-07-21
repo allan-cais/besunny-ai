@@ -101,12 +101,19 @@ export const attendeePollingService = {
         transcript_retrieved_at,
         bot_status,
         project_id,
-        created_at
+        created_at,
+        final_transcript_ready
       `)
       .not('transcript', 'is', null)
-      .order('transcript_retrieved_at', { ascending: false });
+      .not('transcript', 'eq', '')
+      .order('transcript_retrieved_at', { ascending: false })
+      .limit(50);
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error fetching meetings with transcripts:', error);
+      return [];
+    }
+    
     return data || [];
   }
 }; 
