@@ -415,6 +415,45 @@ const MeetingsPage: React.FC = () => {
     }
   };
 
+  const handleForceSync = async () => {
+    try {
+      setLoading(true);
+      setSyncError(null);
+      setSyncSuccess(null);
+      
+      const session = (await supabase.auth.getSession()).data.session;
+      if (!session?.user?.id) {
+        setSyncError('Not authenticated');
+        return;
+      }
+
+      // Get current webhook to check sync token
+      const { data: webhook } = await supabase
+        .from('calendar_webhooks')
+        .select('sync_token')
+        .eq('user_id', session.user.id)
+        .eq('google_calendar_id', 'primary')
+        .eq('is_active', true)
+        .single();
+
+      if (webhook?.sync_token) {
+        const result = await calendarService.performIncrementalSync(session.user.id, webhook.sync_token);
+        if (result.success) {
+          setSyncSuccess(`Force sync completed! Processed events with new sync token.`);
+          await loadWebhookStatus();
+        } else {
+          setSyncError(`Force sync failed: ${result.error}`);
+        }
+      } else {
+        setSyncError('No active sync token found. Please setup watch first.');
+      }
+    } catch (err: any) {
+      setSyncError(err.message || 'Failed to force sync');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="px-4 py-8 font-sans h-full flex flex-col">
       <div className="flex items-center justify-between mb-6">
@@ -694,7 +733,7 @@ const MeetingsPage: React.FC = () => {
             </Button>
           </div>
           
-          <div className="grid gap-2 md:grid-cols-3">
+          <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-4">
             <Button
               onClick={performManualSync}
               disabled={loading}
@@ -723,6 +762,16 @@ const MeetingsPage: React.FC = () => {
             >
               {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
               Test Calendar Access
+            </Button>
+
+            <Button
+              onClick={handleForceSync}
+              disabled={loading}
+              className="w-full"
+              variant="secondary"
+            >
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+              Force Sync
             </Button>
           </div>
         </CardContent>

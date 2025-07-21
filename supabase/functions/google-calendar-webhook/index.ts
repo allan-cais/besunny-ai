@@ -72,6 +72,71 @@ async function getGoogleCredentials(userId: string): Promise<any> {
   return data;
 }
 
+// Handle deleted calendar event
+async function handleDeletedEvent(eventId: string, userId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    console.log('Handling deleted event in webhook:', eventId, 'for user:', userId);
+    
+    // Find the meeting in our database
+    const { data: meeting, error: findError } = await supabase
+      .from('meetings')
+      .select('id, title, bot_status')
+      .eq('google_calendar_event_id', eventId)
+      .eq('user_id', userId)
+      .maybeSingle();
+    
+    if (findError) {
+      console.error('Error finding meeting for deletion:', findError);
+      return { success: false, error: findError.message };
+    }
+    
+    if (!meeting) {
+      console.log('No meeting found for deleted event:', eventId);
+      return { success: true }; // Event not in our database, nothing to delete
+    }
+    
+    // Check if meeting has active bot or transcript
+    if (meeting.bot_status === 'bot_joined' || meeting.bot_status === 'transcribing') {
+      console.log('Meeting has active bot, updating status instead of deleting:', meeting.id);
+      
+      // Update meeting status to cancelled instead of deleting
+      const { error: updateError } = await supabase
+        .from('meetings')
+        .update({
+          event_status: 'declined',
+          bot_status: 'failed',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', meeting.id);
+      
+      if (updateError) {
+        console.error('Error updating cancelled meeting:', updateError);
+        return { success: false, error: updateError.message };
+      }
+      
+      console.log('Meeting marked as cancelled:', meeting.id);
+      return { success: true };
+    }
+    
+    // Delete the meeting if no active bot
+    const { error: deleteError } = await supabase
+      .from('meetings')
+      .delete()
+      .eq('id', meeting.id);
+    
+    if (deleteError) {
+      console.error('Error deleting meeting:', deleteError);
+      return { success: false, error: deleteError.message };
+    }
+    
+    console.log('Meeting deleted successfully:', meeting.id, meeting.title);
+    return { success: true };
+  } catch (error) {
+    console.error('Error handling deleted event:', error);
+    return { success: false, error: error.message || String(error) };
+  }
+}
+
 function extractMeetingUrl(event: any): string | null {
   // Check for Google Meet URL in conferenceData
   if (event.conferenceData?.entryPoints) {
@@ -417,7 +482,7 @@ serve(async (req) => {
             try {
               const response = await fetch(
                 `https://www.googleapis.com/calendar/v3/calendars/primary/events?` +
-                `syncToken=${webhook.sync_token}&singleEvents=true&orderBy=startTime`,
+                `syncToken=${webhook.sync_token}&singleEvents=true&orderBy=startTime&showDeleted=true`,
                 {
                   headers: {
                     'Authorization': `Bearer ${credentials.access_token}`,
@@ -439,15 +504,25 @@ serve(async (req) => {
                 
                 // Process events
                 for (const event of events) {
-                  const result = await processCalendarEvent(event, userId, credentials);
-                  processed++;
-                  
-                  if (result.action === 'created') {
-                    created++;
-                  } else if (result.action === 'updated') {
-                    updated++;
-                  } else if (result.action === 'deleted') {
-                    deleted++;
+                  // Check if event is deleted/cancelled
+                  if (event.status === 'cancelled' || event.deleted) {
+                    console.log('Processing deleted event in webhook:', event.id);
+                    const deleteResult = await handleDeletedEvent(event.id, userId);
+                    if (deleteResult.success) {
+                      deleted++;
+                    }
+                    processed++;
+                  } else {
+                    const result = await processCalendarEvent(event, userId, credentials);
+                    processed++;
+                    
+                    if (result.action === 'created') {
+                      created++;
+                    } else if (result.action === 'updated') {
+                      updated++;
+                    } else if (result.action === 'deleted') {
+                      deleted++;
+                    }
                   }
                 }
                 
