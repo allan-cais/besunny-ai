@@ -4,8 +4,15 @@ import PageHeader from '@/components/dashboard/PageHeader';
 
 const DataPage = () => (
   <div className="px-4 py-8 font-sans h-full flex flex-col">
-    <PageHeader title="DATA" path="~/sunny.ai/data" />
-    <div className="flex-1 min-h-0">
+    {/* Fixed Header */}
+    <div className="flex-shrink-0">
+      <div className="mb-6">
+        <PageHeader title="DATA" path="~/sunny.ai/data" />
+      </div>
+    </div>
+
+    {/* Scrollable Content */}
+    <div className="flex-1 overflow-y-auto">
       <DataFeed />
     </div>
   </div>
