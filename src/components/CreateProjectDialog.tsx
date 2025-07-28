@@ -345,7 +345,6 @@ const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
   };
 
   const handleConfirm = async () => {
-    console.log('handleConfirm called - starting project creation');
     setSubmitting(true);
     setError(null);
 
@@ -363,7 +362,7 @@ const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
         throw new Error('Failed to create project');
       }
 
-      console.log('Project created successfully:', newProject);
+
 
       // Prepare the payload for n8n webhook
       const webhookPayload = {
@@ -386,13 +385,9 @@ const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
       };
 
       // Process project onboarding with AI (background processing)
-      console.log('Starting AI processing for project:', newProject.id);
       try {
         const aiResult = await supabaseService.processProjectOnboarding(webhookPayload);
-        console.log('AI processing result:', aiResult);
-        if (aiResult.success) {
-          console.log('AI processing completed successfully:', aiResult.metadata);
-        } else {
+        if (!aiResult.success) {
           console.warn('AI processing failed:', aiResult.error);
         }
       } catch (aiError) {

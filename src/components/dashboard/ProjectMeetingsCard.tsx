@@ -57,8 +57,6 @@ const ProjectMeetingsCard: React.FC<ProjectMeetingsCardProps> = ({ projectId }) 
               : `user_id=eq.${user.id}`,
           },
           (payload) => {
-            console.log('Project meetings table change:', payload);
-            
             if (payload.eventType === 'UPDATE' && payload.new) {
               // Update the specific meeting in the local state
               const updatedMeeting = payload.new as Meeting;

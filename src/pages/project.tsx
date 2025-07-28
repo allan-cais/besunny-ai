@@ -160,12 +160,10 @@ const ProjectDashboard = () => {
           console.error('Error fetching project:', error);
           setProject(null);
         } else {
-          console.log('Project data fetched:', projectData);
           setProject(projectData);
           
           // Check if AI processing is needed (no metadata yet)
           if (projectData && !projectData.normalized_tags && !projectData.categories) {
-            console.log('Setting AI processing to true - no metadata found');
             setAiProcessing(true);
             
             // Show AI processing started toast
@@ -173,11 +171,6 @@ const ProjectDashboard = () => {
               title: "AI Processing Started",
               description: "Your project is being analyzed. This will take a moment...",
               variant: "default",
-            });
-          } else {
-            console.log('AI processing not needed - metadata exists:', {
-              normalized_tags: projectData?.normalized_tags,
-              categories: projectData?.categories
             });
           }
         }
@@ -197,7 +190,6 @@ const ProjectDashboard = () => {
       loadProjectData();
       
       // Set up real-time subscription for project updates
-      console.log('Setting up real-time subscription for project:', projectId);
       const subscription = supabase
         .channel(`project-${projectId}`)
         .on(
@@ -209,13 +201,11 @@ const ProjectDashboard = () => {
             filter: `id=eq.${projectId}`
           },
           (payload) => {
-            console.log('Project updated via real-time:', payload.new);
             const updatedProject = payload.new as ExtendedProject;
             setProject(updatedProject);
             
             // Check if AI processing is complete
             if (aiProcessing && updatedProject.normalized_tags && updatedProject.categories) {
-              console.log('AI processing completed - metadata found');
               setAiProcessing(false);
               
               // Show success toast
@@ -253,9 +243,7 @@ const ProjectDashboard = () => {
             loadProjectData();
           }
         )
-        .subscribe((status) => {
-          console.log('Real-time subscription status:', status);
-        });
+        .subscribe();
 
       return () => {
         subscription.unsubscribe();

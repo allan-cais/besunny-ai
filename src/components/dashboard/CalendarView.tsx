@@ -67,8 +67,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({
           filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
-          console.log('Calendar meetings table change:', payload);
-          
           if (payload.eventType === 'UPDATE' && payload.new) {
             // Update the specific meeting in the local state
             const updatedMeeting = payload.new as Meeting;

@@ -213,7 +213,7 @@ export async function sendToN8nWebhook(
   }
   
   try {
-    console.log('Sending classification payload to N8N:', JSON.stringify(payload, null, 2));
+
     
     const response = await fetch(n8nWebhookUrl, {
       method: 'POST',
@@ -229,7 +229,7 @@ export async function sendToN8nWebhook(
     }
     
     const responseText = await response.text();
-    console.log('N8N webhook response:', responseText);
+
     
     return true;
   } catch (error) {

@@ -39,7 +39,7 @@ export const apiKeyService = {
       };
     }
     
-    console.log('Sending bot to meeting with payload:', payload);
+
     
     const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/attendee-proxy/send-bot`, {
       method: 'POST',
@@ -50,7 +50,7 @@ export const apiKeyService = {
       body: JSON.stringify(payload)
     });
     const result = await response.json();
-    console.log('Attendee proxy response:', result);
+
     
     if (!result.ok) {
       console.error('Attendee proxy error:', result);
@@ -62,7 +62,7 @@ export const apiKeyService = {
       } else if (result.data && result.data.error) {
         throw new Error(`Attendee API error: ${result.data.error}`);
       } else if (result.data && typeof result.data === 'object') {
-        // Log all keys in the data object to help debug
+    
         console.error('Error data keys:', Object.keys(result.data));
         throw new Error(`Attendee API error: ${JSON.stringify(result.data)}`);
       } else if (result.error) {
@@ -78,7 +78,7 @@ export const apiKeyService = {
       throw new Error('No data received from Attendee API');
     }
     
-    console.log('Attendee API data:', result.data);
+
     return result.data;
   },
 

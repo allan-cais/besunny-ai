@@ -5,14 +5,13 @@ class BackgroundSyncService {
   private syncInterval: NodeJS.Timeout | null = null;
   private isRunning = false;
   private currentUserId: string | null = null;
-  private disabled = false; // Temporary disable flag
+  private disabled = false;
 
   async initialize(userId?: string) {
     if (this.isRunning || this.disabled) return;
     
     this.currentUserId = userId || null;
     this.isRunning = true;
-    console.log('Background sync service initialized for user:', userId);
     
     // Wait a bit before running the first check to avoid blocking page load
     setTimeout(async () => {
@@ -41,7 +40,7 @@ class BackgroundSyncService {
     }
     this.isRunning = false;
     this.currentUserId = null;
-    console.log('Background sync service stopped');
+
   }
 
   private async checkAndSetupCalendarSync() {
@@ -82,10 +81,8 @@ class BackgroundSyncService {
 
       // If no active webhook, set up calendar sync
       if (!webhook) {
-        console.log('Setting up calendar sync for current user');
         try {
           await calendarService.initializeCalendarSync(this.currentUserId);
-          console.log('Calendar sync set up successfully');
         } catch (error) {
           console.error('Failed to set up calendar sync:', error);
         }
@@ -123,12 +120,9 @@ class BackgroundSyncService {
         return; // No expiring webhook
       }
 
-      console.log('Found expiring webhook, renewing...');
-
       // Renew the expiring webhook
       try {
         await calendarService.renewWatch(this.currentUserId);
-        console.log('Webhook renewed successfully');
       } catch (error) {
         console.error('Failed to renew webhook:', error);
       }
@@ -141,28 +135,26 @@ class BackgroundSyncService {
   async syncUserCalendar(userId: string) {
     try {
       await calendarService.initializeCalendarSync(userId);
-      console.log(`Manual calendar sync completed for user: ${userId}`);
     } catch (error) {
       console.error(`Manual calendar sync failed for user ${userId}:`, error);
       throw error;
     }
   }
 
-  // Temporary disable method
   disable() {
     this.disabled = true;
     this.stop();
-    console.log('Background sync service disabled');
+
   }
 
   // Re-enable method
   enable() {
     this.disabled = false;
-    console.log('Background sync service enabled');
+
   }
 }
 
 export const backgroundSyncService = new BackgroundSyncService();
 
-// Temporarily disable background sync to prevent blocking
+// Disable background sync to prevent blocking
 backgroundSyncService.disable(); 

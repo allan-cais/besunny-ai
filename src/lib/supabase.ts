@@ -234,7 +234,7 @@ export const supabaseService = {
   },
 
   async deleteProject(projectId: string): Promise<void> {
-    console.log('Attempting to delete project:', projectId);
+
     
     const { error } = await supabase
       .from('projects')
@@ -252,7 +252,7 @@ export const supabaseService = {
       throw error;
     }
     
-    console.log('Project deleted successfully:', projectId);
+    
   },
 
   // Chat session operations

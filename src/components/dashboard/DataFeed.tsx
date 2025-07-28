@@ -100,19 +100,6 @@ const DataFeed = () => {
         setDocuments(getMockDocuments());
         setActivities(getMockVirtualEmailActivity());
       } else {
-        console.log(`Loaded ${documentsData?.length || 0} total documents`);
-        console.log('Documents:', documentsData);
-        
-        // Log the project_id distribution to see what we're getting
-        if (documentsData && documentsData.length > 0) {
-          const projectIdCounts = documentsData.reduce((acc: any, doc) => {
-            const key = doc.project_id || 'null';
-            acc[key] = (acc[key] || 0) + 1;
-            return acc;
-          }, {});
-          console.log('Project ID distribution:', projectIdCounts);
-        }
-        
         setDocuments(documentsData || []);
         
         // Transform documents to match our interface

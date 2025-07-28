@@ -64,7 +64,7 @@ async function getGoogleCredentials(userId: string): Promise<any> {
       throw new Error('Token expired and no refresh token available');
     }
     
-    console.log('Token expired, attempting refresh...');
+    
     
     // Refresh the token
     const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
@@ -87,7 +87,7 @@ async function getGoogleCredentials(userId: string): Promise<any> {
     }
     
     const refreshData = await refreshResponse.json();
-    console.log('Token refreshed successfully');
+    
     
     // Update the credentials in the database
     const { error: updateError } = await supabase
@@ -110,7 +110,7 @@ async function getGoogleCredentials(userId: string): Promise<any> {
     };
   }
   
-  console.log('Token is still valid, expires at:', data.expires_at);
+  
   return data;
 }
 
@@ -395,14 +395,7 @@ export const calendarService = {
       throw error;
     }
     
-    console.log('Fetched upcoming meetings:', meetings?.map(m => ({
-      id: m.id,
-      title: m.title,
-      bot_status: m.bot_status,
-      attendee_bot_id: m.attendee_bot_id,
-      bot_deployment_method: m.bot_deployment_method,
-      auto_scheduled_via_email: m.auto_scheduled_via_email
-    })));
+
     
     return meetings || [];
   },
@@ -547,7 +540,7 @@ export const calendarService = {
     return result;
   },
 
-  // Get raw calendar events from Google (for debugging)
+  // Get raw calendar events from Google
   async getRawCalendarEvents(daysPast: number = 7, daysFuture: number = 60): Promise<{
     ok: boolean;
     events?: any[];
@@ -602,7 +595,7 @@ export const calendarService = {
     return result;
   },
 
-  // Test webhook notification specifically (for debugging real-time sync)
+  // Test webhook notification specifically
   async testWebhookNotification(): Promise<{
     ok: boolean;
     message?: string;
@@ -687,7 +680,7 @@ export const calendarService = {
   // Enhanced calendar service with watch functionality
   async initializeCalendarSync(userId: string): Promise<{ success: boolean; error?: string; webhook_id?: string }> {
     try {
-      console.log('Initializing calendar sync for user:', userId);
+  
       
       // Step 1: Get initial sync token
       const initialSyncResult = await this.performInitialSync(userId);
@@ -701,7 +694,7 @@ export const calendarService = {
         return { success: false, error: `Watch setup failed: ${watchResult.error}` };
       }
       
-      console.log('Calendar sync initialized successfully');
+      
       return { success: true, webhook_id: watchResult.webhook_id };
     } catch (error) {
       console.error('Calendar sync initialization error:', error);
@@ -712,7 +705,7 @@ export const calendarService = {
   // Perform initial sync to get baseline state and sync token
   async performInitialSync(userId: string): Promise<{ success: boolean; error?: string; sync_token?: string }> {
     try {
-      console.log('Performing initial sync for user:', userId);
+      
       
       const credentials = await getGoogleCredentials(userId);
       if (!credentials) {
@@ -738,7 +731,7 @@ export const calendarService = {
         
         // If we get a 401, the token might be invalid even if it's not expired
         if (response.status === 401) {
-          console.log('Got 401 error, token might be invalid. Attempting token refresh...');
+
           
           // Force a token refresh
           const refreshedCredentials = await getGoogleCredentials(userId);
@@ -763,7 +756,7 @@ export const calendarService = {
           const events = retryData.items || [];
           const nextSyncToken = retryData.nextSyncToken;
           
-          console.log(`Initial sync (retry) found ${events.length} events, nextSyncToken: ${nextSyncToken}`);
+
           
           // Process events and continue with the rest of the function...
           let processed = 0;
@@ -800,8 +793,6 @@ export const calendarService = {
 
           // If no nextSyncToken was returned, we need to get one by making a sync token request
           if (!nextSyncToken) {
-            console.log('No nextSyncToken returned, requesting sync token...');
-            
             // Try first approach: empty sync token request
             const syncTokenResponse = await fetch(
               `https://www.googleapis.com/calendar/v3/calendars/primary/events?` +
@@ -816,7 +807,6 @@ export const calendarService = {
             if (syncTokenResponse.ok) {
               const syncTokenData = await syncTokenResponse.json();
               const syncToken = syncTokenData.nextSyncToken;
-              console.log('Got sync token from sync token request:', syncToken);
               
               if (syncToken) {
                 return { success: true, sync_token: syncToken };
@@ -824,7 +814,7 @@ export const calendarService = {
             }
             
             // If first approach didn't work, try second approach: make a small change and get sync token
-            console.log('First approach failed, trying alternative method...');
+  
             const alternativeResponse = await fetch(
               `https://www.googleapis.com/calendar/v3/calendars/primary/events?` +
               `timeMin=${encodeURIComponent(new Date().toISOString())}&timeMax=${encodeURIComponent(new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString())}&singleEvents=true`,
@@ -838,14 +828,14 @@ export const calendarService = {
             if (alternativeResponse.ok) {
               const alternativeData = await alternativeResponse.json();
               const alternativeSyncToken = alternativeData.nextSyncToken;
-              console.log('Got sync token from alternative request:', alternativeSyncToken);
+  
               
               if (alternativeSyncToken) {
                 return { success: true, sync_token: alternativeSyncToken };
               }
             }
             
-            console.log('Both approaches failed to get sync token');
+
             return { success: false, error: 'Unable to get sync token. This can happen when there are no recent changes to sync. Try making a small change to your calendar and try again.' };
           }
 
@@ -859,7 +849,7 @@ export const calendarService = {
       const events = data.items || [];
       const nextSyncToken = data.nextSyncToken;
       
-      console.log(`Initial sync found ${events.length} events, nextSyncToken: ${nextSyncToken}`);
+      
 
       // Process events and store in database
       let processed = 0;
@@ -896,8 +886,6 @@ export const calendarService = {
 
       // If no nextSyncToken was returned, we need to get one by making a sync token request
       if (!nextSyncToken) {
-        console.log('No nextSyncToken returned, requesting sync token...');
-        
         // Try first approach: empty sync token request
         const syncTokenResponse = await fetch(
           `https://www.googleapis.com/calendar/v3/calendars/primary/events?` +
@@ -912,7 +900,6 @@ export const calendarService = {
         if (syncTokenResponse.ok) {
           const syncTokenData = await syncTokenResponse.json();
           const syncToken = syncTokenData.nextSyncToken;
-          console.log('Got sync token from sync token request:', syncToken);
           
           if (syncToken) {
             return { success: true, sync_token: syncToken };
@@ -920,7 +907,6 @@ export const calendarService = {
         }
         
         // If first approach didn't work, try second approach: make a small change and get sync token
-        console.log('First approach failed, trying alternative method...');
         const alternativeResponse = await fetch(
           `https://www.googleapis.com/calendar/v3/calendars/primary/events?` +
           `timeMin=${encodeURIComponent(new Date().toISOString())}&timeMax=${encodeURIComponent(new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString())}&singleEvents=true`,
@@ -934,14 +920,12 @@ export const calendarService = {
         if (alternativeResponse.ok) {
           const alternativeData = await alternativeResponse.json();
           const alternativeSyncToken = alternativeData.nextSyncToken;
-          console.log('Got sync token from alternative request:', alternativeSyncToken);
           
           if (alternativeSyncToken) {
             return { success: true, sync_token: alternativeSyncToken };
           }
         }
         
-        console.log('Both approaches failed to get sync token');
         return { success: false, error: 'Unable to get sync token. This can happen when there are no recent changes to sync. Try making a small change to your calendar and try again.' };
       }
 
@@ -955,13 +939,13 @@ export const calendarService = {
   // Set up Google Calendar watch with sync token
   async setupWatch(userId: string, syncToken?: string): Promise<{ success: boolean; error?: string; webhook_id?: string }> {
     try {
-      console.log('Setting up calendar watch for user:', userId);
+      
       
       // First, ensure we have valid credentials
       let credentials;
       try {
         credentials = await getGoogleCredentials(userId);
-        console.log('Credentials obtained successfully');
+
       } catch (credError) {
         console.error('Failed to get valid credentials:', credError);
         return { success: false, error: `Authentication failed: ${credError.message}. Please reconnect your Google account.` };
@@ -1008,7 +992,7 @@ export const calendarService = {
       }
 
       const watchData = await response.json();
-      console.log('Watch setup response:', watchData);
+      
 
       // Validate and parse expiration date
       let expirationDate: Date;
@@ -1047,7 +1031,6 @@ export const calendarService = {
         return { success: false, error: `Database error: ${dbError.message}` };
       }
 
-      console.log('Calendar watch setup successfully');
       return { success: true, webhook_id: watchData.id };
     } catch (error) {
       console.error('Watch setup error:', error);
@@ -1058,7 +1041,6 @@ export const calendarService = {
   // Renew existing watch before expiration
   async renewWatch(userId: string): Promise<{ success: boolean; error?: string; webhook_id?: string }> {
     try {
-      console.log('Renewing calendar watch for user:', userId);
       
       // Get current watch info
       const { data: webhook, error: fetchError } = await supabase
@@ -1070,7 +1052,6 @@ export const calendarService = {
         .single();
 
       if (fetchError || !webhook) {
-        console.log('No active watch found, setting up new one');
         return await this.setupWatch(userId);
       }
 
@@ -1080,7 +1061,6 @@ export const calendarService = {
       const renewalThreshold = 24 * 60 * 60 * 1000; // 24 hours
 
       if (expirationTime - now > renewalThreshold) {
-        console.log('Watch not expiring soon, no renewal needed');
         return { success: true, webhook_id: webhook.webhook_id };
       }
 
@@ -1098,7 +1078,6 @@ export const calendarService = {
   // Stop existing watch
   async stopWatch(userId: string, webhookId: string): Promise<{ success: boolean; error?: string }> {
     try {
-      console.log('Stopping calendar watch:', webhookId);
       
       const credentials = await getGoogleCredentials(userId);
       if (!credentials) {
@@ -1133,7 +1112,6 @@ export const calendarService = {
         .eq('user_id', userId)
         .eq('webhook_id', webhookId);
 
-      console.log('Calendar watch stopped successfully');
       return { success: true };
     } catch (error) {
       console.error('Stop watch error:', error);
@@ -1144,7 +1122,6 @@ export const calendarService = {
   // Perform incremental sync using sync token
   async performIncrementalSync(userId: string, syncToken?: string): Promise<{ success: boolean; error?: string; next_sync_token?: string }> {
     try {
-      console.log('Performing incremental sync for user:', userId);
       
       const credentials = await getGoogleCredentials(userId);
       if (!credentials) {
@@ -1153,7 +1130,6 @@ export const calendarService = {
 
       // If no sync token provided, do a full sync
       if (!syncToken) {
-        console.log('No sync token provided, performing full sync');
         const fullSyncResult = await this.performInitialSync(userId);
         return fullSyncResult;
       }
@@ -1173,7 +1149,6 @@ export const calendarService = {
         
         // If sync token is invalid, we need to do a full sync
         if (response.status === 410) {
-          console.log('Sync token invalid, performing full sync');
           const fullSyncResult = await this.performInitialSync(userId);
           if (fullSyncResult.success) {
             // Update webhook with new sync token
@@ -1192,7 +1167,7 @@ export const calendarService = {
       const events = data.items || [];
       const nextSyncToken = data.nextSyncToken;
       
-      console.log(`Incremental sync found ${events.length} events, nextSyncToken: ${nextSyncToken}`);
+      
 
       // Process events
       let processed = 0;
@@ -1203,7 +1178,6 @@ export const calendarService = {
       for (const event of events) {
         // Check if event is deleted/cancelled
         if (event.status === 'cancelled' || event.deleted) {
-          console.log('Processing deleted event:', event.id);
           const deleteResult = await this.handleDeletedEvent(userId, event.id);
           if (deleteResult.success) {
             deleted++;
@@ -1333,50 +1307,71 @@ export const calendarService = {
   // Handle deleted calendar event
   async handleDeletedEvent(userId: string, eventId: string): Promise<{ success: boolean; error?: string }> {
     try {
-      console.log('Handling deleted event:', eventId, 'for user:', userId);
       
-      // Find the meeting in our database
+      // Find all meetings with this event ID
       const { data: meetings, error: findError } = await supabase
         .from('meetings')
-        .select('id, title, bot_status')
+        .select('*')
         .eq('google_calendar_event_id', eventId)
         .eq('user_id', userId);
-      
+
       if (findError) {
         console.error('Error finding meeting for deletion:', findError);
         return { success: false, error: findError.message };
       }
-      
+
       if (!meetings || meetings.length === 0) {
-        console.log('No meeting found for deleted event:', eventId);
         return { success: true }; // Event not in our database, nothing to delete
       }
-      
-      // If multiple meetings found, delete all of them (duplicates)
+
+      // If there are multiple meetings with the same event ID, delete all of them
       if (meetings.length > 1) {
-        console.log(`Found ${meetings.length} duplicate meetings for event ${eventId}, deleting all`);
+        const meetingIds = meetings.map(m => m.id);
+        
+        // Check if any meeting has an active bot
+        const hasActiveBot = meetings.some(m => 
+          m.bot_status === 'bot_joined' || m.bot_status === 'transcribing'
+        );
+
+        if (hasActiveBot) {
+          // Update all meetings to cancelled status instead of deleting
+          const { error: updateError } = await supabase
+            .from('meetings')
+            .update({
+              event_status: 'declined',
+              bot_status: 'failed',
+              updated_at: new Date().toISOString(),
+            })
+            .in('id', meetingIds);
+
+          if (updateError) {
+            console.error('Error updating cancelled meetings:', updateError);
+            return { success: false, error: updateError.message };
+          }
+        } else {
+          // Delete all meetings
+          const { error: deleteError } = await supabase
+            .from('meetings')
+            .delete()
+            .in('id', meetingIds);
+
+          if (deleteError) {
+            console.error('Error deleting meetings:', deleteError);
+            return { success: false, error: deleteError.message };
+          }
+        }
+
+        return { success: true };
       }
+
+      // Single meeting case
+      const meeting = meetings[0];
       
-      const meeting = meetings[0]; // Use the first one for status check
-      
-      if (findError) {
-        console.error('Error finding meeting for deletion:', findError);
-        return { success: false, error: findError.message };
-      }
-      
-      if (!meeting) {
-        console.log('No meeting found for deleted event:', eventId);
-        return { success: true }; // Event not in our database, nothing to delete
-      }
-      
-      // Check if any meeting has active bot or transcript
-      const hasActiveBot = meetings.some(m => m.bot_status === 'bot_joined' || m.bot_status === 'transcribing');
+      // Check if meeting has active bot
+      const hasActiveBot = meeting.bot_status === 'bot_joined' || meeting.bot_status === 'transcribing';
       
       if (hasActiveBot) {
-        console.log('Meeting has active bot, updating status instead of deleting');
-        
-        // Update all meetings status to cancelled instead of deleting
-        const meetingIds = meetings.map(m => m.id);
+        // Update meeting status to cancelled instead of deleting
         const { error: updateError } = await supabase
           .from('meetings')
           .update({
@@ -1384,30 +1379,25 @@ export const calendarService = {
             bot_status: 'failed',
             updated_at: new Date().toISOString(),
           })
-          .in('id', meetingIds);
-        
+          .eq('id', meeting.id);
+
         if (updateError) {
-          console.error('Error updating cancelled meetings:', updateError);
+          console.error('Error updating cancelled meeting:', updateError);
           return { success: false, error: updateError.message };
         }
-        
-        console.log('Meetings marked as cancelled:', meetingIds);
-        return { success: true };
+      } else {
+        // Delete meeting if no active bot
+        const { error: deleteError } = await supabase
+          .from('meetings')
+          .delete()
+          .eq('id', meeting.id);
+
+        if (deleteError) {
+          console.error('Error deleting meeting:', deleteError);
+          return { success: false, error: deleteError.message };
+        }
       }
-      
-      // Delete all meetings if no active bot
-      const meetingIds = meetings.map(m => m.id);
-      const { error: deleteError } = await supabase
-        .from('meetings')
-        .delete()
-        .in('id', meetingIds);
-      
-      if (deleteError) {
-        console.error('Error deleting meetings:', deleteError);
-        return { success: false, error: deleteError.message };
-      }
-      
-      console.log('Meetings deleted successfully:', meetingIds);
+
       return { success: true };
     } catch (error) {
       console.error('Error handling deleted event:', error);
@@ -1418,7 +1408,6 @@ export const calendarService = {
   // Clean up orphaned meetings that no longer exist in Google Calendar
   async cleanupOrphanedMeetings(userId: string, existingEventIds: Set<string>): Promise<{ deleted: number; cancelled: number; error?: string }> {
     try {
-      console.log('Cleaning up orphaned meetings for user:', userId);
       
       // Get all meetings for this user that have google_calendar_event_id
       const { data: meetings, error: findError } = await supabase
@@ -1433,65 +1422,33 @@ export const calendarService = {
       }
       
       if (!meetings || meetings.length === 0) {
-        console.log('No meetings found for cleanup');
         return { deleted: 0, cancelled: 0 };
       }
-      
+
       let deleted = 0;
       let cancelled = 0;
-      
+
       for (const meeting of meetings) {
-        // Check if this meeting's Google Calendar event still exists
-        if (!existingEventIds.has(meeting.google_calendar_event_id)) {
-          console.log(`Found orphaned meeting: ${meeting.title} (${meeting.google_calendar_event_id})`);
-          
-          // Check if meeting has active bot or transcript
-          const hasActiveBot = meeting.bot_status === 'bot_joined' || meeting.bot_status === 'transcribing';
-          const hasBot = meeting.attendee_bot_id !== null;
-          
-          if (hasActiveBot || hasBot) {
-            console.log('Meeting has bot, marking as cancelled instead of deleting');
-            
-            // Update meeting status to cancelled instead of deleting
-            const { error: updateError } = await supabase
-              .from('meetings')
-              .update({
-                event_status: 'declined',
-                bot_status: 'failed',
-                updated_at: new Date().toISOString(),
-              })
-              .eq('id', meeting.id);
-            
-            if (updateError) {
-              console.error('Error updating cancelled meeting:', updateError);
-              continue;
-            }
-            
-            cancelled++;
-          } else {
-            console.log('Deleting orphaned meeting without bot');
-            
-            // Delete meeting if no active bot
-            const { error: deleteError } = await supabase
-              .from('meetings')
-              .delete()
-              .eq('id', meeting.id);
-            
-            if (deleteError) {
-              console.error('Error deleting orphaned meeting:', deleteError);
-              continue;
-            }
-            
-            deleted++;
-          }
+        // Check if the meeting has an active bot
+        if (meeting.bot_status && meeting.bot_status !== 'pending') {
+          // Meeting has bot, mark as cancelled instead of deleting
+          await this.updateMeeting(meeting.id, { 
+            event_status: 'declined',
+            bot_status: 'failed',
+            updated_at: new Date().toISOString()
+          });
+          cancelled++;
+        } else {
+          // No bot, safe to delete
+          await this.deleteMeeting(meeting.id);
+          deleted++;
         }
       }
-      
-      console.log(`Cleanup completed: ${deleted} deleted, ${cancelled} cancelled`);
+
       return { deleted, cancelled };
     } catch (error) {
       console.error('Error cleaning up orphaned meetings:', error);
-      return { deleted: 0, cancelled: 0, error: error.message || String(error) };
+      return { deleted: 0, cancelled: 0, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   },
 
