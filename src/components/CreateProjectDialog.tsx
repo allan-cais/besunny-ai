@@ -12,7 +12,8 @@ import {
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Send, CheckCircle, Edit3, ArrowRight } from 'lucide-react';
 import { useSupabase } from '@/hooks/use-supabase';
-import { Project } from '@/lib/supabase';
+import { Project, supabase, supabaseService } from '@/lib/supabase';
+import { useToast } from '@/hooks/use-toast';
 
 interface ProjectOnboardingData {
   project_name: string;
@@ -116,6 +117,7 @@ const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
   onProjectCreated,
   currentUserId
 }) => {
+  const { toast } = useToast();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [onboardingData, setOnboardingData] = useState<Partial<ProjectOnboardingData>>({});
@@ -343,6 +345,7 @@ const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
   };
 
   const handleConfirm = async () => {
+    console.log('handleConfirm called - starting project creation');
     setSubmitting(true);
     setError(null);
 
@@ -359,6 +362,8 @@ const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
       if (!newProject) {
         throw new Error('Failed to create project');
       }
+
+      console.log('Project created successfully:', newProject);
 
       // Prepare the payload for n8n webhook
       const webhookPayload = {
@@ -380,26 +385,27 @@ const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
         }
       };
 
-      // Send to n8n webhook for project onboarding (optional)
-      const webhookUrl = import.meta.env.VITE_N8N_PROJECT_ONBOARDING_WEBHOOK_URL;
-      
-      if (webhookUrl) {
-        try {
-          const webhookResponse = await fetch(webhookUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(webhookPayload)
-          });
-
-          if (!webhookResponse.ok) {
-            // Webhook failed but project was created - handle silently
-          }
-        } catch (webhookError) {
-          // Don't throw error - webhook is optional
+      // Process project onboarding with AI (background processing)
+      console.log('Starting AI processing for project:', newProject.id);
+      try {
+        const aiResult = await supabaseService.processProjectOnboarding(webhookPayload);
+        console.log('AI processing result:', aiResult);
+        if (aiResult.success) {
+          console.log('AI processing completed successfully:', aiResult.metadata);
+        } else {
+          console.warn('AI processing failed:', aiResult.error);
         }
+      } catch (aiError) {
+        console.warn('AI processing error:', aiError);
+        // Don't throw error - AI processing is optional for project creation
       }
+
+      // Show success toast
+      toast({
+        title: "Project Created Successfully",
+        description: "Your project has been created and AI processing has started. You'll be redirected to the project page.",
+        variant: "default",
+      });
 
       // Call the callback
       onProjectCreated(newProject);

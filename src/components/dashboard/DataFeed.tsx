@@ -62,13 +62,21 @@ const DataFeed = () => {
         .order('created_at', { ascending: false });
 
       if (projectsError) {
-        // Use mock project for demo
-        setProjects([{ id: 'mock-project-1', name: 'Summer' }]);
+        console.error('Error loading projects:', projectsError);
+        // Use a fallback project for demo
+        setProjects([{ id: 'fallback-project', name: 'Demo Project' }]);
       } else {
-        setProjects(projectsData || [{ id: 'mock-project-1', name: 'Summer' }]);
+        // Always ensure we have at least one project for demo purposes
+        const projects = projectsData || [];
+        if (projects.length === 0) {
+          setProjects([{ id: 'fallback-project', name: 'Demo Project' }]);
+        } else {
+          setProjects(projects);
+        }
       }
     } catch (error) {
-      setProjects([{ id: 'mock-project-1', name: 'Summer' }]);
+      console.error('Error in loadProjects:', error);
+      setProjects([{ id: 'fallback-project', name: 'Demo Project' }]);
     }
   };
 
@@ -78,97 +86,65 @@ const DataFeed = () => {
     try {
       setLoading(true);
       
-      // Get documents from the documents table that are associated with this user's projects
+      // Load ALL documents from the documents table - no filtering at all
+      // This should return every document in the database
       const { data: documentsData, error: documentsError } = await supabase
         .from('documents')
-        .select(`
-          id,
-          title,
-          summary,
-          source,
-          source_id,
-          author,
-          received_at,
-          file_url,
-          status,
-          file_id,
-          last_synced_at,
-          watch_active,
-          created_at,
-          project_id
-        `)
-        .in('project_id', (
-          await supabase
-            .from('projects')
-            .select('id')
-            .eq('created_by', user.id)
-        ).data?.map(p => p.id) || [])
+        .select('*')
         .order('created_at', { ascending: false })
-        .limit(50);
+        .limit(200); // Increased limit to get more documents
 
-      // Get meeting transcripts
-      setTranscriptsLoading(true);
-      try {
-        const transcriptsData = await attendeePollingService.getMeetingsWithTranscripts();
-
-        // Transform transcripts to match our interface (always do this regardless of documents success/failure)
-        const transcriptActivities: VirtualEmailActivity[] = (transcriptsData || [])
-          .filter(transcript => transcript.transcript && transcript.transcript.trim().length > 0)
-          .map(transcript => ({
-            id: transcript.id,
-            type: 'meeting_transcript',
-            title: transcript.title ? `Meeting: ${transcript.title}` : 'Untitled Meeting',
-            summary: transcript.transcript_summary || 
-                     (transcript.transcript ? transcript.transcript.substring(0, 150) + '...' : 'No transcript summary available'),
-            source: 'attendee_bot',
-            created_at: transcript.transcript_retrieved_at || transcript.created_at,
-            processed: true,
-            project_id: transcript.project_id,
-            transcript_duration_seconds: transcript.transcript_duration_seconds,
-            transcript_metadata: transcript.transcript_metadata,
-            rawTranscript: transcript // Store the full transcript data for detail view
-          }));
+      if (documentsError) {
+        console.error('Error loading documents:', documentsError);
+        // Fallback to mock data
+        setDocuments(getMockDocuments());
+        setActivities(getMockVirtualEmailActivity());
+      } else {
+        console.log(`Loaded ${documentsData?.length || 0} total documents`);
+        console.log('Documents:', documentsData);
         
-        if (documentsError) {
-          const mockDocs = getMockDocuments();
-          const mockActivities = getMockVirtualEmailActivity();
-          setDocuments(mockDocs);
-          
-          // Combine mock activities with real transcripts
-          const allActivities = [...mockActivities, ...transcriptActivities]
-            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-          
-          setActivities(allActivities);
-        } else {
-          setDocuments(documentsData || []);
-          
-          // Transform documents to match our interface
-          const documentActivities: VirtualEmailActivity[] = (documentsData || []).map(doc => ({
-            id: doc.id,
-            type: getDocumentType(doc.source, doc),
-            title: doc.title || 'Untitled Document',
-            summary: doc.summary ? doc.summary.substring(0, 150) + '...' : 'No content available',
-            source: doc.source || 'unknown',
-            sender: doc.author,
-            file_size: doc.file_url ? 'Unknown' : undefined,
-            created_at: doc.created_at,
-            processed: true, // All documents in DB are processed
-            project_id: doc.project_id
-          }));
-          
-          // Combine and sort by creation date
-          const allActivities = [...documentActivities, ...transcriptActivities]
-            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-          
-          setActivities(allActivities);
+        // Log the project_id distribution to see what we're getting
+        if (documentsData && documentsData.length > 0) {
+          const projectIdCounts = documentsData.reduce((acc: any, doc) => {
+            const key = doc.project_id || 'null';
+            acc[key] = (acc[key] || 0) + 1;
+            return acc;
+          }, {});
+          console.log('Project ID distribution:', projectIdCounts);
         }
-      } catch (error) {
-        console.error('Error loading transcripts:', error);
-        // Continue with documents only if transcript loading fails
-      } finally {
-        setTranscriptsLoading(false);
+        
+        setDocuments(documentsData || []);
+        
+        // Transform documents to match our interface
+        const documentActivities: VirtualEmailActivity[] = (documentsData || []).map(doc => ({
+          id: doc.id,
+          type: doc.type || getDocumentType(doc.source, doc),
+          title: doc.title || 'Untitled Document',
+          summary: doc.summary ? doc.summary.substring(0, 150) + '...' : 'No content available',
+          source: doc.source || 'unknown',
+          sender: doc.author,
+          file_size: doc.file_size,
+          created_at: doc.created_at,
+          processed: true, // All documents in DB are processed
+          project_id: doc.project_id,
+          transcript_duration_seconds: doc.transcript_duration_seconds,
+          transcript_metadata: doc.transcript_metadata,
+          rawTranscript: doc.type === 'meeting_transcript' ? {
+            id: doc.meeting_id || doc.id,
+            title: doc.title,
+            transcript: doc.summary,
+            transcript_summary: doc.summary,
+            transcript_metadata: doc.transcript_metadata,
+            transcript_duration_seconds: doc.transcript_duration_seconds,
+            transcript_retrieved_at: doc.received_at,
+            final_transcript_ready: true
+          } : undefined
+        }));
+        
+        setActivities(documentActivities);
       }
     } catch (error) {
+      console.error('Error loading documents:', error);
       // Fallback to mock data
       setDocuments(getMockDocuments());
       setActivities(getMockVirtualEmailActivity());
@@ -195,7 +171,7 @@ const DataFeed = () => {
   const getMockDocuments = (): Document[] => [
     {
       id: '2',
-      project_id: 'mock-project-1',
+      project_id: 'fallback-project',
       title: 'Q1 Budget Review.xlsx',
       summary: 'Comprehensive budget analysis for Q1 2025 including revenue projections, expense tracking, and variance analysis.',
       source: 'google_drive',
@@ -209,7 +185,7 @@ const DataFeed = () => {
     },
     {
       id: '3',
-      project_id: 'mock-project-1',
+      project_id: 'fallback-project',
       title: 'Product Roadmap 2025',
       summary: 'This document outlines our product vision and planned feature releases for the next 12 months, including timelines and resource allocation.',
       source: 'google_drive',
@@ -223,7 +199,7 @@ const DataFeed = () => {
     },
     {
       id: '5',
-      project_id: 'mock-project-1',
+      project_id: 'fallback-project',
       title: 'Marketing Campaign Assets',
       summary: 'Collection of images, copy, and design files for our upcoming social media campaign. Please review and provide feedback.',
       source: 'google_drive',
@@ -237,7 +213,7 @@ const DataFeed = () => {
     },
     {
       id: '6',
-      project_id: 'mock-project-1',
+      project_id: 'fallback-project',
       title: 'Board Meeting Presentation',
       summary: 'Quarterly board meeting presentation covering financial results, strategic initiatives, and upcoming milestones.',
       source: 'google_drive',
@@ -261,7 +237,7 @@ const DataFeed = () => {
       sender: 'sarah@company.com',
       created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
       processed: true,
-      project_id: 'mock-project-1'
+      project_id: 'fallback-project'
     },
     {
       id: '2',
@@ -272,7 +248,7 @@ const DataFeed = () => {
       file_size: '2.4 MB',
       created_at: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
       processed: true,
-      project_id: 'mock-project-1'
+      project_id: 'fallback-project'
     },
     {
       id: '3',
@@ -283,7 +259,7 @@ const DataFeed = () => {
       file_size: '1.8 MB',
       created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
       processed: true,
-      project_id: 'mock-project-1'
+      project_id: 'fallback-project'
     },
     {
       id: '4',
@@ -304,7 +280,7 @@ const DataFeed = () => {
       source: 'google_drive',
       created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
       processed: true,
-      project_id: 'mock-project-1'
+      project_id: 'fallback-project'
     },
     {
       id: '6',
@@ -326,7 +302,7 @@ const DataFeed = () => {
       source: 'attendee_bot',
       created_at: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
       processed: true,
-      project_id: 'mock-project-1',
+      project_id: 'fallback-project',
       transcript_duration_seconds: 3240, // 54 minutes
       transcript_metadata: {
         word_count: 2847,
@@ -451,6 +427,7 @@ Sarah Johnson: Perfect. Meeting adjourned. Thanks everyone for your time and inp
       source: 'attendee_bot',
       created_at: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
       processed: true,
+      project_id: 'fallback-project',
       transcript_duration_seconds: 2700, // 45 minutes
       transcript_metadata: {
         word_count: 2156,
@@ -662,6 +639,7 @@ Alex Rodriguez: Perfect. Meeting adjourned. Thanks everyone for your input and c
 
   const getProjectName = (projectId?: string) => {
     if (!projectId) return null;
+    if (projectId === 'fallback-project') return 'Demo Project';
     const project = projects.find(p => p.id === projectId);
     return project?.name || null;
   };
@@ -677,17 +655,33 @@ Alex Rodriguez: Perfect. Meeting adjourned. Thanks everyone for your input and c
         )
       );
 
-      // In a real implementation, you would also update the database
-      // const { error } = await supabase
-      //   .from('virtual_email_activity')
-      //   .update({ project_id: projectId })
-      //   .eq('id', activityId);
+      // Update the document in the database
+      const { error } = await supabase
+        .from('documents')
+        .update({ project_id: projectId || null })
+        .eq('id', activityId);
 
-      // if (error) {
-      //   console.error('Error updating project classification:', error);
-      // }
+      if (error) {
+        console.error('Error updating project classification:', error);
+        // Revert local state if database update failed
+        setActivities(prevActivities => 
+          prevActivities.map(activity => 
+            activity.id === activityId 
+              ? { ...activity, project_id: activity.project_id }
+              : activity
+          )
+        );
+      }
     } catch (error) {
-      // Handle classification error silently
+      console.error('Error in handleClassify:', error);
+      // Revert local state if there was an error
+      setActivities(prevActivities => 
+        prevActivities.map(activity => 
+          activity.id === activityId 
+            ? { ...activity, project_id: activity.project_id }
+            : activity
+        )
+      );
     }
   };
 
@@ -865,8 +859,15 @@ Alex Rodriguez: Perfect. Meeting adjourned. Thanks everyone for your input and c
                     <div className="flex items-center gap-2">
                       {/* Project Badge - First */}
                       {activity.project_id ? (
-                        <Badge variant="outline" className="px-2 py-0.5 text-[10px] text-[#4a5565] dark:text-zinc-200 bg-stone-50 dark:bg-zinc-800 uppercase font-mono">
-                          Project {activity.project_id === 'mock-project-1' ? 'Summer' : getProjectName(activity.project_id)}
+                        <Badge 
+                          variant="outline" 
+                          className="select-project-badge px-2 py-0.5 text-[10px] text-[#4a5565] dark:text-zinc-200 bg-stone-50 dark:bg-zinc-800 uppercase font-mono cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setClassificationActivity(activity);
+                          }}
+                        >
+                          Project {getProjectName(activity.project_id)}
                         </Badge>
                       ) : (
                         <Badge variant="outline" className="select-project-badge px-2 py-0.5 text-[10px] text-red-500 bg-red-50 dark:bg-red-950 uppercase font-mono cursor-pointer">
@@ -936,14 +937,18 @@ Alex Rodriguez: Perfect. Meeting adjourned. Thanks everyone for your input and c
       <EmailModal 
         email={selectedEmail} 
         isOpen={!!selectedEmail}
-        onClose={() => setSelectedEmail(null)} 
+        onClose={() => setSelectedEmail(null)}
+        projects={projects}
+        onProjectChange={handleClassify}
       />
 
       {/* Document Modal */}
       <DocumentModal 
         document={selectedDocument} 
         isOpen={!!selectedDocument}
-        onClose={() => setSelectedDocument(null)} 
+        onClose={() => setSelectedDocument(null)}
+        projects={projects}
+        onProjectChange={handleClassify}
       />
 
       {/* Classification Modal */}

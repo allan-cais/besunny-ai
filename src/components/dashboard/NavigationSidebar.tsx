@@ -42,24 +42,14 @@ const NavigationSidebar = ({
   openSubmenus, 
   onToggleSubmenu, 
   onNavItemClick,
-  onNewChat,
   onNewProject,
-  chats,
   projects,
-  activeChatId,
   activeProjectId,
-  onChatSelect,
   onProjectSelect,
-  onRenameChat,
-  onDeleteChat,
   onRenameProject,
   onDeleteProject,
   activeNavItem
 }: NavigationSidebarProps) => {
-  const [renameDialogOpen, setRenameDialogOpen] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [selectedChat, setSelectedChat] = useState<DashboardChatSession | null>(null);
-  const [newTitle, setNewTitle] = useState("");
   const [renameProjectDialogOpen, setRenameProjectDialogOpen] = useState(false);
   const [deleteProjectDialogOpen, setDeleteProjectDialogOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
@@ -79,34 +69,6 @@ const NavigationSidebar = ({
     // { icon: Terminal, label: "Playbooks", active: false },
     // { icon: Settings, label: "Settings", active: activeNavItem === "Settings" },
   ];
-
-  const handleRenameClick = (chat: DashboardChatSession) => {
-    setSelectedChat(chat);
-    setNewTitle(chat.title);
-    setRenameDialogOpen(true);
-  };
-
-  const handleDeleteClick = (chat: DashboardChatSession) => {
-    setSelectedChat(chat);
-    setDeleteDialogOpen(true);
-  };
-
-  const handleRenameConfirm = () => {
-    if (selectedChat && newTitle.trim()) {
-      onRenameChat(selectedChat.id, newTitle.trim());
-      setRenameDialogOpen(false);
-      setSelectedChat(null);
-      setNewTitle("");
-    }
-  };
-
-  const handleDeleteConfirm = () => {
-    if (selectedChat) {
-      onDeleteChat(selectedChat.id);
-      setDeleteDialogOpen(false);
-      setSelectedChat(null);
-    }
-  };
 
   const handleProjectRenameClick = (project: Project) => {
     setSelectedProject(project);
@@ -221,13 +183,12 @@ const NavigationSidebar = ({
             </div>
           ))}
 
-          {/* Chats Section */}
-          <div className="mt-6">
+          {/* Chats Section - REMOVED: Now project-specific */}
+          {/* <div className="mt-6">
             <div className="px-3 py-2 text-xs font-mono text-gray-600 dark:text-gray-400 uppercase tracking-wide">
               Chats
             </div>
             <div className="pl-4 space-y-1">
-              {/* New Chat Button - First item under Chats */}
               <div
                 className="w-full flex items-center font-mono text-left px-3 h-9 text-xs cursor-pointer border border-transparent hover:bg-stone-300 dark:hover:bg-zinc-700 hover:border-[#4a5565] dark:hover:border-zinc-700 rounded-md transition-colors mb-2"
                 onClick={onNewChat}
@@ -236,7 +197,6 @@ const NavigationSidebar = ({
                 <span className="truncate">New Chat</span>
               </div>
               
-              {/* Existing Chats */}
               {chats.map((chat) => (
                 <div
                   key={chat.id}
@@ -245,7 +205,7 @@ const NavigationSidebar = ({
                 >
                   <MessageSquare className="w-4 h-4 mr-3 flex-shrink-0" />
                   <span className="truncate text-xs font-mono flex-1" style={{ minWidth: 0 }}>{chat.title}</span>
-                  {!isCollapsed && (
+                  {
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button
@@ -273,11 +233,11 @@ const NavigationSidebar = ({
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
-                  )}
+                  }
                 </div>
               ))}
             </div>
-          </div>
+          </div> */}
         </div>
         
         {/* Sidebar Toggle Button */}
@@ -295,7 +255,7 @@ const NavigationSidebar = ({
       </div>
 
       {/* Rename Chat Dialog */}
-      <Dialog open={renameDialogOpen} onOpenChange={setRenameDialogOpen}>
+      {/* <Dialog open={renameDialogOpen} onOpenChange={setRenameDialogOpen}>
         <DialogContent className="sm:max-w-[425px] bg-stone-100 dark:bg-zinc-800 border border-[#4a5565] dark:border-zinc-700 font-mono text-xs">
           <DialogHeader>
             <DialogTitle className="text-[#4a5565] dark:text-zinc-50 font-mono text-sm font-bold">
@@ -341,10 +301,10 @@ const NavigationSidebar = ({
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
+      </Dialog> */}
 
       {/* Delete Chat Dialog */}
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      {/* <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent className="sm:max-w-[425px] bg-stone-100 dark:bg-zinc-800 border border-[#4a5565] dark:border-zinc-700 font-mono text-xs">
           <DialogHeader>
             <DialogTitle className="text-[#4a5565] dark:text-zinc-50 font-mono text-sm font-bold">
@@ -371,7 +331,7 @@ const NavigationSidebar = ({
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
+      </Dialog> */}
 
       {/* Edit Project Dialog */}
       <Dialog open={renameProjectDialogOpen} onOpenChange={setRenameProjectDialogOpen}>

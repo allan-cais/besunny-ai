@@ -5,6 +5,7 @@ import { useSupabase } from '@/hooks/use-supabase';
 import { ChatSession, supabaseService } from '@/lib/supabase';
 import CreateProjectDialog from '@/components/CreateProjectDialog';
 import AIAssistant from '@/components/AIAssistant';
+import ProjectChat from '@/components/ProjectChat';
 import { v4 as uuidv4 } from 'uuid';
 import {
   Header,
@@ -19,10 +20,10 @@ const DashboardLayout = () => {
   const { getProjectsForUser, getChatSessions, createChatSession, endChatSession, updateChatSession } = useSupabase();
   const [openSubmenus, setOpenSubmenus] = useState<{ [key: string]: boolean }>({});
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [isChatSidebarCollapsed, setIsChatSidebarCollapsed] = useState(true);
-  const [chats, setChats] = useState<DashboardChatSession[]>([]);
+  // const [isChatSidebarCollapsed, setIsChatSidebarCollapsed] = useState(true); // REMOVED: Now project-specific
+  // const [chats, setChats] = useState<DashboardChatSession[]>([]); // REMOVED: Now project-specific
   const [projects, setProjects] = useState<any[]>([]);
-  const [activeChatId, setActiveChatId] = useState<string | null>(null);
+  // const [activeChatId, setActiveChatId] = useState<string | null>(null); // REMOVED: Now project-specific
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [createProjectDialogOpen, setCreateProjectDialogOpen] = useState(false);
   const [activeCenterPanel, setActiveCenterPanel] = useState('');
@@ -68,9 +69,9 @@ const DashboardLayout = () => {
         lastMessageAt: session.started_at,
         unreadCount: 0
       }));
-      setChats(dashboardChats);
-      if (dashboardChats.length > 0 && !activeChatId) {
-        setActiveChatId(dashboardChats[0].id);
+      // setChats(dashboardChats); // REMOVED: Now project-specific
+      if (dashboardChats.length > 0 && !activeProjectId) { // REMOVED: Now project-specific
+        setActiveProjectId(dashboardChats[0].id);
       }
     } catch (error) {
       console.error('Error loading chat sessions:', error);
@@ -103,7 +104,7 @@ const DashboardLayout = () => {
   // Handle chat updates from AIAssistant
   const handleAIChatUpdate = (updatedAIChats: AIChatSession[]) => {
     const updatedDashboardChats = updatedAIChats.map(convertToDashboardChatSession);
-    setChats(updatedDashboardChats);
+    // setChats(updatedDashboardChats); // REMOVED: Now project-specific
   };
 
   // Create new chat session in Supabase
@@ -127,13 +128,13 @@ const DashboardLayout = () => {
       const newSession = await createChatSession(session);
       const newChat: DashboardChatSession = {
         id: newSession.id,
-        title: newSession.name || `Chat ${chats.length + 1}`,
+        title: newSession.name || `Chat ${projects.length + 1}`, // REMOVED: Now project-specific
         createdAt: newSession.started_at,
         lastMessageAt: newSession.started_at,
         unreadCount: 0
       };
-      setChats(prev => [newChat, ...prev]);
-      setActiveChatId(newChat.id);
+      // setChats(prev => [newChat, ...prev]); // REMOVED: Now project-specific
+      setActiveProjectId(newChat.id);
     } catch (error) {
       console.error('Error creating chat session:', error);
     }
@@ -143,7 +144,7 @@ const DashboardLayout = () => {
   const renameChat = async (chatId: string, newTitle: string) => {
     try {
       await updateChatSession(chatId, { name: newTitle });
-      setChats(prev => prev.map(chat => chat.id === chatId ? { ...chat, title: newTitle } : chat));
+      // setChats(prev => prev.map(chat => chat.id === chatId ? { ...chat, title: newTitle } : chat)); // REMOVED: Now project-specific
     } catch (error) {
       console.error('Error renaming chat session:', error);
     }
@@ -153,9 +154,9 @@ const DashboardLayout = () => {
   const deleteChat = async (chatId: string) => {
     try {
       await endChatSession(chatId);
-      setChats(prev => prev.filter(chat => chat.id !== chatId));
-      if (activeChatId === chatId) {
-        setActiveChatId(chats.length > 1 ? chats[0].id : null);
+      // setChats(prev => prev.filter(chat => chat.id !== chatId)); // REMOVED: Now project-specific
+      if (activeProjectId === chatId) {
+        setActiveProjectId(projects.length > 1 ? projects[0].id : null);
       }
     } catch (error) {
       console.error('Error deleting chat session:', error);
@@ -219,13 +220,13 @@ const DashboardLayout = () => {
     }
   };
 
-  const toggleChatSidebar = () => {
-    setIsChatSidebarCollapsed(!isChatSidebarCollapsed);
-  };
+  // const toggleChatSidebar = () => { // REMOVED: Now project-specific
+  //   setIsChatSidebarCollapsed(!isChatSidebarCollapsed);
+  // };
 
-  const selectChat = (chatId: string) => {
-    setActiveChatId(chatId);
-  };
+  // const selectChat = (chatId: string) => { // REMOVED: Now project-specific
+  //   setActiveChatId(chatId);
+  // };
 
   const renameProject = async (projectId: string, newName: string, newDescription: string) => {
     try {
@@ -284,6 +285,10 @@ const DashboardLayout = () => {
     return 'Home';
   };
 
+  // Check if we're on a project page
+  const isProjectPage = location.pathname.startsWith('/project/');
+  const projectId = isProjectPage ? location.pathname.split('/')[2] : null;
+
   return (
     <div className="flex flex-col h-screen bg-stone-50 dark:bg-zinc-900">
       {/* Header at the very top, full width */}
@@ -296,16 +301,16 @@ const DashboardLayout = () => {
           openSubmenus={openSubmenus}
           onToggleSubmenu={toggleSubmenu}
           onNavItemClick={handleNavItemClick}
-          onNewChat={createNewChat}
+          // onNewChat={createNewChat} // REMOVED: Now project-specific
           onNewProject={createNewProject}
-          chats={chats}
+          // chats={chats} // REMOVED: Now project-specific
           projects={projects}
-          activeChatId={activeChatId}
+          // activeChatId={activeChatId} // REMOVED: Now project-specific
           activeProjectId={activeProjectId}
-          onChatSelect={selectChat}
+          // onChatSelect={selectChat} // REMOVED: Now project-specific
           onProjectSelect={selectProject}
-          onRenameChat={renameChat}
-          onDeleteChat={deleteChat}
+          // onRenameChat={renameChat} // REMOVED: Now project-specific
+          // onDeleteChat={deleteChat} // REMOVED: Now project-specific
           onRenameProject={renameProject}
           onDeleteProject={deleteProject}
           activeNavItem={getActiveNavItem()}
@@ -317,15 +322,31 @@ const DashboardLayout = () => {
                 <Outlet />
               </div>
             </div>
-            <AIAssistant
-              isCollapsed={isChatSidebarCollapsed}
-              onToggle={toggleChatSidebar}
-              chats={convertChatsToAI(chats)}
-              activeChatId={activeChatId}
+            {/* AIAssistant - REMOVED: Now project-specific */}
+            {/* <AIAssistant
+              // isCollapsed={isChatSidebarCollapsed} // REMOVED: Now project-specific
+              // onToggle={toggleChatSidebar} // REMOVED: Now project-specific
+              chats={convertChatsToAI(projects.map(p => ({ // REMOVED: Now project-specific
+                id: p.id,
+                title: p.name || `Chat ${p.id}`,
+                createdAt: p.created_at,
+                lastMessageAt: p.updated_at,
+                unreadCount: 0
+              })))}
+              activeChatId={activeProjectId}
               onChatUpdate={handleAIChatUpdate}
               currentUserId={user?.id}
               currentProjectId={activeProjectId}
-            />
+            /> */}
+            
+            {/* Project Chat - Show only on project pages */}
+            {isProjectPage && projectId && (
+              <ProjectChat 
+                projectId={projectId}
+                userId={user?.id || ''}
+                projectName={projects.find(p => p.id === projectId)?.name}
+              />
+            )}
           </div>
         </div>
       </div>

@@ -1,0 +1,490 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Send, ChevronRight, MessageSquare } from 'lucide-react';
+import { useSupabase } from '@/hooks/use-supabase';
+import { ChatMessage as SupabaseChatMessage } from '@/lib/supabase';
+import { v4 as uuidv4 } from 'uuid';
+
+interface ChatMessage {
+  id: string;
+  session_id: string;
+  role?: string;
+  message?: string;
+  used_chunks?: string[];
+  created_at: string;
+}
+
+interface ProjectChatProps {
+  projectId: string;
+  userId: string;
+  projectName?: string;
+}
+
+const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectName }) => {
+  const [chatMessage, setChatMessage] = useState("");
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
+  const [activeChatId, setActiveChatId] = useState<string | null>(null);
+  const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
+  const [streamingText, setStreamingText] = useState("");
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const assistantContainerRef = useRef<HTMLDivElement>(null);
+
+  // Supabase hooks
+  const { 
+    saveMessages, 
+    getMessagesBySession, 
+    createChatSession,
+    updateChatSession,
+    getMostRecentProjectChat
+  } = useSupabase();
+
+  // Get n8n webhook URL from environment or use default
+  const N8N_WEBHOOK_URL = import.meta.env.VITE_N8N_WEBHOOK_URL || 'https://n8n.customaistudio.io/webhook/kirit-rag-webhook';
+
+  // Load existing chat session for this project on mount
+  useEffect(() => {
+    const loadExistingChat = async () => {
+      if (!userId || !projectId) return;
+      
+      try {
+        const existingChat = await getMostRecentProjectChat(userId, projectId);
+        if (existingChat) {
+          setActiveChatId(existingChat.id);
+          await loadMessagesForChat(existingChat.id);
+          setIsCollapsed(false);
+        }
+      } catch (error) {
+        console.error('Error loading existing chat:', error);
+      }
+    };
+
+    loadExistingChat();
+  }, [userId, projectId, getMostRecentProjectChat]);
+
+  // Real-time subscription for messages
+  useEffect(() => {
+    if (!activeChatId) return;
+
+    const supabase = (window as any).supabase;
+    if (!supabase) return;
+
+    const subscription = supabase
+      .channel(`chat-${activeChatId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'chat_messages',
+          filter: `session_id=eq.${activeChatId}`
+        },
+        (payload: any) => {
+          if (payload.new) {
+            const newMessage = payload.new as SupabaseChatMessage;
+            setMessages(prev => {
+              // Check if message already exists
+              const exists = prev.some(msg => msg.id === newMessage.id);
+              if (!exists) {
+                return [...prev, newMessage];
+              }
+              return prev;
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [activeChatId]);
+
+  const loadMessagesForChat = async (chatId: string) => {
+    try {
+      const supabaseMessages = await getMessagesBySession(chatId, 100);
+      let loadedMessages: ChatMessage[] = supabaseMessages;
+      // If no messages found, initialize with welcome message
+      if (loadedMessages.length === 0) {
+        loadedMessages = [{
+          id: crypto.randomUUID(),
+          session_id: chatId,
+          role: "assistant",
+          message: `Hello! I'm here to help you with your project "${projectName || 'this project'}". How can I assist you today?`,
+          created_at: new Date().toISOString()
+        }];
+      }
+      setMessages(loadedMessages);
+    } catch (error) {
+      console.error('Error loading messages:', error);
+      setMessages([{
+        id: crypto.randomUUID(),
+        session_id: chatId,
+        role: "assistant",
+        message: `Hello! I'm here to help you with your project "${projectName || 'this project'}". How can I assist you today?`,
+        created_at: new Date().toISOString()
+      }]);
+    }
+  };
+
+  const createNewChat = async () => {
+    if (!userId) return;
+    
+    const newId = uuidv4();
+    const session = {
+      id: newId,
+      user_id: userId,
+      project_id: projectId,
+      name: `Chat for ${projectName || 'Project'}`
+    };
+    
+    try {
+      const newSession = await createChatSession(session);
+      setActiveChatId(newSession.id);
+      await loadMessagesForChat(newSession.id);
+      setIsCollapsed(false);
+    } catch (error) {
+      console.error('Error creating chat session:', error);
+    }
+  };
+
+  const saveMessagesForChat = async (chatId: string, messages: ChatMessage[]) => {
+    try {
+      const messagesToSave = messages.map(msg => ({
+        id: msg.id,
+        session_id: msg.session_id,
+        role: msg.role,
+        message: msg.message,
+        used_chunks: msg.used_chunks || []
+      }));
+      await saveMessages(messagesToSave);
+    } catch (error) {
+      console.error('Error saving messages:', error);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (chatMessage.trim() && !isLoading) {
+      const userMessageText = chatMessage.trim();
+      setChatMessage("");
+      
+      // Create new chat if this is the first message
+      if (!activeChatId) {
+        await createNewChat();
+        // Wait a moment for the chat to be created
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
+      if (!activeChatId) return;
+
+      // Open chat interface immediately so user can see the message being sent
+      setIsCollapsed(false);
+
+      const userMessage: ChatMessage = {
+        id: crypto.randomUUID(),
+        session_id: activeChatId,
+        role: "user",
+        message: userMessageText,
+        created_at: new Date().toISOString()
+      };
+      
+      // Add user message immediately
+      setMessages(prev => [...prev, userMessage]);
+      
+      // Add typing indicator after a small delay to feel more natural
+      setTimeout(() => {
+        const typingMessage: ChatMessage = {
+          id: crypto.randomUUID(),
+          session_id: activeChatId,
+          role: "assistant",
+          message: "",
+          created_at: new Date().toISOString()
+        };
+        setMessages(prev => [...prev, typingMessage]);
+      }, 500); // 500ms delay
+      
+      setIsLoading(true);
+      
+      try {
+        // Save user message to database
+        await saveMessagesForChat(activeChatId, [userMessage]);
+        
+        // Send message to n8n webhook for AI processing
+        const webhookPayload = {
+          session_id: activeChatId,
+          user_id: userId,
+          project_id: projectId,
+          message: userMessageText,
+          message_id: userMessage.id,
+          timestamp: new Date().toISOString()
+        };
+        
+        const webhookResponse = await fetch(N8N_WEBHOOK_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(webhookPayload),
+        });
+        
+        if (!webhookResponse.ok) {
+          const errorText = await webhookResponse.text();
+          console.error('N8N webhook error:', webhookResponse.status, webhookResponse.statusText, errorText);
+          throw new Error('Failed to get AI response');
+        } else {
+          const responseText = await webhookResponse.text();
+          // Parse the assistant's reply from n8n
+          let assistantReply = '';
+          try {
+            const webhookResult = JSON.parse(responseText);
+            assistantReply = webhookResult.output || webhookResult.message || responseText;
+          } catch (e) {
+            assistantReply = responseText;
+          }
+          
+          // Create assistant message with empty content initially
+          const assistantMessage: ChatMessage = {
+            id: crypto.randomUUID(),
+            session_id: activeChatId,
+            role: "assistant",
+            message: "",
+            created_at: new Date().toISOString()
+          };
+          
+          // Remove typing indicator and add empty assistant message
+          setMessages(prev => {
+            const withoutTyping = prev.filter(msg => !(msg.role === 'assistant' && (!msg.message || msg.message === "")));
+            return [...withoutTyping, assistantMessage];
+          });
+          
+          // Start streaming the response
+          streamResponse(assistantReply, assistantMessage.id);
+          
+          // Save the complete message to Supabase after streaming completes
+          setTimeout(async () => {
+            const completeMessage: ChatMessage = {
+              ...assistantMessage,
+              message: assistantReply
+            };
+            await saveMessagesForChat(activeChatId, [completeMessage]);
+            
+            // Update the message with the complete text
+            setMessages(prev => prev.map(msg => 
+              msg.id === assistantMessage.id 
+                ? { ...msg, message: assistantReply }
+                : msg
+            ));
+          }, assistantReply.length * 17.5 + 100); // Wait for streaming to complete (avg 17.5ms per char)
+        }
+      } catch (error) {
+        console.error('Error sending message:', error);
+        // Remove typing indicator and add error message
+        setMessages(prev => {
+          const withoutTyping = prev.filter(msg => !(msg.role === 'assistant' && (!msg.message || msg.message === "")));
+          return [...withoutTyping, {
+            id: crypto.randomUUID(),
+            session_id: activeChatId,
+            role: "assistant",
+            message: "Sorry, I encountered an error. Please try again.",
+            created_at: new Date().toISOString()
+          }];
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
+  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setChatMessage(e.target.value);
+    e.target.style.height = 'auto';
+    e.target.style.height = `${e.target.scrollHeight}px`;
+  };
+
+  // Simulate streaming by gradually revealing text
+  const streamResponse = (fullText: string, messageId: string) => {
+    setStreamingMessageId(messageId);
+    setStreamingText("");
+    
+    let currentIndex = 0;
+    const streamNextChar = () => {
+      if (currentIndex < fullText.length) {
+        setStreamingText(prev => prev + fullText[currentIndex]);
+        currentIndex++;
+        
+        // Random delay between 10-25ms for natural typing feel
+        const delay = 10 + Math.random() * 15;
+        setTimeout(streamNextChar, delay);
+      } else {
+        setStreamingMessageId(null);
+        setStreamingText("");
+      }
+    };
+    
+    // Start streaming
+    streamNextChar();
+  };
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    if (scrollAreaRef.current) {
+      scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  const toggleChat = () => {
+    setIsCollapsed(!isCollapsed);
+  };
+
+  // Show placeholder when no chat is selected
+  if (!activeChatId) {
+    return (
+      <>
+        <div
+          ref={assistantContainerRef}
+          className={`relative transition-all duration-300 ease-in-out ${
+          isCollapsed ? 'w-0' : 'w-[25rem]'
+        }`}>
+          {!isCollapsed && (
+            <div className="h-full border-l border-[#4a5565] dark:border-zinc-700 bg-stone-100 dark:bg-zinc-800 flex flex-col">
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center text-gray-500 dark:text-gray-400">
+                  <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p className="text-sm">Start a conversation about your project</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Floating sunnyAI Button (when chat sidebar is collapsed) */}
+        {isCollapsed && (
+          <button
+            onClick={toggleChat}
+            className="fixed right-4 bottom-4 w-12 h-12 bg-[#4a5565] dark:bg-zinc-50 text-stone-100 dark:text-zinc-900 border border-[#4a5565] dark:border-zinc-700 rounded-full flex items-center justify-center hover:bg-stone-300 dark:hover:bg-zinc-700 transition-colors z-20 shadow-lg"
+            title="Open Project Assistant"
+          >
+            <MessageSquare className="w-6 h-6" />
+          </button>
+        )}
+      </>
+    );
+  }
+
+  return (
+    <>
+      {/* Right Sidebar - Project Chat */}
+      <div
+        ref={assistantContainerRef}
+        className={`relative transition-all duration-300 ease-in-out ${
+        isCollapsed ? 'w-0' : 'w-[25rem]'
+      }`}>
+        {!isCollapsed && (
+          <div className="h-full border-l border-[#4a5565] dark:border-zinc-700 bg-stone-100 dark:bg-zinc-800 flex flex-col">
+            {/* Chat Header */}
+            <div className="p-3 border-b border-[#4a5565] dark:border-zinc-700 flex-shrink-0">
+              <div className="text-sm font-bold font-mono uppercase tracking-wide">
+                Project Assistant
+              </div>
+              <div className="text-xs text-gray-500 font-mono">
+                {projectName || 'Project'} Chat
+              </div>
+            </div>
+
+            {/* Chat Messages */}
+            <ScrollArea className="flex-1 p-2" ref={scrollAreaRef}>
+              <div className="space-y-4">
+                {messages.map((message) => (
+                  <div key={message.id} className={`space-y-2`}>
+                    <div className={`text-xs font-bold font-mono uppercase tracking-wide ${
+                      message.role === 'user' ? 'text-right' : 'text-left'
+                    }`}>
+                      {message.role === 'user' ? 'USER' : 'ASSISTANT'}
+                    </div>
+                    <div className={`p-2 text-xs font-mono whitespace-pre-wrap break-words ${
+                      message.role === 'user' 
+                        ? 'border border-[#4a5565] bg-[#4a5565] text-stone-100 ml-8' 
+                        : 'text-[#4a5565] dark:text-zinc-50 mr-8'
+                    }`}>
+                      {streamingMessageId === message.id ? streamingText : message.message}
+                      {streamingMessageId === message.id && (
+                        <span className="inline-block w-0.5 h-4 bg-[#4a5565] dark:bg-zinc-50 ml-0.5 animate-pulse"></span>
+                      )}
+                      {message.role === 'assistant' && isLoading && (!message.message || message.message === "") && (
+                        <span className="inline-flex items-center">
+                          <span className="animate-pulse">.</span>
+                          <span className="animate-pulse" style={{ animationDelay: '0.2s' }}>.</span>
+                          <span className="animate-pulse" style={{ animationDelay: '0.4s' }}>.</span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+
+            {/* Chat Input */}
+            <div className="p-2 border-t border-[#4a5565] dark:border-zinc-700 flex-shrink-0">
+              <div className="flex items-end space-x-2">
+                <div className="flex-1">
+                  <textarea
+                    ref={textareaRef}
+                    value={chatMessage}
+                    onChange={handleTextareaChange}
+                    onKeyPress={handleKeyPress}
+                    className="w-full resize-none border border-[#4a5565] dark:border-zinc-700 rounded-md bg-white dark:bg-zinc-900 px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#4a5565] dark:focus:ring-zinc-700"
+                    rows={1}
+                    placeholder="Type your message..."
+                  />
+                </div>
+                <Button
+                  type="button"
+                  onClick={handleSendMessage}
+                  disabled={isLoading || !chatMessage.trim()}
+                  className="p-2 h-8 w-8 flex items-center justify-center border border-[#4a5565] dark:border-zinc-700 bg-[#4a5565] dark:bg-zinc-700 text-stone-100 dark:text-zinc-50 rounded-md hover:bg-[#3a4555] dark:hover:bg-zinc-600 transition-colors font-mono text-xs"
+                >
+                  <Send className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Chat Sidebar Toggle Button */}
+        {!isCollapsed && (
+          <button
+            onClick={toggleChat}
+            className="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-stone-100 dark:bg-zinc-800 border border-[#4a5565] dark:border-zinc-700 rounded-full flex items-center justify-center hover:bg-stone-300 dark:hover:bg-zinc-700 transition-colors z-10"
+            title="Collapse chat"
+          >
+            <ChevronRight className="w-3 h-3" />
+          </button>
+        )}
+      </div>
+
+      {/* Floating sunnyAI Button (when chat sidebar is collapsed) */}
+      {isCollapsed && (
+        <button
+          onClick={toggleChat}
+          className="fixed right-4 bottom-4 w-12 h-12 bg-[#4a5565] dark:bg-zinc-50 text-stone-100 dark:text-zinc-900 border border-[#4a5565] dark:border-zinc-700 rounded-full flex items-center justify-center hover:bg-stone-300 dark:hover:bg-zinc-700 transition-colors z-20 shadow-lg"
+          title="Open Project Assistant"
+        >
+          <MessageSquare className="w-6 h-6" />
+        </button>
+      )}
+    </>
+  );
+};
+
+export default ProjectChat; 

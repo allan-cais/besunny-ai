@@ -183,6 +183,28 @@ export const useSupabase = () => {
     }
   }, []);
 
+  const getMostRecentProjectChat = useCallback(async (userId: string, projectId: string) => {
+    if (!supabaseService.isConfigured()) {
+      console.warn('Supabase not configured');
+      return null;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const sessions = await supabaseService.getChatSessions(userId, projectId);
+      // Return the most recent active chat session (not ended)
+      const activeSessions = sessions.filter(session => !session.ended_at);
+      return activeSessions.length > 0 ? activeSessions[0] : null;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch project chat session');
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   const endChatSession = useCallback(async (sessionId: string) => {
     if (!supabaseService.isConfigured()) {
       console.warn('Supabase not configured');
@@ -301,6 +323,7 @@ export const useSupabase = () => {
     createChatSession,
     updateChatSession,
     getChatSessions,
+    getMostRecentProjectChat,
     endChatSession,
     
     // Chat message operations

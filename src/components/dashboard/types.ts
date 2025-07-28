@@ -23,16 +23,10 @@ export interface NavigationSidebarProps {
   openSubmenus: { [key: string]: boolean };
   onToggleSubmenu: (label: string) => void;
   onNavItemClick: (item: { icon: React.ComponentType; label: string; active: boolean; subItems?: string[] }) => void;
-  onNewChat: () => void;
   onNewProject: () => void;
-  chats: DashboardChatSession[];
   projects: Project[];
-  activeChatId: string | null;
   activeProjectId: string | null;
-  onChatSelect: (chatId: string) => void;
   onProjectSelect: (projectId: string) => void;
-  onRenameChat: (chatId: string, newTitle: string) => void;
-  onDeleteChat: (chatId: string) => void;
   onRenameProject: (projectId: string, newName: string, newDescription: string) => void;
   onDeleteProject: (projectId: string) => void;
   activeNavItem: string;

@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Mail, FileText, MessageSquare, X } from 'lucide-react';
+import { Mail, FileText, MessageSquare, X, Edit3 } from 'lucide-react';
 
 interface ClassificationModalProps {
   activity: {
@@ -14,6 +14,7 @@ interface ClassificationModalProps {
     source: string;
     sender?: string;
     created_at: string;
+    project_id?: string;
   } | null;
   projects: Array<{ id: string; name: string }>;
   isOpen: boolean;
@@ -29,6 +30,15 @@ const ClassificationModal: React.FC<ClassificationModalProps> = ({
   onClassify 
 }) => {
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
+  const [isReclassifying, setIsReclassifying] = useState(false);
+
+  // Reset state when modal opens/closes or activity changes
+  useEffect(() => {
+    if (activity) {
+      setSelectedProjectId(activity.project_id || '');
+      setIsReclassifying(!!activity.project_id);
+    }
+  }, [activity, isOpen]);
 
   if (!activity) return null;
 
@@ -64,6 +74,12 @@ const ClassificationModal: React.FC<ClassificationModalProps> = ({
     }
   };
 
+  const getCurrentProjectName = () => {
+    if (!activity.project_id) return null;
+    const project = projects.find(p => p.id === activity.project_id);
+    return project?.name || 'Unknown Project';
+  };
+
   const handleClassify = () => {
     if (selectedProjectId) {
       onClassify(activity.id, selectedProjectId);
@@ -71,17 +87,34 @@ const ClassificationModal: React.FC<ClassificationModalProps> = ({
     }
   };
 
+  const handleRemoveClassification = () => {
+    onClassify(activity.id, ''); // Empty string to remove classification
+    onClose();
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-red-100 dark:bg-red-900/20 rounded-lg flex items-center justify-center">
-              {getTypeIcon(activity.type)}
+            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+              isReclassifying 
+                ? 'bg-orange-100 dark:bg-orange-900/20' 
+                : 'bg-red-100 dark:bg-red-900/20'
+            }`}>
+              {isReclassifying ? (
+                <Edit3 className="w-6 h-6 text-orange-600 dark:text-orange-400" />
+              ) : (
+                getTypeIcon(activity.type)
+              )}
             </div>
             <div>
-              <DialogTitle className="text-lg font-bold font-mono">Classify Item</DialogTitle>
-              <div className="text-xs text-gray-500 font-mono">Select project for this item</div>
+              <DialogTitle className="text-lg font-bold font-mono">
+                {isReclassifying ? 'Reclassify Item' : 'Classify Item'}
+              </DialogTitle>
+              <div className="text-xs text-gray-500 font-mono">
+                {isReclassifying ? 'Change project assignment' : 'Select project for this item'}
+              </div>
             </div>
           </div>
         </DialogHeader>
@@ -103,12 +136,21 @@ const ClassificationModal: React.FC<ClassificationModalProps> = ({
             <p className="text-sm text-gray-600 dark:text-gray-400 font-mono line-clamp-2">
               {activity.summary}
             </p>
+            
+            {/* Current Project (if reclassifying) */}
+            {isReclassifying && activity.project_id && (
+              <div className="mt-3 p-2 bg-orange-50 dark:bg-orange-950/20 rounded border border-orange-200 dark:border-orange-800">
+                <div className="text-xs text-orange-700 dark:text-orange-300 font-mono font-medium">
+                  Currently assigned to: {getCurrentProjectName()}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Project Selection */}
           <div className="space-y-2">
             <label className="text-sm font-medium text-[#4a5565] dark:text-zinc-200 font-mono">
-              ASSOCIATE WITH PROJECT
+              {isReclassifying ? 'REASSIGN TO PROJECT' : 'ASSOCIATE WITH PROJECT'}
             </label>
             <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
               <SelectTrigger className="w-full bg-white dark:bg-zinc-900 border border-[#4a5565] dark:border-zinc-700 text-sm font-mono">
@@ -137,12 +179,28 @@ const ClassificationModal: React.FC<ClassificationModalProps> = ({
             >
               Cancel
             </Button>
+            
+            {/* Remove Classification Button (only for reclassifying) */}
+            {isReclassifying && (
+              <Button
+                variant="outline"
+                onClick={handleRemoveClassification}
+                className="flex-1 border-red-500 text-red-600 hover:bg-red-50 dark:hover:bg-red-950 font-mono"
+              >
+                Remove
+              </Button>
+            )}
+            
             <Button
               onClick={handleClassify}
               disabled={!selectedProjectId}
-              className="flex-1 bg-red-600 hover:bg-red-700 text-white font-mono"
+              className={`flex-1 font-mono ${
+                isReclassifying 
+                  ? 'bg-orange-600 hover:bg-orange-700 text-white' 
+                  : 'bg-red-600 hover:bg-red-700 text-white'
+              }`}
             >
-              Classify
+              {isReclassifying ? 'Reclassify' : 'Classify'}
             </Button>
           </div>
         </div>

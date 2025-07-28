@@ -54,6 +54,11 @@ export interface Document {
   last_synced_at?: string;
   watch_active?: boolean;
   created_at: string;
+  type?: 'email' | 'document' | 'spreadsheet' | 'presentation' | 'image' | 'folder' | 'meeting_transcript';
+  file_size?: string;
+  transcript_duration_seconds?: number;
+  transcript_metadata?: any;
+  meeting_id?: string;
 }
 
 export interface DocumentChunk {
@@ -446,5 +451,55 @@ export const supabaseService = {
   // Check if Supabase is configured
   isConfigured(): boolean {
     return !!(supabaseUrl && supabaseAnonKey);
+  },
+
+  async processProjectOnboarding(payload: {
+    project_id: string;
+    user_id: string;
+    summary: {
+      project_name: string;
+      overview: string;
+      keywords: string[];
+      deliverables: string;
+      contacts: {
+        internal_lead: string;
+        agency_lead: string;
+        client_lead: string;
+      };
+      shoot_date: string;
+      location: string;
+      references: string;
+    };
+  }): Promise<{ success: boolean; message: string; metadata?: any; error?: string }> {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.access_token) {
+        throw new Error('No active session');
+      }
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/project-onboarding-ai`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error('Error processing project onboarding:', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
   }
-}; 
+}

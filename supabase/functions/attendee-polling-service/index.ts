@@ -315,6 +315,34 @@ async function pollMeeting(meetingId: string) {
 
       console.log(`✅ Final transcript saved to database`);
 
+      // Also create a document record for the transcript
+      const { data: documentData, error: documentError } = await supabase
+        .from('documents')
+        .insert({
+          id: crypto.randomUUID(), // Generate UUID for document ID
+          project_id: meeting.project_id,
+          type: 'meeting_transcript',
+          source: 'attendee_bot',
+          source_id: meetingId,
+          title: meeting.title || 'Meeting Transcript',
+          summary: transcriptResult.summary,
+          author: 'Meeting Attendee Bot',
+          received_at: new Date().toISOString(),
+          created_by: meeting.user_id,
+          meeting_id: meetingId,
+          transcript_duration_seconds: transcriptResult.duration_seconds,
+          transcript_metadata: transcriptResult.metadata,
+          status: 'active'
+        })
+        .select('id')
+        .single();
+
+      if (documentError) {
+        console.error(`❌ Failed to create document record for transcript:`, documentError);
+      } else {
+        console.log(`✅ Document record created for transcript: ${documentData.id}`);
+      }
+
       // Verify the transcript update
       const { data: transcriptVerifyData, error: transcriptVerifyError } = await supabase
         .from('meetings')

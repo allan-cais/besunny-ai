@@ -41,6 +41,64 @@ interface GmailMessage {
   };
 }
 
+interface Project {
+  id: string;
+  name: string;
+  description?: string;
+  status: string;
+  normalized_tags?: string[];
+  categories?: string[];
+  reference_keywords?: string[];
+  notes?: string;
+  classification_signals?: any;
+  entity_patterns?: any;
+  created_by: string;
+}
+
+interface Document {
+  id: string;
+  project_id: string | null;
+  source: string;
+  source_id: string;
+  title: string;
+  author: string;
+  received_at: string;
+  summary: string;
+  mimetype?: string;
+}
+
+interface User {
+  id: string;
+  username?: string;
+  email?: string;
+}
+
+interface ClassificationPayload {
+  document_id: string;
+  user_id: string;
+  type: 'email' | 'drive_notification';
+  source: string;
+  title: string;
+  author: string;
+  received_at: string;
+  content: string;
+  metadata: {
+    gmail_message_id?: string;
+    filename?: string;
+    mimetype?: string | null;
+    notification_type?: string;
+  };
+  project_metadata: Array<{
+    project_id: string;
+    normalized_tags?: string[];
+    categories?: string[];
+    reference_keywords?: string[];
+    notes?: string;
+    classification_signals?: any;
+    entity_patterns?: any;
+  }>;
+}
+
 interface EmailProcessingResult {
   success: boolean;
   message: string;
@@ -74,7 +132,7 @@ function extractUsernameFromEmail(email: string): string | null {
   return null;
 }
 
-async function findUserByUsername(supabase: any, username: string): Promise<string | null> {
+async function findUserByUsername(supabase: any, username: string): Promise<User | null> {
   const { data, error } = await supabase
     .rpc('get_user_by_username', { search_username: username })
     .maybeSingle();
@@ -83,7 +141,11 @@ async function findUserByUsername(supabase: any, username: string): Promise<stri
     return null;
   }
   
-  return data.user_id;
+  return {
+    id: data.user_id,
+    username: username,
+    email: data.email
+  };
 }
 
 async function createDocumentFromEmail(
@@ -106,7 +168,8 @@ async function createDocumentFromEmail(
       author: sender,
       received_at: new Date(parseInt(gmailMessage.internalDate)).toISOString(),
       created_by: userId,
-      summary: gmailMessage.snippet || ''
+      summary: gmailMessage.snippet || '',
+      mimetype: gmailMessage.payload.mimeType || null
     })
     .select('id')
     .single();
@@ -118,13 +181,72 @@ async function createDocumentFromEmail(
   return document.id;
 }
 
+async function getActiveProjectsForUser(supabase: any, userId: string): Promise<Project[]> {
+  const { data: projects, error } = await supabase
+    .from('projects')
+    .select(`
+      id,
+      name,
+      description,
+      status,
+      normalized_tags,
+      categories,
+      reference_keywords,
+      notes,
+      classification_signals,
+      entity_patterns,
+      created_by
+    `)
+    .eq('created_by', userId)
+    .in('status', ['active', 'in_progress'])
+    .order('last_classification_at', { ascending: false, nullsLast: true });
+  
+  if (error) {
+    console.error('Error fetching projects:', error);
+    return [];
+  }
+  
+  return projects || [];
+}
+
+function buildClassificationPayload({
+  document,
+  user,
+  projects
+}: {
+  document: Document;
+  user: User;
+  projects: Project[];
+}): ClassificationPayload {
+  return {
+    document_id: document.id,
+    user_id: user.id,
+    type: document.source === 'gmail' ? 'email' : 'drive_notification',
+    source: document.source,
+    title: document.title,
+    author: document.author,
+    received_at: document.received_at,
+    content: document.summary,
+    metadata: {
+      gmail_message_id: document.source_id,
+      filename: document.title,
+      mimetype: document.mimetype || null,
+      notification_type: document.source === 'drive_notification' ? 'drive_shared' : undefined
+    },
+    project_metadata: projects.map(project => ({
+      project_id: project.id,
+      normalized_tags: project.normalized_tags,
+      categories: project.categories,
+      reference_keywords: project.reference_keywords,
+      notes: project.notes,
+      classification_signals: project.classification_signals,
+      entity_patterns: project.entity_patterns
+    }))
+  };
+}
+
 async function sendToN8nWebhook(
-  userId: string,
-  documentId: string,
-  gmailMessage: GmailMessage,
-  subject: string,
-  sender: string,
-  username: string
+  payload: ClassificationPayload
 ): Promise<boolean> {
   const n8nWebhookUrl = Deno.env.get('N8N_CLASSIFICATION_WEBHOOK_URL');
   
@@ -134,21 +256,7 @@ async function sendToN8nWebhook(
   }
   
   try {
-    // Send payload to n8n classification agent
-    // The agent will analyze the content and determine the appropriate project_id
-    // based on AI reasoning and content analysis
-    const payload = {
-      user_id: userId,
-      document_id: documentId,
-      gmail_message_id: gmailMessage.id,
-      subject: subject,
-      sender: sender,
-      username: username,
-      snippet: gmailMessage.snippet,
-      received_at: new Date(parseInt(gmailMessage.internalDate)).toISOString(),
-      source: 'gmail',
-      type: 'email'
-    };
+    console.log('Sending classification payload to N8N:', JSON.stringify(payload, null, 2));
     
     const response = await fetch(n8nWebhookUrl, {
       method: 'POST',
@@ -162,6 +270,9 @@ async function sendToN8nWebhook(
       console.error(`N8N webhook failed: ${response.status} ${response.statusText}`);
       return false;
     }
+    
+    const responseText = await response.text();
+    console.log('N8N webhook response:', responseText);
     
     return true;
   } catch (error) {
@@ -198,9 +309,9 @@ async function processInboundEmail(
     }
     
     // Find user by username
-    const userId = await findUserByUsername(supabase, username);
+    const user = await findUserByUsername(supabase, username);
     
-    if (!userId) {
+    if (!user) {
       // Log the attempt but don't create a document
       await supabase
         .from('email_processing_logs')
@@ -223,27 +334,41 @@ async function processInboundEmail(
     // Create document
     const documentId = await createDocumentFromEmail(
       supabase,
-      userId,
+      user.id,
       gmailMessage,
       subjectHeader || 'No Subject',
       fromHeader || 'Unknown Sender'
     );
     
+    // Get the created document
+    const { data: document, error: docError } = await supabase
+      .from('documents')
+      .select('*')
+      .eq('id', documentId)
+      .single();
+    
+    if (docError || !document) {
+      throw new Error(`Failed to retrieve created document: ${docError?.message}`);
+    }
+    
+    // Get active projects for the user
+    const projects = await getActiveProjectsForUser(supabase, user.id);
+    
+    // Build classification payload
+    const classificationPayload = buildClassificationPayload({
+      document,
+      user,
+      projects
+    });
+    
     // Send to N8N webhook
-    const n8nSuccess = await sendToN8nWebhook(
-      userId,
-      documentId,
-      gmailMessage,
-      subjectHeader || 'No Subject',
-      fromHeader || 'Unknown Sender',
-      username
-    );
+    const n8nSuccess = await sendToN8nWebhook(classificationPayload);
     
     // Log the processing
     await supabase
       .from('email_processing_logs')
       .insert({
-        user_id: userId,
+        user_id: user.id,
         gmail_message_id: gmailMessage.id,
         inbound_address: toHeader,
         extracted_username: username,
@@ -259,7 +384,7 @@ async function processInboundEmail(
     return {
       success: true,
       message: `Email processed successfully for user: ${username}`,
-      user_id: userId,
+      user_id: user.id,
       document_id: documentId,
       n8n_webhook_sent: n8nSuccess
     };

@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Mail, Clock, Calendar, Copy, Download, User, FileText } from 'lucide-react';
+import { Mail, Clock, Calendar, Copy, Download, User, FileText, Edit3 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface EmailModalProps {
   email: {
@@ -27,10 +28,49 @@ interface EmailModalProps {
   } | null;
   isOpen: boolean;
   onClose: () => void;
+  projects?: Array<{ id: string; name: string }>;
+  onProjectChange?: (emailId: string, projectId: string) => void;
 }
 
-const EmailModal: React.FC<EmailModalProps> = ({ email, isOpen, onClose }) => {
+const EmailModal: React.FC<EmailModalProps> = ({ 
+  email, 
+  isOpen, 
+  onClose, 
+  projects = [], 
+  onProjectChange 
+}) => {
+  const [isEditingProject, setIsEditingProject] = useState(false);
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
+
+  // Reset state when modal opens/closes or email changes
+  useEffect(() => {
+    if (email) {
+      setSelectedProjectId(email.project_id || '');
+      setIsEditingProject(false);
+    }
+  }, [email, isOpen]);
+
   if (!email) return null;
+
+  const getCurrentProjectName = () => {
+    if (!email.project_id) return null;
+    const project = projects.find(p => p.id === email.project_id);
+    return project?.name || 'Unknown Project';
+  };
+
+  const handleProjectChange = () => {
+    if (selectedProjectId && onProjectChange) {
+      onProjectChange(email.id, selectedProjectId);
+      setIsEditingProject(false);
+    }
+  };
+
+  const handleRemoveProject = () => {
+    if (onProjectChange) {
+      onProjectChange(email.id, '');
+      setIsEditingProject(false);
+    }
+  };
 
   const formatDateTime = (dateString: string) => {
     return new Date(dateString).toLocaleString('en-US', {
@@ -122,11 +162,76 @@ const EmailModal: React.FC<EmailModalProps> = ({ email, isOpen, onClose }) => {
               <Badge className="border border-[#4a5565] dark:border-zinc-700 rounded px-2 py-0.5 text-[10px] text-[#4a5565] dark:text-zinc-200 bg-stone-50 dark:bg-zinc-800 hover:bg-stone-50 dark:hover:bg-zinc-800 uppercase font-mono">
                 Source: {email.source}
               </Badge>
-              {email.project_id && (
-                <Badge className="border border-[#4a5565] dark:border-zinc-700 rounded px-2 py-0.5 text-[10px] text-[#4a5565] dark:text-zinc-200 bg-stone-50 dark:bg-zinc-800 hover:bg-stone-50 dark:hover:bg-zinc-800 uppercase font-mono">
-                  Project ID: {email.project_id}
-                </Badge>
-              )}
+              
+              {/* Project Assignment Section */}
+              <div className="flex items-center gap-2">
+                {isEditingProject ? (
+                  <div className="flex items-center gap-2">
+                    <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+                      <SelectTrigger className="w-48 h-6 text-xs bg-white dark:bg-zinc-900 border border-[#4a5565] dark:border-zinc-700 font-mono">
+                        <SelectValue placeholder="Select project..." />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white dark:bg-zinc-900 border border-[#4a5565] dark:border-zinc-700 font-mono">
+                        {projects.map(project => (
+                          <SelectItem
+                            key={project.id}
+                            value={project.id}
+                            className="text-[#4a5565] dark:text-zinc-200 hover:bg-stone-50 dark:hover:bg-zinc-800 focus:bg-stone-50 dark:focus:bg-zinc-800 font-mono text-xs"
+                          >
+                            {project.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      size="sm"
+                      onClick={handleProjectChange}
+                      disabled={!selectedProjectId}
+                      className="h-6 px-2 text-xs bg-green-600 hover:bg-green-700 text-white font-mono"
+                    >
+                      Save
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsEditingProject(false)}
+                      className="h-6 px-2 text-xs border-[#4a5565] dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[#4a5565] dark:text-zinc-200 hover:bg-stone-50 dark:hover:bg-zinc-800 font-mono"
+                    >
+                      Cancel
+                    </Button>
+                    {email.project_id && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleRemoveProject}
+                        className="h-6 px-2 text-xs border-red-500 text-red-600 hover:bg-red-50 dark:hover:bg-red-950 font-mono"
+                      >
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    {email.project_id ? (
+                      <Badge className="border border-[#4a5565] dark:border-zinc-700 rounded px-2 py-0.5 text-[10px] text-[#4a5565] dark:text-zinc-200 bg-stone-50 dark:bg-zinc-800 hover:bg-stone-50 dark:hover:bg-zinc-800 uppercase font-mono">
+                        Project: {getCurrentProjectName()}
+                      </Badge>
+                    ) : (
+                      <Badge className="border border-red-500 rounded px-2 py-0.5 text-[10px] text-red-500 bg-red-50 dark:bg-red-950 hover:bg-red-50 dark:hover:bg-red-950 uppercase font-mono">
+                        No Project
+                      </Badge>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsEditingProject(true)}
+                      className="h-6 px-2 text-xs border-[#4a5565] dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[#4a5565] dark:text-zinc-200 hover:bg-stone-50 dark:hover:bg-zinc-800 font-mono"
+                    >
+                      <Edit3 className="w-3 h-3" />
+                    </Button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
