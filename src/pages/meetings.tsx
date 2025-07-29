@@ -15,6 +15,8 @@ import { supabase } from '@/lib/supabase';
 import BotConfigurationModal from '@/components/dashboard/BotConfigurationModal';
 import { apiKeyService } from '@/lib/api-keys';
 import { attendeePollingService } from '@/lib/attendee-polling';
+import { attendeeService } from '../lib/attendee-service';
+import { useToast } from '@/components/ui/use-toast';
 
 
 const MeetingsPage: React.FC = () => {
@@ -44,6 +46,8 @@ const MeetingsPage: React.FC = () => {
       console.error('Polling error:', error);
     }
   });
+
+  const { toast } = useToast();
 
   useEffect(() => {
     loadMeetings();
@@ -200,87 +204,36 @@ const MeetingsPage: React.FC = () => {
     try {
       setSendingBot(meeting.id);
       
-      // Build basic bot options - only essential configuration
-      const botOptions: any = {
-        // Basic required fields
+      const result = await attendeeService.sendBotToMeeting({
         meeting_url: meeting.meeting_url,
-        bot_name: configuration?.bot_name || meeting.bot_name || 'Sunny AI Assistant',
-        
-        // Chat message configuration
-        bot_chat_message: {
-          to: configuration?.chat_message_recipient || 'everyone',
-          message: configuration?.bot_chat_message || meeting.bot_chat_message || 'Hi, I\'m here to transcribe this meeting!',
-          ...(configuration?.to_user_uuid && { to_user_uuid: configuration.to_user_uuid })
-        },
-        
-        // Future scheduling
-        join_at: (() => {
-          const meetingStartTime = new Date(meeting.start_time);
-          const joinAtTime = new Date(meetingStartTime.getTime() - 2 * 60 * 1000); // Join 2 minutes before start
-          return joinAtTime.toISOString();
-        })(),
-      };
+        bot_name: configuration?.bot_name || meeting.bot_name || 'AI Assistant',
+        bot_chat_message: configuration?.bot_chat_message || meeting.bot_chat_message || 'Hi, I\'m here to transcribe this meeting!'
+      });
       
-      // Note: transcription_settings.language is not supported by Attendee API
-      // Language will use API defaults
+      // Update meeting with bot ID and status
+      await supabase
+        .from('meetings')
+        .update({
+          attendee_bot_id: result.botId,
+          bot_status: 'bot_scheduled',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', meeting.id);
 
-      const result = await apiKeyService.sendBotToMeeting(meeting.meeting_url, botOptions);
+      // Reload meetings to show updated status
+      loadMeetings();
       
-      // Handle different possible response structures from Attendee API
-      let attendeeBotId = null;
-      if (result && typeof result === 'object') {
-        // Try different possible field names for the bot ID
-        attendeeBotId = result.id || result.bot_id || result.botId || result.bot_id;
-      }
-      
-      if (!attendeeBotId) {
-        throw new Error('Failed to get bot ID from Attendee API response');
-      }
-      
-      // Create a bot record in the bots table with basic settings
-      const botRecord = await calendarService.createBot({
-        name: configuration?.bot_name || meeting.bot_name || 'Sunny AI Assistant',
-        description: 'Basic transcription bot with essential configuration',
-        provider: 'attendee',
-        provider_bot_id: attendeeBotId,
-        settings: {
-          attendee_bot_id: attendeeBotId,
-          created_via: 'manual_deployment',
-          meeting_id: meeting.id,
-          configuration: configuration || {},
-          join_at: botOptions.join_at,
-          meeting_start_time: meeting.start_time,
-        },
-        is_active: true
+      toast({
+        title: "Bot deployed successfully!",
+        description: `Bot will join the meeting 2 minutes before it starts.`,
       });
-      
-      // Update the meeting with the bot UUID and status
-      await calendarService.updateBotStatus(
-        meeting.id, 
-        'bot_scheduled', 
-        botRecord.id // Use the UUID from the bots table
-      );
-      
-      // Also update the deployment method, configuration, and enable polling
-      await calendarService.updateMeeting(meeting.id, {
-        bot_deployment_method: 'manual',
-        bot_configuration: configuration || {},
-        polling_enabled: true
+    } catch (error: any) {
+      console.error('Error sending bot to meeting:', error);
+      toast({
+        title: "Failed to deploy bot",
+        description: error.message,
+        variant: "destructive",
       });
-      
-      // Immediately update the local state to show the new bot status
-      updateMeetingInState(meeting.id, {
-        bot_status: 'bot_scheduled',
-        attendee_bot_id: botRecord.id,
-        bot_deployment_method: 'manual',
-        bot_configuration: configuration || {},
-        polling_enabled: true
-      });
-      
-      handleMeetingUpdate();
-    } catch (err: any) {
-      console.error('Error sending bot to meeting:', err);
-      // Handle error silently
     } finally {
       setSendingBot(null);
     }

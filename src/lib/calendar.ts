@@ -144,6 +144,15 @@ export interface Meeting {
   auto_scheduled_via_email?: boolean;
   virtual_email_attendee?: string;
   auto_bot_notification_sent?: boolean;
+  // Enhanced transcript fields
+  transcript_summary?: string;
+  transcript_duration_seconds?: number;
+  transcript_retrieved_at?: string;
+  transcript_participants?: string[];
+  transcript_speakers?: string[];
+  transcript_segments?: any[];
+  transcript_audio_url?: string;
+  transcript_recording_url?: string;
   created_at: string;
   updated_at: string;
 }

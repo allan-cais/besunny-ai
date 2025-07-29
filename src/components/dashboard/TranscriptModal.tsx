@@ -2,7 +2,8 @@ import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MessageSquare, Clock, Calendar, ExternalLink, Copy, Download, X } from 'lucide-react';
+import { MessageSquare, Clock, Calendar, ExternalLink, Copy, Download, X, Play } from 'lucide-react';
+import ParticipantAnalytics from './ParticipantAnalytics';
 
 interface TranscriptModalProps {
   transcript: {
@@ -16,6 +17,9 @@ interface TranscriptModalProps {
     meeting_url?: string;
     start_time?: string;
     end_time?: string;
+    transcript_audio_url?: string;
+    transcript_segments?: any[];
+    transcript_participants?: string[];
   } | null;
   isOpen: boolean;
   onClose: () => void;
@@ -39,6 +43,12 @@ const TranscriptModal: React.FC<TranscriptModalProps> = ({ transcript, isOpen, o
       minute: '2-digit',
       hour12: true,
     });
+  };
+
+  const formatTimestamp = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
   const copyTranscript = async () => {
@@ -136,11 +146,31 @@ const TranscriptModal: React.FC<TranscriptModalProps> = ({ transcript, isOpen, o
             </p>
           </div>
 
+          {/* Participant Analytics */}
+          {transcript.transcript_participants && transcript.transcript_segments && transcript.transcript_duration_seconds && (
+            <ParticipantAnalytics
+              participants={transcript.transcript_participants}
+              segments={transcript.transcript_segments}
+              duration={transcript.transcript_duration_seconds}
+            />
+          )}
+
           {/* Full Transcript */}
           <div className="bg-stone-50 dark:bg-zinc-800 rounded-lg p-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-bold font-mono">FULL TRANSCRIPT</h3>
               <div className="flex items-center gap-2">
+                {transcript.transcript_audio_url && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.open(transcript.transcript_audio_url, '_blank')}
+                    className="font-mono text-xs border-[#4a5565] dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[#4a5565] dark:text-zinc-200 hover:bg-stone-50 dark:hover:bg-zinc-800"
+                  >
+                    <Play className="w-3 h-3 mr-1" />
+                    Audio
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   size="sm"
@@ -161,11 +191,44 @@ const TranscriptModal: React.FC<TranscriptModalProps> = ({ transcript, isOpen, o
                 </Button>
               </div>
             </div>
-            <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 max-h-96 overflow-y-auto scrollbar-hide border border-[#4a5565] dark:border-zinc-700">
-              <pre className="text-sm text-gray-700 dark:text-gray-300 font-mono whitespace-pre-wrap leading-relaxed">
-                {transcript.transcript}
-              </pre>
-            </div>
+            
+            {/* Speaker Segments */}
+            {transcript.transcript_segments && transcript.transcript_segments.length > 0 ? (
+              <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 max-h-96 overflow-y-auto scrollbar-hide border border-[#4a5565] dark:border-zinc-700">
+                <div className="space-y-3">
+                  {transcript.transcript_segments.map((segment: any, index: number) => (
+                    <div key={index} className="flex items-start space-x-3">
+                      <div className="flex-shrink-0">
+                        <div className="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/20 flex items-center justify-center">
+                          <span className="text-xs font-bold text-purple-600 dark:text-purple-400">
+                            {segment.speaker ? segment.speaker.charAt(0).toUpperCase() : '?'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center space-x-2 mb-1">
+                          <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                            {segment.speaker || 'Unknown Speaker'}
+                          </span>
+                          <span className="text-xs text-gray-500 font-mono">
+                            {formatTimestamp(segment.start)} - {formatTimestamp(segment.end)}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                          {segment.text}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 max-h-96 overflow-y-auto scrollbar-hide border border-[#4a5565] dark:border-zinc-700">
+                <pre className="text-sm text-gray-700 dark:text-gray-300 font-mono whitespace-pre-wrap leading-relaxed">
+                  {transcript.transcript}
+                </pre>
+              </div>
+            )}
           </div>
 
           {/* AI Actions */}
