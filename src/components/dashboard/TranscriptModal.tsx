@@ -77,7 +77,7 @@ const TranscriptModal: React.FC<TranscriptModalProps> = ({ transcript, isOpen, o
           </div>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto space-y-6">
+        <div className="flex-1 overflow-y-auto scrollbar-hide space-y-6">
           {/* Meeting Info */}
           <div className="bg-stone-50 dark:bg-zinc-800 rounded-lg p-4 space-y-3">
             <h3 className="text-sm font-bold font-mono">MEETING DETAILS</h3>
@@ -161,7 +161,7 @@ const TranscriptModal: React.FC<TranscriptModalProps> = ({ transcript, isOpen, o
                 </Button>
               </div>
             </div>
-            <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 max-h-96 overflow-y-auto border border-[#4a5565] dark:border-zinc-700">
+            <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 max-h-96 overflow-y-auto scrollbar-hide border border-[#4a5565] dark:border-zinc-700">
               <pre className="text-sm text-gray-700 dark:text-gray-300 font-mono whitespace-pre-wrap leading-relaxed">
                 {transcript.transcript}
               </pre>

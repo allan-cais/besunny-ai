@@ -39,7 +39,7 @@ const FeedItemDetail = ({ id, onBack }: FeedItemDetailProps) => {
   if (detail.type === 'email') {
     const msg = detail.messages[0];
     return (
-      <div className="flex-1 flex flex-col overflow-y-auto">
+      <div className="flex-1 flex flex-col overflow-y-auto scrollbar-hide">
         <div className="p-8 pb-2">
           <button onClick={onBack} className="mb-4 text-xs text-gray-500 hover:underline">&lt; Feed</button>
           <h1 className="text-xl font-bold mb-1">{detail.title}</h1>

@@ -133,7 +133,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
           </div>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto space-y-6">
+        <div className="flex-1 overflow-y-auto scrollbar-hide space-y-6">
           {/* Document Info */}
           <div className="bg-stone-50 dark:bg-zinc-800 rounded-lg p-4 space-y-3">
             <h3 className="text-sm font-bold font-mono">DOCUMENT DETAILS</h3>

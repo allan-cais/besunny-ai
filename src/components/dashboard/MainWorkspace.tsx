@@ -29,7 +29,7 @@ const MainWorkspace = ({
   if (activeProjectId) {
     // Project dashboard should be full width, standardized spacing
     return (
-      <div className="flex-1 flex flex-col overflow-y-auto">
+      <div className="flex-1 flex flex-col overflow-y-auto scrollbar-hide">
         <div className="mb-6 flex items-center">
           <div>
             <span className="text-xs font-medium">PROJECT</span>
@@ -49,7 +49,7 @@ const MainWorkspace = ({
   
   // Default workspace view (centered, full width, standardized spacing)
   return (
-    <div className="flex-1 flex flex-col overflow-y-auto">
+    <div className="flex-1 flex flex-col overflow-y-auto scrollbar-hide">
       {/* Workspace Header */}
       <div className="mb-6 flex items-center">
         <div>

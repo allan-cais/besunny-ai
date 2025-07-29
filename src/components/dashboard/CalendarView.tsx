@@ -317,7 +317,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
   return (
     <div className="h-full flex flex-col">
       <h1 className="text-2xl font-bold font-mono uppercase tracking-wide text-[#2d3748] dark:text-zinc-50 mb-6">Meetings</h1>
-      <div className="flex-1 overflow-y-auto space-y-6 pr-2">
+      <div className="flex-1 overflow-y-auto scrollbar-hide space-y-6 pr-2">
         {sortedMeetings.length === 0 && (
           <div className="text-center text-gray-400 py-12 font-mono">No meetings scheduled.</div>
         )}

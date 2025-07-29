@@ -60,7 +60,7 @@ const TranscriptDetail: React.FC<TranscriptDetailProps> = ({ transcript, onBack 
   };
 
   return (
-    <div className="flex-1 flex flex-col overflow-y-auto">
+    <div className="flex-1 flex flex-col overflow-y-auto scrollbar-hide">
       <div className="p-8 pb-2">
         <button onClick={onBack} className="mb-4 text-xs text-gray-500 hover:underline font-mono">
           &lt; Data Feed
@@ -164,7 +164,7 @@ const TranscriptDetail: React.FC<TranscriptDetailProps> = ({ transcript, onBack 
             </div>
           </CardHeader>
           <CardContent>
-            <div className="bg-stone-50 dark:bg-zinc-800 rounded-lg p-4 max-h-96 overflow-y-auto">
+            <div className="bg-stone-50 dark:bg-zinc-800 rounded-lg p-4 max-h-96 overflow-y-auto scrollbar-hide">
               <pre className="text-sm text-gray-700 dark:text-gray-300 font-mono whitespace-pre-wrap leading-relaxed">
                 {transcript.transcript}
               </pre>

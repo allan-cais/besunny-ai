@@ -10,6 +10,9 @@ import PageHeader from '@/components/dashboard/PageHeader';
 import { Loader2, Brain, Tag, Users, MapPin, Calendar, FileText, Building, Clock, Database } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/providers/AuthProvider';
+import TranscriptModal from '@/components/dashboard/TranscriptModal';
+import EmailModal from '@/components/dashboard/EmailModal';
+import DocumentModal from '@/components/dashboard/DocumentModal';
 
 const colorMap = {
   red: 'bg-red-500',
@@ -44,11 +47,11 @@ interface ExtendedProject extends Project {
   categories?: string[];
   reference_keywords?: string[];
   notes?: string;
-  entity_patterns?: any;
-  classification_signals?: any;
+  entity_patterns?: Record<string, unknown>;
+  classification_signals?: Record<string, unknown>;
   pinecone_document_count?: number;
   last_classification_at?: string | null;
-  classification_feedback?: any;
+  classification_feedback?: Record<string, unknown>;
 }
 
 interface ProjectMeeting {
@@ -59,6 +62,13 @@ interface ProjectMeeting {
   status: string;
   attendees?: string[];
   notes?: string;
+  meeting_url?: string;
+  transcript_url?: string;
+  transcript?: string;
+  transcript_summary?: string;
+  transcript_metadata?: Record<string, unknown>;
+  transcript_duration_seconds?: number;
+  transcript_retrieved_at?: string;
 }
 
 interface ProjectData {
@@ -69,6 +79,10 @@ interface ProjectData {
   status: string;
   size?: string;
   source?: string;
+  content?: string;
+  summary?: string;
+  sender?: string;
+  file_size?: string;
 }
 
 const ProjectDashboard = () => {
@@ -81,6 +95,13 @@ const ProjectDashboard = () => {
   const [projectData, setProjectData] = useState<ProjectData[]>([]);
   const [meetingsLoading, setMeetingsLoading] = useState(true);
   const [dataLoading, setDataLoading] = useState(true);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [selectedTranscript, setSelectedTranscript] = useState<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [selectedEmail, setSelectedEmail] = useState<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [selectedDocument, setSelectedDocument] = useState<any>(null);
+  const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([]);
   const { toast } = useToast();
 
   // Load project-specific meetings
@@ -89,9 +110,13 @@ const ProjectDashboard = () => {
     
     setMeetingsLoading(true);
     try {
+      // Load meetings with transcript data
       const { data: meetings, error } = await supabase
         .from('meetings')
-        .select('*')
+        .select(`
+          *,
+          transcripts:meeting_transcripts(*)
+        `)
         .eq('project_id', projectId)
         .order('start_time', { ascending: true });
 
@@ -99,13 +124,48 @@ const ProjectDashboard = () => {
         console.error('Error loading project meetings:', error);
         setProjectMeetings([]);
       } else {
-        setProjectMeetings(meetings || []);
+        // Transform meetings to include transcript data
+        const transformedMeetings = (meetings || []).map(meeting => {
+          const transcript = meeting.transcripts?.[0];
+          return {
+            ...meeting,
+            transcript: transcript?.transcript,
+            transcript_summary: transcript?.transcript_summary,
+            transcript_metadata: transcript?.transcript_metadata,
+            transcript_duration_seconds: transcript?.transcript_duration_seconds,
+            transcript_retrieved_at: transcript?.transcript_retrieved_at,
+          };
+        });
+        setProjectMeetings(transformedMeetings);
       }
     } catch (error) {
       console.error('Error loading project meetings:', error);
       setProjectMeetings([]);
     } finally {
       setMeetingsLoading(false);
+    }
+  };
+
+  // Load projects for modal dropdowns
+  const loadProjects = async () => {
+    if (!user?.id) return;
+    
+    try {
+      const { data: projectsData, error: projectsError } = await supabase
+        .from('projects')
+        .select('id, name')
+        .eq('created_by', user.id)
+        .order('created_at', { ascending: false });
+
+      if (projectsError) {
+        console.error('Error loading projects:', projectsError);
+        setProjects([]);
+      } else {
+        setProjects(projectsData || []);
+      }
+    } catch (error) {
+      console.error('Error in loadProjects:', error);
+      setProjects([]);
     }
   };
 
@@ -125,7 +185,7 @@ const ProjectDashboard = () => {
         console.error('Error loading project data:', error);
         setProjectData([]);
       } else {
-        // Transform documents to ProjectData format
+        // Transform documents to ProjectData format with additional fields
         const transformedData: ProjectData[] = (documents || []).map(doc => ({
           id: doc.id,
           type: doc.type || 'document',
@@ -133,7 +193,11 @@ const ProjectDashboard = () => {
           created_at: doc.created_at,
           status: doc.status || 'active',
           size: doc.file_size ? `${Math.round(doc.file_size / 1024)}KB` : undefined,
-          source: doc.source || 'upload'
+          source: doc.source || 'upload',
+          content: doc.content,
+          summary: doc.summary,
+          sender: doc.sender,
+          file_size: doc.file_size ? `${Math.round(doc.file_size / 1024)}KB` : undefined
         }));
         setProjectData(transformedData);
       }
@@ -188,6 +252,7 @@ const ProjectDashboard = () => {
       // Load project-specific meetings and data
       loadProjectMeetings();
       loadProjectData();
+      loadProjects();
       
       // Set up real-time subscription for project updates
       const subscription = supabase
@@ -260,9 +325,16 @@ const ProjectDashboard = () => {
   }
 
   return (
-    <div className="px-4 py-8 font-sans">
-      <PageHeader title="PROJECT" path={`~/sunny.ai/project/${project?.name?.toLowerCase().replace(/\s+/g, '-') || projectId || ''}`} />
-      <div className="flex-1">
+    <div className="px-4 py-8 font-sans h-full flex flex-col">
+      {/* Fixed Header */}
+      <div className="flex-shrink-0">
+        <div className="mb-6">
+          <PageHeader title="PROJECT" path={`~/sunny.ai/project/${project?.name?.toLowerCase().replace(/\s+/g, '-') || projectId || ''}`} />
+        </div>
+      </div>
+
+      {/* Scrollable Content */}
+      <div className="flex-1 overflow-y-auto scrollbar-hide">
         <div className="space-y-8">
           <div className="text-center space-y-4 mb-8">
             <h1 className="text-2xl font-bold font-mono uppercase tracking-wide mb-6">SUNNY DAILY DIGEST</h1>
@@ -336,14 +408,16 @@ const ProjectDashboard = () => {
                 )} */}
 
                 {/* Companies/Agencies */}
-                {project.entity_patterns?.domains && project.entity_patterns.domains.length > 0 && (
+                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                {(project.entity_patterns as any)?.domains && (project.entity_patterns as any).domains.length > 0 && (
                   <div>
                     <h4 className="text-sm font-semibold font-mono mb-3 text-[#4a5565] dark:text-zinc-200 flex items-center">
                       <Building className="w-3 h-3 mr-2" />
                       COMPANIES & AGENCIES
                     </h4>
                     <div className="flex flex-wrap gap-2">
-                      {project.entity_patterns.domains.map((domain: string, index: number) => (
+                      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                      {(project.entity_patterns as any).domains.map((domain: string, index: number) => (
                         <Badge key={index} variant="outline" className="text-xs font-mono border-indigo-200 text-indigo-700 dark:border-indigo-700 dark:text-indigo-300">
                           {domain}
                         </Badge>
@@ -470,7 +544,19 @@ const ProjectDashboard = () => {
                 ) : (
                   <div className="space-y-3">
                     {projectMeetings.map((meeting) => (
-                      <div key={meeting.id} className="flex items-start space-x-3 p-2 rounded-md border border-stone-200 dark:border-zinc-700">
+                      <div 
+                        key={meeting.id} 
+                        className="flex items-start space-x-3 p-2 rounded-md border border-stone-200 dark:border-zinc-700 hover:bg-stone-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                        onClick={() => {
+                          if (meeting.transcript) {
+                            setSelectedTranscript(meeting);
+                          } else {
+                            // For meetings without transcripts, we could show a meeting detail modal
+                            // For now, just show the transcript modal with available data
+                            setSelectedTranscript(meeting);
+                          }
+                        }}
+                      >
                         <div className="flex-shrink-0 w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-semibold font-mono text-[#4a5565] dark:text-zinc-200 truncate">
@@ -518,7 +604,19 @@ const ProjectDashboard = () => {
                 ) : (
                   <div className="space-y-3">
                     {projectData.map((item) => (
-                      <div key={item.id} className="flex items-start space-x-3 p-2 rounded-md border border-stone-200 dark:border-zinc-700">
+                      <div 
+                        key={item.id} 
+                        className="flex items-start space-x-3 p-2 rounded-md border border-stone-200 dark:border-zinc-700 hover:bg-stone-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                        onClick={() => {
+                          // Determine the type and open appropriate modal
+                          if (item.type === 'email' || item.sender) {
+                            setSelectedEmail(item);
+                          } else {
+                            // For documents, spreadsheets, presentations, etc.
+                            setSelectedDocument(item);
+                          }
+                        }}
+                      >
                         <div className="flex-shrink-0 w-2 h-2 bg-green-500 rounded-full mt-2"></div>
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-semibold font-mono text-[#4a5565] dark:text-zinc-200 truncate">
@@ -556,6 +654,31 @@ const ProjectDashboard = () => {
           /> */}
         </div>
       </div>
+
+      {/* Transcript Modal */}
+      <TranscriptModal 
+        transcript={selectedTranscript} 
+        isOpen={!!selectedTranscript}
+        onClose={() => setSelectedTranscript(null)} 
+      />
+
+      {/* Email Modal */}
+      <EmailModal 
+        email={selectedEmail} 
+        isOpen={!!selectedEmail}
+        onClose={() => setSelectedEmail(null)}
+        projects={projects}
+        onProjectChange={() => {}} // No-op since we're already in a project context
+      />
+
+      {/* Document Modal */}
+      <DocumentModal 
+        document={selectedDocument} 
+        isOpen={!!selectedDocument}
+        onClose={() => setSelectedDocument(null)}
+        projects={projects}
+        onProjectChange={() => {}} // No-op since we're already in a project context
+      />
     </div>
   );
 };

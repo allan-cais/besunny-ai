@@ -106,4 +106,25 @@
   .chat-textarea {
     min-height: calc(2rem + 2px);
   }
+
+  /* Hide scrollbar for webkit browsers */
+  .scrollbar-hide {
+    -ms-overflow-style: none;  /* Internet Explorer 10+ */
+    scrollbar-width: none;  /* Firefox */
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;  /* Safari and Chrome */
+  }
+
+  /* Scrollable content without visible scrollbar */
+  .scrollable-content {
+    overflow-y: auto;
+    -ms-overflow-style: none;  /* Internet Explorer 10+ */
+    scrollbar-width: none;  /* Firefox */
+  }
+  
+  .scrollable-content::-webkit-scrollbar {
+    display: none;  /* Safari and Chrome */
+  }
 }
