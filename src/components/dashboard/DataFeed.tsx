@@ -7,7 +7,6 @@ import { Mail, FileText, Folder, Image, File, Calendar, Clock, Search, Filter, M
 import { useAuth } from '@/providers/AuthProvider';
 import { supabase, Document } from '@/lib/supabase';
 import FileWatchStatus from '@/components/FileWatchStatus';
-import { attendeePollingService } from '@/lib/attendee-polling';
 import TranscriptModal from './TranscriptModal';
 import EmailModal from './EmailModal';
 import DocumentModal from './DocumentModal';

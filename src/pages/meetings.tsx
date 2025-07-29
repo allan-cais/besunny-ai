@@ -14,7 +14,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/lib/supabase';
 import BotConfigurationModal from '@/components/dashboard/BotConfigurationModal';
 import { apiKeyService } from '@/lib/api-keys';
-import { attendeePollingService } from '@/lib/attendee-polling';
 import { attendeeService } from '../lib/attendee-service';
 import { useToast } from '@/components/ui/use-toast';
 
