@@ -46,7 +46,7 @@
 
 #### Classification Flow:
 
-1. **Email Reception**: `inbound+{username}@sunny.ai`
+1. **Email Reception**: `ai+{username}@besunny.ai`
 2. **User Lookup**: Extract username and find user in database
 3. **Document Creation**: Store email as document with `project_id = null`
 4. **Project Retrieval**: Get all active projects with classification metadata

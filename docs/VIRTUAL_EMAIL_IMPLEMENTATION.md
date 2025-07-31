@@ -4,7 +4,7 @@ This document describes the implementation of virtual inbound email addresses us
 
 ## Overview
 
-The virtual email addresses feature allows each user to have their own unique email address in the format `inbound+{username}@sunny.ai`. When emails are sent to this address, they are automatically processed, stored as documents, and sent to the n8n classification webhook. The classification agent uses AI reasoning to determine which project the content should be associated with.
+The virtual email addresses feature allows each user to have their own unique email address in the format `ai+{username}@besunny.ai`. When emails are sent to this address, they are automatically processed, stored as documents, and sent to the n8n classification webhook. The classification agent uses AI reasoning to determine which project the content should be associated with.
 
 ## Architecture
 
@@ -64,7 +64,7 @@ The virtual email addresses feature allows each user to have their own unique em
 4. User chooses username and gets virtual email address
 
 ### 2. Email Processing
-1. Email sent to `inbound+{username}@sunny.ai`
+1. Email sent to `ai+{username}@besunny.ai`
 2. Email lands in `inbound@sunny.ai` mailbox
 3. Gmail webhook triggers `process-inbound-emails`
 4. Function extracts username from "To" header
@@ -90,7 +90,7 @@ Usernames must:
 
 ### Email Processing Logic
 
-1. **Extract username:** Parse `inbound+{username}@sunny.ai` format
+1. **Extract username:** Parse `ai+{username}@besunny.ai` format
 2. **Find user:** Lookup user by username in database
 3. **Create document:** Store email metadata in documents table (project_id initially null)
 4. **Send to n8n:** Forward to classification webhook for AI-based project association
@@ -282,7 +282,7 @@ Execute the SQL migration in your Supabase SQL editor.
 
 ### Test Email Processing
 
-1. Send an email to `inbound+{username}@sunny.ai`
+1. Send an email to `ai+{username}@besunny.ai`
 2. Check email_processing_logs table for processing record
 3. Verify document is created in documents table
 4. Check n8n webhook receives payload
@@ -318,7 +318,7 @@ Content-Type: application/json
       "id": "gmail_message_id",
       "payload": {
         "headers": [
-          {"name": "to", "value": "inbound+user123@sunny.ai"},
+          {"name": "to", "value": "ai+user123@besunny.ai"},
           {"name": "subject", "value": "Test Email"},
           {"name": "from", "value": "sender@example.com"}
         ]

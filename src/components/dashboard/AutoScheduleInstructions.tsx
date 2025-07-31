@@ -85,7 +85,7 @@ const AutoScheduleInstructions: React.FC = () => {
               size="sm"
               variant="outline"
               onClick={copyToClipboard}
-              className="font-mono text-xs border border-[#4a5565] dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[#4a5565] dark:text-zinc-200 hover:bg-stone-50 dark:hover:bg-zinc-800"
+              className="font-mono text-xs border border-[#4a5565] dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[#4a5565] dark:text-zinc-200"
             >
               {copied ? (
                 <CheckCircle className="w-4 h-4" />

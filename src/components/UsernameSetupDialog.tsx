@@ -25,7 +25,7 @@ const UsernameSetupDialog: React.FC<UsernameSetupDialogProps> = ({ open, onClose
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const virtualEmailAddress = username ? `inbound+${username}@sunny.ai` : '';
+  const virtualEmailAddress = username ? `ai+${username}@besunny.ai` : '';
 
   // Validate username format
   const validateUsername = (value: string) => {
@@ -197,7 +197,7 @@ const UsernameSetupDialog: React.FC<UsernameSetupDialogProps> = ({ open, onClose
               <Label htmlFor="username" className="text-xs font-bold text-[#4a5565] dark:text-zinc-300">CHOOSE YOUR USERNAME</Label>
               <div className="flex gap-2">
                 <Badge variant="secondary" className="px-3 py-2 text-xs font-mono bg-stone-200 dark:bg-zinc-700 text-[#4a5565] dark:text-zinc-300 border border-[#4a5565] dark:border-zinc-700">
-                  inbound+
+                  ai+
                 </Badge>
                 <Input
                   id="username"
@@ -209,7 +209,7 @@ const UsernameSetupDialog: React.FC<UsernameSetupDialogProps> = ({ open, onClose
                   disabled={isLoading}
                 />
                 <Badge variant="secondary" className="px-3 py-2 text-xs font-mono bg-stone-200 dark:bg-zinc-700 text-[#4a5565] dark:text-zinc-300 border border-[#4a5565] dark:border-zinc-700">
-                  @sunny.ai
+                  @besunny.ai
                 </Badge>
               </div>
               {validationMessage && (

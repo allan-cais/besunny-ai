@@ -7,14 +7,14 @@ The email classification system processes incoming emails and Google Drive notif
 ## 📬 Email Ingestion Flow
 
 ### 1. Email Reception
-- **Email Address**: `inbound+{username}@sunny.ai`
+- **Email Address**: `ai+{username}@besunny.ai`
 - **Source**: Gmail webhook or Google Drive notification
 - **Processing**: `process-inbound-emails` Edge Function
 
 ### 2. User Lookup & Document Creation
 ```typescript
 // Extract username from email address
-const username = extractUsernameFromEmail('inbound+johndoe@sunny.ai'); // Returns: 'johndoe'
+const username = extractUsernameFromEmail('ai+johndoe@besunny.ai'); // Returns: 'johndoe'
 
 // Look up user in database
 const user = await findUserByUsername(supabase, username);
@@ -227,7 +227,7 @@ INSERT INTO projects (
 ### 1. Email Received
 ```
 From: lauren@agency.com
-To: inbound+johndoe@sunny.ai
+To: ai+johndoe@besunny.ai
 Subject: Updated storyboard for launch
 Content: Hey team — attaching the new storyboard for the summer campaign. Please review.
 ```

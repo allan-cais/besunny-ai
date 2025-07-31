@@ -336,15 +336,8 @@ const ProjectDashboard = () => {
       <div className="flex-1 overflow-y-auto scrollbar-hide">
         <div className="space-y-8">
           <div className="text-center space-y-4 mb-8">
-            <h1 className="text-2xl font-bold font-mono uppercase tracking-wide mb-6">SUNNY DAILY DIGEST</h1>
+            <h1 className="text-2xl font-bold font-mono uppercase tracking-wide mb-6">PROJECT {project.name?.toUpperCase()}: DIGEST</h1>
             <div className="w-24 h-px bg-[#4a5565] dark:bg-zinc-700 mx-auto"></div>
-            <div className="flex justify-center gap-4 text-sm text-gray-600 dark:text-gray-400 font-mono">
-              <span><b>Project:</b> {project.name}</span>
-              <span>|</span>
-              <span><b>Client:</b> {project.created_by || 'Unknown'}</span>
-              <span>|</span>
-              <span><b>Budget</b> $0 spent</span>
-            </div>
           </div>
           {/* AI Processing Status */}
           {aiProcessing && (
@@ -541,7 +534,7 @@ const ProjectDashboard = () => {
                     No meetings scheduled for this project
                   </div>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="max-h-[350px] overflow-y-auto scrollbar-hide space-y-3">
                     {projectMeetings.map((meeting) => (
                       <div 
                         key={meeting.id} 
@@ -602,7 +595,7 @@ const ProjectDashboard = () => {
                     No data files for this project
                   </div>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="max-h-[350px] overflow-y-auto scrollbar-hide space-y-3">
                     {projectData.map((item) => (
                       <div 
                         key={item.id} 

@@ -123,7 +123,7 @@ serve(async (req) => {
     }
 
     // Construct the virtual email address
-    const virtualEmailAddress = `inbound+${username}@sunny.ai`;
+    const virtualEmailAddress = `ai+${username}@besunny.ai`;
 
     const response: SetUsernameResponse = {
       success: true,

@@ -1,4 +1,4 @@
-# Sunny.ai - Intelligent Workspace
+# BeSunny.ai - Intelligent Workspace
 
 A modern, intelligent development workspace built with React, TypeScript, and Supabase.
 

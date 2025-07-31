@@ -13,7 +13,7 @@ const Index = () => {
       <div className="max-w-[90rem] mx-auto px-4 py-8 font-sans">
         <div className="text-center space-y-8">
           <div className="space-y-4">
-            <h1 className="text-6xl font-bold tracking-tight">sunny.ai</h1>
+            <h1 className="text-6xl font-bold tracking-tight">besunny.ai</h1>
             <div className="w-32 h-px bg-black mx-auto"></div>
           </div>
           <div className="space-y-6">

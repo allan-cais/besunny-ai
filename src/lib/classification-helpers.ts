@@ -78,7 +78,7 @@ export interface ClassificationResponse {
 
 /**
  * Extract username from email address using plus-addressing
- * Example: inbound+johndoe@sunny.ai -> johndoe
+ * Example: ai+johndoe@besunny.ai -> johndoe
  */
 export function extractUsernameFromEmail(email: string): string | null {
   if (!email) return null;
@@ -395,7 +395,7 @@ export async function logProcessingEvent(
  * 
  * ```typescript
  * // Extract username and find user
- * const username = extractUsernameFromEmail('inbound+johndoe@sunny.ai');
+ * const username = extractUsernameFromEmail('ai+johndoe@besunny.ai');
  * const user = await findUserByUsername(supabase, username);
  * 
  * // Create document

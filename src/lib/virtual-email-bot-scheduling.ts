@@ -125,20 +125,19 @@ export const virtualEmailBotScheduling: VirtualEmailBotScheduling = {
   
   async getUserVirtualEmail(userId: string) {
     try {
-      // Get user's virtual email address
+      // Get user's username from the users table
       const { data: user, error } = await supabase
         .from('users')
-        .select('email')
+        .select('username')
         .eq('id', userId)
         .single();
       
-      if (error || !user?.email) {
-        throw new Error('User not found or no email');
+      if (error || !user?.username) {
+        throw new Error('User not found or username not set');
       }
       
-      // Extract username from email and create virtual email
-      const username = user.email.split('@')[0];
-      return `inbound+${username}@sunny.ai`;
+      // Create virtual email using the username from the users table
+      return `ai+${user.username}@besunny.ai`;
     } catch (error) {
       console.error('Error getting user virtual email:', error);
       throw error;
@@ -149,7 +148,7 @@ export const virtualEmailBotScheduling: VirtualEmailBotScheduling = {
     try {
       // Check if event has virtual email attendees
       const attendees = eventData.attendees || [];
-      const virtualEmailPattern = /inbound\+([^@]+)@sunny\.ai/;
+      const virtualEmailPattern = /ai\+([^@]+)@besunny\.ai/;
       
       let virtualEmailAttendee: string | undefined;
       let username: string | undefined;

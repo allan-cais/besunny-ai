@@ -24,7 +24,7 @@ const VirtualEmailSettings: React.FC = () => {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const virtualEmailAddress = userData?.username ? `inbound+${userData.username}@sunny.ai` : null;
+  const virtualEmailAddress = userData?.username ? `ai+${userData.username}@besunny.ai` : null;
 
   useEffect(() => {
     loadUserData();
@@ -111,7 +111,7 @@ const VirtualEmailSettings: React.FC = () => {
           <CardContent>
             <Button 
               onClick={() => setShowUsernameDialog(true)}
-              className="bg-[#4a5565] dark:bg-zinc-700 text-white hover:bg-[#3a4555] dark:hover:bg-zinc-600 font-mono"
+              className="bg-[#4a5565] dark:bg-zinc-700 text-white font-mono"
             >
               Set Up Username
             </Button>
@@ -138,7 +138,7 @@ const VirtualEmailSettings: React.FC = () => {
                   size="sm"
                   onClick={copyToClipboard}
                   disabled={copied}
-                  className="border-[#4a5565] dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[#4a5565] dark:text-zinc-200 hover:bg-stone-50 dark:hover:bg-zinc-800 font-mono"
+                  className="border-[#4a5565] dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[#4a5565] dark:text-zinc-200 font-mono"
                 >
                   {copied ? (
                     <CheckCircle className="h-4 w-4" />
@@ -149,10 +149,10 @@ const VirtualEmailSettings: React.FC = () => {
               </div>
               
               <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 font-mono">
-                <Badge className="border border-[#4a5565] dark:border-zinc-700 rounded px-2 py-0.5 text-[10px] text-[#4a5565] dark:text-zinc-200 bg-stone-50 dark:bg-zinc-800 uppercase font-mono">
+                <Badge className="border border-[#4a5565] dark:border-zinc-700 rounded px-2 py-0.5 text-[10px] text-[#4a5565] dark:text-zinc-200 bg-stone-50 dark:bg-zinc-800 uppercase font-mono hover:bg-stone-50 dark:hover:bg-zinc-800">
                   Username: {userData.username}
                 </Badge>
-                <Badge className="border border-[#4a5565] dark:border-zinc-700 rounded px-2 py-0.5 text-[10px] text-[#4a5565] dark:text-zinc-200 bg-stone-50 dark:bg-zinc-800 uppercase font-mono">
+                <Badge className="border border-green-500 rounded px-2 py-0.5 text-[10px] text-green-500 bg-green-50 dark:bg-green-950 hover:bg-green-50 dark:hover:bg-green-950 uppercase font-mono">
                   Active
                 </Badge>
               </div>
@@ -177,7 +177,7 @@ const VirtualEmailSettings: React.FC = () => {
                     <div>
                       <h4 className="font-medium text-[#4a5565] dark:text-zinc-200 font-mono">Email Capture</h4>
                       <p className="text-sm text-gray-600 dark:text-gray-400 font-mono">
-                        CC <code className="bg-stone-50 dark:bg-zinc-800 px-1 rounded text-xs border border-[#4a5565] dark:border-zinc-700 font-mono">{virtualEmailAddress}</code> on any emails you want to capture
+                        CC <code className="bg-stone-50 dark:bg-zinc-800 px-1 rounded text-xs font-mono">{virtualEmailAddress}</code> on any emails you want to capture
                       </p>
                     </div>
                   </div>

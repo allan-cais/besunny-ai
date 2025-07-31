@@ -51,10 +51,10 @@ const MainWorkspace = ({
       <div className="flex-1">
         <div className="space-y-8">
           <div className="text-center space-y-4">
-            <h1 className="text-2xl font-bold font-mono mb-6">Welcome to Workspace</h1>
+            <h1 className="text-2xl font-bold font-mono mb-6">Welcome to Sunny</h1>
             <div className="w-24 h-px bg-[#4a5565] dark:bg-zinc-700 mx-auto"></div>
             <p className="text-gray-600 dark:text-gray-400 text-sm font-mono">
-              Your intelligent development environment
+              Your AI production dashboard
             </p>
           </div>
           <StatsGrid />
