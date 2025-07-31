@@ -57,7 +57,7 @@ const NavigationSidebar = ({
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
   const navItems = [
-    { icon: Home, label: "Home", active: activeNavItem === "Home" },
+    { icon: Home, label: "Dashboard", active: activeNavItem === "Home" },
     { 
       icon: FileText, 
       label: "Projects", 
