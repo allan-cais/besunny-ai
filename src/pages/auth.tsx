@@ -58,7 +58,7 @@ const AuthPage: React.FC = () => {
     <div className="min-h-screen bg-white text-black font-mono flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold tracking-tight mb-2">besunny.ai</h1>
+          <h1 className="text-4xl font-bold tracking-tight mb-2">sunny.ai</h1>
           <div className="w-16 h-px bg-black mx-auto"></div>
         </div>
         {renderForm()}
