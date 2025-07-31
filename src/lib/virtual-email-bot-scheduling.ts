@@ -105,7 +105,7 @@ export const virtualEmailBotScheduling: VirtualEmailBotScheduling = {
           bot_status: 'bot_scheduled',
           bot_deployment_method: 'automatic',
           bot_configuration: defaultConfig,
-          polling_enabled: true,
+          // polling_enabled field removed
           updated_at: new Date().toISOString()
         })
         .eq('id', meetingId);

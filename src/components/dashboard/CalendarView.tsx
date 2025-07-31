@@ -217,11 +217,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({
         botRecord.id // Use the UUID from the bots table
       );
       
-      // Also update the deployment method, configuration, and enable polling
+      // Also update the deployment method and configuration
       await calendarService.updateMeeting(meeting.id, {
         bot_deployment_method: 'manual',
-        bot_configuration: configuration || {},
-        polling_enabled: true
+        bot_configuration: configuration || {}
       });
       
       // Immediately update the local state to show the new bot status
@@ -230,8 +229,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
           bot_status: 'bot_scheduled',
           attendee_bot_id: botRecord.id,
           bot_deployment_method: 'manual',
-          bot_configuration: configuration || {},
-          polling_enabled: true
+          bot_configuration: configuration || {}
         });
       }
       

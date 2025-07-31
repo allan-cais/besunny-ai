@@ -64,8 +64,6 @@ const NavigationSidebar = ({
       active: activeNavItem === "Projects",
       subItems: projects.map(p => p.name)
     },
-    { icon: Calendar, label: "Meetings", active: activeNavItem === "Meetings" },
-    { icon: Database, label: "Data", active: activeNavItem === "Data" },
     // { icon: Terminal, label: "Playbooks", active: false },
     // { icon: Settings, label: "Settings", active: activeNavItem === "Settings" },
   ];

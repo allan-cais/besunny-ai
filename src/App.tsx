@@ -15,8 +15,6 @@ import OAuthLoginCallback from "./pages/oauth-login-callback";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import ProjectDashboard from "./pages/project";
-import MeetingsPage from "./pages/meetings";
-import DataPage from "./pages/data";
 import SettingsPage from "./pages/settings";
 
 const queryClient = new QueryClient();
@@ -73,26 +71,6 @@ const App = () => (
                 } 
               >
                 <Route index element={<ProjectDashboard />} />
-              </Route>
-              <Route 
-                path="/meetings" 
-                element={
-                  <ProtectedRoute>
-                    <DashboardLayout />
-                  </ProtectedRoute>
-                } 
-              >
-                <Route index element={<MeetingsPage />} />
-              </Route>
-              <Route 
-                path="/data" 
-                element={
-                  <ProtectedRoute>
-                    <DashboardLayout />
-                  </ProtectedRoute>
-                } 
-              >
-                <Route index element={<DataPage />} />
               </Route>
               <Route 
                 path="/settings" 

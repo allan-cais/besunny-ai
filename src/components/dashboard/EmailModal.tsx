@@ -251,7 +251,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button
+                  {/* <Button
                     variant="outline"
                     size="sm"
                     onClick={copyEmailContent}
@@ -268,7 +268,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
                   >
                     <Download className="w-3 h-3 mr-1" />
                     Download
-                  </Button>
+                  </Button> */}
                 </div>
               </div>
             </div>

@@ -3,6 +3,8 @@ import { useParams } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import { supabaseService, Project, supabase } from '@/lib/supabase';
 import { useSupabase } from '@/hooks/use-supabase';
 import ProjectMeetingsCard from '@/components/dashboard/ProjectMeetingsCard';
@@ -60,6 +62,7 @@ interface ProjectMeeting {
   start_time: string;
   end_time: string;
   status: string;
+  description?: string;
   attendees?: string[];
   notes?: string;
   meeting_url?: string;
@@ -83,6 +86,7 @@ interface ProjectData {
   summary?: string;
   sender?: string;
   file_size?: string;
+  project_id?: string;
 }
 
 const ProjectDashboard = () => {
@@ -101,6 +105,7 @@ const ProjectDashboard = () => {
   const [selectedEmail, setSelectedEmail] = useState<any>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [selectedDocument, setSelectedDocument] = useState<any>(null);
+  const [selectedMeeting, setSelectedMeeting] = useState<ProjectMeeting | null>(null);
   const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([]);
   const { toast } = useToast();
 
@@ -110,13 +115,10 @@ const ProjectDashboard = () => {
     
     setMeetingsLoading(true);
     try {
-      // Load meetings with transcript data
+      // Load meetings (transcript data is stored directly in meetings table)
       const { data: meetings, error } = await supabase
         .from('meetings')
-        .select(`
-          *,
-          transcripts:meeting_transcripts(*)
-        `)
+        .select('*')
         .eq('project_id', projectId)
         .order('start_time', { ascending: true });
 
@@ -124,16 +126,17 @@ const ProjectDashboard = () => {
         console.error('Error loading project meetings:', error);
         setProjectMeetings([]);
       } else {
-        // Transform meetings to include transcript data
+        // Transform meetings (transcript data is already in the meeting object)
         const transformedMeetings = (meetings || []).map(meeting => {
-          const transcript = meeting.transcripts?.[0];
+          console.log('Meeting status:', meeting.title, meeting.status, meeting.event_status);
           return {
             ...meeting,
-            transcript: transcript?.transcript,
-            transcript_summary: transcript?.transcript_summary,
-            transcript_metadata: transcript?.transcript_metadata,
-            transcript_duration_seconds: transcript?.transcript_duration_seconds,
-            transcript_retrieved_at: transcript?.transcript_retrieved_at,
+            // Transcript fields are already available directly from the meeting
+            transcript: meeting.transcript,
+            transcript_summary: meeting.transcript_summary,
+            transcript_metadata: meeting.transcript_metadata,
+            transcript_duration_seconds: meeting.transcript_duration_seconds,
+            transcript_retrieved_at: meeting.transcript_retrieved_at,
           };
         });
         setProjectMeetings(transformedMeetings);
@@ -197,7 +200,8 @@ const ProjectDashboard = () => {
           content: doc.content,
           summary: doc.summary,
           sender: doc.sender,
-          file_size: doc.file_size ? `${Math.round(doc.file_size / 1024)}KB` : undefined
+          file_size: doc.file_size ? `${Math.round(doc.file_size / 1024)}KB` : undefined,
+          project_id: doc.project_id
         }));
         setProjectData(transformedData);
       }
@@ -325,13 +329,8 @@ const ProjectDashboard = () => {
   }
 
   return (
-    <div className="px-4 py-8 font-sans h-full flex flex-col">
-      {/* Fixed Header */}
-      <div className="flex-shrink-0">
-        <div className="mb-6">
-          <PageHeader title="PROJECT" path={`~/sunny.ai/project/${project?.name?.toLowerCase().replace(/\s+/g, '-') || projectId || ''}`} />
-        </div>
-      </div>
+    <div className="px-4 pt-12 pb-8 font-sans h-full flex flex-col">
+
 
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto scrollbar-hide">
@@ -546,23 +545,30 @@ const ProjectDashboard = () => {
                     {projectMeetings.map((meeting) => (
                       <div 
                         key={meeting.id} 
-                        className="flex items-start space-x-3 p-2 rounded-md border border-stone-200 dark:border-zinc-700 hover:bg-stone-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                        className="flex items-start space-x-3 p-3 rounded-md border border-stone-200 dark:border-zinc-700 hover:bg-stone-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
                         onClick={() => {
                           if (meeting.transcript) {
                             setSelectedTranscript(meeting);
                           } else {
-                            // For meetings without transcripts, we could show a meeting detail modal
-                            // For now, just show the transcript modal with available data
-                            setSelectedTranscript(meeting);
+                            // For meetings without transcripts, show a simple meeting detail modal
+                            setSelectedMeeting(meeting);
                           }
                         }}
                       >
                         <div className="flex-shrink-0 w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-semibold font-mono text-[#4a5565] dark:text-zinc-200 truncate">
-                            {meeting.title}
+                          <div className="flex items-center justify-between mb-1">
+                            <div className="text-sm font-semibold font-mono text-[#4a5565] dark:text-zinc-200 truncate">
+                              {meeting.title}
+                            </div>
+                            {/* <Badge 
+                              variant="outline"
+                              className="text-xs px-3 py-1 uppercase font-mono ml-2 flex-shrink-0 bg-white dark:bg-zinc-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600"
+                            >
+                              {meeting.event_status || meeting.status || 'pending'}
+                            </Badge> */}
                           </div>
-                          <div className="text-xs text-gray-500 font-mono mt-1">
+                          <div className="text-xs text-gray-500 font-mono">
                             {new Date(meeting.start_time).toLocaleDateString()} • {new Date(meeting.start_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                           </div>
                           {meeting.attendees && meeting.attendees.length > 0 && (
@@ -571,12 +577,6 @@ const ProjectDashboard = () => {
                             </div>
                           )}
                         </div>
-                        <Badge 
-                          variant={meeting.status === 'completed' ? 'secondary' : 'default'} 
-                          className="text-[10px] px-1.5 py-0.5 uppercase font-mono"
-                        >
-                          {meeting.status}
-                        </Badge>
                       </div>
                     ))}
                   </div>
@@ -632,12 +632,12 @@ const ProjectDashboard = () => {
                             </div>
                           )}
                         </div>
-                        <Badge 
+                        {/* <Badge 
                           variant={item.status === 'active' ? 'default' : 'secondary'} 
                           className="text-[10px] px-1.5 py-0.5 uppercase font-mono"
                         >
                           {item.status}
-                        </Badge>
+                        </Badge> */}
                       </div>
                     ))}
                   </div>
@@ -679,6 +679,77 @@ const ProjectDashboard = () => {
         projects={projects}
         onProjectChange={() => {}} // No-op since we're already in a project context
       />
+
+      {/* Meeting Modal */}
+      <Dialog open={!!selectedMeeting} onOpenChange={() => setSelectedMeeting(null)}>
+        <DialogContent className="sm:max-w-[480px] bg-stone-100 dark:bg-zinc-800 border border-[#4a5565] dark:border-zinc-700 font-mono text-xs">
+          <DialogHeader>
+            <DialogTitle className="text-[#4a5565] dark:text-zinc-50 font-mono text-sm font-bold">
+              {selectedMeeting?.title}
+            </DialogTitle>
+            <DialogDescription className="text-gray-600 dark:text-gray-400 font-mono text-xs">
+              Meeting details and actions
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="bg-white dark:bg-zinc-700 rounded-lg p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-gray-500" />
+                <span className="text-xs font-mono">
+                  {selectedMeeting?.start_time && new Date(selectedMeeting.start_time).toLocaleDateString()} - {selectedMeeting?.end_time && new Date(selectedMeeting.end_time).toLocaleDateString()}
+                </span>
+              </div>
+              
+              {selectedMeeting?.description && (
+                <div className="text-xs text-gray-600 dark:text-gray-400 font-mono">
+                  {selectedMeeting.description}
+                </div>
+              )}
+
+              {selectedMeeting?.meeting_url && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono text-gray-600 dark:text-gray-400">Meeting URL:</span>
+                  <a 
+                    href={selectedMeeting.meeting_url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-mono"
+                  >
+                    Join Meeting
+                  </a>
+                </div>
+              )}
+            </div>
+
+            <div className="flex space-x-2 pt-4">
+              {selectedMeeting && selectedMeeting.meeting_url && (
+                <Button
+                  onClick={() => {
+                    // Deploy bot logic would go here
+                    console.log('Deploy bot to meeting:', selectedMeeting.id);
+                  }}
+                  size="sm"
+                  className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-mono text-xs"
+                >
+                  <Calendar className="mr-2 h-4 w-4" />
+                  DEPLOY BOT
+                </Button>
+              )}
+              {selectedMeeting?.meeting_url && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open(selectedMeeting.meeting_url, '_blank')}
+                  className="font-mono text-xs border border-[#4a5565] dark:border-zinc-700 bg-stone-100 dark:bg-zinc-800 text-[#4a5565] dark:text-zinc-50 hover:bg-stone-300 dark:hover:bg-zinc-700"
+                >
+                  Join Meeting
+                </Button>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

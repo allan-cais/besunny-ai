@@ -54,10 +54,11 @@ const DataFeed = () => {
     if (!user?.id) return;
     
     try {
+      // Load all projects - don't filter by created_by to ensure we can see all projects
+      // that documents might be assigned to
       const { data: projectsData, error: projectsError } = await supabase
         .from('projects')
         .select('id, name')
-        .eq('created_by', user.id)
         .order('created_at', { ascending: false });
 
       if (projectsError) {
@@ -78,6 +79,8 @@ const DataFeed = () => {
       setProjects([{ id: 'fallback-project', name: 'Demo Project' }]);
     }
   };
+
+
 
   const loadVirtualEmailActivity = async () => {
     if (!user?.id) return;
@@ -627,7 +630,7 @@ Alex Rodriguez: Perfect. Meeting adjourned. Thanks everyone for your input and c
     if (!projectId) return null;
     if (projectId === 'fallback-project') return 'Demo Project';
     const project = projects.find(p => p.id === projectId);
-    return project?.name || null;
+    return project?.name || 'Unknown Project';
   };
 
   const handleClassify = async (activityId: string, projectId: string) => {
@@ -638,6 +641,15 @@ Alex Rodriguez: Perfect. Meeting adjourned. Thanks everyone for your input and c
           activity.id === activityId 
             ? { ...activity, project_id: projectId }
             : activity
+        )
+      );
+
+      // Update the documents state as well
+      setDocuments(prevDocuments => 
+        prevDocuments.map(doc => 
+          doc.id === activityId 
+            ? { ...doc, project_id: projectId }
+            : doc
         )
       );
 
@@ -657,6 +669,13 @@ Alex Rodriguez: Perfect. Meeting adjourned. Thanks everyone for your input and c
               : activity
           )
         );
+        setDocuments(prevDocuments => 
+          prevDocuments.map(doc => 
+            doc.id === activityId 
+              ? { ...doc, project_id: doc.project_id }
+              : doc
+          )
+        );
       }
     } catch (error) {
       console.error('Error in handleClassify:', error);
@@ -666,6 +685,13 @@ Alex Rodriguez: Perfect. Meeting adjourned. Thanks everyone for your input and c
           activity.id === activityId 
             ? { ...activity, project_id: activity.project_id }
             : activity
+        )
+      );
+      setDocuments(prevDocuments => 
+        prevDocuments.map(doc => 
+          doc.id === activityId 
+            ? { ...doc, project_id: doc.project_id }
+            : doc
         )
       );
     }
@@ -810,14 +836,27 @@ Alex Rodriguez: Perfect. Meeting adjourned. Thanks everyone for your input and c
                 }
                 
                 if (activity.type === 'meeting_transcript' && activity.rawTranscript) {
-                  setSelectedTranscript(activity.rawTranscript);
+                  // Merge activity data with rawTranscript data for the modal
+                  const transcriptData = {
+                    ...activity.rawTranscript,
+                    project_id: activity.project_id,
+                    source: activity.source,
+                    bot_name: activity.rawTranscript.transcript_metadata?.bot_id || 'SunnyAI Notetaker'
+                  };
+                  setSelectedTranscript(transcriptData);
                 } else if (activity.type === 'email') {
                   setSelectedEmail(activity);
                 } else if (activity.type === 'document' || activity.type === 'spreadsheet' || activity.type === 'presentation' || activity.type === 'image' || activity.type === 'folder') {
                   // Find the corresponding document (check both real and mock documents)
                   const document = documents.find(doc => doc.id === activity.id) || mockDocuments.find(doc => doc.id === activity.id);
                   if (document) {
-                    setSelectedDocument(document);
+                    // Always use the activity's project_id as it's the most up-to-date
+                    // The activity state gets updated immediately when classification happens
+                    const updatedDocument = {
+                      ...document,
+                      project_id: activity.project_id
+                    };
+                    setSelectedDocument(updatedDocument);
                   }
                 }
               }}
@@ -916,7 +955,9 @@ Alex Rodriguez: Perfect. Meeting adjourned. Thanks everyone for your input and c
       <TranscriptModal 
         transcript={selectedTranscript} 
         isOpen={!!selectedTranscript}
-        onClose={() => setSelectedTranscript(null)} 
+        onClose={() => setSelectedTranscript(null)}
+        projects={projects}
+        onProjectChange={handleClassify}
       />
 
       {/* Email Modal */}

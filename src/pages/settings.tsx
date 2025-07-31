@@ -5,11 +5,8 @@ import PageHeader from '@/components/dashboard/PageHeader';
 
 const SettingsPage: React.FC = () => {
   return (
-    <div className="px-4 py-8 font-sans">
-      <PageHeader 
-        title="Settings" 
-        path="~/sunny.ai/settings" 
-      />
+    <div className="px-4 pt-12 pb-8 font-sans">
+
 
       <div className="max-w-4xl">
         <Tabs defaultValue="virtual-email" className="space-y-6">

@@ -5,7 +5,6 @@ import QuickActions from './QuickActions';
 import DataFeed from './DataFeed';
 import FeedItemDetail from './FeedItemDetail';
 import ProjectDashboard from '@/pages/project';
-import MeetingsPage from '@/pages/meetings';
 
 const MainWorkspace = ({ 
   activeProjectId, 
@@ -21,10 +20,7 @@ const MainWorkspace = ({
     return <DataFeed onSelect={setActiveFeedItemId} />;
   }
   
-  if (activeCenterPanel === 'meetings') {
-    // Meetings view should be fully fluid, no max-w-4xl wrapper
-    return <MeetingsPage />;
-  }
+
   
   if (activeProjectId) {
     // Project dashboard should be full width, standardized spacing
@@ -50,15 +46,7 @@ const MainWorkspace = ({
   // Default workspace view (centered, full width, standardized spacing)
   return (
     <div className="flex-1 flex flex-col overflow-y-auto scrollbar-hide">
-      {/* Workspace Header */}
-      <div className="mb-6 flex items-center">
-        <div>
-          <span className="text-xs font-medium font-mono uppercase tracking-wide">WORKSPACE</span>
-          <div className="mt-1 text-xs text-gray-500 dark:text-gray-400 font-mono">
-            ~/sunny.ai/dashboard
-          </div>
-        </div>
-      </div>
+
       {/* Content Area */}
       <div className="flex-1">
         <div className="space-y-8">
@@ -70,7 +58,7 @@ const MainWorkspace = ({
             </p>
           </div>
           <StatsGrid />
-          <QuickActions />
+          {/* <QuickActions /> */}
         </div>
       </div>
     </div>

@@ -288,7 +288,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
                       Open Original
                     </Button>
                   )}
-                  <Button
+                  {/* <Button
                     variant="outline"
                     size="sm"
                     onClick={copyDocumentContent}
@@ -305,7 +305,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
                   >
                     <Download className="w-3 h-3 mr-1" />
                     Download
-                  </Button>
+                  </Button> */}
                 </div>
               </div>
             </div>

@@ -131,12 +131,11 @@ export interface Meeting {
   transcript_url?: string;
   event_status: 'accepted' | 'declined' | 'tentative' | 'needsAction';
   bot_status: 'pending' | 'bot_scheduled' | 'bot_joined' | 'transcribing' | 'completed' | 'failed';
-  // Real-time transcription fields
-  last_polled_at?: string;
-  next_poll_at?: string;
-  polling_enabled?: boolean;
-  real_time_transcript?: any;
-  final_transcript_ready?: boolean;
+      // Real-time transcription fields
+    last_polled_at?: string;
+    next_poll_at?: string;
+    real_time_transcript?: any;
+    final_transcript_ready?: boolean;
   transcript_metadata?: any;
   bot_configuration?: any;
   // Auto-scheduling fields
@@ -291,6 +290,7 @@ export const calendarService = {
       .from('meetings')
       .select('*')
       .eq('user_id', session.user.id)
+      .is('project_id', null) // Only unassigned meetings
       .gte('start_time', startOfWeek.toISOString())
       .lte('start_time', endOfWeek.toISOString())
       .order('start_time', { ascending: true });
@@ -1269,7 +1269,7 @@ export const calendarService = {
     // Check if meeting already exists
     const { data: existingMeeting } = await supabase
       .from('meetings')
-      .select('id, bot_status, attendee_bot_id, polling_enabled, bot_configuration, bot_deployment_method, auto_scheduled_via_email, virtual_email_attendee')
+      .select('id, bot_status, attendee_bot_id, bot_configuration, bot_deployment_method, auto_scheduled_via_email, virtual_email_attendee')
       .eq('google_calendar_event_id', event.id)
       .eq('user_id', userId)
       .maybeSingle();
@@ -1282,7 +1282,6 @@ export const calendarService = {
           ...meeting,
           bot_status: existingMeeting.bot_status,
           attendee_bot_id: existingMeeting.attendee_bot_id,
-          polling_enabled: existingMeeting.polling_enabled,
           bot_configuration: existingMeeting.bot_configuration,
           bot_deployment_method: existingMeeting.bot_deployment_method,
           auto_scheduled_via_email: existingMeeting.auto_scheduled_via_email,
