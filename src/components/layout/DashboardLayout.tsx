@@ -190,7 +190,7 @@ const DashboardLayout = () => {
   };
 
   const handleNavItemClick = (item: { icon: React.ComponentType; label: string; active: boolean; subItems?: string[] }) => {
-    if (item.label === 'Home') {
+    if (item.label === 'Dashboard') {
       navigate('/dashboard');
       setActiveCenterPanel('');
       setActiveProjectId(null);
