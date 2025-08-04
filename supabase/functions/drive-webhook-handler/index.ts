@@ -59,6 +59,56 @@ async function getDocumentByChannelId(channelId: string): Promise<DocumentInfo |
   };
 }
 
+// Check if document was created via virtual email sharing
+async function checkVirtualEmailDocument(documentId: string): Promise<{ isVirtualEmail: boolean; virtualEmail?: string; username?: string }> {
+  try {
+    const { data, error } = await supabase
+      .from('documents')
+      .select('source, source_id, title')
+      .eq('id', documentId)
+      .single();
+    
+    if (error || !data) {
+      return { isVirtualEmail: false };
+    }
+    
+    // Check if document was created via virtual email
+    const virtualEmailPattern = /ai\+([^@]+)@besunny\.ai/;
+    const titleMatch = data.title?.match(virtualEmailPattern);
+    
+    if (titleMatch) {
+      return {
+        isVirtualEmail: true,
+        virtualEmail: titleMatch[0],
+        username: titleMatch[1]
+      };
+    }
+    
+    // Check if source indicates virtual email processing
+    if (data.source === 'gmail' && data.source_id) {
+      // Check virtual email detections table
+      const { data: detection } = await supabase
+        .from('virtual_email_detections')
+        .select('virtual_email, username')
+        .eq('document_id', documentId)
+        .single();
+      
+      if (detection) {
+        return {
+          isVirtualEmail: true,
+          virtualEmail: detection.virtual_email,
+          username: detection.username
+        };
+      }
+    }
+    
+    return { isVirtualEmail: false };
+  } catch (error) {
+    console.error('Error checking virtual email document:', error);
+    return { isVirtualEmail: false };
+  }
+}
+
 // Handle file deletion
 async function handleFileDeletion(documentId: string, projectId: string, fileId: string): Promise<void> {
   try {
@@ -172,6 +222,39 @@ async function handleDriveWebhook(headers: DriveWebhookHeaders): Promise<{ succe
     
     const { document_id, project_id, file_id, title, status } = documentInfo;
     
+    // Check if this is a virtual email document and set up automatic Drive watch if needed
+    const virtualEmailInfo = await checkVirtualEmailDocument(document_id);
+    if (virtualEmailInfo.isVirtualEmail && !status.includes('watch_active')) {
+      console.log(`Setting up automatic Drive watch for virtual email document: ${document_id}`);
+      
+      // Set up automatic Drive watch for this file
+      try {
+        const watchResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/subscribe-to-drive-file`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            documentId: document_id,
+            projectId: project_id,
+            fileId: file_id,
+            autoSetup: true,
+            virtualEmail: virtualEmailInfo.virtualEmail,
+            username: virtualEmailInfo.username,
+          }),
+        });
+        
+        if (watchResponse.ok) {
+          console.log(`Automatic Drive watch set up for virtual email document: ${document_id}`);
+        } else {
+          console.warn(`Failed to set up automatic Drive watch for document: ${document_id}`);
+        }
+      } catch (error) {
+        console.error('Error setting up automatic Drive watch:', error);
+      }
+    }
+    
     // Handle different resource states
     if (resourceState === 'deleted') {
       await handleFileDeletion(document_id, project_id, file_id);
@@ -188,6 +271,15 @@ async function handleDriveWebhook(headers: DriveWebhookHeaders): Promise<{ succe
         n8n_webhook_response: 'File deleted - no sync needed',
         n8n_webhook_sent_at: new Date().toISOString(),
       });
+
+      // Update last webhook received timestamp
+      await supabase
+        .from('drive_file_watches')
+        .update({ 
+          last_webhook_received: new Date().toISOString(),
+          webhook_failures: 0 // Reset failure counter on successful webhook
+        })
+        .eq('file_id', file_id);
       
       return {
         success: true,
@@ -220,6 +312,15 @@ async function handleDriveWebhook(headers: DriveWebhookHeaders): Promise<{ succe
         n8n_webhook_sent_at: new Date().toISOString(),
         error_message: n8nSuccess ? undefined : 'Failed to send to n8n webhook',
       });
+
+      // Update last webhook received timestamp
+      await supabase
+        .from('drive_file_watches')
+        .update({ 
+          last_webhook_received: new Date().toISOString(),
+          webhook_failures: 0 // Reset failure counter on successful webhook
+        })
+        .eq('file_id', file_id);
       
       return {
         success: true,

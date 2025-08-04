@@ -5,6 +5,20 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+// Encryption key for API keys (should be stored securely in production)
+const ENCRYPTION_KEY = Deno.env.get('ENCRYPTION_KEY') || 'your-encryption-key-here';
+
+// Decrypt API key
+async function decryptApiKey(encryptedKey: string): Promise<string> {
+  try {
+    // Simple base64 decode for now - in production use proper encryption
+    return atob(encryptedKey);
+  } catch (error) {
+    console.error('Error decrypting API key:', error);
+    throw new Error('Failed to decrypt API key');
+  }
+}
+
 function withCORS(resp: Response) {
   resp.headers.set('Access-Control-Allow-Origin', '*');
   resp.headers.set('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
@@ -247,6 +261,80 @@ serve(async (req) => {
             meeting.auto_scheduled_via_email = true;
             meeting.virtual_email_attendee = virtualEmailAttendee;
             meeting.bot_deployment_method = 'scheduled';
+          }
+        }
+        
+        // Check for virtual email attendees and auto-schedule bots
+        const virtualEmailPattern = /ai\+([^@]+)@besunny\.ai/;
+        let virtualEmailAttendee: string | undefined;
+        let username: string | undefined;
+        
+        if (Array.isArray(event.attendees)) {
+          for (const attendee of event.attendees) {
+            if (virtualEmailPattern.test(attendee.email)) {
+              virtualEmailAttendee = attendee.email;
+              const match = attendee.email.match(virtualEmailPattern);
+              username = match ? match[1] : undefined;
+              break;
+            }
+          }
+        }
+        
+        // If virtual email attendee found, mark for auto-scheduling
+        if (virtualEmailAttendee && username) {
+          // Find the user by username
+          const { data: virtualEmailUser, error: userError } = await supabase
+            .from('users')
+            .select('id')
+            .ilike('email', `%${username}%`)
+            .single();
+          
+          if (!userError && virtualEmailUser && virtualEmailUser.id === userId) {
+            meeting.auto_scheduled_via_email = true;
+            meeting.virtual_email_attendee = virtualEmailAttendee;
+            meeting.bot_deployment_method = 'scheduled';
+            
+            // Auto-schedule the bot immediately
+            try {
+              const { data: attendeeCredentials } = await supabase
+                .from('user_api_keys')
+                .select('api_key')
+                .eq('user_id', userId)
+                .eq('service', 'attendee')
+                .single();
+              
+              if (attendeeCredentials) {
+                // Decrypt the API key
+                const decryptedKey = await decryptApiKey(attendeeCredentials.api_key);
+                
+                // Send bot to meeting
+                const botResponse = await fetch('https://app.attendee.dev/api/v1/bots', {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${decryptedKey}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    meeting_url: meetingUrl,
+                    name: `Auto-scheduled bot for ${event.summary || 'Meeting'}`,
+                    auto_join: true,
+                    recording: true,
+                    transcription: true,
+                  }),
+                });
+                
+                if (botResponse.ok) {
+                  const botData = await botResponse.json();
+                  meeting.attendee_bot_id = botData.id;
+                  meeting.bot_status = 'scheduled';
+                  console.log(`Auto-scheduled bot for meeting: ${event.id}`);
+                } else {
+                  console.error('Failed to auto-schedule bot:', botResponse.status);
+                }
+              }
+            } catch (error) {
+              console.error('Error auto-scheduling bot:', error);
+            }
           }
         }
         

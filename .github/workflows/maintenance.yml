@@ -1,0 +1,77 @@
+name: Database Maintenance
+
+on:
+  schedule:
+    # Daily maintenance at 2 AM UTC
+    - cron: '0 2 * * *'
+    # Weekly maintenance on Sundays at 3 AM UTC
+    - cron: '0 3 * * 0'
+    # Monthly maintenance on the 1st at 4 AM UTC
+    - cron: '0 4 1 * *'
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  daily-maintenance:
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '0 2 * * *' || github.event.inputs.maintenance_type == 'daily'
+    
+    steps:
+    - name: Run Daily Maintenance
+      run: |
+        # Call the daily maintenance function
+        curl -X POST \
+          -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+          -H "Content-Type: application/json" \
+          -d '{"maintenance_type": "daily"}' \
+          "${{ secrets.SUPABASE_URL }}/rest/v1/rpc/perform_daily_maintenance"
+      
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+  weekly-maintenance:
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '0 3 * * 0' || github.event.inputs.maintenance_type == 'weekly'
+    
+    steps:
+    - name: Run Weekly Maintenance
+      run: |
+        # Call the weekly maintenance function
+        curl -X POST \
+          -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+          -H "Content-Type: application/json" \
+          -d '{"maintenance_type": "weekly"}' \
+          "${{ secrets.SUPABASE_URL }}/rest/v1/rpc/perform_weekly_maintenance"
+      
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+  monthly-maintenance:
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '0 4 1 * *' || github.event.inputs.maintenance_type == 'monthly'
+    
+    steps:
+    - name: Run Monthly Maintenance
+      run: |
+        # Call the monthly maintenance function
+        curl -X POST \
+          -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+          -H "Content-Type: application/json" \
+          -d '{"maintenance_type": "monthly"}' \
+          "${{ secrets.SUPABASE_URL }}/rest/v1/rpc/perform_monthly_maintenance"
+      
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+    - name: Handle failure
+      if: failure()
+      run: |
+        echo "Maintenance failed"
+        # Add notification logic here if needed
+
+    - name: Handle success
+      if: success()
+      run: |
+        echo "Maintenance completed successfully" 

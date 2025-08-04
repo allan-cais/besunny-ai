@@ -56,17 +56,33 @@ const OAuthLoginCallback: React.FC = () => {
           }
 
           setStatus('success');
-          setMessage('Successfully authenticated! Setting up calendar sync...');
+          setMessage('Successfully authenticated! Setting up Google services...');
           
-          // Set up automatic calendar sync
+          // Set up automatic calendar sync and Gmail watch
           try {
             const { calendarService } = await import('@/lib/calendar');
+            const { gmailWatchService } = await import('@/lib/gmail-watch-service');
+            
+            // Set up calendar sync
             await calendarService.initializeCalendarSync(result.session.user.id);
-            setMessage('Calendar sync configured! Redirecting to dashboard...');
+            setMessage('Calendar sync configured! Setting up Gmail watch...');
+            
+            // Set up Gmail watch for virtual email detection
+            if (result.session.user.email) {
+              const gmailResult = await gmailWatchService.setupGmailWatch(result.session.user.email);
+              if (gmailResult.success) {
+                setMessage('Gmail watch configured! Redirecting to dashboard...');
+              } else {
+                console.warn('Gmail watch setup failed:', gmailResult.error);
+                setMessage('Calendar sync configured! Gmail watch can be set up later. Redirecting...');
+              }
+            } else {
+              setMessage('Calendar sync configured! Gmail watch can be set up later. Redirecting...');
+            }
           } catch (syncError) {
-            console.error('Calendar sync setup failed:', syncError);
-            // Continue anyway - sync can be set up later
-            setMessage('Authentication successful! Redirecting to dashboard...');
+            console.error('Google services setup failed:', syncError);
+            // Continue anyway - services can be set up later
+            setMessage('Authentication successful! Services can be configured later. Redirecting...');
           }
           
           // Redirect to dashboard after a short delay

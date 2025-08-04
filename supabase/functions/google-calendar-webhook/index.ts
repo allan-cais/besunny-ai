@@ -534,11 +534,12 @@ serve(async (req) => {
                   }
                 }
                 
-                // Update sync token in database
+                // Update sync token and webhook activity in database
                 await supabase
                   .from('calendar_webhooks')
                   .update({ 
-                    sync_token: nextSyncToken
+                    sync_token: nextSyncToken,
+                    last_webhook_received: new Date().toISOString()
                   })
                   .eq('user_id', userId);
                 
@@ -620,11 +621,12 @@ serve(async (req) => {
               }
             }
             
-            // Update sync token in database
+            // Update sync token and webhook activity in database
             await supabase
               .from('calendar_webhooks')
               .update({ 
-                sync_token: nextSyncToken
+                sync_token: nextSyncToken,
+                last_webhook_received: new Date().toISOString()
               })
               .eq('user_id', userId);
             

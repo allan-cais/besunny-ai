@@ -7,9 +7,12 @@ const corsHeaders = {
 };
 
 interface SubscribeRequest {
-  user_id: string;
+  user_id?: string;
   document_id: string;
   file_id: string;
+  autoSetup?: boolean;
+  virtualEmail?: string;
+  username?: string;
 }
 
 interface GoogleDriveWatchResponse {
@@ -192,13 +195,21 @@ async function storeWatchInfo(
 // Main handler function
 async function handleSubscribeToDriveFile(request: SubscribeRequest): Promise<SubscribeResponse> {
   try {
-    const { user_id, document_id, file_id } = request;
+    const { user_id, document_id, file_id, autoSetup, virtualEmail, username } = request;
     
     // Validate input
-    if (!user_id || !document_id || !file_id) {
+    if (!document_id || !file_id) {
       return {
         success: false,
-        message: 'Missing required parameters: user_id, document_id, file_id',
+        message: 'Missing required parameters: document_id, file_id',
+      };
+    }
+    
+    // For auto-setup (virtual email), user_id is optional
+    if (!autoSetup && !user_id) {
+      return {
+        success: false,
+        message: 'Missing required parameter: user_id',
       };
     }
     
@@ -209,6 +220,11 @@ async function handleSubscribeToDriveFile(request: SubscribeRequest): Promise<Su
         success: false,
         message: 'Watch already exists for this file',
       };
+    }
+    
+    // For auto-setup, log the virtual email information
+    if (autoSetup && virtualEmail && username) {
+      console.log(`Auto-setting up Drive watch for virtual email: ${virtualEmail} (username: ${username})`);
     }
     
     // Get document and project information

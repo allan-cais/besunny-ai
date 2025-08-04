@@ -364,6 +364,50 @@ async function processInboundEmail(
     // Send to N8N webhook
     const n8nSuccess = await sendToN8nWebhook(classificationPayload);
     
+    // Check if this email contains Drive file sharing and set up automatic Drive watch
+    const emailContent = gmailMessage.snippet || '';
+    const driveUrlPattern = /https:\/\/drive\.google\.com\/[^\s]+/g;
+    const driveUrls = emailContent.match(driveUrlPattern);
+    
+    if (driveUrls && driveUrls.length > 0) {
+      console.log(`Found Drive URLs in virtual email: ${driveUrls.length} URLs`);
+      
+      // Extract file IDs from Drive URLs and set up watches
+      for (const driveUrl of driveUrls) {
+        const fileIdMatch = driveUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
+        if (fileIdMatch) {
+          const fileId = fileIdMatch[1];
+          console.log(`Setting up automatic Drive watch for file: ${fileId}`);
+          
+          try {
+            // Set up Drive watch for this file
+            const watchResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/subscribe-to-drive-file`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                documentId: documentId,
+                fileId: fileId,
+                autoSetup: true,
+                virtualEmail: toHeader,
+                username: username,
+              }),
+            });
+            
+            if (watchResponse.ok) {
+              console.log(`Automatic Drive watch set up for file: ${fileId}`);
+            } else {
+              console.warn(`Failed to set up automatic Drive watch for file: ${fileId}`);
+            }
+          } catch (error) {
+            console.error('Error setting up automatic Drive watch:', error);
+          }
+        }
+      }
+    }
+    
     // Log the processing
     await supabase
       .from('email_processing_logs')
