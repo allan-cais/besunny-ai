@@ -224,6 +224,72 @@ const Dashboard = () => {
     }
   };
 
+  // Debug function to clear webhook and resync
+  const debugClearAndResync = async () => {
+    if (!user?.id) return;
+    
+    try {
+      console.log('Starting clear webhook and resync...');
+      const result = await calendarService.clearWebhookAndResync(user.id);
+      if (result.success) {
+        console.log('Clear and resync completed successfully');
+        toast({
+          title: 'Clear and Resync Completed',
+          description: 'Webhook cleared and fresh sync completed',
+        });
+        // Reload meetings after sync
+        await loadCurrentWeekMeetings();
+      } else {
+        console.error('Clear and resync failed:', result.error);
+        toast({
+          title: 'Clear and Resync Failed',
+          description: result.error,
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Clear and resync error:', error);
+      toast({
+        title: 'Clear and Resync Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Debug function to clean up calendar data
+  const debugCleanupCalendar = async () => {
+    if (!user?.id) return;
+    
+    try {
+      console.log('Starting calendar cleanup...');
+      const result = await calendarService.cleanupCalendarData(user.id);
+      if (result.success) {
+        console.log('Calendar cleanup completed successfully');
+        toast({
+          title: 'Calendar Cleanup Completed',
+          description: `Deleted ${result.deleted.meetings} meetings, ${result.deleted.webhooks} webhooks, ${result.deleted.syncLogs} sync logs`,
+        });
+        // Reload meetings after cleanup
+        await loadCurrentWeekMeetings();
+      } else {
+        console.error('Calendar cleanup failed:', result.error);
+        toast({
+          title: 'Calendar Cleanup Failed',
+          description: result.error,
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Calendar cleanup error:', error);
+      toast({
+        title: 'Calendar Cleanup Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  };
+
   const loadUnclassifiedData = async () => {
     if (!user?.id) return;
 
@@ -623,6 +689,22 @@ const Dashboard = () => {
                   className="text-xs"
                 >
                   Webhook Status
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={debugClearAndResync}
+                  className="text-xs"
+                >
+                  Clear & Resync
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={debugCleanupCalendar}
+                  className="text-xs"
+                >
+                  Cleanup Calendar
                 </Button>
                 <span className="text-xs text-gray-500 font-mono">Action Required</span>
               </div>

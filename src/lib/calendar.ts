@@ -732,8 +732,51 @@ export const calendarService = {
       console.log('Existing webhook found:', existingWebhook);
       
       if (existingWebhook) {
-        console.log('Calendar webhook already exists, skipping initial sync');
-        return { success: true, webhook_id: existingWebhook.webhook_id };
+        console.log('Calendar webhook already exists, checking if meetings are synced...');
+        
+        // Check if we have any meetings in the database
+        const { data: existingMeetings, error: meetingsError } = await supabase
+          .from('meetings')
+          .select('id')
+          .eq('user_id', userId)
+          .limit(1);
+        
+        if (meetingsError) {
+          console.error('Error checking existing meetings:', meetingsError);
+        }
+        
+        console.log('Existing meetings found:', existingMeetings?.length || 0);
+        
+        if (!existingMeetings || existingMeetings.length === 0) {
+          console.log('No meetings found despite existing webhook, performing initial sync...');
+          
+          // Step 1: Get initial sync token
+          const initialSyncResult = await this.performInitialSync(userId);
+          console.log('Initial sync result:', initialSyncResult);
+          
+          if (!initialSyncResult.success) {
+            return { success: false, error: `Initial sync failed: ${initialSyncResult.error}` };
+          }
+          
+          // Step 2: Update the existing webhook with the new sync token
+          const { error: updateError } = await supabase
+            .from('calendar_webhooks')
+            .update({
+              sync_token: initialSyncResult.sync_token,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existingWebhook.id);
+          
+          if (updateError) {
+            console.error('Error updating webhook with sync token:', updateError);
+          }
+          
+          console.log('Calendar sync completed for existing webhook');
+          return { success: true, webhook_id: existingWebhook.webhook_id };
+        } else {
+          console.log('Meetings already exist, webhook is working correctly');
+          return { success: true, webhook_id: existingWebhook.webhook_id };
+        }
       }
       
       console.log('No existing webhook found, performing initial sync...');
@@ -1640,6 +1683,170 @@ export const calendarService = {
     } catch (error) {
       console.error('Force initial sync error:', error);
       return { success: false, error: error.message || String(error) };
+    }
+  },
+
+  // Clear webhook and force fresh setup (for debugging)
+  async clearWebhookAndResync(userId: string): Promise<{ success: boolean; error?: string; webhook_id?: string }> {
+    try {
+      console.log('Clearing webhook and forcing fresh setup for user:', userId);
+      
+      // Step 1: Get existing webhook
+      const { data: existingWebhook } = await supabase
+        .from('calendar_webhooks')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .maybeSingle();
+      
+      if (existingWebhook) {
+        console.log('Found existing webhook, stopping it...');
+        
+        // Stop the existing webhook
+        const stopResult = await this.stopWatch(userId, existingWebhook.webhook_id);
+        if (!stopResult.success) {
+          console.warn('Failed to stop existing webhook:', stopResult.error);
+        }
+        
+        // Mark webhook as inactive
+        await supabase
+          .from('calendar_webhooks')
+          .update({ is_active: false })
+          .eq('id', existingWebhook.id);
+      }
+      
+      // Step 2: Perform fresh initial sync
+      const initialSyncResult = await this.performInitialSync(userId);
+      console.log('Fresh initial sync result:', initialSyncResult);
+      
+      if (!initialSyncResult.success) {
+        return { success: false, error: `Initial sync failed: ${initialSyncResult.error}` };
+      }
+      
+      // Step 3: Set up new watch
+      console.log('Setting up new watch...');
+      const watchResult = await this.setupWatch(userId, initialSyncResult.sync_token);
+      console.log('New watch setup result:', watchResult);
+      
+      if (!watchResult.success) {
+        return { success: false, error: `Watch setup failed: ${watchResult.error}` };
+      }
+      
+      console.log('Clear and resync completed successfully');
+      return { success: true, webhook_id: watchResult.webhook_id };
+    } catch (error) {
+      console.error('Clear and resync error:', error);
+      return { success: false, error: error.message || String(error) };
+    }
+  },
+
+  // Clean up all calendar data for a user (when disconnecting Google)
+  async cleanupCalendarData(userId: string): Promise<{ success: boolean; error?: string; deleted: { meetings: number; webhooks: number; syncLogs: number } }> {
+    try {
+      console.log('Cleaning up calendar data for user:', userId);
+      
+      let deletedMeetings = 0;
+      let deletedWebhooks = 0;
+      let deletedSyncLogs = 0;
+      
+      // Step 1: Stop and delete webhooks
+      const { data: webhooks, error: webhookError } = await supabase
+        .from('calendar_webhooks')
+        .select('*')
+        .eq('user_id', userId);
+      
+      if (webhookError) {
+        console.error('Error fetching webhooks:', webhookError);
+      } else if (webhooks && webhooks.length > 0) {
+        for (const webhook of webhooks) {
+          // Stop the webhook with Google
+          if (webhook.is_active) {
+            try {
+              const stopResult = await this.stopWatch(userId, webhook.webhook_id);
+              if (!stopResult.success) {
+                console.warn('Failed to stop webhook:', stopResult.error);
+              }
+            } catch (error) {
+              console.warn('Error stopping webhook:', error);
+            }
+          }
+        }
+        
+        // Delete all webhooks for this user
+        const { error: deleteWebhookError } = await supabase
+          .from('calendar_webhooks')
+          .delete()
+          .eq('user_id', userId);
+        
+        if (deleteWebhookError) {
+          console.error('Error deleting webhooks:', deleteWebhookError);
+        } else {
+          deletedWebhooks = webhooks.length;
+          console.log(`Deleted ${deletedWebhooks} webhooks`);
+        }
+      }
+      
+      // Step 2: Delete all meetings for this user
+      const { data: meetings, error: meetingsError } = await supabase
+        .from('meetings')
+        .select('id')
+        .eq('user_id', userId);
+      
+      if (meetingsError) {
+        console.error('Error fetching meetings:', meetingsError);
+      } else if (meetings && meetings.length > 0) {
+        const { error: deleteMeetingsError } = await supabase
+          .from('meetings')
+          .delete()
+          .eq('user_id', userId);
+        
+        if (deleteMeetingsError) {
+          console.error('Error deleting meetings:', deleteMeetingsError);
+        } else {
+          deletedMeetings = meetings.length;
+          console.log(`Deleted ${deletedMeetings} meetings`);
+        }
+      }
+      
+      // Step 3: Delete sync logs for this user
+      const { data: syncLogs, error: syncLogsError } = await supabase
+        .from('calendar_sync_logs')
+        .select('id')
+        .eq('user_id', userId);
+      
+      if (syncLogsError) {
+        console.error('Error fetching sync logs:', syncLogsError);
+      } else if (syncLogs && syncLogs.length > 0) {
+        const { error: deleteSyncLogsError } = await supabase
+          .from('calendar_sync_logs')
+          .delete()
+          .eq('user_id', userId);
+        
+        if (deleteSyncLogsError) {
+          console.error('Error deleting sync logs:', deleteSyncLogsError);
+        } else {
+          deletedSyncLogs = syncLogs.length;
+          console.log(`Deleted ${deletedSyncLogs} sync logs`);
+        }
+      }
+      
+      console.log(`Calendar cleanup completed: ${deletedMeetings} meetings, ${deletedWebhooks} webhooks, ${deletedSyncLogs} sync logs deleted`);
+      
+      return {
+        success: true,
+        deleted: {
+          meetings: deletedMeetings,
+          webhooks: deletedWebhooks,
+          syncLogs: deletedSyncLogs
+        }
+      };
+    } catch (error) {
+      console.error('Calendar cleanup error:', error);
+      return { 
+        success: false, 
+        error: error.message || String(error),
+        deleted: { meetings: 0, webhooks: 0, syncLogs: 0 }
+      };
     }
   },
 

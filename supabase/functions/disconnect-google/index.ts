@@ -103,6 +103,85 @@ serve(async (req) => {
       }
     }
 
+    // Clean up calendar data before deleting credentials
+    console.log('Cleaning up calendar data for user:', user.id)
+    
+    // Stop and delete webhooks
+    const { data: webhooks, error: webhookError } = await supabase
+      .from('calendar_webhooks')
+      .select('*')
+      .eq('user_id', user.id)
+    
+    if (webhookError) {
+      console.error('Error fetching webhooks:', webhookError)
+    } else if (webhooks && webhooks.length > 0) {
+      // Mark webhooks as inactive (we can't stop them without credentials)
+      const { error: updateError } = await supabase
+        .from('calendar_webhooks')
+        .update({ is_active: false })
+        .eq('user_id', user.id)
+      
+      if (updateError) {
+        console.error('Error updating webhooks:', updateError)
+      } else {
+        console.log(`Marked ${webhooks.length} webhooks as inactive`)
+      }
+    }
+    
+    // Delete all meetings for this user
+    const { data: meetings, error: meetingsError } = await supabase
+      .from('meetings')
+      .select('id')
+      .eq('user_id', user.id)
+    
+    if (meetingsError) {
+      console.error('Error fetching meetings:', meetingsError)
+    } else if (meetings && meetings.length > 0) {
+      const { error: deleteMeetingsError } = await supabase
+        .from('meetings')
+        .delete()
+        .eq('user_id', user.id)
+      
+      if (deleteMeetingsError) {
+        console.error('Error deleting meetings:', deleteMeetingsError)
+      } else {
+        console.log(`Deleted ${meetings.length} meetings`)
+      }
+    }
+    
+    // Delete sync logs for this user
+    const { data: syncLogs, error: syncLogsError } = await supabase
+      .from('calendar_sync_logs')
+      .select('id')
+      .eq('user_id', user.id)
+    
+    if (syncLogsError) {
+      console.error('Error fetching sync logs:', syncLogsError)
+    } else if (syncLogs && syncLogs.length > 0) {
+      const { error: deleteSyncLogsError } = await supabase
+        .from('calendar_sync_logs')
+        .delete()
+        .eq('user_id', user.id)
+      
+      if (deleteSyncLogsError) {
+        console.error('Error deleting sync logs:', deleteSyncLogsError)
+      } else {
+        console.log(`Deleted ${syncLogs.length} sync logs`)
+      }
+    }
+    
+    // Delete webhooks completely
+    const { error: deleteWebhooksError } = await supabase
+      .from('calendar_webhooks')
+      .delete()
+      .eq('user_id', user.id)
+    
+    if (deleteWebhooksError) {
+      console.error('Error deleting webhooks:', deleteWebhooksError)
+    } else {
+      console.log('Deleted all webhooks')
+    }
+
     // Delete credentials from database
     const { error: deleteError } = await supabase
       .from('google_credentials')

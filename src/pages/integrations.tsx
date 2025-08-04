@@ -337,6 +337,20 @@ const IntegrationsPage: React.FC = () => {
         }
       }
 
+      // Clean up calendar data before deleting credentials
+      try {
+        const { calendarService } = await import('@/lib/calendar');
+        const cleanupResult = await calendarService.cleanupCalendarData(user.id);
+        
+        if (cleanupResult.success) {
+          console.log('Calendar cleanup completed:', cleanupResult.deleted);
+        } else {
+          console.warn('Calendar cleanup failed:', cleanupResult.error);
+        }
+      } catch (cleanupError) {
+        console.warn('Calendar cleanup error:', cleanupError);
+      }
+
       // Delete credentials from database (only integration credentials, not login providers)
       const { error: deleteError } = await supabase
         .from('google_credentials')
@@ -349,7 +363,7 @@ const IntegrationsPage: React.FC = () => {
       }
 
       setGoogleStatus({ connected: false });
-      setSuccess('Successfully disconnected from Google');
+      setSuccess('Successfully disconnected from Google and cleaned up calendar data');
       setTimeout(() => setSuccess(null), 3000);
     } catch (error) {
       console.error('Disconnect error:', error);
