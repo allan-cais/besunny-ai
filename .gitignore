@@ -32,6 +32,10 @@ supabase/.temp/
 .env
 .env.local
 
+# Google Cloud Keys
+service-account-key.json
+client-secret.json
+
 # Do NOT ignore supabase-migrations or supabase/functions
 # (these are needed for version control and deployment)
 .supabase/
