@@ -96,6 +96,7 @@ const Dashboard = () => {
   // Load dashboard data
   useEffect(() => {
     if (user?.id) {
+      console.log('Loading dashboard data for user:', user.id);
       loadCurrentWeekMeetings();
       loadUnclassifiedData();
     }
@@ -161,6 +162,62 @@ const Dashboard = () => {
       console.error('Manual sync error:', error);
       toast({
         title: 'Manual sync error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Debug function to force initial sync
+  const debugForceSync = async () => {
+    if (!user?.id) return;
+    
+    try {
+      console.log('Starting force initial sync...');
+      const result = await calendarService.forceInitialSync(user.id);
+      if (result.success) {
+        console.log('Force initial sync completed successfully');
+        toast({
+          title: 'Force initial sync completed',
+          description: 'Calendar sync initialized with webhook',
+        });
+        // Reload meetings after sync
+        await loadCurrentWeekMeetings();
+      } else {
+        console.error('Force initial sync failed:', result.error);
+        toast({
+          title: 'Force initial sync failed',
+          description: result.error,
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Force initial sync error:', error);
+      toast({
+        title: 'Force initial sync error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Debug function to check webhook status
+  const debugWebhookStatus = async () => {
+    if (!user?.id) return;
+    
+    try {
+      console.log('Checking webhook status...');
+      const status = await calendarService.getWatchStatus(user.id);
+      console.log('Webhook status:', status);
+      
+      toast({
+        title: 'Webhook Status',
+        description: `Active: ${status.webhook_active}, Last sync: ${status.last_sync || 'Never'}`,
+      });
+    } catch (error) {
+      console.error('Webhook status check error:', error);
+      toast({
+        title: 'Webhook status check failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -550,6 +607,22 @@ const Dashboard = () => {
                   className="text-xs"
                 >
                   Debug Sync
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={debugForceSync}
+                  className="text-xs"
+                >
+                  Force Sync
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={debugWebhookStatus}
+                  className="text-xs"
+                >
+                  Webhook Status
                 </Button>
                 <span className="text-xs text-gray-500 font-mono">Action Required</span>
               </div>

@@ -715,34 +715,47 @@ export const calendarService = {
   // Enhanced calendar service with watch functionality
   async initializeCalendarSync(userId: string): Promise<{ success: boolean; error?: string; webhook_id?: string }> {
     try {
-  
+      console.log('Initializing calendar sync for user:', userId);
       
       // Check if we already have an active webhook
-      const { data: existingWebhook } = await supabase
+      const { data: existingWebhook, error: webhookError } = await supabase
         .from('calendar_webhooks')
         .select('*')
         .eq('user_id', userId)
         .eq('is_active', true)
         .maybeSingle();
       
+      if (webhookError) {
+        console.error('Error checking for existing webhook:', webhookError);
+      }
+      
+      console.log('Existing webhook found:', existingWebhook);
+      
       if (existingWebhook) {
         console.log('Calendar webhook already exists, skipping initial sync');
         return { success: true, webhook_id: existingWebhook.webhook_id };
       }
       
+      console.log('No existing webhook found, performing initial sync...');
+      
       // Step 1: Get initial sync token (only if no webhook exists)
       const initialSyncResult = await this.performInitialSync(userId);
+      console.log('Initial sync result:', initialSyncResult);
+      
       if (!initialSyncResult.success) {
         return { success: false, error: `Initial sync failed: ${initialSyncResult.error}` };
       }
       
       // Step 2: Set up watch with sync token
+      console.log('Setting up watch with sync token...');
       const watchResult = await this.setupWatch(userId, initialSyncResult.sync_token);
+      console.log('Watch setup result:', watchResult);
+      
       if (!watchResult.success) {
         return { success: false, error: `Watch setup failed: ${watchResult.error}` };
       }
       
-      
+      console.log('Calendar sync initialization completed successfully');
       return { success: true, webhook_id: watchResult.webhook_id };
     } catch (error) {
       console.error('Calendar sync initialization error:', error);
@@ -753,12 +766,15 @@ export const calendarService = {
   // Perform initial sync to get baseline state and sync token
   async performInitialSync(userId: string): Promise<{ success: boolean; error?: string; sync_token?: string }> {
     try {
-      
+      console.log('Performing initial sync for user:', userId);
       
       const credentials = await getGoogleCredentials(userId);
       if (!credentials) {
+        console.error('No Google credentials found for user:', userId);
         return { success: false, error: 'No Google credentials found' };
       }
+      
+      console.log('Google credentials found, proceeding with sync...');
 
       // Get events from the past 7 days to future 60 days
       const timeMin = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -1593,6 +1609,36 @@ export const calendarService = {
       return { success: true, processed };
     } catch (error) {
       console.error('Manual sync error:', error);
+      return { success: false, error: error.message || String(error) };
+    }
+  },
+
+  // Force initial sync even if webhook exists (for debugging)
+  async forceInitialSync(userId: string): Promise<{ success: boolean; error?: string; webhook_id?: string }> {
+    try {
+      console.log('Forcing initial sync for user:', userId);
+      
+      // Step 1: Get initial sync token (force sync regardless of webhook)
+      const initialSyncResult = await this.performInitialSync(userId);
+      console.log('Force initial sync result:', initialSyncResult);
+      
+      if (!initialSyncResult.success) {
+        return { success: false, error: `Initial sync failed: ${initialSyncResult.error}` };
+      }
+      
+      // Step 2: Set up watch with sync token
+      console.log('Setting up watch with sync token...');
+      const watchResult = await this.setupWatch(userId, initialSyncResult.sync_token);
+      console.log('Watch setup result:', watchResult);
+      
+      if (!watchResult.success) {
+        return { success: false, error: `Watch setup failed: ${watchResult.error}` };
+      }
+      
+      console.log('Force initial sync completed successfully');
+      return { success: true, webhook_id: watchResult.webhook_id };
+    } catch (error) {
+      console.error('Force initial sync error:', error);
       return { success: false, error: error.message || String(error) };
     }
   },
