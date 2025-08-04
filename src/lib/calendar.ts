@@ -299,6 +299,32 @@ export const calendarService = {
     return meetings || [];
   },
 
+  // Get ALL meetings for the current week (including assigned ones) - for debugging
+  async getAllCurrentWeekMeetings(): Promise<Meeting[]> {
+    const session = (await supabase.auth.getSession()).data.session;
+    if (!session) throw new Error('Not authenticated');
+    
+    const now = new Date();
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay()); // Start of current week (Sunday)
+    startOfWeek.setHours(0, 0, 0, 0);
+    
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 7); // End of current week
+    endOfWeek.setHours(23, 59, 59, 999);
+    
+    const { data: meetings, error } = await supabase
+      .from('meetings')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .gte('start_time', startOfWeek.toISOString())
+      .lte('start_time', endOfWeek.toISOString())
+      .order('start_time', { ascending: true });
+    
+    if (error) throw error;
+    return meetings || [];
+  },
+
   // Get sync status and logs
   async getSyncStatus(): Promise<{
     webhook_active: boolean;
@@ -691,7 +717,20 @@ export const calendarService = {
     try {
   
       
-      // Step 1: Get initial sync token
+      // Check if we already have an active webhook
+      const { data: existingWebhook } = await supabase
+        .from('calendar_webhooks')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .maybeSingle();
+      
+      if (existingWebhook) {
+        console.log('Calendar webhook already exists, skipping initial sync');
+        return { success: true, webhook_id: existingWebhook.webhook_id };
+      }
+      
+      // Step 1: Get initial sync token (only if no webhook exists)
       const initialSyncResult = await this.performInitialSync(userId);
       if (!initialSyncResult.success) {
         return { success: false, error: `Initial sync failed: ${initialSyncResult.error}` };
@@ -1420,7 +1459,7 @@ export const calendarService = {
       // Get all meetings for this user that have google_calendar_event_id
       const { data: meetings, error: findError } = await supabase
         .from('meetings')
-        .select('id, google_calendar_event_id, title, bot_status, attendee_bot_id')
+        .select('id, google_calendar_event_id, title, bot_status, attendee_bot_id, project_id, transcript')
         .eq('user_id', userId)
         .not('google_calendar_event_id', 'is', null);
       
@@ -1437,19 +1476,30 @@ export const calendarService = {
       let cancelled = 0;
 
       for (const meeting of meetings) {
-        // Check if the meeting has an active bot
-        if (meeting.bot_status && meeting.bot_status !== 'pending') {
-          // Meeting has bot, mark as cancelled instead of deleting
-          await this.updateMeeting(meeting.id, { 
-            event_status: 'declined',
-            bot_status: 'failed',
-            updated_at: new Date().toISOString()
-          });
-          cancelled++;
-        } else {
-          // No bot, safe to delete
-          await this.deleteMeeting(meeting.id);
-          deleted++;
+        // Check if the meeting exists in the current Google Calendar response
+        if (!existingEventIds.has(meeting.google_calendar_event_id)) {
+          // Meeting no longer exists in Google Calendar
+          
+          // Check if the meeting has important data that should be preserved
+          const hasImportantData = 
+            meeting.bot_status && meeting.bot_status !== 'pending' || // Has active bot
+            meeting.project_id || // Assigned to project
+            meeting.transcript || // Has transcript
+            meeting.attendee_bot_id; // Has bot ID
+          
+          if (hasImportantData) {
+            // Meeting has important data, mark as cancelled instead of deleting
+            await this.updateMeeting(meeting.id, { 
+              event_status: 'declined',
+              bot_status: meeting.bot_status === 'pending' ? 'failed' : meeting.bot_status,
+              updated_at: new Date().toISOString()
+            });
+            cancelled++;
+          } else {
+            // No important data, safe to delete
+            await this.deleteMeeting(meeting.id);
+            deleted++;
+          }
         }
       }
 
@@ -1490,6 +1540,59 @@ export const calendarService = {
       return { success: true };
     } catch (error) {
       console.error('Calendar access test error:', error);
+      return { success: false, error: error.message || String(error) };
+    }
+  },
+
+  // Manual sync without cleanup (for debugging)
+  async manualSyncWithoutCleanup(userId: string): Promise<{ success: boolean; error?: string; processed?: number }> {
+    try {
+      const credentials = await getGoogleCredentials(userId);
+      if (!credentials) {
+        return { success: false, error: 'No Google credentials found' };
+      }
+
+      // Get events from the past 7 days to future 60 days
+      const timeMin = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const timeMax = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString();
+      
+      const response = await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/primary/events?` +
+        `timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&orderBy=startTime`,
+        {
+          headers: {
+            'Authorization': `Bearer ${credentials.access_token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Calendar API error: ${response.status} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      const events = data.items || [];
+      
+      let processed = 0;
+      let created = 0;
+      let updated = 0;
+
+      for (const event of events) {
+        const result = await this.processCalendarEvent(event, userId, credentials);
+        processed++;
+        
+        if (result.action === 'created') {
+          created++;
+        } else if (result.action === 'updated') {
+          updated++;
+        }
+      }
+
+      console.log(`Manual sync completed: ${processed} events processed, ${created} created, ${updated} updated`);
+      return { success: true, processed };
+    } catch (error) {
+      console.error('Manual sync error:', error);
       return { success: false, error: error.message || String(error) };
     }
   },

@@ -80,7 +80,7 @@ async function handleDeletedEvent(eventId: string, userId: string): Promise<{ su
     // Find the meeting in our database
     const { data: meetings, error: findError } = await supabase
       .from('meetings')
-      .select('id, title, bot_status')
+      .select('id, title, bot_status, project_id, transcript, attendee_bot_id')
       .eq('google_calendar_event_id', eventId)
       .eq('user_id', userId);
     
@@ -94,50 +94,54 @@ async function handleDeletedEvent(eventId: string, userId: string): Promise<{ su
       return { success: true }; // Event not in our database, nothing to delete
     }
     
-    // If multiple meetings found, delete all of them (duplicates)
+    // If multiple meetings found, handle each one individually
     if (meetings.length > 1) {
-      console.log(`Found ${meetings.length} duplicate meetings for event ${eventId}, deleting all`);
+      console.log(`Found ${meetings.length} duplicate meetings for event ${eventId}, processing individually`);
     }
     
-    // Check if any meeting has active bot or transcript
-    const hasActiveBot = meetings.some(m => m.bot_status === 'bot_joined' || m.bot_status === 'transcribing');
+    let deleted = 0;
+    let cancelled = 0;
     
-    if (hasActiveBot) {
-      console.log('Meeting has active bot, updating status instead of deleting');
+    for (const meeting of meetings) {
+      // Check if the meeting has important data that should be preserved
+      const hasImportantData = 
+        meeting.bot_status && meeting.bot_status !== 'pending' || // Has active bot
+        meeting.project_id || // Assigned to project
+        meeting.transcript || // Has transcript
+        meeting.attendee_bot_id; // Has bot ID
       
-      // Update all meetings status to cancelled instead of deleting
-      const meetingIds = meetings.map(m => m.id);
-      const { error: updateError } = await supabase
-        .from('meetings')
-        .update({
-          event_status: 'declined',
-          bot_status: 'failed',
-          updated_at: new Date().toISOString(),
-        })
-        .in('id', meetingIds);
-      
-      if (updateError) {
-        console.error('Error updating cancelled meetings:', updateError);
-        return { success: false, error: updateError.message };
+      if (hasImportantData) {
+        // Meeting has important data, mark as cancelled instead of deleting
+        const { error: updateError } = await supabase
+          .from('meetings')
+          .update({
+            event_status: 'declined',
+            bot_status: meeting.bot_status === 'pending' ? 'failed' : meeting.bot_status,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', meeting.id);
+        
+        if (!updateError) {
+          cancelled++;
+        } else {
+          console.error('Error updating cancelled meeting:', updateError);
+        }
+      } else {
+        // No important data, safe to delete
+        const { error: deleteError } = await supabase
+          .from('meetings')
+          .delete()
+          .eq('id', meeting.id);
+        
+        if (!deleteError) {
+          deleted++;
+        } else {
+          console.error('Error deleting meeting:', deleteError);
+        }
       }
-      
-      console.log('Meetings marked as cancelled:', meetingIds);
-      return { success: true };
     }
     
-    // Delete all meetings if no active bot
-    const meetingIds = meetings.map(m => m.id);
-    const { error: deleteError } = await supabase
-      .from('meetings')
-      .delete()
-      .in('id', meetingIds);
-    
-    if (deleteError) {
-      console.error('Error deleting meetings:', deleteError);
-      return { success: false, error: deleteError.message };
-    }
-    
-    console.log('Meetings deleted successfully:', meetingIds);
+    console.log(`Successfully processed ${meetings.length} meetings for deleted event ${eventId}: ${deleted} deleted, ${cancelled} cancelled`);
     return { success: true };
   } catch (error) {
     console.error('Error handling deleted event:', error);

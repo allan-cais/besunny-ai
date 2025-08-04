@@ -117,10 +117,53 @@ const Dashboard = () => {
       setMeetingsLoading(true);
       const meetings = await calendarService.getCurrentWeekMeetings();
       setCurrentWeekMeetings(meetings);
+      
+      // Debug: Also load all meetings to see what's happening
+      try {
+        const allMeetings = await calendarService.getAllCurrentWeekMeetings();
+        console.log('All current week meetings:', allMeetings);
+        console.log('Unassigned meetings (shown in dashboard):', meetings);
+        console.log('Assigned meetings (hidden from dashboard):', allMeetings.filter(m => m.project_id));
+      } catch (debugErr) {
+        console.error('Debug: Failed to load all meetings:', debugErr);
+      }
     } catch (err: any) {
       console.error('Failed to load current week meetings:', err);
     } finally {
       setMeetingsLoading(false);
+    }
+  };
+
+  // Debug function to manually sync without cleanup
+  const debugManualSync = async () => {
+    if (!user?.id) return;
+    
+    try {
+      console.log('Starting manual sync without cleanup...');
+      const result = await calendarService.manualSyncWithoutCleanup(user.id);
+      if (result.success) {
+        console.log('Manual sync completed successfully');
+        toast({
+          title: 'Manual sync completed',
+          description: `Processed ${result.processed} events`,
+        });
+        // Reload meetings after sync
+        await loadCurrentWeekMeetings();
+      } else {
+        console.error('Manual sync failed:', result.error);
+        toast({
+          title: 'Manual sync failed',
+          description: result.error,
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Manual sync error:', error);
+      toast({
+        title: 'Manual sync error',
+        description: error.message,
+        variant: 'destructive',
+      });
     }
   };
 
@@ -499,7 +542,17 @@ const Dashboard = () => {
                 <Clock className="w-4 h-4 mr-2" />
                 UNASSIGNED MEETINGS
               </CardTitle>
-              <span className="text-xs text-gray-500 font-mono">Action Required</span>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={debugManualSync}
+                  className="text-xs"
+                >
+                  Debug Sync
+                </Button>
+                <span className="text-xs text-gray-500 font-mono">Action Required</span>
+              </div>
             </CardHeader>
             <CardContent className="space-y-2">
               {meetingsLoading ? (

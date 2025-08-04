@@ -402,7 +402,7 @@ serve(async (req) => {
       if (daysPast >= 30 && daysFuture >= 30) {
         const { data: orphanedMeetings, error: orphanError } = await supabase
           .from('meetings')
-          .select('id, google_calendar_event_id')
+          .select('id, google_calendar_event_id, bot_status, project_id, transcript, attendee_bot_id')
           .eq('user_id', userId)
           .gte('start_time', startDate.toISOString())
           .lte('start_time', endDate.toISOString())
@@ -412,13 +412,37 @@ serve(async (req) => {
           for (const orphan of orphanedMeetings) {
             if (!processedEventIds.has(orphan.google_calendar_event_id)) {
               // This meeting no longer exists in Google Calendar
-              const { error: deleteError } = await supabase
-                .from('meetings')
-                .delete()
-                .eq('id', orphan.id);
+              // Only delete if it doesn't have important data
+              const hasImportantData = 
+                orphan.bot_status && orphan.bot_status !== 'pending' || // Has active bot
+                orphan.project_id || // Assigned to project
+                orphan.transcript || // Has transcript
+                orphan.attendee_bot_id; // Has bot ID
               
-              if (!deleteError) {
-                deletedMeetings++;
+              if (!hasImportantData) {
+                // Safe to delete - no important data
+                const { error: deleteError } = await supabase
+                  .from('meetings')
+                  .delete()
+                  .eq('id', orphan.id);
+                
+                if (!deleteError) {
+                  deletedMeetings++;
+                }
+              } else {
+                // Mark as declined instead of deleting to preserve data
+                const { error: updateError } = await supabase
+                  .from('meetings')
+                  .update({
+                    event_status: 'declined',
+                    bot_status: orphan.bot_status === 'pending' ? 'failed' : orphan.bot_status,
+                    updated_at: new Date().toISOString()
+                  })
+                  .eq('id', orphan.id);
+                
+                if (!updateError) {
+                  deletedMeetings++; // Count as "deleted" for reporting purposes
+                }
               }
             }
           }
