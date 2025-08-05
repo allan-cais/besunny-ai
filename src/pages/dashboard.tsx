@@ -24,6 +24,7 @@ import TranscriptModal from '@/components/dashboard/TranscriptModal';
 import EmailModal from '@/components/dashboard/EmailModal';
 import DocumentModal from '@/components/dashboard/DocumentModal';
 import ClassificationModal from '@/components/dashboard/ClassificationModal';
+import CalendarSyncDiagnostic from '@/components/dashboard/CalendarSyncDiagnostic';
 
 interface VirtualEmailActivity {
   id: string;
@@ -822,16 +823,21 @@ const Dashboard = () => {
         onProjectChange={handleClassify}
       />
 
-      {/* Classification Modal */}
-      <ClassificationModal 
-        activity={classificationActivity} 
-        projects={projects}
-        isOpen={!!classificationActivity}
-        onClose={() => setClassificationActivity(null)}
-        onClassify={handleClassify}
-      />
-    </div>
-  );
+              {/* Classification Modal */}
+        <ClassificationModal 
+          activity={classificationActivity} 
+          projects={projects}
+          isOpen={!!classificationActivity}
+          onClose={() => setClassificationActivity(null)}
+          onClassify={handleClassify}
+        />
+
+        {/* Calendar Sync Diagnostic - Temporary for troubleshooting */}
+        <div className="mt-8">
+          <CalendarSyncDiagnostic />
+        </div>
+      </div>
+    );
 };
 
 export default Dashboard; 
