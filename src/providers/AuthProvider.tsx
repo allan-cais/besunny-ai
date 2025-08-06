@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
-import { backgroundSyncService } from '@/lib/background-sync';
+import { adaptiveSyncStrategy } from '@/lib/adaptive-sync-strategy';
 
 interface AuthContextType {
   user: User | null;
@@ -62,19 +62,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(session?.user ?? null);
       setLoading(false);
       
-      // Initialize background sync when user is authenticated
+      // Initialize adaptive sync when user is authenticated
       if (session?.user) {
         try {
-          await backgroundSyncService.initialize(session.user.id);
+          await adaptiveSyncStrategy.initializeUser(session.user.id);
         } catch (error) {
-          console.error('Failed to initialize background sync:', error);
+          console.error('Failed to initialize adaptive sync:', error);
         }
       } else {
-        // Stop background sync when user signs out
+        // Stop adaptive sync when user signs out
         try {
-          await backgroundSyncService.stop();
+          adaptiveSyncStrategy.stopUser(session?.user?.id || '');
         } catch (error) {
-          console.error('Failed to stop background sync:', error);
+          console.error('Failed to stop adaptive sync:', error);
         }
       }
     });

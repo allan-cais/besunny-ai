@@ -14,6 +14,7 @@ import { Loader2, Clock, Database, Calendar, Video, Bot, Send, ExternalLink, Mai
 import { calendarService, Meeting } from '@/lib/calendar';
 import { supabase, Document } from '@/lib/supabase';
 import { useAttendeePolling } from '@/hooks/use-attendee-polling';
+import { useAdaptiveSync } from '@/hooks/use-adaptive-sync';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import BotConfigurationModal from '@/components/dashboard/BotConfigurationModal';
@@ -72,6 +73,12 @@ const Dashboard = () => {
 
   const { toast } = useToast();
 
+  // Set up adaptive sync
+  const { recordActivity, userState } = useAdaptiveSync({
+    enabled: true,
+    trackActivity: true,
+  });
+
   // Set up automatic polling
   const { pollNow } = useAttendeePolling({
     enabled: false, // Temporarily disabled due to 401 errors
@@ -101,10 +108,13 @@ const Dashboard = () => {
       loadCurrentWeekMeetings();
       loadUnclassifiedData();
       
+      // Record calendar view activity
+      recordActivity('calendar_view');
+      
       // Automatically set up calendar sync if needed
       setupCalendarSyncIfNeeded();
     }
-  }, [user?.id]);
+  }, [user?.id, recordActivity]);
 
   const setupCalendarSyncIfNeeded = async () => {
     if (!user?.id) return;
@@ -332,6 +342,9 @@ const Dashboard = () => {
   const sendBotToMeeting = async (meeting: Meeting, configuration?: any) => {
     if (!meeting.meeting_url) return;
     try {
+      // Record meeting creation activity
+      recordActivity('meeting_create');
+      
       setSendingBot(meeting.id);
       
       const result = await attendeeService.sendBotToMeeting({
