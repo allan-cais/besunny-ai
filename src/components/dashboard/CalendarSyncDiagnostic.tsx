@@ -393,6 +393,47 @@ const CalendarSyncDiagnostic: React.FC = () => {
     }
   };
 
+  const testWebhookDirectly = async () => {
+    setActionLoading('test-direct');
+    setError(null);
+    setSuccess(null);
+    try {
+      const session = (await supabase.auth.getSession()).data.session;
+      if (!session) {
+        setError('Not authenticated');
+        return;
+      }
+
+      console.log('Testing webhook directly for user:', session.user.id);
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-calendar-webhook?action=test`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+        }
+      );
+
+      const result = await response.json();
+      
+      if (result.success) {
+        setSuccess(`Webhook test successful! ${result.message}`);
+        console.log('Test response:', result.test_response);
+      } else {
+        setError(`Webhook test failed: ${result.error}`);
+      }
+
+    } catch (err) {
+      console.error('Webhook test error:', err);
+      setError(err.message || 'Webhook test failed');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   useEffect(() => {
     loadStatus();
   }, []);
@@ -626,6 +667,24 @@ const CalendarSyncDiagnostic: React.FC = () => {
               <RefreshCw className="w-4 h-4 mr-2" />
             )}
             Force Refresh Webhook
+          </Button>
+        </div>
+
+        {/* Test Webhook Directly Button */}
+        <div className="pt-2">
+          <Button
+            variant="outline"
+            onClick={testWebhookDirectly}
+            disabled={actionLoading !== null}
+            className="w-full"
+            size="sm"
+          >
+            {actionLoading === 'test-direct' ? (
+              <RefreshCw className="w-4 h-4 animate-spin mr-2" />
+            ) : (
+              <AlertTriangle className="w-4 h-4 mr-2" />
+            )}
+            Test Webhook Directly
           </Button>
         </div>
       </CardContent>

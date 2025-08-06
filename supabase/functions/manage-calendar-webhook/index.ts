@@ -59,10 +59,12 @@ serve(async (req) => {
       return await handleRecreateWebhook(supabase, user.id)
     } else if (action === 'verify') {
       return await handleVerifyWebhook(supabase, user.id)
+    } else if (action === 'test') {
+      return await handleTestWebhook(supabase, user.id)
     } else {
       console.log('Invalid action:', action);
       return new Response(
-        JSON.stringify({ error: 'Invalid action. Use stop, recreate, or verify' }),
+        JSON.stringify({ error: 'Invalid action. Use stop, recreate, verify, or test' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -247,6 +249,8 @@ async function handleRecreateWebhook(supabase: any, userId: string) {
       },
       expiration: expiration,
     }
+    
+    console.log('Watch request payload:', JSON.stringify(watchRequest, null, 2));
 
     console.log('Making Google API call to create webhook...');
     const createResponse = await fetch(
@@ -474,6 +478,81 @@ async function handleVerifyWebhook(supabase: any, userId: string) {
 
   } catch (error) {
     console.error('Error verifying webhook:', error)
+    return new Response(
+      JSON.stringify({ success: false, error: error.message || String(error) }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
+  }
+}
+
+async function handleTestWebhook(supabase: any, userId: string) {
+  try {
+    console.log('Testing webhook for user:', userId);
+    
+    // Get current webhook info
+    const { data: webhookData, error: webhookError } = await supabase
+      .from('calendar_webhooks')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('google_calendar_id', 'primary')
+      .eq('is_active', true)
+      .single()
+
+    if (webhookError || !webhookData) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'No active webhook found' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    console.log('Found webhook:', webhookData);
+
+    // Test the webhook URL directly
+    const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/google-calendar-webhook/notify?userId=${userId}`;
+    console.log('Testing webhook URL:', webhookUrl);
+
+    const testResponse = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Channel-ID': webhookData.webhook_id,
+        'X-Goog-Resource-ID': webhookData.resource_id,
+        'X-Goog-Resource-URI': 'https://www.googleapis.com/calendar/v3/calendars/primary/events?alt=json',
+        'X-Goog-Resource-State': 'exists',
+      },
+      body: JSON.stringify({
+        state: 'test',
+        userId: userId,
+      }),
+    });
+
+    console.log('Test response status:', testResponse.status);
+    const testResult = await testResponse.text();
+    console.log('Test response body:', testResult);
+
+    if (testResponse.ok) {
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: 'Webhook URL is accessible',
+          webhook_url: webhookUrl,
+          webhook_id: webhookData.webhook_id,
+          test_response: testResult
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    } else {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: `Webhook URL test failed: ${testResponse.status} - ${testResult}` 
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+  } catch (error) {
+    console.error('Error testing webhook:', error)
     return new Response(
       JSON.stringify({ success: false, error: error.message || String(error) }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
