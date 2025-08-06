@@ -292,16 +292,23 @@ serve(async (req) => {
   // Webhook notification endpoint (POST /notify)
   if (url.pathname.endsWith('/notify') && method === 'POST') {
     try {
-      const body = await req.json();
-      
       console.log('=== WEBHOOK NOTIFICATION RECEIVED ===');
       console.log('Timestamp:', new Date().toISOString());
       console.log('URL:', req.url);
       console.log('Headers:', Object.fromEntries(req.headers.entries()));
-      console.log('Body:', JSON.stringify(body, null, 2));
+      
+      // Try to parse body as JSON (for test/manual sync requests)
+      let body: any = null;
+      try {
+        body = await req.json();
+        console.log('Body:', JSON.stringify(body, null, 2));
+      } catch (parseError) {
+        console.log('No JSON body found - this is likely a real Google Calendar webhook');
+        // For real Google Calendar webhooks, the body is empty and info is in headers
+      }
       
       // Handle different notification types
-      if (body.state === 'sync') {
+      if (body && body.state === 'sync') {
         console.log('Processing MANUAL sync request');
         // This is a manual sync request (not a real webhook)
         const userId = body.userId;
@@ -386,7 +393,7 @@ serve(async (req) => {
           errors,
         }), { status: 200 }));
         
-      } else if (body.state === 'test') {
+      } else if (body && body.state === 'test') {
         console.log('Processing TEST webhook notification');
         // This is a test webhook notification
         const userId = body.userId;
@@ -418,77 +425,77 @@ serve(async (req) => {
         
       } else {
         // Handle real Google Calendar webhook notifications
-        if (!body.state || body.state === 'webhook') {
-          console.log('=== REAL GOOGLE CALENDAR WEBHOOK NOTIFICATION RECEIVED ===');
-          console.log('Headers:', Object.fromEntries(req.headers.entries()));
-          console.log('Body:', body);
+        // Real Google Calendar webhooks have empty bodies and info in headers
+        console.log('=== REAL GOOGLE CALENDAR WEBHOOK NOTIFICATION RECEIVED ===');
+        console.log('Headers:', Object.fromEntries(req.headers.entries()));
+        console.log('Body:', body);
+        
+        // Extract user ID from webhook URL params or headers
+        let userId = url.searchParams.get('userId');
           
-          // Extract user ID from webhook URL params or headers
-          let userId = url.searchParams.get('userId');
-          
-          // If not in URL, try to extract from webhook body or headers
-          if (!userId) {
-            // Check for X-Goog-Resource-URI header which might contain user info
-            const resourceUri = req.headers.get('X-Goog-Resource-URI');
-            if (resourceUri) {
-              console.log('Resource URI from header:', resourceUri);
-            }
-            
-            // Check for X-Goog-Channel-ID header
-            const channelId = req.headers.get('X-Goog-Channel-ID');
-            if (channelId) {
-              console.log('Channel ID from header:', channelId);
-              // Try to find user by channel ID in database
-              const { data: webhook } = await supabase
-                .from('calendar_webhooks')
-                .select('user_id')
-                .eq('webhook_id', channelId)
-                .eq('is_active', true)
-                .single();
-              
-              if (webhook) {
-                userId = webhook.user_id;
-                console.log('Found user ID from channel ID:', userId);
-              }
-            }
+        // If not in URL, try to extract from webhook body or headers
+        if (!userId) {
+          // Check for X-Goog-Resource-URI header which might contain user info
+          const resourceUri = req.headers.get('X-Goog-Resource-URI');
+          if (resourceUri) {
+            console.log('Resource URI from header:', resourceUri);
           }
           
-          if (!userId) {
-            console.error('Could not determine userId from webhook notification');
-            // Log this as a failed webhook for debugging
-            await supabase
-              .from('calendar_sync_logs')
-              .insert({
-                user_id: null,
-                sync_type: 'webhook',
-                status: 'failed',
-                error_message: 'Could not determine userId from webhook notification',
-                events_processed: 0,
-              });
+          // Check for X-Goog-Channel-ID header
+          const channelId = req.headers.get('X-Goog-Channel-ID');
+          if (channelId) {
+            console.log('Channel ID from header:', channelId);
+            // Try to find user by channel ID in database
+            const { data: webhook } = await supabase
+              .from('calendar_webhooks')
+              .select('user_id')
+              .eq('webhook_id', channelId)
+              .eq('is_active', true)
+              .single();
             
-            return withCORS(new Response(JSON.stringify({ 
-              ok: true, 
-              message: 'Webhook received but userId not found' 
-            }), { status: 200 }));
+            if (webhook) {
+              userId = webhook.user_id;
+              console.log('Found user ID from channel ID:', userId);
+            }
           }
+        }
+        
+        if (!userId) {
+          console.error('Could not determine userId from webhook notification');
+          // Log this as a failed webhook for debugging
+          await supabase
+            .from('calendar_sync_logs')
+            .insert({
+              user_id: null,
+              sync_type: 'webhook',
+              status: 'failed',
+              error_message: 'Could not determine userId from webhook notification',
+              events_processed: 0,
+            });
           
-          console.log('Processing real Google Calendar webhook notification for user:', userId);
-          
-          // Get user's Google credentials
-          const credentials = await getGoogleCredentials(userId);
-          
-          // Get current webhook info to check if we have a sync token
-          const { data: webhook } = await supabase
-            .from('calendar_webhooks')
-            .select('sync_token')
-            .eq('user_id', userId)
-            .eq('google_calendar_id', 'primary')
-            .eq('is_active', true)
-            .single();
-          
-          let syncResult;
-          
-          if (webhook?.sync_token) {
+          return withCORS(new Response(JSON.stringify({ 
+            ok: true, 
+            message: 'Webhook received but userId not found' 
+          }), { status: 200 }));
+        }
+        
+        console.log('Processing real Google Calendar webhook notification for user:', userId);
+        
+        // Get user's Google credentials
+        const credentials = await getGoogleCredentials(userId);
+        
+        // Get current webhook info to check if we have a sync token
+        const { data: webhook } = await supabase
+          .from('calendar_webhooks')
+          .select('sync_token')
+          .eq('user_id', userId)
+          .eq('google_calendar_id', 'primary')
+          .eq('is_active', true)
+          .single();
+        
+        let syncResult;
+        
+        if (webhook?.sync_token) {
             // Try incremental sync first
             console.log('Attempting incremental sync with sync token');
             try {
@@ -657,9 +664,7 @@ serve(async (req) => {
             ok: true,
             ...syncResult,
           }), { status: 200 }));
-        }
       }
-      
     } catch (error) {
       console.error('Webhook processing error:', error);
       
@@ -724,8 +729,6 @@ serve(async (req) => {
       }
       
       const webhookData = await webhookResponse.json();
-      
-
       
       // Validate expiration value
       if (!webhookData.expiration) {

@@ -511,10 +511,25 @@ async function handleTestWebhook(supabase: any, userId: string) {
     const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/google-calendar-webhook/notify?userId=${userId}`;
     console.log('Testing webhook URL:', webhookUrl);
 
+    // Get user's access token for authorization
+    const { data: credentials, error: credError } = await supabase
+      .from('google_credentials')
+      .select('access_token')
+      .eq('user_id', userId)
+      .single();
+
+    if (credError || !credentials) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'User credentials not found' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     const testResponse = await fetch(webhookUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${credentials.access_token}`,
         'X-Goog-Channel-ID': webhookData.webhook_id,
         'X-Goog-Resource-ID': webhookData.resource_id,
         'X-Goog-Resource-URI': 'https://www.googleapis.com/calendar/v3/calendars/primary/events?alt=json',
