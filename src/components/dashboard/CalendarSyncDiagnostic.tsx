@@ -241,13 +241,14 @@ const CalendarSyncDiagnostic: React.FC = () => {
 
       console.log('Webhook data from database:', webhookData);
 
-      // Test the webhook URL directly
+      // Test the webhook URL directly with proper authentication
       const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-calendar-webhook/notify?userId=${session.user.id}`;
       
       const testResponse = await fetch(webhookUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
           state: 'test',
