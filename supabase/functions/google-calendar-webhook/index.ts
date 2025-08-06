@@ -307,6 +307,29 @@ serve(async (req) => {
         // For real Google Calendar webhooks, the body is empty and info is in headers
       }
       
+      // Check if this is an internal function call (test/sync) or real Google webhook
+      const authHeader = req.headers.get('Authorization');
+      const isInternalCall = body && (body.state === 'test' || body.state === 'sync');
+      
+      // For internal calls, validate the service role key
+      if (isInternalCall) {
+        console.log('Internal function call detected');
+        if (!authHeader) {
+          console.log('Missing authorization header for internal call');
+          return withCORS(new Response(JSON.stringify({ error: 'Missing authorization header' }), { status: 401 }));
+        }
+        
+        const expectedToken = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+        if (authHeader !== `Bearer ${expectedToken}`) {
+          console.log('Invalid authorization token for internal call');
+          return withCORS(new Response(JSON.stringify({ error: 'Invalid authorization token' }), { status: 401 }));
+        }
+        
+        console.log('Internal call authorization validated');
+      } else {
+        console.log('Real Google Calendar webhook detected - skipping internal auth check');
+      }
+      
       // Handle different notification types
       if (body && body.state === 'sync') {
         console.log('Processing MANUAL sync request');
