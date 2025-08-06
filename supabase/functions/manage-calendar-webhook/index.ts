@@ -77,6 +77,8 @@ serve(async (req) => {
 })
 
 async function getGoogleCredentials(supabase: any, userId: string): Promise<any> {
+  console.log('Getting Google credentials for user:', userId);
+  
   const { data, error } = await supabase
     .from('google_credentials')
     .select('*')
@@ -84,12 +86,21 @@ async function getGoogleCredentials(supabase: any, userId: string): Promise<any>
     .single()
 
   if (error || !data) {
+    console.log('Google credentials not found:', error);
     throw new Error('Google credentials not found')
   }
 
-  // Check if token needs refresh
+  console.log('Found credentials, checking expiration...');
+  console.log('Current time:', Math.floor(Date.now() / 1000));
+  console.log('Token expires at:', data.expires_at);
+
+  // Check if token needs refresh (refresh if expired or expires within 5 minutes)
   const now = Math.floor(Date.now() / 1000)
-  if (data.expires_at && data.expires_at <= now) {
+  const fiveMinutesFromNow = now + (5 * 60)
+  
+  if (data.expires_at && data.expires_at <= fiveMinutesFromNow) {
+    console.log('Token needs refresh, refreshing...');
+    
     // Refresh token
     const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
@@ -105,19 +116,26 @@ async function getGoogleCredentials(supabase: any, userId: string): Promise<any>
     })
 
     if (!refreshResponse.ok) {
-      throw new Error('Failed to refresh Google token')
+      const errorText = await refreshResponse.text();
+      console.log('Token refresh failed:', refreshResponse.status, errorText);
+      throw new Error(`Failed to refresh Google token: ${refreshResponse.status} - ${errorText}`)
     }
 
     const refreshData = await refreshResponse.json()
+    console.log('Token refreshed successfully');
     
     // Update credentials in database
-    await supabase
+    const { error: updateError } = await supabase
       .from('google_credentials')
       .update({
         access_token: refreshData.access_token,
         expires_at: Math.floor(Date.now() / 1000) + refreshData.expires_in,
       })
       .eq('user_id', userId)
+
+    if (updateError) {
+      console.log('Failed to update credentials in database:', updateError);
+    }
 
     return {
       ...data,
@@ -126,6 +144,7 @@ async function getGoogleCredentials(supabase: any, userId: string): Promise<any>
     }
   }
 
+  console.log('Token is still valid');
   return data
 }
 
@@ -151,6 +170,7 @@ async function handleStopWebhook(supabase: any, userId: string) {
     const credentials = await getGoogleCredentials(supabase, userId)
 
     // Stop the webhook with Google
+    console.log('Stopping webhook with Google:', webhookData.webhook_id, webhookData.resource_id);
     const stopResponse = await fetch(
       `https://www.googleapis.com/calendar/v3/calendars/primary/events/stop`,
       {
@@ -204,13 +224,19 @@ async function handleStopWebhook(supabase: any, userId: string) {
 
 async function handleRecreateWebhook(supabase: any, userId: string) {
   try {
+    console.log('Recreating webhook for user:', userId);
+    
     // Get Google credentials
     const credentials = await getGoogleCredentials(supabase, userId)
+    console.log('Got credentials, access token length:', credentials.access_token?.length);
 
     // Create new webhook
     const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/google-calendar-webhook/notify?userId=${userId}`
     const channelId = `calendar-watch-${userId}-${Date.now()}`
     const expiration = Date.now() + (7 * 24 * 60 * 60 * 1000) // 7 days
+
+    console.log('Creating webhook with URL:', webhookUrl);
+    console.log('Channel ID:', channelId);
 
     const watchRequest = {
       id: channelId,
@@ -222,6 +248,7 @@ async function handleRecreateWebhook(supabase: any, userId: string) {
       expiration: expiration,
     }
 
+    console.log('Making Google API call to create webhook...');
     const createResponse = await fetch(
       'https://www.googleapis.com/calendar/v3/calendars/primary/events/watch',
       {
@@ -233,6 +260,8 @@ async function handleRecreateWebhook(supabase: any, userId: string) {
         body: JSON.stringify(watchRequest),
       }
     )
+    
+    console.log('Google API response status:', createResponse.status);
 
     if (!createResponse.ok) {
       const errorText = await createResponse.text()
