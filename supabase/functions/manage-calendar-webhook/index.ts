@@ -275,7 +275,19 @@ async function handleRecreateWebhook(supabase: any, userId: string) {
     }
 
     const watchData = await createResponse.json()
-    const expirationDate = new Date(watchData.expiration)
+    console.log('Google webhook response:', watchData);
+    
+    // Handle expiration time properly
+    let expirationDate: Date;
+    if (watchData.expiration) {
+      // Google returns expiration as milliseconds since epoch
+      expirationDate = new Date(parseInt(watchData.expiration));
+      console.log('Parsed expiration date:', expirationDate.toISOString());
+    } else {
+      // Fallback: use our calculated expiration
+      expirationDate = new Date(expiration);
+      console.log('Using fallback expiration date:', expirationDate.toISOString());
+    }
 
     // Get sync token for initial sync
     const syncResponse = await fetch(
@@ -293,6 +305,7 @@ async function handleRecreateWebhook(supabase: any, userId: string) {
       syncToken = syncData.nextSyncToken
     }
 
+    console.log('Storing webhook in database...');
     // Store webhook info in database
     const { error: dbError } = await supabase
       .from('calendar_webhooks')
