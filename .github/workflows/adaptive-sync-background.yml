@@ -18,7 +18,7 @@ jobs:
           -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
           -H "Content-Type: application/json" \
           -d '{"service": "all", "forceSync": false}' \
-          "${{ secrets.SUPABASE_URL }}/functions/v1/adaptive-sync-service"
+                          "${{ secrets.SUPABASE_URL }}/functions/v1/enhanced-adaptive-sync-service"
       
       env:
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}

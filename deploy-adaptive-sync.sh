@@ -58,7 +58,7 @@ fi
 
 # 2. Deploy adaptive sync service
 print_status "Deploying adaptive sync service..."
-supabase functions deploy adaptive-sync-service
+supabase functions deploy enhanced-adaptive-sync-service
 
 if [ $? -eq 0 ]; then
     print_success "Adaptive sync service deployed successfully"
@@ -122,7 +122,7 @@ echo "  supabase functions delete gmail-polling-cron"
 print_status "Verifying deployment..."
 
 # Test the adaptive sync service
-ADAPTIVE_SYNC_URL="${SUPABASE_URL}/functions/v1/adaptive-sync-service"
+ADAPTIVE_SYNC_URL="${SUPABASE_URL}/functions/v1/enhanced-adaptive-sync-service"
 
 if [ ! -z "$SUPABASE_URL" ]; then
     print_status "Testing adaptive sync service..."
