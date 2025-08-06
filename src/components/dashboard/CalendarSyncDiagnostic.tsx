@@ -292,7 +292,18 @@ const CalendarSyncDiagnostic: React.FC = () => {
 
       console.log('Verifying webhook with Google for user:', session.user.id);
 
-      const result = await calendarService.verifyWebhookWithGoogle(session.user.id);
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-calendar-webhook?action=verify`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+        }
+      );
+
+      const result = await response.json();
       
       if (result.success) {
         setSuccess(`Webhook verified and refreshed with Google! New Webhook ID: ${result.webhook_id}`);
@@ -304,6 +315,67 @@ const CalendarSyncDiagnostic: React.FC = () => {
     } catch (err) {
       console.error('Webhook verification error:', err);
       setError(err.message || 'Webhook verification failed');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const forceWebhookRefresh = async () => {
+    setActionLoading('force-refresh');
+    setError(null);
+    setSuccess(null);
+    try {
+      const session = (await supabase.auth.getSession()).data.session;
+      if (!session) {
+        setError('Not authenticated');
+        return;
+      }
+
+      console.log('Force refreshing webhook with Google for user:', session.user.id);
+
+      // First, stop any existing webhook
+      const stopResponse = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-calendar-webhook?action=stop`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+        }
+      );
+
+      const stopResult = await stopResponse.json();
+      if (stopResult.success) {
+        console.log('Successfully stopped existing webhook');
+      } else {
+        console.log('Failed to stop existing webhook:', stopResult.error);
+      }
+
+      // Now create a fresh webhook
+      const recreateResponse = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-calendar-webhook?action=recreate`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+        }
+      );
+
+      const recreateResult = await recreateResponse.json();
+      
+      if (recreateResult.success) {
+        setSuccess(`Webhook force refreshed! New Webhook ID: ${recreateResult.webhook_id}`);
+        await loadStatus(); // Refresh status
+      } else {
+        setError(`Webhook force refresh failed: ${recreateResult.error}`);
+      }
+
+    } catch (err) {
+      console.error('Webhook force refresh error:', err);
+      setError(err.message || 'Webhook force refresh failed');
     } finally {
       setActionLoading(null);
     }
@@ -524,6 +596,24 @@ const CalendarSyncDiagnostic: React.FC = () => {
               <CheckCircle className="w-4 h-4 mr-2" />
             )}
             Verify & Refresh Webhook
+          </Button>
+        </div>
+
+        {/* Force Refresh Webhook Button */}
+        <div className="pt-2">
+          <Button
+            variant="outline"
+            onClick={forceWebhookRefresh}
+            disabled={actionLoading !== null}
+            className="w-full"
+            size="sm"
+          >
+            {actionLoading === 'force-refresh' ? (
+              <RefreshCw className="w-4 h-4 animate-spin mr-2" />
+            ) : (
+              <RefreshCw className="w-4 h-4 mr-2" />
+            )}
+            Force Refresh Webhook
           </Button>
         </div>
       </CardContent>
