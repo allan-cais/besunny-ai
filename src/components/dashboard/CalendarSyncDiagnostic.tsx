@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Calendar, RefreshCw, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
+import { Calendar, RefreshCw, AlertTriangle, CheckCircle, XCircle, Database } from 'lucide-react';
 import { calendarService } from '@/lib/calendar';
 import { supabase } from '@/lib/supabase';
 
@@ -34,9 +34,76 @@ const CalendarSyncDiagnostic: React.FC = () => {
         return;
       }
 
-      const webhookStatus = await calendarService.getWatchStatus(session.user.id);
+      console.log('Loading webhook status for user:', session.user.id);
+      
+      // First, let's test if we can access the table at all
+      const { data: testData, error: testError } = await supabase
+        .from('calendar_webhooks')
+        .select('id')
+        .limit(1);
+      
+      if (testError) {
+        console.error('Table access test failed:', testError);
+        setError(`Database access error: ${testError.message} (${testError.code})`);
+        return;
+      }
+
+      // Now try the actual query
+      const { data: webhookData, error: webhookError } = await supabase
+        .from('calendar_webhooks')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .eq('google_calendar_id', 'primary')
+        .eq('is_active', true)
+        .single();
+
+      console.log('Webhook query result:', { webhookData, webhookError });
+
+      if (webhookError && webhookError.code !== 'PGRST116') {
+        // PGRST116 is "not found" which is expected if no webhook exists
+        console.error('Webhook query failed:', webhookError);
+        setError(`Webhook query failed: ${webhookError.message} (${webhookError.code})`);
+        return;
+      }
+
+      // Get sync logs
+      const { data: syncLogs, error: syncLogsError } = await supabase
+        .from('calendar_sync_logs')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (syncLogsError) {
+        console.error('Sync logs query failed:', syncLogsError);
+      }
+
+      // Get recent errors
+      const { data: recentErrors, error: errorsError } = await supabase
+        .from('calendar_sync_logs')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .eq('status', 'failed')
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (errorsError) {
+        console.error('Errors query failed:', errorsError);
+      }
+
+      const webhookStatus = {
+        webhook_active: !!webhookData,
+        webhook_url: webhookData ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-calendar-webhook/notify?userId=${session.user.id}` : undefined,
+        last_sync: webhookData?.updated_at,
+        sync_logs: syncLogs || [],
+        recent_errors: recentErrors || [],
+        expiration_time: webhookData?.expiration_time,
+        sync_token: webhookData?.sync_token,
+      };
+
       setStatus(webhookStatus);
     } catch (err) {
+      console.error('Load status error:', err);
       setError(err.message || 'Failed to load status');
     } finally {
       setLoading(false);
@@ -101,6 +168,41 @@ const CalendarSyncDiagnostic: React.FC = () => {
       }
     } catch (err) {
       setError(err.message || 'Webhook test failed');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const testDatabaseAccess = async () => {
+    setActionLoading('db-test');
+    setError(null);
+    setSuccess(null);
+    try {
+      const session = (await supabase.auth.getSession()).data.session;
+      if (!session) {
+        setError('Not authenticated');
+        return;
+      }
+
+      console.log('Testing database access for user:', session.user.id);
+
+      // Test basic table access
+      const { data: testData, error: testError } = await supabase
+        .from('calendar_webhooks')
+        .select('id, user_id, is_active')
+        .eq('user_id', session.user.id);
+
+      if (testError) {
+        setError(`Database access failed: ${testError.message} (${testError.code})`);
+        return;
+      }
+
+      console.log('Database access test result:', testData);
+      setSuccess(`Database access successful! Found ${testData?.length || 0} webhook records for your user.`);
+      
+    } catch (err) {
+      console.error('Database access test error:', err);
+      setError(err.message || 'Database access test failed');
     } finally {
       setActionLoading(null);
     }
@@ -267,6 +369,24 @@ const CalendarSyncDiagnostic: React.FC = () => {
               <AlertTriangle className="h-4 w-4 mr-2" />
             )}
             Test Webhook
+          </Button>
+        </div>
+
+        {/* Database Test Button */}
+        <div className="pt-2">
+          <Button
+            variant="outline"
+            onClick={testDatabaseAccess}
+            disabled={actionLoading !== null}
+            className="w-full"
+            size="sm"
+          >
+            {actionLoading === 'db-test' ? (
+              <RefreshCw className="w-4 h-4 animate-spin mr-2" />
+            ) : (
+              <Database className="w-4 h-4 mr-2" />
+            )}
+            Test Database Access
           </Button>
         </div>
       </CardContent>
