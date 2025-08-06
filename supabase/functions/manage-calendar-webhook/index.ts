@@ -519,6 +519,7 @@ async function handleTestWebhook(supabase: any, userId: string) {
         'X-Goog-Resource-ID': webhookData.resource_id,
         'X-Goog-Resource-URI': 'https://www.googleapis.com/calendar/v3/calendars/primary/events?alt=json',
         'X-Goog-Resource-State': 'exists',
+        'User-Agent': 'Google-Calendar-Webhook/1.0',
       },
       body: JSON.stringify({
         state: 'test',
