@@ -7,8 +7,14 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
+  console.log('=== MANAGE-CALENDAR-WEBHOOK FUNCTION CALLED ===');
+  console.log('Method:', req.method);
+  console.log('URL:', req.url);
+  console.log('Headers:', Object.fromEntries(req.headers.entries()));
+
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
+    console.log('Handling CORS preflight request');
     return new Response('ok', { headers: corsHeaders })
   }
 
@@ -20,7 +26,10 @@ serve(async (req) => {
 
     // Get authorization header
     const authHeader = req.headers.get('Authorization')
+    console.log('Auth header present:', !!authHeader);
+    
     if (!authHeader) {
+      console.log('Missing authorization header');
       return new Response(
         JSON.stringify({ error: 'Missing authorization header' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -28,16 +37,21 @@ serve(async (req) => {
     }
 
     // Verify JWT and get user
+    console.log('Verifying JWT...');
     const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''))
     if (authError || !user) {
+      console.log('JWT verification failed:', authError);
       return new Response(
         JSON.stringify({ error: 'Invalid token' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
+    console.log('JWT verified for user:', user.id);
+
     const url = new URL(req.url)
     const action = url.searchParams.get('action')
+    console.log('Action requested:', action);
 
     if (action === 'stop') {
       return await handleStopWebhook(supabase, user.id)
@@ -46,6 +60,7 @@ serve(async (req) => {
     } else if (action === 'verify') {
       return await handleVerifyWebhook(supabase, user.id)
     } else {
+      console.log('Invalid action:', action);
       return new Response(
         JSON.stringify({ error: 'Invalid action. Use stop, recreate, or verify' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

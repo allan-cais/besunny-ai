@@ -291,6 +291,7 @@ const CalendarSyncDiagnostic: React.FC = () => {
       }
 
       console.log('Verifying webhook with Google for user:', session.user.id);
+      console.log('Function URL:', `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-calendar-webhook?action=verify`);
 
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-calendar-webhook?action=verify`,
@@ -303,7 +304,18 @@ const CalendarSyncDiagnostic: React.FC = () => {
         }
       );
 
+      console.log('Response status:', response.status);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Response error:', errorText);
+        setError(`HTTP ${response.status}: ${errorText}`);
+        return;
+      }
+
       const result = await response.json();
+      console.log('Response result:', result);
       
       if (result.success) {
         setSuccess(`Webhook verified and refreshed with Google! New Webhook ID: ${result.webhook_id}`);
