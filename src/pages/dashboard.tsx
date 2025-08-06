@@ -14,7 +14,7 @@ import { Loader2, Clock, Database, Calendar, Video, Bot, Send, ExternalLink, Mai
 import { calendarService, Meeting } from '@/lib/calendar';
 import { supabase, Document } from '@/lib/supabase';
 import { useAttendeePolling } from '@/hooks/use-attendee-polling';
-import { useAdaptiveSync } from '@/hooks/use-adaptive-sync';
+import { useEnhancedAdaptiveSync } from '@/hooks/use-enhanced-adaptive-sync';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import BotConfigurationModal from '@/components/dashboard/BotConfigurationModal';
@@ -25,7 +25,7 @@ import TranscriptModal from '@/components/dashboard/TranscriptModal';
 import EmailModal from '@/components/dashboard/EmailModal';
 import DocumentModal from '@/components/dashboard/DocumentModal';
 import ClassificationModal from '@/components/dashboard/ClassificationModal';
-import CalendarSyncDiagnostic from '@/components/dashboard/CalendarSyncDiagnostic';
+
 
 interface VirtualEmailActivity {
   id: string;
@@ -73,10 +73,11 @@ const Dashboard = () => {
 
   const { toast } = useToast();
 
-  // Set up adaptive sync
-  const { recordActivity, userState } = useAdaptiveSync({
+  // Set up enhanced adaptive sync
+  const { recordActivity, recordVirtualEmailDetection, virtualEmailActivity, userState } = useEnhancedAdaptiveSync({
     enabled: true,
     trackActivity: true,
+    trackVirtualEmailActivity: true,
   });
 
   // Set up automatic polling
@@ -890,10 +891,7 @@ const Dashboard = () => {
           onClassify={handleClassify}
         />
 
-        {/* Calendar Sync Diagnostic - Temporary for troubleshooting webhook issues */}
-        <div className="mt-8">
-          <CalendarSyncDiagnostic />
-        </div>
+
       </div>
     );
 };

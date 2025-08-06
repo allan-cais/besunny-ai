@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
-import { adaptiveSyncStrategy } from '@/lib/adaptive-sync-strategy';
+import { enhancedAdaptiveSyncStrategy } from '@/lib/enhanced-adaptive-sync-strategy';
 
 interface AuthContextType {
   user: User | null;
@@ -62,21 +62,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(session?.user ?? null);
       setLoading(false);
       
-      // Initialize adaptive sync when user is authenticated
-      if (session?.user) {
-        try {
-          await adaptiveSyncStrategy.initializeUser(session.user.id);
-        } catch (error) {
-          console.error('Failed to initialize adaptive sync:', error);
+              // Initialize enhanced adaptive sync when user is authenticated
+        if (session?.user) {
+          try {
+            await enhancedAdaptiveSyncStrategy.initializeUser(session.user.id);
+          } catch (error) {
+            console.error('Failed to initialize enhanced adaptive sync:', error);
+          }
+        } else {
+          // Stop enhanced adaptive sync when user signs out
+          try {
+            enhancedAdaptiveSyncStrategy.stopUser(session?.user?.id || '');
+          } catch (error) {
+            console.error('Failed to stop enhanced adaptive sync:', error);
+          }
         }
-      } else {
-        // Stop adaptive sync when user signs out
-        try {
-          adaptiveSyncStrategy.stopUser(session?.user?.id || '');
-        } catch (error) {
-          console.error('Failed to stop adaptive sync:', error);
-        }
-      }
     });
 
     return () => {
