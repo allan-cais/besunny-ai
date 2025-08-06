@@ -59,11 +59,15 @@ const CalendarSyncDiagnostic: React.FC = () => {
 
       console.log('Webhook query result:', { webhookData, webhookError });
 
-      if (webhookError && webhookError.code !== 'PGRST116') {
-        // PGRST116 is "not found" which is expected if no webhook exists
-        console.error('Webhook query failed:', webhookError);
-        setError(`Webhook query failed: ${webhookError.message} (${webhookError.code})`);
-        return;
+      if (webhookError) {
+        if (webhookError.code === 'PGRST116') {
+          // PGRST116 is "not found" which is expected if no webhook exists
+          console.log('No webhook found - this is expected if webhook was never set up');
+        } else {
+          console.error('Webhook query failed:', webhookError);
+          setError(`Webhook query failed: ${webhookError.message} (${webhookError.code})`);
+          return;
+        }
       }
 
       // Get sync logs

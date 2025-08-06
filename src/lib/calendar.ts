@@ -1120,18 +1120,20 @@ export const calendarService = {
         throw new Error(`Failed to parse expiration date: ${dateError.message}`);
       }
 
-      // Store watch info in database - use update to preserve created_at
+      // Store watch info in database - use upsert to create if doesn't exist
       const { error: dbError } = await supabase
         .from('calendar_webhooks')
-        .update({
+        .upsert({
+          user_id: userId,
+          google_calendar_id: 'primary',
           webhook_id: watchData.id,
           resource_id: watchData.resourceId,
           expiration_time: expirationDate.toISOString(),
           sync_token: syncToken,
           is_active: true,
-        })
-        .eq('user_id', userId)
-        .eq('google_calendar_id', 'primary');
+        }, {
+          onConflict: 'user_id,google_calendar_id'
+        });
 
       if (dbError) {
         console.error('Database error storing watch:', dbError);

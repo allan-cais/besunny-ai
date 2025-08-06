@@ -100,8 +100,53 @@ const Dashboard = () => {
       console.log('Loading dashboard data for user:', user.id);
       loadCurrentWeekMeetings();
       loadUnclassifiedData();
+      
+      // Automatically set up calendar sync if needed
+      setupCalendarSyncIfNeeded();
     }
   }, [user?.id]);
+
+  const setupCalendarSyncIfNeeded = async () => {
+    if (!user?.id) return;
+    
+    try {
+      // Check if user has Google credentials
+      const { data: credentials } = await supabase
+        .from('google_credentials')
+        .select('user_id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (!credentials) {
+        return; // User doesn't have Google credentials
+      }
+
+      // Check if user has active webhook
+      const { data: webhook } = await supabase
+        .from('calendar_webhooks')
+        .select('user_id')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      // If no active webhook, set up calendar sync automatically
+      if (!webhook) {
+        console.log('No active webhook found, setting up calendar sync automatically...');
+        try {
+          const result = await calendarService.initializeCalendarSync(user.id);
+          if (result.success) {
+            console.log('Automatic calendar sync setup successful');
+          } else {
+            console.error('Automatic calendar sync setup failed:', result.error);
+          }
+        } catch (error) {
+          console.error('Automatic calendar sync setup error:', error);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking calendar sync status:', error);
+    }
+  };
 
   const loadUserProjects = async () => {
     if (!user?.id) return;
@@ -832,10 +877,7 @@ const Dashboard = () => {
           onClassify={handleClassify}
         />
 
-        {/* Calendar Sync Diagnostic - Temporary for troubleshooting */}
-        <div className="mt-8">
-          <CalendarSyncDiagnostic />
-        </div>
+        {/* Calendar Sync Diagnostic - Removed since automatic setup is now integrated */}
       </div>
     );
 };

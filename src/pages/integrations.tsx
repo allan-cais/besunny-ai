@@ -271,7 +271,15 @@ const IntegrationsPage: React.FC = () => {
         // Automatically set up calendar sync
         try {
           const { calendarService } = await import('@/lib/calendar');
-          await calendarService.initializeCalendarSync(user.id);
+          console.log('Setting up automatic calendar sync for user:', user.id);
+          const syncResult = await calendarService.initializeCalendarSync(user.id);
+          console.log('Calendar sync setup result:', syncResult);
+          
+          if (syncResult.success) {
+            console.log('Calendar sync setup successful');
+          } else {
+            console.error('Calendar sync setup failed:', syncResult.error);
+          }
         } catch (syncError) {
           console.error('Calendar sync setup failed:', syncError);
           // Continue anyway - sync can be set up later
