@@ -212,6 +212,102 @@ const CalendarSyncDiagnostic: React.FC = () => {
     }
   };
 
+  const testWebhookConnectivity = async () => {
+    setActionLoading('connectivity');
+    setError(null);
+    setSuccess(null);
+    try {
+      const session = (await supabase.auth.getSession()).data.session;
+      if (!session) {
+        setError('Not authenticated');
+        return;
+      }
+
+      console.log('Testing webhook connectivity for user:', session.user.id);
+
+      // Get current webhook info from database
+      const { data: webhookData, error: webhookError } = await supabase
+        .from('calendar_webhooks')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .eq('google_calendar_id', 'primary')
+        .eq('is_active', true)
+        .single();
+
+      if (webhookError || !webhookData) {
+        setError('No active webhook found in database');
+        return;
+      }
+
+      console.log('Webhook data from database:', webhookData);
+
+      // Test the webhook URL directly
+      const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-calendar-webhook/notify?userId=${session.user.id}`;
+      
+      const testResponse = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          state: 'test',
+          userId: session.user.id,
+        }),
+      });
+
+      if (!testResponse.ok) {
+        const errorText = await testResponse.text();
+        setError(`Webhook URL test failed: ${testResponse.status} - ${errorText}`);
+        return;
+      }
+
+      const testResult = await testResponse.json();
+      console.log('Webhook connectivity test result:', testResult);
+
+      if (testResult.ok) {
+        setSuccess(`Webhook connectivity test successful! Webhook ID: ${webhookData.webhook_id}, Resource ID: ${webhookData.resource_id}`);
+      } else {
+        setError(`Webhook connectivity test failed: ${testResult.error}`);
+      }
+
+    } catch (err) {
+      console.error('Webhook connectivity test error:', err);
+      setError(err.message || 'Webhook connectivity test failed');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const verifyWebhookWithGoogle = async () => {
+    setActionLoading('verify');
+    setError(null);
+    setSuccess(null);
+    try {
+      const session = (await supabase.auth.getSession()).data.session;
+      if (!session) {
+        setError('Not authenticated');
+        return;
+      }
+
+      console.log('Verifying webhook with Google for user:', session.user.id);
+
+      const result = await calendarService.verifyWebhookWithGoogle(session.user.id);
+      
+      if (result.success) {
+        setSuccess(`Webhook verified and refreshed with Google! New Webhook ID: ${result.webhook_id}`);
+        await loadStatus(); // Refresh status
+      } else {
+        setError(`Webhook verification failed: ${result.error}`);
+      }
+
+    } catch (err) {
+      console.error('Webhook verification error:', err);
+      setError(err.message || 'Webhook verification failed');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   useEffect(() => {
     loadStatus();
   }, []);
@@ -391,6 +487,42 @@ const CalendarSyncDiagnostic: React.FC = () => {
               <Database className="w-4 h-4 mr-2" />
             )}
             Test Database Access
+          </Button>
+        </div>
+
+        {/* Webhook Connectivity Test Button */}
+        <div className="pt-2">
+          <Button
+            variant="outline"
+            onClick={testWebhookConnectivity}
+            disabled={actionLoading !== null}
+            className="w-full"
+            size="sm"
+          >
+            {actionLoading === 'connectivity' ? (
+              <RefreshCw className="w-4 h-4 animate-spin mr-2" />
+            ) : (
+              <AlertTriangle className="w-4 h-4 mr-2" />
+            )}
+            Test Webhook Connectivity
+          </Button>
+        </div>
+
+        {/* Verify Webhook with Google Button */}
+        <div className="pt-2">
+          <Button
+            variant="outline"
+            onClick={verifyWebhookWithGoogle}
+            disabled={actionLoading !== null}
+            className="w-full"
+            size="sm"
+          >
+            {actionLoading === 'verify' ? (
+              <RefreshCw className="w-4 h-4 animate-spin mr-2" />
+            ) : (
+              <CheckCircle className="w-4 h-4 mr-2" />
+            )}
+            Verify & Refresh Webhook
           </Button>
         </div>
       </CardContent>

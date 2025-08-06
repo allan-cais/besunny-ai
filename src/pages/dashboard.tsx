@@ -877,7 +877,10 @@ const Dashboard = () => {
           onClassify={handleClassify}
         />
 
-        {/* Calendar Sync Diagnostic - Removed since automatic setup is now integrated */}
+        {/* Calendar Sync Diagnostic - Temporary for troubleshooting webhook issues */}
+        <div className="mt-8">
+          <CalendarSyncDiagnostic />
+        </div>
       </div>
     );
 };

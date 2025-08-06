@@ -1914,4 +1914,113 @@ export const calendarService = {
       };
     }
   },
+
+  // Verify webhook registration with Google
+  async verifyWebhookWithGoogle(userId: string): Promise<{ 
+    success: boolean; 
+    error?: string; 
+    webhook_active?: boolean;
+    webhook_id?: string;
+    resource_id?: string;
+    expiration?: string;
+  }> {
+    try {
+      const credentials = await getGoogleCredentials(userId);
+      
+      // Get current webhook info from database
+      const { data: webhookData, error: webhookError } = await supabase
+        .from('calendar_webhooks')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('google_calendar_id', 'primary')
+        .eq('is_active', true)
+        .single();
+
+      if (webhookError || !webhookData) {
+        return { success: false, error: 'No active webhook found in database' };
+      }
+
+      // Try to stop the current webhook to verify it exists
+      const stopResponse = await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/primary/events/stop`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${credentials.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            id: webhookData.webhook_id,
+            resourceId: webhookData.resource_id,
+          }),
+        }
+      );
+
+      if (stopResponse.ok) {
+        // Webhook exists, now recreate it
+        const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-calendar-webhook/notify?userId=${userId}`;
+        const channelId = `calendar-watch-${userId}-${Date.now()}`;
+        const expiration = Date.now() + (7 * 24 * 60 * 60 * 1000); // 7 days
+
+        const watchRequest = {
+          id: channelId,
+          type: 'web_hook',
+          address: webhookUrl,
+          params: {
+            userId: userId,
+          },
+          expiration: expiration,
+        };
+
+        const createResponse = await fetch(
+          'https://www.googleapis.com/calendar/v3/calendars/primary/events/watch',
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${credentials.access_token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(watchRequest),
+          }
+        );
+
+        if (!createResponse.ok) {
+          const errorText = await createResponse.text();
+          return { success: false, error: `Failed to recreate webhook: ${createResponse.status} - ${errorText}` };
+        }
+
+        const watchData = await createResponse.json();
+        
+        // Update database with new webhook info
+        const expirationDate = new Date(watchData.expiration);
+        const { error: updateError } = await supabase
+          .from('calendar_webhooks')
+          .update({
+            webhook_id: watchData.id,
+            resource_id: watchData.resourceId,
+            expiration_time: expirationDate.toISOString(),
+            is_active: true,
+          })
+          .eq('user_id', userId)
+          .eq('google_calendar_id', 'primary');
+
+        if (updateError) {
+          return { success: false, error: `Database update failed: ${updateError.message}` };
+        }
+
+        return { 
+          success: true, 
+          webhook_active: true,
+          webhook_id: watchData.id,
+          resource_id: watchData.resourceId,
+          expiration: expirationDate.toISOString()
+        };
+      } else {
+        return { success: false, error: 'Webhook not found or invalid with Google' };
+      }
+    } catch (error) {
+      console.error('Webhook verification error:', error);
+      return { success: false, error: error.message || String(error) };
+    }
+  },
 }; 
