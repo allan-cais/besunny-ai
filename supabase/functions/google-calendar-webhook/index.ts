@@ -1,9 +1,20 @@
-import { serve } from 'std/http/server.ts';
-import { createClient } from '@supabase/supabase-js';
+// Add this export at the top of your index.ts file
+export const config = {
+  isPublic: true,
+};
+
+// Then your existing imports...
+import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false
+  }
+});
 
 function withCORS(resp: Response) {
   resp.headers.set('Access-Control-Allow-Origin', '*');
@@ -280,6 +291,12 @@ serve(async (req) => {
   const url = new URL(req.url);
   const method = req.method;
 
+  // Log all incoming requests for debugging
+  console.log('=== WEBHOOK FUNCTION CALLED ===');
+  console.log('Method:', method);
+  console.log('URL:', req.url);
+  console.log('Headers:', Object.fromEntries(req.headers.entries()));
+
   // Webhook verification endpoint (GET /verify)
   if (url.pathname.endsWith('/verify') && method === 'GET') {
     const challenge = url.searchParams.get('challenge');
@@ -297,6 +314,19 @@ serve(async (req) => {
       console.log('URL:', req.url);
       console.log('Headers:', Object.fromEntries(req.headers.entries()));
       
+      // Verify webhook authenticity
+      const channelId = req.headers.get('X-Goog-Channel-ID');
+      const resourceState = req.headers.get('X-Goog-Resource-State');
+      
+      console.log('Channel ID:', channelId);
+      console.log('Resource State:', resourceState);
+      
+      // For sync events, just return OK
+      if (resourceState === 'sync') {
+        console.log('Sync event received, returning OK');
+        return withCORS(new Response('OK', { status: 200 }));
+      }
+      
       // Try to parse body as JSON (for test/manual sync requests)
       let body: any = null;
       try {
@@ -310,24 +340,62 @@ serve(async (req) => {
       // Check if this is an internal function call (test/sync) or real Google webhook
       const authHeader = req.headers.get('Authorization');
       const isInternalCall = body && (body.state === 'test' || body.state === 'sync');
+      const isForwardedWebhook = body && body.state === 'google_webhook';
       
-      // For internal calls, validate the service role key
-      if (isInternalCall) {
+      // For internal calls (test/sync), validate the service role key
+      if (isInternalCall && authHeader) {
         console.log('Internal function call detected');
-        if (!authHeader) {
-          console.log('Missing authorization header for internal call');
-          return withCORS(new Response(JSON.stringify({ error: 'Missing authorization header' }), { status: 401 }));
-        }
-        
         const expectedToken = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
         if (authHeader !== `Bearer ${expectedToken}`) {
           console.log('Invalid authorization token for internal call');
           return withCORS(new Response(JSON.stringify({ error: 'Invalid authorization token' }), { status: 401 }));
         }
-        
         console.log('Internal call authorization validated');
-      } else {
-        console.log('Real Google Calendar webhook detected - skipping internal auth check');
+      }
+
+      // For forwarded Google webhooks from Netlify, validate the service role key
+      if (isForwardedWebhook && authHeader) {
+        console.log('Forwarded Google webhook detected');
+        const expectedToken = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+        if (authHeader !== `Bearer ${expectedToken}`) {
+          console.log('Invalid authorization token for forwarded webhook');
+          return withCORS(new Response(JSON.stringify({ error: 'Invalid authorization token' }), { status: 401 }));
+        }
+        console.log('Forwarded webhook authorization validated');
+        
+        // Extract channel ID from the forwarded request
+        if (body.channelId) {
+          const { data: webhook } = await supabase
+            .from('calendar_webhooks')
+            .select('user_id')
+            .eq('webhook_id', body.channelId)
+            .eq('is_active', true)
+            .single();
+          
+          if (!webhook) {
+            console.log('Invalid channel ID:', body.channelId);
+            return withCORS(new Response(JSON.stringify({ error: 'Invalid webhook channel' }), { status: 401 }));
+          }
+          
+          console.log('Valid webhook channel verified for user:', webhook.user_id);
+        }
+      }
+
+      // For direct Google Calendar webhooks, just verify the channel ID exists (no auth required)
+      if (!isInternalCall && !isForwardedWebhook && channelId) {
+        const { data: webhook } = await supabase
+          .from('calendar_webhooks')
+          .select('user_id')
+          .eq('webhook_id', channelId)
+          .eq('is_active', true)
+          .single();
+        
+        if (!webhook) {
+          console.log('Invalid channel ID:', channelId);
+          return withCORS(new Response(JSON.stringify({ error: 'Invalid webhook channel' }), { status: 401 }));
+        }
+        
+        console.log('Valid webhook channel verified for user:', webhook.user_id);
       }
       
       // Handle different notification types

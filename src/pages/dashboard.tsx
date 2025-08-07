@@ -109,10 +109,13 @@ const Dashboard = () => {
       loadCurrentWeekMeetings();
       loadUnclassifiedData();
       
+      // Record calendar view activity
+      recordActivity('calendar_view');
+      
       // Automatically set up calendar sync if needed
       setupCalendarSyncIfNeeded();
     }
-  }, [user?.id]);
+  }, [user?.id, recordActivity]);
 
   const setupCalendarSyncIfNeeded = async () => {
     if (!user?.id) return;
@@ -327,6 +330,9 @@ const Dashboard = () => {
   const sendBotToMeeting = async (meeting: Meeting, configuration?: any) => {
     if (!meeting.meeting_url) return;
     try {
+      // Record meeting creation activity
+      recordActivity('meeting_create');
+      
       setSendingBot(meeting.id);
       
       const result = await attendeeService.sendBotToMeeting({
@@ -872,7 +878,6 @@ const Dashboard = () => {
           onClassify={handleClassify}
         />
 
-        
       </div>
     );
 };

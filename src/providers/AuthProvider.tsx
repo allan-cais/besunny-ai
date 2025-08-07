@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
-import { backgroundSyncService } from '@/lib/background-sync';
+import { enhancedAdaptiveSyncStrategy } from '@/lib/enhanced-adaptive-sync-strategy';
 
 interface AuthContextType {
   user: User | null;
@@ -62,39 +62,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(session?.user ?? null);
       setLoading(false);
       
-      // Initialize background sync when user is authenticated
+      // Initialize enhanced adaptive sync when user is authenticated
       if (session?.user) {
-        try {
-          await backgroundSyncService.initialize(session.user.id);
-        } catch (error) {
-          // Background sync initialization error handled silently
-        }
-        
-        // TEMPORARILY DISABLED: Enhanced adaptive sync initialization
-        // This was causing session issues - testing without it
-        /*
         try {
           await enhancedAdaptiveSyncStrategy.initializeUser(session.user.id);
         } catch (error) {
           console.error('Failed to initialize enhanced adaptive sync:', error);
         }
-        */
       } else {
-        // Stop background sync when user signs out
-        try {
-          await backgroundSyncService.stop();
-        } catch (error) {
-          // Background sync stop error handled silently
-        }
-        
-        // TEMPORARILY DISABLED: Enhanced adaptive sync cleanup
-        /*
+        // Stop enhanced adaptive sync when user signs out
         try {
           enhancedAdaptiveSyncStrategy.stopUser(session?.user?.id || '');
         } catch (error) {
           console.error('Failed to stop enhanced adaptive sync:', error);
         }
-        */
       }
     });
 

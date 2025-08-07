@@ -75,6 +75,7 @@ export function useEnhancedAdaptiveSync(options: UseEnhancedAdaptiveSyncOptions 
           enhancedAdaptiveSyncStrategy.recordActivity(user.id, 'app_load');
         }
       } catch (error) {
+        console.error('Failed to initialize enhanced adaptive sync:', error);
         if (onError) {
           onError(error instanceof Error ? error : new Error('Failed to initialize enhanced adaptive sync'));
         }
@@ -86,11 +87,11 @@ export function useEnhancedAdaptiveSync(options: UseEnhancedAdaptiveSyncOptions 
 
     // Cleanup when user changes or component unmounts
     return () => {
-              clearTimeout(timeoutId);
-        if (user?.id && isInitialized.current) {
-          enhancedAdaptiveSyncStrategy.stopUser(user.id);
-          isInitialized.current = false;
-        }
+      clearTimeout(timeoutId);
+      if (user?.id && isInitialized.current) {
+        enhancedAdaptiveSyncStrategy.stopUser(user.id);
+        isInitialized.current = false;
+      }
     };
   }, [enabled, user?.id, session, loading, trackActivity, trackVirtualEmailActivity, initializeAfterSession, onError]);
 
@@ -128,12 +129,38 @@ export function useEnhancedAdaptiveSync(options: UseEnhancedAdaptiveSyncOptions 
     };
   }, [enabled, user?.id, trackActivity]);
 
+  // Update virtual email activity periodically
+  useEffect(() => {
+    if (!enabled || !user?.id || !trackVirtualEmailActivity || !isInitialized.current) {
+      return;
+    }
+
+    const updateVirtualEmailActivity = async () => {
+      try {
+        const activity = await enhancedAdaptiveSyncStrategy.getVirtualEmailActivityForUser(user.id);
+        setVirtualEmailActivity(activity);
+      } catch (error) {
+        console.error('Error updating virtual email activity:', error);
+      }
+    };
+
+    // Update immediately
+    updateVirtualEmailActivity();
+
+    // Update every 5 minutes
+    const interval = setInterval(updateVirtualEmailActivity, 5 * 60 * 1000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [enabled, user?.id, trackVirtualEmailActivity]);
+
   // Record activity manually
   const recordActivity = useCallback((activityType: 'app_load' | 'calendar_view' | 'meeting_create' | 'general' | 'virtual_email_detected') => {
     if (!user?.id || !isInitialized.current) {
       return;
     }
-    
+
     enhancedAdaptiveSyncStrategy.recordActivity(user.id, activityType);
   }, [user?.id]);
 
@@ -160,16 +187,16 @@ export function useEnhancedAdaptiveSync(options: UseEnhancedAdaptiveSyncOptions 
     if (!user?.id || !isInitialized.current) {
       return;
     }
-    
+
     enhancedAdaptiveSyncStrategy.recordVirtualEmailDetection(user.id);
     
-    // Update virtual email activity state
+    // Update virtual email activity immediately
     enhancedAdaptiveSyncStrategy.getVirtualEmailActivityForUser(user.id).then(activity => {
       setVirtualEmailActivity(activity);
     });
   }, [user?.id]);
 
-  // Get stats
+  // Get enhanced sync statistics
   const stats = enhancedAdaptiveSyncStrategy.getStats();
 
   return {

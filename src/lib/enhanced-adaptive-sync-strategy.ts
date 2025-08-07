@@ -103,6 +103,8 @@ class EnhancedAdaptiveSyncStrategy {
     
     // Start background sync
     this.startBackgroundSync(userId);
+    
+    console.log(`Enhanced adaptive sync initialized for user ${userId}`, { virtualEmailActivity });
   }
 
   /**
@@ -155,6 +157,7 @@ class EnhancedAdaptiveSyncStrategy {
         autoScheduledMeetings: autoScheduledMeetings?.length || 0,
       };
     } catch (error) {
+      console.error('Error getting virtual email activity:', error);
       return null;
     }
   }
@@ -761,6 +764,35 @@ class EnhancedAdaptiveSyncStrategy {
    */
   async getVirtualEmailActivityForUser(userId: string): Promise<VirtualEmailActivity | null> {
     return await this.getVirtualEmailActivity(userId);
+  }
+
+  /**
+   * Trigger manual sync for a specific service or all services
+   */
+  async triggerSync(userId: string, service?: 'calendar' | 'drive' | 'gmail' | 'attendee'): Promise<EnhancedSyncResult[]> {
+    if (!this.userStates.has(userId)) {
+      throw new Error(`User ${userId} not initialized for enhanced sync`);
+    }
+
+    try {
+      if (service) {
+        // Trigger specific service sync
+        const result = await this[`sync${service.charAt(0).toUpperCase() + service.slice(1)}`](userId);
+        return [result];
+      } else {
+        // Trigger full sync
+        const results = await Promise.all([
+          this.syncCalendar(userId),
+          this.syncDrive(userId),
+          this.syncGmail(userId),
+          this.syncAttendee(userId),
+        ]);
+        return results;
+      }
+    } catch (error) {
+      console.error(`Manual sync failed for user ${userId}:`, error);
+      throw error;
+    }
   }
 }
 
