@@ -128,7 +128,7 @@ const ProjectDashboard = () => {
       } else {
         // Transform meetings (transcript data is already in the meeting object)
         const transformedMeetings = (meetings || []).map(meeting => {
-          console.log('Meeting status:', meeting.title, meeting.status, meeting.event_status);
+  
           return {
             ...meeting,
             // Transcript fields are already available directly from the meeting
@@ -720,7 +720,7 @@ const ProjectDashboard = () => {
                 <Button
                   onClick={() => {
                     // Deploy bot logic would go here
-                    console.log('Deploy bot to meeting:', selectedMeeting.id);
+              
                   }}
                   size="sm"
                   className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-mono text-xs"

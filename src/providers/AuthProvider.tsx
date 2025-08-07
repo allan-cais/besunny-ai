@@ -67,15 +67,34 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         try {
           await backgroundSyncService.initialize(session.user.id);
         } catch (error) {
-          console.error('Failed to initialize background sync:', error);
+          // Background sync initialization error handled silently
         }
+        
+        // TEMPORARILY DISABLED: Enhanced adaptive sync initialization
+        // This was causing session issues - testing without it
+        /*
+        try {
+          await enhancedAdaptiveSyncStrategy.initializeUser(session.user.id);
+        } catch (error) {
+          console.error('Failed to initialize enhanced adaptive sync:', error);
+        }
+        */
       } else {
         // Stop background sync when user signs out
         try {
           await backgroundSyncService.stop();
         } catch (error) {
-          console.error('Failed to stop background sync:', error);
+          // Background sync stop error handled silently
         }
+        
+        // TEMPORARILY DISABLED: Enhanced adaptive sync cleanup
+        /*
+        try {
+          enhancedAdaptiveSyncStrategy.stopUser(session?.user?.id || '');
+        } catch (error) {
+          console.error('Failed to stop enhanced adaptive sync:', error);
+        }
+        */
       }
     });
 
@@ -113,7 +132,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.error('Supabase signOut error:', response.error);
       }
     } catch (error) {
-      console.error('Error in signOut:', error);
+      // Sign out error handled silently
     }
   };
 

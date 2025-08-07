@@ -4,7 +4,7 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn('Supabase environment variables are not configured. Please check your .env file.');
+  // Supabase environment variables not configured
 }
 
 export const supabase = createClient(
@@ -150,7 +150,6 @@ export const supabaseService = {
       .single();
 
     if (error) {
-      console.error('Error creating user:', error);
       throw error;
     }
 

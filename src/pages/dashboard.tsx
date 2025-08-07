@@ -14,6 +14,7 @@ import { Loader2, Clock, Database, Calendar, Video, Bot, Send, ExternalLink, Mai
 import { calendarService, Meeting } from '@/lib/calendar';
 import { supabase, Document } from '@/lib/supabase';
 import { useAttendeePolling } from '@/hooks/use-attendee-polling';
+import { useEnhancedAdaptiveSync } from '@/hooks/use-enhanced-adaptive-sync';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import BotConfigurationModal from '@/components/dashboard/BotConfigurationModal';
@@ -24,7 +25,7 @@ import TranscriptModal from '@/components/dashboard/TranscriptModal';
 import EmailModal from '@/components/dashboard/EmailModal';
 import DocumentModal from '@/components/dashboard/DocumentModal';
 import ClassificationModal from '@/components/dashboard/ClassificationModal';
-import CalendarSyncDiagnostic from '@/components/dashboard/CalendarSyncDiagnostic';
+
 
 interface VirtualEmailActivity {
   id: string;
@@ -72,6 +73,14 @@ const Dashboard = () => {
 
   const { toast } = useToast();
 
+  // Set up enhanced adaptive sync with safer initialization
+  const { recordActivity, recordVirtualEmailDetection, virtualEmailActivity, userState, isInitialized: enhancedSyncInitialized } = useEnhancedAdaptiveSync({
+    enabled: true,
+    trackActivity: true,
+    trackVirtualEmailActivity: true,
+    initializeAfterSession: true, // Wait for session to be fully established
+  });
+
   // Set up automatic polling
   const { pollNow } = useAttendeePolling({
     enabled: false, // Temporarily disabled due to 401 errors
@@ -83,7 +92,7 @@ const Dashboard = () => {
       }
     },
     onError: (error) => {
-      console.error('Polling error:', error);
+      // Polling error handled silently
     }
   });
 
@@ -97,7 +106,6 @@ const Dashboard = () => {
   // Load dashboard data
   useEffect(() => {
     if (user?.id) {
-      console.log('Loading dashboard data for user:', user.id);
       loadCurrentWeekMeetings();
       loadUnclassifiedData();
       
@@ -131,20 +139,17 @@ const Dashboard = () => {
 
       // If no active webhook, set up calendar sync automatically
       if (!webhook) {
-        console.log('No active webhook found, setting up calendar sync automatically...');
         try {
           const result = await calendarService.initializeCalendarSync(user.id);
-          if (result.success) {
-            console.log('Automatic calendar sync setup successful');
-          } else {
-            console.error('Automatic calendar sync setup failed:', result.error);
+          if (!result.success) {
+            // Calendar sync setup failed silently
           }
         } catch (error) {
-          console.error('Automatic calendar sync setup error:', error);
+          // Calendar sync setup error handled silently
         }
       }
     } catch (error) {
-      console.error('Error checking calendar sync status:', error);
+      // Calendar sync status check error handled silently
     }
   };
 
@@ -155,7 +160,7 @@ const Dashboard = () => {
       const userProjects = await getProjectsForUser(user.id);
       setProjects(userProjects);
     } catch (error) {
-      console.error('Error loading user projects:', error);
+      // Error loading user projects handled silently
     }
   };
 
@@ -165,17 +170,9 @@ const Dashboard = () => {
       const meetings = await calendarService.getCurrentWeekMeetings();
       setCurrentWeekMeetings(meetings);
       
-      // Debug: Also load all meetings to see what's happening
-      try {
-        const allMeetings = await calendarService.getAllCurrentWeekMeetings();
-        console.log('All current week meetings:', allMeetings);
-        console.log('Unassigned meetings (shown in dashboard):', meetings);
-        console.log('Assigned meetings (hidden from dashboard):', allMeetings.filter(m => m.project_id));
-      } catch (debugErr) {
-        console.error('Debug: Failed to load all meetings:', debugErr);
-      }
+
     } catch (err: any) {
-      console.error('Failed to load current week meetings:', err);
+      // Failed to load current week meetings handled silently
     } finally {
       setMeetingsLoading(false);
     }
@@ -198,7 +195,6 @@ const Dashboard = () => {
         .limit(50);
 
       if (documentsError) {
-        console.error('Error loading unclassified documents:', documentsError);
         setUnclassifiedData([]);
       } else {
         // Transform documents to match our interface
@@ -230,7 +226,6 @@ const Dashboard = () => {
         setUnclassifiedData(documentActivities);
       }
     } catch (error) {
-      console.error('Error loading unclassified data:', error);
       setUnclassifiedData([]);
     } finally {
       setDataLoading(false);
@@ -356,7 +351,6 @@ const Dashboard = () => {
         description: `Bot will join the meeting 2 minutes before it starts.`,
       });
     } catch (error: any) {
-      console.error('Error sending bot to meeting:', error);
       toast({
         title: "Failed to deploy bot",
         description: error.message,
@@ -421,7 +415,6 @@ const Dashboard = () => {
       
       // Don't refresh the meetings list here - let it happen when modal closes
     } catch (error) {
-      console.error('Error assigning meeting to project:', error);
       toast({
         title: "Failed to assign meeting",
         description: "Please try again.",
@@ -506,7 +499,6 @@ const Dashboard = () => {
         .eq('id', activityId);
 
       if (error) {
-        console.error('Error updating project classification:', error);
         setUnclassifiedData(prevActivities => 
           prevActivities.map(activity => 
             activity.id === activityId 
@@ -516,7 +508,6 @@ const Dashboard = () => {
         );
       }
     } catch (error) {
-      console.error('Error in handleClassify:', error);
       setUnclassifiedData(prevActivities => 
         prevActivities.map(activity => 
           activity.id === activityId 
@@ -549,6 +540,8 @@ const Dashboard = () => {
           projects={projects}
         />
 
+
+
         {/* Two Column Layout for Meetings and Data */}
         <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Current Week's Meetings */}
@@ -571,19 +564,21 @@ const Dashboard = () => {
                   All meetings have been assigned to projects
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="max-h-[350px] overflow-y-auto scrollbar-hide space-y-3">
                   {currentWeekMeetings.map((meeting) => (
                     <div 
                       key={meeting.id} 
-                      className="flex items-start space-x-3 p-2 rounded-md border border-stone-200 dark:border-zinc-700 hover:bg-stone-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                      className="flex items-start space-x-3 p-3 rounded-md border border-stone-200 dark:border-zinc-700 hover:bg-stone-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
                       onClick={() => setSelectedMeeting(meeting)}
                     >
                       <div className="flex-shrink-0 w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-semibold font-mono text-[#4a5565] dark:text-zinc-200 truncate">
-                          {meeting.title}
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="text-sm font-semibold font-mono text-[#4a5565] dark:text-zinc-200 truncate">
+                            {meeting.title}
+                          </div>
                         </div>
-                        <div className="text-xs text-gray-500 font-mono mt-1">
+                        <div className="text-xs text-gray-500 font-mono">
                           {new Date(meeting.start_time).toLocaleDateString()} • {new Date(meeting.start_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                         </div>
                         <div className="flex items-center gap-2 mt-2">
@@ -651,11 +646,11 @@ const Dashboard = () => {
                   No unclassified data found
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="max-h-[350px] overflow-y-auto scrollbar-hide space-y-3">
                   {unclassifiedData.map((activity) => (
                     <div 
                       key={activity.id} 
-                      className="flex items-start space-x-3 p-2 rounded-md border border-stone-200 dark:border-zinc-700 hover:bg-stone-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                      className="flex items-start space-x-3 p-3 rounded-md border border-stone-200 dark:border-zinc-700 hover:bg-stone-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
                       onClick={(e) => {
                         const target = e.target as HTMLElement;
                         if (target.closest('.select-project-badge')) {
@@ -877,10 +872,7 @@ const Dashboard = () => {
           onClassify={handleClassify}
         />
 
-        {/* Calendar Sync Diagnostic - Temporary for troubleshooting webhook issues */}
-        <div className="mt-8">
-          <CalendarSyncDiagnostic />
-        </div>
+        
       </div>
     );
 };
