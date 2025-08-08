@@ -538,7 +538,7 @@ const Dashboard = () => {
                   All meetings have been assigned to projects
                 </div>
               ) : (
-                <div className="max-h-[350px] overflow-y-auto scrollbar-hide space-y-3">
+                <div className="max-h-[450px] overflow-y-auto scrollbar-hide space-y-3">
                   {currentWeekMeetings.map((meeting) => (
                     <div 
                       key={meeting.id} 
@@ -620,39 +620,31 @@ const Dashboard = () => {
                   All data has been classified
                 </div>
               ) : (
-                <div className="max-h-[350px] overflow-y-auto scrollbar-hide space-y-3">
+                <div className="max-h-[450px] overflow-y-auto scrollbar-hide space-y-3">
                   {unclassifiedData.map((activity) => (
                     <div 
                       key={activity.id} 
                       className="flex items-start space-x-3 p-3 rounded-md border border-stone-200 dark:border-zinc-700 hover:bg-stone-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
                       onClick={() => {
-                                                 if (activity.type === 'meeting_transcript') {
-                           setSelectedTranscript(activity.rawTranscript);
-                         } else if (activity.type === 'email') {
-                           setSelectedEmail(activity);
-                         } else {
-                           setSelectedDocument(activity as any);
-                         }
+                        if (activity.type === 'meeting_transcript') {
+                          setSelectedTranscript(activity.rawTranscript);
+                        } else if (activity.type === 'email') {
+                          setSelectedEmail(activity);
+                        } else {
+                          setSelectedDocument(activity as any);
+                        }
                       }}
                     >
                       <div className="flex-shrink-0 w-2 h-2 bg-green-500 rounded-full mt-2"></div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-1">
-                          <div className="text-sm font-semibold font-mono text-[#4a5565] dark:text-zinc-200 truncate">
-                            {activity.title}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {getTypeIcon(activity.type)}
-                            <span className="text-xs text-gray-500 font-mono">
-                              {getTypeLabel(activity.type)}
-                            </span>
-                          </div>
+                        <div className="text-sm font-semibold font-mono text-[#4a5565] dark:text-zinc-200 truncate mb-1">
+                          {activity.title}
                         </div>
-                        <div className="text-xs text-gray-500 font-mono mb-2">
-                          {formatTimeAgo(activity.created_at)} • {activity.source}
+                        <div className="text-xs text-gray-500 font-mono mb-1">
+                          {formatTimeAgo(activity.created_at)} • {activity.type}
                         </div>
-                        <div className="text-xs text-gray-600 dark:text-zinc-300 line-clamp-2">
-                          {stripHtml(activity.summary)}
+                        <div className="text-xs text-gray-500 font-mono">
+                          {activity.source}
                         </div>
                       </div>
                       <div className="flex flex-col items-end space-y-1">
@@ -663,7 +655,7 @@ const Dashboard = () => {
                             e.stopPropagation();
                             setClassificationActivity(activity);
                           }}
-                          className="text-xs"
+                          className="text-xs font-mono"
                         >
                           Classify
                         </Button>

@@ -272,7 +272,7 @@ export const calendarService = {
     return result;
   },
 
-  // Get current week meetings (for UI display)
+  // Get current and upcoming meetings (for UI display)
     async getCurrentWeekMeetings(session?: any): Promise<Meeting[]> {
     try {
       // Use provided session or get from auth
@@ -282,21 +282,17 @@ export const calendarService = {
       }
       
       const now = new Date();
-      const startOfWeek = new Date(now);
-      startOfWeek.setDate(now.getDate() - now.getDay()); // Start of current week (Sunday)
-      startOfWeek.setHours(0, 0, 0, 0);
-      
-      const endOfWeek = new Date(startOfWeek);
-      endOfWeek.setDate(startOfWeek.getDate() + 7); // End of current week
-      endOfWeek.setHours(23, 59, 59, 999);
+      const sevenDaysFromNow = new Date(now);
+      sevenDaysFromNow.setDate(now.getDate() + 7); // 7 days from now
+      sevenDaysFromNow.setHours(23, 59, 59, 999);
       
       const { data: meetings, error } = await supabase
         .from('meetings')
         .select('*')
         .eq('user_id', currentSession.user.id)
         .is('project_id', null) // Only unassigned meetings
-        .gte('start_time', startOfWeek.toISOString())
-        .lte('start_time', endOfWeek.toISOString())
+        .gte('start_time', now.toISOString()) // From current time onwards (including in-progress meetings)
+        .lte('start_time', sevenDaysFromNow.toISOString()) // Up to 7 days in the future
         .order('start_time', { ascending: true });
       
       if (error) {
