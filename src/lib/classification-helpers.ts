@@ -208,7 +208,6 @@ export async function sendToN8nWebhook(
   const n8nWebhookUrl = webhookUrl || Deno.env.get('N8N_CLASSIFICATION_WEBHOOK_URL');
   
   if (!n8nWebhookUrl) {
-    console.warn('N8N webhook URL not configured');
     return false;
   }
   

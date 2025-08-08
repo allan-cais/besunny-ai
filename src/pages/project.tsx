@@ -91,7 +91,7 @@ interface ProjectData {
 
 const ProjectDashboard = () => {
   const { projectId } = useParams<{ projectId: string }>();
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const [project, setProject] = useState<ExtendedProject | null>(null);
   const [loading, setLoading] = useState(true);
   const [aiProcessing, setAiProcessing] = useState(false);

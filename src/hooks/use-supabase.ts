@@ -25,7 +25,6 @@ export const useSupabase = () => {
   // User operations
   const createUser = useCallback(async (user: Omit<User, 'created_at'>) => {
     if (!supabaseService.isConfigured()) {
-      console.warn('Supabase not configured');
       return null;
     }
 
@@ -45,7 +44,6 @@ export const useSupabase = () => {
 
   const getUser = useCallback(async (id: string) => {
     if (!supabaseService.isConfigured()) {
-      console.warn('Supabase not configured');
       return null;
     }
 
@@ -66,7 +64,6 @@ export const useSupabase = () => {
   // Project operations
   const createProject = useCallback(async (project: Omit<Project, 'created_at'>) => {
     if (!supabaseService.isConfigured()) {
-      console.warn('Supabase not configured');
       return null;
     }
 
@@ -86,7 +83,6 @@ export const useSupabase = () => {
 
   const getProjects = useCallback(async () => {
     if (!supabaseService.isConfigured()) {
-      console.warn('Supabase not configured');
       return [];
     }
 
@@ -106,7 +102,6 @@ export const useSupabase = () => {
 
   const getProjectsForUser = useCallback(async (userId: string) => {
     if (!supabaseService.isConfigured()) {
-      console.warn('Supabase not configured');
       return [];
     }
 
@@ -127,7 +122,6 @@ export const useSupabase = () => {
   // Chat session operations
   const createChatSession = useCallback(async (session: Omit<ChatSession, 'started_at'>) => {
     if (!supabaseService.isConfigured()) {
-      console.warn('Supabase not configured');
       return null;
     }
 
@@ -147,7 +141,6 @@ export const useSupabase = () => {
 
   const updateChatSession = useCallback(async (sessionId: string, updates: Partial<ChatSession>) => {
     if (!supabaseService.isConfigured()) {
-      console.warn('Supabase not configured');
       return null;
     }
     setIsLoading(true);
@@ -165,7 +158,6 @@ export const useSupabase = () => {
 
   const getChatSessions = useCallback(async (userId?: string, projectId?: string) => {
     if (!supabaseService.isConfigured()) {
-      console.warn('Supabase not configured');
       return [];
     }
 
@@ -185,7 +177,6 @@ export const useSupabase = () => {
 
   const getMostRecentProjectChat = useCallback(async (userId: string, projectId: string) => {
     if (!supabaseService.isConfigured()) {
-      console.warn('Supabase not configured');
       return null;
     }
 
@@ -207,7 +198,6 @@ export const useSupabase = () => {
 
   const endChatSession = useCallback(async (sessionId: string) => {
     if (!supabaseService.isConfigured()) {
-      console.warn('Supabase not configured');
       return;
     }
 
@@ -227,7 +217,6 @@ export const useSupabase = () => {
   // Chat message operations
   const saveMessages = useCallback(async (messages: Omit<ChatMessage, 'created_at'>[]) => {
     if (!supabaseService.isConfigured()) {
-      console.warn('Supabase not configured');
       return;
     }
 
@@ -246,7 +235,6 @@ export const useSupabase = () => {
 
   const getMessagesBySession = useCallback(async (sessionId: string, limit: number = 50) => {
     if (!supabaseService.isConfigured()) {
-      console.warn('Supabase not configured');
       return [];
     }
 
@@ -267,7 +255,6 @@ export const useSupabase = () => {
   // Document operations
   const createDocument = useCallback(async (document: Omit<Document, 'created_at'>) => {
     if (!supabaseService.isConfigured()) {
-      console.warn('Supabase not configured');
       return null;
     }
 
@@ -287,7 +274,6 @@ export const useSupabase = () => {
 
   const getDocuments = useCallback(async (projectId: string) => {
     if (!supabaseService.isConfigured()) {
-      console.warn('Supabase not configured');
       return [];
     }
 

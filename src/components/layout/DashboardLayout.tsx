@@ -15,8 +15,9 @@ import {
   AIChatSession
 } from '@/components/dashboard';
 
+
 const DashboardLayout = () => {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const { getProjectsForUser, getChatSessions, createChatSession, endChatSession, updateChatSession } = useSupabase();
   const [openSubmenus, setOpenSubmenus] = useState<{ [key: string]: boolean }>({});
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -33,13 +34,13 @@ const DashboardLayout = () => {
 
   // Load projects for the current user
   useEffect(() => {
-    if (user?.id) {
+    if (user?.id && session) {
       loadUserProjects();
     }
-  }, [user?.id]);
+  }, [user?.id, session]);
 
   const loadUserProjects = async () => {
-    if (!user?.id) return;
+    if (!user?.id || !session) return;
     
     try {
       const userProjects = await getProjectsForUser(user.id);
@@ -51,13 +52,13 @@ const DashboardLayout = () => {
 
   // Fetch chat sessions from Supabase on load
   useEffect(() => {
-    if (user?.id) {
+    if (user?.id && session) {
       loadUserChats();
     }
-  }, [user?.id]);
+  }, [user?.id, session]);
 
   const loadUserChats = async () => {
-    if (!user?.id) return;
+    if (!user?.id || !session) return;
     try {
       const sessions: ChatSession[] = await getChatSessions(user.id);
       // Only include active chats (ended_at is null)

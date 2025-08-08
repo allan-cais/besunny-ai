@@ -98,6 +98,8 @@ const VirtualEmailSettings: React.FC = () => {
       setGmailWatchStatus(status);
     } catch (error) {
       console.error('Error loading Gmail watch status:', error);
+      // Set a default status to prevent UI errors
+      setGmailWatchStatus({ isActive: false });
     }
   };
 

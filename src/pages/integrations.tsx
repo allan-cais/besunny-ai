@@ -184,7 +184,6 @@ const IntegrationsPage: React.FC = () => {
         setConnecting(true);
         await handleGoogleDisconnect();
       } catch (error) {
-        console.warn('Failed to disconnect before reconnecting:', error);
         // Continue anyway - the prompt=consent should handle scope updates
       } finally {
         setConnecting(false);
@@ -265,18 +264,14 @@ const IntegrationsPage: React.FC = () => {
             await supabase.auth.refreshSession();
           }
         } catch (refreshError) {
-          console.warn('Failed to refresh session:', refreshError);
         }
         
         // Automatically set up calendar sync
         try {
           const { calendarService } = await import('@/lib/calendar');
-          console.log('Setting up automatic calendar sync for user:', user.id);
           const syncResult = await calendarService.initializeCalendarSync(user.id);
-          console.log('Calendar sync setup result:', syncResult);
           
           if (syncResult.success) {
-            console.log('Calendar sync setup successful');
           } else {
             console.error('Calendar sync setup failed:', syncResult.error);
           }
@@ -329,7 +324,6 @@ const IntegrationsPage: React.FC = () => {
             body: new URLSearchParams({ token: credentials.access_token }),
           });
         } catch (error) {
-          console.warn('Could not revoke access token:', error);
         }
       }
 
@@ -341,7 +335,6 @@ const IntegrationsPage: React.FC = () => {
             body: new URLSearchParams({ token: credentials.refresh_token }),
           });
         } catch (error) {
-          console.warn('Could not revoke refresh token:', error);
         }
       }
 
@@ -351,12 +344,9 @@ const IntegrationsPage: React.FC = () => {
         const cleanupResult = await calendarService.cleanupCalendarData(user.id);
         
         if (cleanupResult.success) {
-          console.log('Calendar cleanup completed:', cleanupResult.deleted);
         } else {
-          console.warn('Calendar cleanup failed:', cleanupResult.error);
         }
       } catch (cleanupError) {
-        console.warn('Calendar cleanup error:', cleanupError);
       }
 
       // Delete credentials from database (only integration credentials, not login providers)

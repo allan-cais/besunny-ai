@@ -273,36 +273,47 @@ export const calendarService = {
   },
 
   // Get current week meetings (for UI display)
-  async getCurrentWeekMeetings(): Promise<Meeting[]> {
-    const session = (await supabase.auth.getSession()).data.session;
-    if (!session) throw new Error('Not authenticated');
-    
-    const now = new Date();
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - now.getDay()); // Start of current week (Sunday)
-    startOfWeek.setHours(0, 0, 0, 0);
-    
-    const endOfWeek = new Date(startOfWeek);
-    endOfWeek.setDate(startOfWeek.getDate() + 7); // End of current week
-    endOfWeek.setHours(23, 59, 59, 999);
-    
-    const { data: meetings, error } = await supabase
-      .from('meetings')
-      .select('*')
-      .eq('user_id', session.user.id)
-      .is('project_id', null) // Only unassigned meetings
-      .gte('start_time', startOfWeek.toISOString())
-      .lte('start_time', endOfWeek.toISOString())
-      .order('start_time', { ascending: true });
-    
-    if (error) throw error;
-    return meetings || [];
+    async getCurrentWeekMeetings(session?: any): Promise<Meeting[]> {
+    try {
+      // Use provided session or get from auth
+      const currentSession = session || (await supabase.auth.getSession()).data.session;
+      if (!currentSession) {
+        throw new Error('Not authenticated');
+      }
+      
+      const now = new Date();
+      const startOfWeek = new Date(now);
+      startOfWeek.setDate(now.getDate() - now.getDay()); // Start of current week (Sunday)
+      startOfWeek.setHours(0, 0, 0, 0);
+      
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(startOfWeek.getDate() + 7); // End of current week
+      endOfWeek.setHours(23, 59, 59, 999);
+      
+      const { data: meetings, error } = await supabase
+        .from('meetings')
+        .select('*')
+        .eq('user_id', currentSession.user.id)
+        .is('project_id', null) // Only unassigned meetings
+        .gte('start_time', startOfWeek.toISOString())
+        .lte('start_time', endOfWeek.toISOString())
+        .order('start_time', { ascending: true });
+      
+      if (error) {
+        throw error;
+      }
+      
+      return meetings || [];
+    } catch (error) {
+      throw error;
+    }
   },
 
   // Get ALL meetings for the current week (including assigned ones) - for debugging
-  async getAllCurrentWeekMeetings(): Promise<Meeting[]> {
-    const session = (await supabase.auth.getSession()).data.session;
-    if (!session) throw new Error('Not authenticated');
+  async getAllCurrentWeekMeetings(session?: any): Promise<Meeting[]> {
+    // Use provided session or get from auth
+    const currentSession = session || (await supabase.auth.getSession()).data.session;
+    if (!currentSession) throw new Error('Not authenticated');
     
     const now = new Date();
     const startOfWeek = new Date(now);
@@ -316,7 +327,7 @@ export const calendarService = {
     const { data: meetings, error } = await supabase
       .from('meetings')
       .select('*')
-      .eq('user_id', session.user.id)
+      .eq('user_id', currentSession.user.id)
       .gte('start_time', startOfWeek.toISOString())
       .lte('start_time', endOfWeek.toISOString())
       .order('start_time', { ascending: true });
@@ -326,20 +337,21 @@ export const calendarService = {
   },
 
   // Get sync status and logs
-  async getSyncStatus(): Promise<{
+  async getSyncStatus(session?: any): Promise<{
     webhook_active: boolean;
     last_sync?: string;
     sync_logs: any[];
     webhook_expires_at?: string;
   }> {
-    const session = (await supabase.auth.getSession()).data.session;
-    if (!session) throw new Error('Not authenticated');
+    // Use provided session or get from auth
+    const currentSession = session || (await supabase.auth.getSession()).data.session;
+    if (!currentSession) throw new Error('Not authenticated');
     
     // Get webhook status
     const { data: webhook, error: webhookError } = await supabase
       .from('calendar_webhooks')
       .select('*')
-      .eq('user_id', session.user.id)
+      .eq('user_id', currentSession.user.id)
       .eq('is_active', true)
       .maybeSingle();
     
@@ -347,7 +359,7 @@ export const calendarService = {
     const { data: syncLogs } = await supabase
       .from('calendar_sync_logs')
       .select('*')
-      .eq('user_id', session.user.id)
+      .eq('user_id', currentSession.user.id)
       .order('created_at', { ascending: false })
       .limit(10);
     
@@ -715,7 +727,7 @@ export const calendarService = {
   // Enhanced calendar service with watch functionality
   async initializeCalendarSync(userId: string): Promise<{ success: boolean; error?: string; webhook_id?: string }> {
     try {
-      console.log('Initializing calendar sync for user:', userId);
+  
       
       // Check if we already have an active webhook
       const { data: existingWebhook, error: webhookError } = await supabase
@@ -729,10 +741,10 @@ export const calendarService = {
         console.error('Error checking for existing webhook:', webhookError);
       }
       
-      console.log('Existing webhook found:', existingWebhook);
+      
       
       if (existingWebhook) {
-        console.log('Calendar webhook already exists, checking if meetings are synced...');
+        
         
         // Check if we have any meetings in the database
         const { data: existingMeetings, error: meetingsError } = await supabase
@@ -745,14 +757,13 @@ export const calendarService = {
           console.error('Error checking existing meetings:', meetingsError);
         }
         
-        console.log('Existing meetings found:', existingMeetings?.length || 0);
+        
         
         if (!existingMeetings || existingMeetings.length === 0) {
-          console.log('No meetings found despite existing webhook, performing initial sync...');
+          
           
           // Step 1: Get initial sync token
           const initialSyncResult = await this.performInitialSync(userId);
-          console.log('Initial sync result:', initialSyncResult);
           
           if (!initialSyncResult.success) {
             return { success: false, error: `Initial sync failed: ${initialSyncResult.error}` };
@@ -771,34 +782,27 @@ export const calendarService = {
             console.error('Error updating webhook with sync token:', updateError);
           }
           
-          console.log('Calendar sync completed for existing webhook');
           return { success: true, webhook_id: existingWebhook.webhook_id };
         } else {
-          console.log('Meetings already exist, webhook is working correctly');
           return { success: true, webhook_id: existingWebhook.webhook_id };
         }
       }
       
-      console.log('No existing webhook found, performing initial sync...');
       
       // Step 1: Get initial sync token (only if no webhook exists)
       const initialSyncResult = await this.performInitialSync(userId);
-      console.log('Initial sync result:', initialSyncResult);
       
       if (!initialSyncResult.success) {
         return { success: false, error: `Initial sync failed: ${initialSyncResult.error}` };
       }
       
       // Step 2: Set up watch with sync token
-      console.log('Setting up watch with sync token...');
       const watchResult = await this.setupWatch(userId, initialSyncResult.sync_token);
-      console.log('Watch setup result:', watchResult);
       
       if (!watchResult.success) {
         return { success: false, error: `Watch setup failed: ${watchResult.error}` };
       }
       
-      console.log('Calendar sync initialization completed successfully');
       return { success: true, webhook_id: watchResult.webhook_id };
     } catch (error) {
       console.error('Calendar sync initialization error:', error);
@@ -809,7 +813,6 @@ export const calendarService = {
   // Perform initial sync to get baseline state and sync token
   async performInitialSync(userId: string): Promise<{ success: boolean; error?: string; sync_token?: string }> {
     try {
-      console.log('Performing initial sync for user:', userId);
       
       const credentials = await getGoogleCredentials(userId);
       if (!credentials) {
@@ -817,7 +820,6 @@ export const calendarService = {
         return { success: false, error: 'No Google credentials found' };
       }
       
-      console.log('Google credentials found, proceeding with sync...');
 
       // Get events from the past 7 days to future 60 days
       const timeMin = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -1210,7 +1212,6 @@ export const calendarService = {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.warn(`Failed to stop watch: ${response.status} - ${errorText}`);
         // Don't throw error, just log warning
       }
 
@@ -1650,7 +1651,6 @@ export const calendarService = {
         }
       }
 
-      console.log(`Manual sync completed: ${processed} events processed, ${created} created, ${updated} updated`);
       return { success: true, processed };
     } catch (error) {
       console.error('Manual sync error:', error);
@@ -1661,26 +1661,21 @@ export const calendarService = {
   // Force initial sync even if webhook exists (for debugging)
   async forceInitialSync(userId: string): Promise<{ success: boolean; error?: string; webhook_id?: string }> {
     try {
-      console.log('Forcing initial sync for user:', userId);
       
       // Step 1: Get initial sync token (force sync regardless of webhook)
       const initialSyncResult = await this.performInitialSync(userId);
-      console.log('Force initial sync result:', initialSyncResult);
       
       if (!initialSyncResult.success) {
         return { success: false, error: `Initial sync failed: ${initialSyncResult.error}` };
       }
       
       // Step 2: Set up watch with sync token
-      console.log('Setting up watch with sync token...');
       const watchResult = await this.setupWatch(userId, initialSyncResult.sync_token);
-      console.log('Watch setup result:', watchResult);
       
       if (!watchResult.success) {
         return { success: false, error: `Watch setup failed: ${watchResult.error}` };
       }
       
-      console.log('Force initial sync completed successfully');
       return { success: true, webhook_id: watchResult.webhook_id };
     } catch (error) {
       console.error('Force initial sync error:', error);
@@ -1691,7 +1686,6 @@ export const calendarService = {
   // Clear webhook and force fresh setup (for debugging)
   async clearWebhookAndResync(userId: string): Promise<{ success: boolean; error?: string; webhook_id?: string }> {
     try {
-      console.log('Clearing webhook and forcing fresh setup for user:', userId);
       
       // Step 1: Get existing webhook
       const { data: existingWebhook } = await supabase
@@ -1702,12 +1696,10 @@ export const calendarService = {
         .maybeSingle();
       
       if (existingWebhook) {
-        console.log('Found existing webhook, stopping it...');
         
         // Stop the existing webhook
         const stopResult = await this.stopWatch(userId, existingWebhook.webhook_id);
         if (!stopResult.success) {
-          console.warn('Failed to stop existing webhook:', stopResult.error);
         }
         
         // Mark webhook as inactive
@@ -1719,22 +1711,18 @@ export const calendarService = {
       
       // Step 2: Perform fresh initial sync
       const initialSyncResult = await this.performInitialSync(userId);
-      console.log('Fresh initial sync result:', initialSyncResult);
       
       if (!initialSyncResult.success) {
         return { success: false, error: `Initial sync failed: ${initialSyncResult.error}` };
       }
       
       // Step 3: Set up new watch
-      console.log('Setting up new watch...');
       const watchResult = await this.setupWatch(userId, initialSyncResult.sync_token);
-      console.log('New watch setup result:', watchResult);
       
       if (!watchResult.success) {
         return { success: false, error: `Watch setup failed: ${watchResult.error}` };
       }
       
-      console.log('Clear and resync completed successfully');
       return { success: true, webhook_id: watchResult.webhook_id };
     } catch (error) {
       console.error('Clear and resync error:', error);
@@ -1745,7 +1733,6 @@ export const calendarService = {
   // Clean up all calendar data for a user (when disconnecting Google)
   async cleanupCalendarData(userId: string): Promise<{ success: boolean; error?: string; deleted: { meetings: number; webhooks: number; syncLogs: number } }> {
     try {
-      console.log('Cleaning up calendar data for user:', userId);
       
       let deletedMeetings = 0;
       let deletedWebhooks = 0;
@@ -1766,10 +1753,8 @@ export const calendarService = {
             try {
               const stopResult = await this.stopWatch(userId, webhook.webhook_id);
               if (!stopResult.success) {
-                console.warn('Failed to stop webhook:', stopResult.error);
               }
             } catch (error) {
-              console.warn('Error stopping webhook:', error);
             }
           }
         }
@@ -1784,7 +1769,6 @@ export const calendarService = {
           console.error('Error deleting webhooks:', deleteWebhookError);
         } else {
           deletedWebhooks = webhooks.length;
-          console.log(`Deleted ${deletedWebhooks} webhooks`);
         }
       }
       
@@ -1806,7 +1790,6 @@ export const calendarService = {
           console.error('Error deleting meetings:', deleteMeetingsError);
         } else {
           deletedMeetings = meetings.length;
-          console.log(`Deleted ${deletedMeetings} meetings`);
         }
       }
       
@@ -1828,11 +1811,9 @@ export const calendarService = {
           console.error('Error deleting sync logs:', deleteSyncLogsError);
         } else {
           deletedSyncLogs = syncLogs.length;
-          console.log(`Deleted ${deletedSyncLogs} sync logs`);
         }
       }
       
-      console.log(`Calendar cleanup completed: ${deletedMeetings} meetings, ${deletedWebhooks} webhooks, ${deletedSyncLogs} sync logs deleted`);
       
       return {
         success: true,

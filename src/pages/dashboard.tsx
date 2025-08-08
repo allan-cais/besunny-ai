@@ -1,31 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/providers/AuthProvider';
 import { useSupabase } from '@/hooks/use-supabase';
-import {
-  MainWorkspace,
-} from '@/components/dashboard';
-import PageHeader from '@/components/dashboard/PageHeader';
-import UsernameSetupManager from '@/components/UsernameSetupManager';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Loader2, Clock, Database, Calendar, Video, Bot, Send, ExternalLink, Mail, FileText, Image, Folder, MessageSquare, File } from 'lucide-react';
-import { calendarService, Meeting } from '@/lib/calendar';
-import { supabase, Document } from '@/lib/supabase';
-import { useAttendeePolling } from '@/hooks/use-attendee-polling';
 import { useEnhancedAdaptiveSync } from '@/hooks/use-enhanced-adaptive-sync';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useAttendeePolling } from '@/hooks/use-attendee-polling';
+import { calendarService } from '@/lib/calendar';
+import { attendeeService } from '@/lib/attendee-service';
+import { supabase } from '@/lib/supabase';
+import { useToast } from '@/hooks/use-toast';
+import { MainWorkspace } from '@/components/dashboard';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Clock, Database, Bot, Video, Loader2 } from 'lucide-react';
+import { Meeting } from '@/lib/calendar';
+import { Document } from '@/lib/supabase';
 import BotConfigurationModal from '@/components/dashboard/BotConfigurationModal';
-import { apiKeyService } from '@/lib/api-keys';
-import { attendeeService } from '../lib/attendee-service';
-import { useToast } from '@/components/ui/use-toast';
+import ClassificationModal from '@/components/dashboard/ClassificationModal';
 import TranscriptModal from '@/components/dashboard/TranscriptModal';
 import EmailModal from '@/components/dashboard/EmailModal';
 import DocumentModal from '@/components/dashboard/DocumentModal';
-import ClassificationModal from '@/components/dashboard/ClassificationModal';
-
 
 interface VirtualEmailActivity {
   id: string;
@@ -44,7 +38,7 @@ interface VirtualEmailActivity {
 }
 
 const Dashboard = () => {
-  const { user } = useAuth();
+  const { user, session, loading: authLoading } = useAuth();
   const { getProjectsForUser } = useSupabase();
   const [projects, setProjects] = useState<any[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
@@ -55,8 +49,8 @@ const Dashboard = () => {
   // Dashboard-specific state
   const [currentWeekMeetings, setCurrentWeekMeetings] = useState<Meeting[]>([]);
   const [unclassifiedData, setUnclassifiedData] = useState<VirtualEmailActivity[]>([]);
-  const [meetingsLoading, setMeetingsLoading] = useState(true);
-  const [dataLoading, setDataLoading] = useState(true);
+  const [meetingsLoading, setMeetingsLoading] = useState(false);
+  const [dataLoading, setDataLoading] = useState(false);
   
   // Modal states for meetings
   const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
@@ -96,95 +90,40 @@ const Dashboard = () => {
     }
   });
 
-  // Load projects for the current user
-  useEffect(() => {
-    if (user?.id) {
-      loadUserProjects();
+  // Data loading functions
+  const loadUserProjects = useCallback(async () => {
+    if (!user?.id || !session) {
+      return;
     }
-  }, [user?.id]);
-
-  // Load dashboard data
-  useEffect(() => {
-    if (user?.id) {
-      loadCurrentWeekMeetings();
-      loadUnclassifiedData();
-      
-      // Record calendar view activity
-      recordActivity('calendar_view');
-      
-      // Automatically set up calendar sync if needed
-      setupCalendarSyncIfNeeded();
-    }
-  }, [user?.id, recordActivity]);
-
-  const setupCalendarSyncIfNeeded = async () => {
-    if (!user?.id) return;
-    
-    try {
-      // Check if user has Google credentials
-      const { data: credentials } = await supabase
-        .from('google_credentials')
-        .select('user_id')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (!credentials) {
-        return; // User doesn't have Google credentials
-      }
-
-      // Check if user has active webhook
-      const { data: webhook } = await supabase
-        .from('calendar_webhooks')
-        .select('user_id')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .maybeSingle();
-
-      // If no active webhook, set up calendar sync automatically
-      if (!webhook) {
-        try {
-          const result = await calendarService.initializeCalendarSync(user.id);
-          if (!result.success) {
-            // Calendar sync setup failed silently
-          }
-        } catch (error) {
-          // Calendar sync setup error handled silently
-        }
-      }
-    } catch (error) {
-      // Calendar sync status check error handled silently
-    }
-  };
-
-  const loadUserProjects = async () => {
-    if (!user?.id) return;
     
     try {
       const userProjects = await getProjectsForUser(user.id);
       setProjects(userProjects);
     } catch (error) {
-      // Error loading user projects handled silently
+      // Silent error handling
     }
-  };
+  }, [user?.id, session, getProjectsForUser]);
 
-  const loadCurrentWeekMeetings = async () => {
+  const loadCurrentWeekMeetings = useCallback(async () => {
+    if (!session) {
+      return;
+    }
+
     try {
       setMeetingsLoading(true);
-      const meetings = await calendarService.getCurrentWeekMeetings();
+      const meetings = await calendarService.getCurrentWeekMeetings(session);
       setCurrentWeekMeetings(meetings);
-      
-
     } catch (err: any) {
-      // Failed to load current week meetings handled silently
+      setCurrentWeekMeetings([]);
     } finally {
       setMeetingsLoading(false);
     }
-  };
+  }, [session]);
 
-
-
-  const loadUnclassifiedData = async () => {
-    if (!user?.id) return;
+  const loadUnclassifiedData = useCallback(async () => {
+    if (!user?.id || !session) {
+      return;
+    }
 
     try {
       setDataLoading(true);
@@ -233,8 +172,74 @@ const Dashboard = () => {
     } finally {
       setDataLoading(false);
     }
-  };
+  }, [user?.id, session]);
 
+  const setupCalendarSyncIfNeeded = useCallback(async () => {
+    if (!user?.id || !session) {
+      return;
+    }
+    
+    try {
+      // Check if user has Google credentials
+      const { data: credentials } = await supabase
+        .from('google_credentials')
+        .select('user_id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (!credentials) {
+        return; // User doesn't have Google credentials
+      }
+
+      // Check if user has active webhook
+      const { data: webhook } = await supabase
+        .from('calendar_webhooks')
+        .select('user_id')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      // If no active webhook, set up calendar sync automatically
+      if (!webhook) {
+        try {
+          await calendarService.initializeCalendarSync(user.id);
+        } catch (error) {
+          // Silent error handling
+        }
+      }
+    } catch (error) {
+      // Silent error handling
+    }
+  }, [user?.id, session]);
+
+  // Load data when session is ready
+  useEffect(() => {
+    if (!authLoading && user?.id && session) {
+      // Load projects
+      loadUserProjects();
+      
+      // Load dashboard data
+      loadCurrentWeekMeetings();
+      loadUnclassifiedData();
+      
+      // Setup calendar sync
+      setupCalendarSyncIfNeeded();
+      
+      // Record activity
+      recordActivity('calendar_view');
+    }
+  }, [authLoading, user?.id, session, loadUserProjects, loadCurrentWeekMeetings, loadUnclassifiedData, setupCalendarSyncIfNeeded, recordActivity]);
+
+  // Check URL parameters for panel
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const panel = searchParams.get('panel');
+    if (panel === 'data') {
+      setActiveCenterPanel('data');
+    }
+  }, [location.search]);
+
+  // Helper functions
   const getDocumentType = (source: string, document: Document): VirtualEmailActivity['type'] => {
     if (source === 'email' || source === 'gmail') return 'email';
     
@@ -247,16 +252,6 @@ const Dashboard = () => {
     return 'document';
   };
 
-  // Check URL parameters for panel
-  useEffect(() => {
-    const searchParams = new URLSearchParams(location.search);
-    const panel = searchParams.get('panel');
-    if (panel === 'data') {
-      setActiveCenterPanel('data');
-    }
-  }, [location.search]);
-
-  // Meeting functions
   const handleMeetingUpdate = () => {
     loadCurrentWeekMeetings();
   };
@@ -375,51 +370,35 @@ const Dashboard = () => {
   const handleDeployWithConfiguration = async (configuration: any) => {
     if (meetingForConfig) {
       await sendBotToMeeting(meetingForConfig, configuration);
-      setConfigModalOpen(false);
-      setMeetingForConfig(null);
     }
+    setConfigModalOpen(false);
+    setMeetingForConfig(null);
   };
 
   const canSendBot = (meeting?: Meeting | null) => {
     if (!meeting) return false;
-    return meeting.meeting_url && 
-           (meeting.bot_status === 'pending') && 
-           !meeting.auto_scheduled_via_email &&
-           !sendingBot;
+    return !meeting.attendee_bot_id && meeting.meeting_url && meeting.event_status === 'accepted';
   };
 
   const handleProjectChange = async (meetingId: string, projectId: string) => {
     try {
       setUpdatingProject(meetingId);
       
-      // Use direct Supabase query instead of calendarService to avoid the polling_enabled error
-      const { error } = await supabase
+      await supabase
         .from('meetings')
-        .update({
-          project_id: projectId === 'none' ? null : projectId,
-          updated_at: new Date().toISOString(),
+        .update({ 
+          project_id: projectId,
+          updated_at: new Date().toISOString()
         })
         .eq('id', meetingId);
+
+      // Update local state
+      updateMeetingInState(meetingId, { project_id: projectId });
       
-      if (error) throw error;
-      
-      if (selectedMeeting && selectedMeeting.id === meetingId) {
-        setSelectedMeeting({
-          ...selectedMeeting,
-          project_id: projectId === 'none' ? undefined : projectId
-        });
-      }
-      
-      // Show success message if a project was assigned
-      if (projectId !== 'none') {
-        const projectName = projects.find(p => p.id === projectId)?.name;
-        toast({
-          title: "Meeting assigned successfully!",
-          description: `Meeting assigned to project: ${projectName}`,
-        });
-      }
-      
-      // Don't refresh the meetings list here - let it happen when modal closes
+      toast({
+        title: "Meeting assigned successfully!",
+        description: "The meeting has been assigned to the selected project.",
+      });
     } catch (error) {
       toast({
         title: "Failed to assign meeting",
@@ -431,25 +410,24 @@ const Dashboard = () => {
     }
   };
 
-  // Data functions
   const getTypeIcon = (type: VirtualEmailActivity['type']) => {
     switch (type) {
       case 'email':
-        return <Mail className="h-4 w-4" />;
+        return <Database className="w-4 h-4" />;
       case 'document':
-        return <FileText className="h-4 w-4" />;
+        return <Database className="w-4 h-4" />;
       case 'spreadsheet':
-        return <FileText className="h-4 w-4" />;
+        return <Database className="w-4 h-4" />;
       case 'presentation':
-        return <FileText className="h-4 w-4" />;
+        return <Database className="w-4 h-4" />;
       case 'image':
-        return <Image className="h-4 w-4" />;
+        return <Database className="w-4 h-4" />;
       case 'folder':
-        return <Folder className="h-4 w-4" />;
+        return <Database className="w-4 h-4" />;
       case 'meeting_transcript':
-        return <MessageSquare className="h-4 w-4" />;
+        return <Database className="w-4 h-4" />;
       default:
-        return <File className="h-4 w-4" />;
+        return <Database className="w-4 h-4" />;
     }
   };
 
@@ -468,59 +446,51 @@ const Dashboard = () => {
       case 'folder':
         return 'Folder';
       case 'meeting_transcript':
-        return 'Meeting Transcript';
+        return 'Transcript';
       default:
-        return 'File';
+        return 'Unknown';
     }
   };
 
   const formatTimeAgo = (dateString: string) => {
-    const date = new Date(dateString);
     const now = new Date();
-    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+    const date = new Date(dateString);
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
     
-    if (diffInHours < 1) return 'Just now';
-    if (diffInHours < 24) return `${diffInHours} hour${diffInHours > 1 ? 's' : ''} ago`;
-    
-    const diffInDays = Math.floor(diffInHours / 24);
-    if (diffInDays < 7) return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`;
-    
-    const diffInWeeks = Math.floor(diffInDays / 7);
-    return `${diffInWeeks} week${diffInWeeks > 1 ? 's' : ''} ago`;
+    if (diffInSeconds < 60) return 'just now';
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+    return `${Math.floor(diffInSeconds / 86400)}d ago`;
   };
 
   const handleClassify = async (activityId: string, projectId: string) => {
     try {
-      setUnclassifiedData(prevActivities => 
-        prevActivities.map(activity => 
-          activity.id === activityId 
-            ? { ...activity, project_id: projectId }
-            : activity
-        )
-      );
+      // Find the activity
+      const activity = unclassifiedData.find(a => a.id === activityId);
+      if (!activity) return;
 
-      const { error } = await supabase
+      // Update the document with the project ID
+      await supabase
         .from('documents')
-        .update({ project_id: projectId || null })
+        .update({ 
+          project_id: projectId,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', activityId);
 
-      if (error) {
-        setUnclassifiedData(prevActivities => 
-          prevActivities.map(activity => 
-            activity.id === activityId 
-              ? { ...activity, project_id: activity.project_id }
-              : activity
-          )
-        );
-      }
+      // Remove from unclassified data
+      setUnclassifiedData(prev => prev.filter(a => a.id !== activityId));
+      
+      toast({
+        title: "Item classified successfully!",
+        description: "The item has been assigned to the selected project.",
+      });
     } catch (error) {
-      setUnclassifiedData(prevActivities => 
-        prevActivities.map(activity => 
-          activity.id === activityId 
-            ? { ...activity, project_id: activity.project_id }
-            : activity
-        )
-      );
+      toast({
+        title: "Failed to classify item",
+        description: "Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -530,10 +500,10 @@ const Dashboard = () => {
     return tmp.textContent || tmp.innerText || '';
   };
 
+
+
   return (
     <div className="px-4 pt-12 pb-8 font-sans h-full flex flex-col">
-
-
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto scrollbar-hide">
         {/* Main Workspace (existing functionality) */}
@@ -546,8 +516,6 @@ const Dashboard = () => {
           projects={projects}
         />
 
-
-
         {/* Two Column Layout for Meetings and Data */}
         <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Current Week's Meetings */}
@@ -557,7 +525,7 @@ const Dashboard = () => {
                 <Clock className="w-4 h-4 mr-2" />
                 UNASSIGNED MEETINGS
               </CardTitle>
-                                  <span className="text-xs text-gray-500 font-mono">Action Required</span>
+              <span className="text-xs text-gray-500 font-mono">Action Required</span>
             </CardHeader>
             <CardContent className="space-y-2">
               {meetingsLoading ? (
@@ -649,7 +617,7 @@ const Dashboard = () => {
                 </div>
               ) : unclassifiedData.length === 0 ? (
                 <div className="text-sm text-gray-500 font-mono text-center py-4">
-                  No unclassified data found
+                  All data has been classified
                 </div>
               ) : (
                 <div className="max-h-[350px] overflow-y-auto scrollbar-hide space-y-3">
@@ -657,46 +625,48 @@ const Dashboard = () => {
                     <div 
                       key={activity.id} 
                       className="flex items-start space-x-3 p-3 rounded-md border border-stone-200 dark:border-zinc-700 hover:bg-stone-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
-                      onClick={(e) => {
-                        const target = e.target as HTMLElement;
-                        if (target.closest('.select-project-badge')) {
-                          e.stopPropagation();
-                          setClassificationActivity(activity);
-                          return;
-                        }
-                        
-                        if (activity.type === 'meeting_transcript' && activity.rawTranscript) {
-                          // Merge activity data with rawTranscript data for the modal
-                          const transcriptData = {
-                            ...activity.rawTranscript,
-                            project_id: activity.project_id,
-                            source: activity.source,
-                            bot_name: activity.rawTranscript.transcript_metadata?.bot_id || 'SunnyAI Notetaker'
-                          };
-                          setSelectedTranscript(transcriptData);
-                        } else if (activity.type === 'email') {
-                          setSelectedEmail(activity);
-                        } else {
-                          setSelectedDocument(activity as any);
-                        }
+                      onClick={() => {
+                                                 if (activity.type === 'meeting_transcript') {
+                           setSelectedTranscript(activity.rawTranscript);
+                         } else if (activity.type === 'email') {
+                           setSelectedEmail(activity);
+                         } else {
+                           setSelectedDocument(activity as any);
+                         }
                       }}
                     >
                       <div className="flex-shrink-0 w-2 h-2 bg-green-500 rounded-full mt-2"></div>
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-semibold font-mono text-[#4a5565] dark:text-zinc-200 truncate">
-                          {activity.title}
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="text-sm font-semibold font-mono text-[#4a5565] dark:text-zinc-200 truncate">
+                            {activity.title}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {getTypeIcon(activity.type)}
+                            <span className="text-xs text-gray-500 font-mono">
+                              {getTypeLabel(activity.type)}
+                            </span>
+                          </div>
                         </div>
-                        <div className="text-xs text-gray-500 font-mono mt-1">
-                          {formatTimeAgo(activity.created_at)} • {getTypeLabel(activity.type)}
+                        <div className="text-xs text-gray-500 font-mono mb-2">
+                          {formatTimeAgo(activity.created_at)} • {activity.source}
                         </div>
-                        <div className="flex items-center gap-2 mt-2">
-                          <Badge variant="outline" className="select-project-badge px-2 py-0.5 text-[10px] text-red-500 bg-red-50 dark:bg-red-950 uppercase font-mono cursor-pointer">
-                            Select Project
-                          </Badge>
-                          <Badge variant="outline" className="px-2 py-0.5 text-[10px] text-[#4a5565] dark:text-zinc-200 bg-stone-50 dark:bg-zinc-800 uppercase font-mono">
-                            {getTypeLabel(activity.type)}
-                          </Badge>
+                        <div className="text-xs text-gray-600 dark:text-zinc-300 line-clamp-2">
+                          {stripHtml(activity.summary)}
                         </div>
+                      </div>
+                      <div className="flex flex-col items-end space-y-1">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={e => {
+                            e.stopPropagation();
+                            setClassificationActivity(activity);
+                          }}
+                          className="text-xs"
+                        >
+                          Classify
+                        </Button>
                       </div>
                     </div>
                   ))}
@@ -707,179 +677,48 @@ const Dashboard = () => {
         </div>
       </div>
 
-      <UsernameSetupManager />
-
-      {/* Meeting Detail Dialog */}
-      <Dialog open={!!selectedMeeting} onOpenChange={(open) => {
-        if (!open) {
-          // When modal is closed, refresh the meetings list
-          // This ensures that meetings assigned to projects disappear from the dashboard
-          loadCurrentWeekMeetings();
-          setSelectedMeeting(null);
-        }
-      }}>
-        <DialogContent className="sm:max-w-[480px] bg-stone-100 dark:bg-zinc-800 border border-[#4a5565] dark:border-zinc-700 font-mono text-xs">
-          <DialogHeader>
-            <DialogTitle className="text-[#4a5565] dark:text-zinc-50 font-mono text-sm font-bold">
-              {selectedMeeting?.title}
-            </DialogTitle>
-            <DialogDescription className="text-gray-600 dark:text-gray-400 font-mono text-xs">
-              Meeting details and project association
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="bg-white dark:bg-zinc-700 rounded-lg p-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-gray-500" />
-                <span className="text-xs font-mono">
-                  {formatDate(selectedMeeting?.start_time || '')} - {formatDate(selectedMeeting?.end_time || '')}
-                </span>
-              </div>
-              
-              {selectedMeeting?.description && (
-                <div className="text-xs text-gray-600 dark:text-gray-400 font-mono">
-                  {stripHtml(selectedMeeting.description)}
-                </div>
-              )}
-
-              {selectedMeeting?.meeting_url && (
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-mono text-gray-600 dark:text-gray-400">Meeting URL:</span>
-                  <a 
-                    href={selectedMeeting.meeting_url} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-mono"
-                  >
-                    Join Meeting
-                  </a>
-                </div>
-              )}
-
-              <div className="flex items-center gap-2">
-                {selectedMeeting && getEventStatusBadge(selectedMeeting.event_status)}
-                {selectedMeeting?.bot_status && getBotStatusBadge(selectedMeeting)}
-              </div>
-            </div>
-
-            <div className="bg-white dark:bg-zinc-700 rounded-lg p-4 space-y-3">
-              <h3 className="text-xs font-bold text-[#4a5565] dark:text-zinc-50 font-mono">PROJECT ASSOCIATION</h3>
-              <div className="flex items-center gap-2">
-                <Select
-                  value={selectedMeeting?.project_id || 'none'}
-                  onValueChange={(value) => selectedMeeting && handleProjectChange(selectedMeeting.id, value)}
-                  disabled={updatingProject === selectedMeeting?.id}
-                >
-                  <SelectTrigger className="text-xs bg-white dark:bg-zinc-600 border border-[#4a5565] dark:border-zinc-600">
-                    <SelectValue>
-                      {selectedMeeting?.project_id && selectedMeeting.project_id !== 'none' 
-                        ? projects.find(p => p.id === selectedMeeting.project_id)?.name || 'Unknown Project'
-                        : 'No Project'
-                      }
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent className="bg-white dark:bg-zinc-700 border border-[#4a5565] dark:border-zinc-600">
-                    <SelectItem value="none">No Project</SelectItem>
-                    {projects.map((project) => (
-                      <SelectItem key={project.id} value={project.id}>
-                        {project.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {updatingProject === selectedMeeting?.id && (
-                  <div className="flex items-center gap-1 text-xs text-gray-500 font-mono">
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                    <span>Updating...</span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="flex space-x-2 pt-4">
-              {selectedMeeting && canSendBot(selectedMeeting) && (
-                <Button
-                  onClick={() => selectedMeeting && handleConfigureAndDeploy(selectedMeeting)}
-                  disabled={sendingBot === selectedMeeting?.id}
-                  size="sm"
-                  className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-mono text-xs"
-                >
-                  {sendingBot === selectedMeeting?.id ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      SENDING...
-                    </>
-                  ) : (
-                    <>
-                      <Calendar className="mr-2 h-4 w-4" />
-                      DEPLOY BOT
-                    </>
-                  )}
-                </Button>
-              )}
-              {selectedMeeting?.meeting_url && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => window.open(selectedMeeting.meeting_url, '_blank')}
-                  className="font-mono text-xs border border-[#4a5565] dark:border-zinc-700 bg-stone-100 dark:bg-zinc-800 text-[#4a5565] dark:text-zinc-50 hover:bg-stone-300 dark:hover:bg-zinc-700"
-                >
-                  Join Meeting
-                </Button>
-              )}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Bot Configuration Modal */}
+      {/* Modals */}
       <BotConfigurationModal
-        meeting={meetingForConfig}
         open={configModalOpen}
         onOpenChange={setConfigModalOpen}
         onDeploy={handleDeployWithConfiguration}
+        meeting={meetingForConfig}
         deploying={sendingBot === meetingForConfig?.id}
       />
 
-      {/* Transcript Modal */}
-      <TranscriptModal 
-        transcript={selectedTranscript} 
+      <ClassificationModal
+        isOpen={!!classificationActivity}
+        onClose={() => setClassificationActivity(null)}
+        activity={classificationActivity}
+        projects={projects}
+        onClassify={handleClassify}
+      />
+
+      <TranscriptModal
+        transcript={selectedTranscript}
         isOpen={!!selectedTranscript}
         onClose={() => setSelectedTranscript(null)}
         projects={projects}
         onProjectChange={handleClassify}
       />
 
-      {/* Email Modal */}
-      <EmailModal 
-        email={selectedEmail} 
+      <EmailModal
+        email={selectedEmail}
         isOpen={!!selectedEmail}
         onClose={() => setSelectedEmail(null)}
         projects={projects}
         onProjectChange={handleClassify}
       />
 
-      {/* Document Modal */}
-      <DocumentModal 
-        document={selectedDocument} 
+      <DocumentModal
+        document={selectedDocument}
         isOpen={!!selectedDocument}
         onClose={() => setSelectedDocument(null)}
         projects={projects}
         onProjectChange={handleClassify}
       />
-
-              {/* Classification Modal */}
-        <ClassificationModal 
-          activity={classificationActivity} 
-          projects={projects}
-          isOpen={!!classificationActivity}
-          onClose={() => setClassificationActivity(null)}
-          onClassify={handleClassify}
-        />
-
-      </div>
-    );
+    </div>
+  );
 };
 
 export default Dashboard; 

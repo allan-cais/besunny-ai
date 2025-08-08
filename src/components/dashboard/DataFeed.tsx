@@ -29,7 +29,7 @@ interface VirtualEmailActivity {
 }
 
 const DataFeed = () => {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const [activities, setActivities] = useState<VirtualEmailActivity[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,14 +44,14 @@ const DataFeed = () => {
   const [classificationActivity, setClassificationActivity] = useState<VirtualEmailActivity | null>(null);
 
   useEffect(() => {
-    if (user?.id) {
+    if (user?.id && session) {
       loadVirtualEmailActivity();
       loadProjects();
     }
-  }, [user?.id]);
+  }, [user?.id, session]);
 
   const loadProjects = async () => {
-    if (!user?.id) return;
+    if (!user?.id || !session) return;
     
     try {
       // Load all projects - don't filter by created_by to ensure we can see all projects
@@ -83,7 +83,7 @@ const DataFeed = () => {
 
 
   const loadVirtualEmailActivity = async () => {
-    if (!user?.id) return;
+    if (!user?.id || !session) return;
 
     try {
       setLoading(true);

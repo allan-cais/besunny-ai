@@ -20,6 +20,7 @@ export const gmailWatchService = {
   // Set up Gmail watch for a user
   async setupGmailWatch(userEmail: string): Promise<{ success: boolean; error?: string }> {
     try {
+
       const session = (await supabase.auth.getSession()).data.session;
       if (!session) throw new Error('Not authenticated');
 
@@ -48,13 +49,22 @@ export const gmailWatchService = {
   // Get Gmail watch status for a user
   async getGmailWatchStatus(userEmail: string): Promise<GmailWatchStatus> {
     try {
+
       const { data, error } = await supabase
         .from('gmail_watches')
         .select('is_active, expiration, history_id')
         .eq('user_email', userEmail)
         .single();
 
-      if (error || !data) {
+      if (error) {
+        // Handle 406 error (table not accessible) or other RLS issues
+        if (error.code === '406' || error.message?.includes('Not Acceptable')) {
+          return { isActive: false };
+        }
+        throw error;
+      }
+
+      if (!data) {
         return { isActive: false };
       }
 
@@ -148,18 +158,31 @@ export const gmailWatchService = {
   async renewGmailWatch(userEmail: string): Promise<{ success: boolean; error?: string }> {
     try {
       // First, stop the current watch
-      const { data: currentWatch } = await supabase
+      const { data: currentWatch, error: watchError } = await supabase
         .from('gmail_watches')
         .select('*')
         .eq('user_email', userEmail)
         .single();
 
+      // Handle RLS access issues gracefully
+      if (watchError) {
+        if (watchError.code === '406' || watchError.message?.includes('Not Acceptable')) {
+          // If we can't access the table, just try to set up a new watch
+          return await this.setupGmailWatch(userEmail);
+        }
+        throw watchError;
+      }
+
       if (currentWatch?.is_active) {
         // Stop the current watch (this would require a separate function)
-        await supabase
+        const { error: updateError } = await supabase
           .from('gmail_watches')
           .update({ is_active: false })
           .eq('user_email', userEmail);
+        
+        if (updateError && updateError.code !== '406') {
+          throw updateError;
+        }
       }
 
       // Set up a new watch

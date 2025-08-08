@@ -104,7 +104,6 @@ class EnhancedAdaptiveSyncStrategy {
     // Start background sync
     this.startBackgroundSync(userId);
     
-    console.log(`Enhanced adaptive sync initialized for user ${userId}`, { virtualEmailActivity });
   }
 
   /**
@@ -168,7 +167,6 @@ class EnhancedAdaptiveSyncStrategy {
   recordActivity(userId: string, activityType: 'app_load' | 'calendar_view' | 'meeting_create' | 'general' | 'virtual_email_detected'): void {
     const state = this.userStates.get(userId);
     if (!state) {
-      console.warn(`No sync state found for user ${userId}`);
       return;
     }
 
@@ -223,7 +221,6 @@ class EnhancedAdaptiveSyncStrategy {
         break;
     }
 
-    console.log(`Activity recorded for user ${userId}: ${activityType}`);
   }
 
   /**
@@ -249,7 +246,6 @@ class EnhancedAdaptiveSyncStrategy {
     if (state?.virtualEmailActivity) {
       state.virtualEmailActivity.recentActivity = false;
       this.adjustSyncStrategy(userId);
-      console.log(`Virtual email activity marked as inactive for user ${userId}`);
     }
   }
 
@@ -257,7 +253,6 @@ class EnhancedAdaptiveSyncStrategy {
    * Trigger immediate sync for a specific service
    */
   private async triggerImmediateSync(userId: string, service: 'calendar' | 'drive' | 'gmail' | 'attendee'): Promise<void> {
-    console.log(`Triggering immediate sync for user ${userId}, service: ${service}`);
     
     try {
       switch (service) {
@@ -321,14 +316,6 @@ class EnhancedAdaptiveSyncStrategy {
 
     // Restart sync interval with new timing
     this.restartSyncInterval(userId, newInterval);
-
-    console.log(`Sync strategy adjusted for user ${userId}:`, {
-      interval: newInterval,
-      active: isActive,
-      frequency: state.changeFrequency,
-      virtualEmailActivity: hasVirtualEmailActivity,
-      recentVirtualEmailDetection: hasRecentVirtualEmailDetection
-    });
   }
 
   /**
@@ -342,7 +329,6 @@ class EnhancedAdaptiveSyncStrategy {
     state.activityCount = 0;
     this.adjustSyncStrategy(userId);
 
-    console.log(`User ${userId} marked as inactive`);
   }
 
   /**
@@ -355,7 +341,6 @@ class EnhancedAdaptiveSyncStrategy {
     const interval = this.INTERVALS.BACKGROUND;
     this.restartSyncInterval(userId, interval);
 
-    console.log(`Background sync started for user ${userId} with ${interval}ms interval`);
   }
 
   /**
@@ -380,7 +365,6 @@ class EnhancedAdaptiveSyncStrategy {
     const state = this.userStates.get(userId);
     if (!state) return;
 
-    console.log(`Performing background sync for user ${userId}`);
 
     try {
       // Sync all services
@@ -404,7 +388,6 @@ class EnhancedAdaptiveSyncStrategy {
       // Update virtual email activity
       await this.updateVirtualEmailActivity(userId);
 
-      console.log(`Background sync completed for user ${userId}: ${changes} services had changes`);
     } catch (error) {
       console.error(`Background sync failed for user ${userId}:`, error);
     }
@@ -546,16 +529,66 @@ class EnhancedAdaptiveSyncStrategy {
   }
 
   /**
+   * Check if Gmail watches table is accessible
+   */
+  private async checkGmailWatchesAccess(): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('gmail_watches')
+        .select('id')
+        .limit(1);
+      
+      return !error || error.code !== '406';
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
    * Enhanced Gmail sync with virtual email detection
    */
   private async syncGmail(userId: string): Promise<EnhancedSyncResult> {
     try {
-      // Get user's Gmail watch status
-      const { data: gmailWatch } = await supabase
+      // Get user's Gmail watch status - filter by user's email to match RLS policy
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.email) {
+        return {
+          success: true,
+          type: 'gmail',
+          processed: 0,
+          created: 0,
+          updated: 0,
+          deleted: 0,
+          skipped: true,
+          virtualEmailsDetected: 0,
+          autoScheduledMeetings: 0,
+        };
+      }
+
+      const { data: gmailWatch, error: gmailWatchError } = await supabase
         .from('gmail_watches')
         .select('user_email')
+        .eq('user_email', user.email)
         .eq('is_active', true)
         .single();
+
+      // Handle RLS access issues gracefully
+      if (gmailWatchError) {
+        if (gmailWatchError.code === '406' || gmailWatchError.message?.includes('Not Acceptable')) {
+          return {
+            success: true,
+            type: 'gmail',
+            processed: 0,
+            created: 0,
+            updated: 0,
+            deleted: 0,
+            skipped: true,
+            virtualEmailsDetected: 0,
+            autoScheduledMeetings: 0,
+          };
+        }
+        throw gmailWatchError;
+      }
 
       if (!gmailWatch) {
         return {
@@ -708,7 +741,6 @@ class EnhancedAdaptiveSyncStrategy {
     // Remove state
     this.userStates.delete(userId);
 
-    console.log(`Enhanced sync stopped for user ${userId}`);
   }
 
   /**
