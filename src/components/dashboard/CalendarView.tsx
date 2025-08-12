@@ -145,13 +145,13 @@ const CalendarView: React.FC<CalendarViewProps> = ({
     return badge;
   };
 
-  const sendBotToMeeting = async (meeting: Meeting, configuration?: any) => {
+  const sendBotToMeeting = async (meeting: Meeting, configuration?: Record<string, unknown>) => {
     if (!meeting.meeting_url) return;
     try {
       setSendingBot(meeting.id);
       
       // Build basic bot options - only essential configuration
-      const botOptions: any = {
+      const botOptions: Record<string, unknown> = {
         // Basic required fields
         meeting_url: meeting.meeting_url,
         bot_name: configuration?.bot_name || meeting.bot_name || 'Sunny AI Assistant',
@@ -234,8 +234,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({
       }
       
       onMeetingUpdate();
-    } catch (err: any) {
-      console.error('Error sending bot to meeting:', err);
+    } catch (err: unknown) {
+      // Error sending bot to meeting
       // Handle error silently
     } finally {
       setSendingBot(null);
@@ -247,7 +247,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
     setConfigModalOpen(true);
   };
 
-  const handleDeployWithConfiguration = async (configuration: any) => {
+  const handleDeployWithConfiguration = async (configuration: Record<string, unknown>) => {
     if (meetingForConfig) {
       await sendBotToMeeting(meetingForConfig, configuration);
       setConfigModalOpen(false);

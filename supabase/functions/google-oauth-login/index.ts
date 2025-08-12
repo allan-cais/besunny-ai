@@ -189,7 +189,7 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('Google OAuth login error:', error)
+    // Google OAuth login error
     
     const errorResponse = {
       success: false,

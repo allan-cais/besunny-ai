@@ -6,7 +6,7 @@ import { Users, MessageSquare, Clock, TrendingUp } from 'lucide-react';
 
 interface ParticipantAnalyticsProps {
   participants: string[];
-  segments: any[];
+  segments: Record<string, unknown>[];
   duration: number;
 }
 

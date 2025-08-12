@@ -41,7 +41,7 @@ export const gmailWatchService = {
 
       return { success: true };
     } catch (error) {
-      console.error('Error setting up Gmail watch:', error);
+      // Error setting up Gmail watch
       return { success: false, error: error.message || 'Failed to setup Gmail watch' };
     }
   },
@@ -74,7 +74,7 @@ export const gmailWatchService = {
         historyId: data.history_id,
       };
     } catch (error) {
-      console.error('Error getting Gmail watch status:', error);
+      // Error getting Gmail watch status
       return { isActive: false };
     }
   },
@@ -91,7 +91,7 @@ export const gmailWatchService = {
       if (error) throw error;
       return data || [];
     } catch (error) {
-      console.error('Error getting virtual email detections:', error);
+      // Error getting virtual email detections
       return [];
     }
   },
@@ -112,47 +112,12 @@ export const gmailWatchService = {
 
       return `ai+${data.username}@besunny.ai`;
     } catch (error) {
-      console.error('Error getting user virtual email:', error);
+      // Error getting user virtual email
       return null;
     }
   },
 
-  // Test virtual email detection by polling Gmail
-  async testVirtualEmailDetection(): Promise<{ success: boolean; error?: string }> {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user?.email) {
-        return { success: false, error: 'No user email found' };
-      }
-
-      const session = (await supabase.auth.getSession()).data.session;
-      if (!session) throw new Error('Not authenticated');
-
-      // Poll Gmail for new messages
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/gmail-polling-service`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ userEmail: user.email }),
-      });
-
-      const result = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to poll Gmail');
-      }
-
-      return { 
-        success: true,
-        message: `Polled ${result.processed} messages, found ${result.detections} virtual emails${result.skipped ? ' (skipped due to recent webhook)' : ''}`
-      };
-    } catch (error) {
-      console.error('Error testing virtual email detection:', error);
-      return { success: false, error: error.message || 'Failed to test virtual email detection' };
-    }
-  },
+  // Test virtual email detection function removed for production
 
   // Renew Gmail watch (called when watch is about to expire)
   async renewGmailWatch(userEmail: string): Promise<{ success: boolean; error?: string }> {
@@ -188,7 +153,7 @@ export const gmailWatchService = {
       // Set up a new watch
       return await this.setupGmailWatch(userEmail);
     } catch (error) {
-      console.error('Error renewing Gmail watch:', error);
+      // Error renewing Gmail watch
       return { success: false, error: error.message || 'Failed to renew Gmail watch' };
     }
   },
@@ -225,7 +190,7 @@ export const gmailWatchService = {
         byType,
       };
     } catch (error) {
-      console.error('Error getting virtual email stats:', error);
+      // Error getting virtual email stats
       return {
         totalDetections: 0,
         recentDetections: 0,

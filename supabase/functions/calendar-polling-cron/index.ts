@@ -31,7 +31,7 @@ async function pollCalendarForUser(userId: string): Promise<{ processed: number;
       skipped: result.skipped || false,
     };
   } catch (error) {
-    console.error(`Error polling calendar for user ${userId}:`, error);
+          // Error polling calendar for user
     return { processed: 0, created: 0, updated: 0, deleted: 0, skipped: false };
   }
 }
@@ -49,7 +49,7 @@ serve(async (req) => {
   }
 
   try {
-    console.log('Starting calendar polling cron job...');
+    // Starting calendar polling cron job
 
     // Get all active calendar webhooks
     const { data: activeWebhooks, error } = await supabase
@@ -63,7 +63,7 @@ serve(async (req) => {
     }
 
     if (!activeWebhooks || activeWebhooks.length === 0) {
-      console.log('No active calendar webhooks found');
+      // No active calendar webhooks found
       return new Response(JSON.stringify({
         success: true,
         message: 'No active calendar webhooks found',
@@ -77,7 +77,7 @@ serve(async (req) => {
       });
     }
 
-    console.log(`Found ${activeWebhooks.length} active calendar webhooks`);
+    // Found active calendar webhooks
 
     let totalProcessed = 0;
     let totalCreated = 0;
@@ -108,7 +108,7 @@ serve(async (req) => {
         // Small delay to avoid rate limiting
         await new Promise(resolve => setTimeout(resolve, 100));
       } catch (error) {
-        console.error(`Failed to poll calendar for user ${webhook.user_id}:`, error);
+        // Failed to poll calendar for user
         results.push({
           user_id: webhook.user_id,
           error: error.message,
@@ -116,7 +116,7 @@ serve(async (req) => {
       }
     }
 
-    console.log(`Calendar polling completed: ${totalProcessed} events processed, ${totalCreated} created, ${totalUpdated} updated, ${totalDeleted} deleted, ${totalSkipped} skipped`);
+    // Calendar polling completed
 
     return new Response(JSON.stringify({
       success: true,
@@ -133,7 +133,7 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('Calendar polling cron job error:', error);
+    // Calendar polling cron job error
     return new Response(JSON.stringify({ 
       error: error.message || 'Failed to run calendar polling cron job' 
     }), {

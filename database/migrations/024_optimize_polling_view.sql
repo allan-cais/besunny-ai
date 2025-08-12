@@ -37,13 +37,4 @@ WHERE m.polling_enabled = TRUE
 -- Grant select permissions on the view
 GRANT SELECT ON polling_status TO authenticated;
 
--- Test the view to see what meetings it now shows
-SELECT 
-  id,
-  title,
-  bot_status,
-  polling_enabled,
-  transcript_retrieved_at,
-  polling_status
-FROM polling_status 
-ORDER BY bot_status, next_poll_at; 
+-- View created successfully 

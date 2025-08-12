@@ -156,7 +156,7 @@ const IntegrationsPage: React.FC = () => {
         setGoogleStatus({ connected: false });
       }
     } catch (error) {
-      console.error('Error loading Google status:', error);
+      // Error loading Google status
       setError('Failed to load Google integration status');
       setGoogleStatus({ connected: false });
     } finally {
@@ -273,10 +273,10 @@ const IntegrationsPage: React.FC = () => {
           
           if (syncResult.success) {
           } else {
-            console.error('Calendar sync setup failed:', syncResult.error);
+            // Calendar sync setup failed
           }
         } catch (syncError) {
-          console.error('Calendar sync setup failed:', syncError);
+          // Calendar sync setup failed
           // Continue anyway - sync can be set up later
         }
         // Remove code/state from URL to prevent re-triggering
@@ -289,7 +289,7 @@ const IntegrationsPage: React.FC = () => {
     } catch (error) {
       setError(error.message || 'Failed to complete OAuth process');
       setSuccess(null);
-      console.error('OAuth callback error:', error);
+              // OAuth callback error
     } finally {
       setConnecting(false);
     }
@@ -364,7 +364,7 @@ const IntegrationsPage: React.FC = () => {
       setSuccess('Successfully disconnected from Google and cleaned up calendar data');
       setTimeout(() => setSuccess(null), 3000);
     } catch (error) {
-      console.error('Disconnect error:', error);
+      // Disconnect error
       setError(error.message || 'Failed to disconnect from Google');
     } finally {
       setDisconnecting(false);

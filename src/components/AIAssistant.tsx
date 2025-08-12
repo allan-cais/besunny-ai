@@ -95,7 +95,7 @@ const AIAssistant = ({
       }
       setMessages(loadedMessages);
     } catch (error) {
-      console.error('Error loading messages:', error);
+      // Error loading messages
       setMessages([{
         id: crypto.randomUUID(),
         session_id: chatId,
@@ -140,7 +140,7 @@ const AIAssistant = ({
       }));
       await saveMessages(messagesToSave);
     } catch (error) {
-      console.error('Error saving messages:', error);
+      // Error saving messages
     }
   };
 
@@ -182,7 +182,7 @@ const AIAssistant = ({
         try {
           await updateChatSession(activeChatId, { name: chatName });
         } catch (err) {
-          console.error('Failed to update chat name:', err);
+          // Failed to update chat name
         }
       }
       
@@ -210,7 +210,7 @@ const AIAssistant = ({
         
         if (!webhookResponse.ok) {
           const errorText = await webhookResponse.text();
-          console.error('N8N webhook error:', webhookResponse.status, webhookResponse.statusText, errorText);
+          // N8N webhook error
         } else {
           const responseText = await webhookResponse.text();
           // Parse the assistant's reply from n8n
@@ -234,7 +234,7 @@ const AIAssistant = ({
         }
         
       } catch (error) {
-        console.error('Error processing message:', error);
+        // Error processing message
         // Add error message to chat
         const errorMessage: ChatMessage = {
           id: crypto.randomUUID(),

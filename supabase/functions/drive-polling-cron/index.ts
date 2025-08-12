@@ -30,7 +30,7 @@ async function pollDriveForFile(fileId: string, documentId: string): Promise<{ p
       error: result.error,
     };
   } catch (error) {
-    console.error(`Error polling drive for file ${fileId}:`, error);
+          // Error polling drive for file
     return { processed: false, error: error.message, skipped: false };
   }
 }
@@ -48,7 +48,7 @@ serve(async (req) => {
   }
 
   try {
-    console.log('Starting drive polling cron job...');
+    // Starting drive polling cron job
 
     // Get all active drive file watches
     const { data: activeWatches, error } = await supabase
@@ -61,7 +61,7 @@ serve(async (req) => {
     }
 
     if (!activeWatches || activeWatches.length === 0) {
-      console.log('No active drive file watches found');
+      // No active drive file watches found
       return new Response(JSON.stringify({
         success: true,
         message: 'No active drive file watches found',
@@ -74,7 +74,7 @@ serve(async (req) => {
       });
     }
 
-    console.log(`Found ${activeWatches.length} active drive file watches`);
+    // Found active drive file watches
 
     let totalProcessed = 0;
     let totalActions = 0;
@@ -101,7 +101,7 @@ serve(async (req) => {
         // Small delay to avoid rate limiting
         await new Promise(resolve => setTimeout(resolve, 100));
       } catch (error) {
-        console.error(`Failed to poll drive for file ${watch.file_id}:`, error);
+        // Failed to poll drive for file
         results.push({
           file_id: watch.file_id,
           document_id: watch.document_id,
@@ -110,7 +110,7 @@ serve(async (req) => {
       }
     }
 
-    console.log(`Drive polling completed: ${totalProcessed} files processed, ${totalActions} actions taken, ${totalSkipped} skipped`);
+    // Drive polling completed
 
     return new Response(JSON.stringify({
       success: true,
@@ -125,7 +125,7 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('Drive polling cron job error:', error);
+    // Drive polling cron job error
     return new Response(JSON.stringify({ 
       error: error.message || 'Failed to run drive polling cron job' 
     }), {

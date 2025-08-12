@@ -82,7 +82,7 @@ const OAuthLoginCallback: React.FC = () => {
                 setMessage('Calendar sync configured! Setting up Gmail watch...');
               }
             } else {
-              console.error('Calendar sync failed:', syncResult.error);
+              // Calendar sync failed
               setMessage('Calendar sync failed, but authentication successful. Setting up Gmail watch...');
             }
             
@@ -96,14 +96,14 @@ const OAuthLoginCallback: React.FC = () => {
                   setMessage('Calendar sync configured! Gmail watch can be set up later. Redirecting...');
                 }
               } catch (gmailError) {
-                console.warn('Gmail watch setup failed:', gmailError);
+                // Gmail watch setup failed
                 setMessage('Calendar sync configured! Gmail watch can be set up later. Redirecting...');
               }
             } else {
               setMessage('Calendar sync configured! Gmail watch can be set up later. Redirecting...');
             }
           } catch (syncError) {
-            console.error('Google services setup failed:', syncError);
+            // Google services setup failed
             // Continue anyway - services can be set up later
             setMessage('Authentication successful! Services can be configured later. Redirecting...');
           }
@@ -114,7 +114,7 @@ const OAuthLoginCallback: React.FC = () => {
           throw new Error(result.message || 'Authentication failed');
         }
       } catch (error) {
-        console.error('OAuth login error:', error);
+        // OAuth login error
         setStatus('error');
         setMessage(error.message || 'Authentication failed');
         setTimeout(() => navigate('/auth'), 3000);

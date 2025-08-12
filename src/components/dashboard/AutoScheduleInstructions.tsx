@@ -32,7 +32,7 @@ const AutoScheduleInstructions: React.FC = () => {
       const email = await virtualEmailBotScheduling.getUserVirtualEmail(user!.id);
       setVirtualEmail(email);
     } catch (error) {
-      console.error('Error loading virtual email:', error);
+      // Error loading virtual email
     } finally {
       setLoading(false);
     }
@@ -44,7 +44,7 @@ const AutoScheduleInstructions: React.FC = () => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
-      console.error('Failed to copy:', error);
+      // Failed to copy
     }
   };
 

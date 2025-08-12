@@ -15,7 +15,7 @@ class AttendeePollingServiceImpl implements AttendeePollingService {
     try {
       return await attendeeService.pollAllMeetings();
     } catch (error) {
-      console.error('Error polling meetings:', error);
+      // Error polling meetings
       return [];
     }
   }

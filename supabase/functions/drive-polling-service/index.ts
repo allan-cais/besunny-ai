@@ -94,7 +94,7 @@ async function getAccessToken(jwt: string): Promise<string> {
 // Handle file deletion
 async function handleFileDeletion(documentId: string, projectId: string, fileId: string): Promise<void> {
   try {
-    console.log(`Handling file deletion for document ${documentId}, file ${fileId}`);
+    // Handling file deletion for document
     
     // Update document status
     await supabase
@@ -118,9 +118,9 @@ async function handleFileDeletion(documentId: string, projectId: string, fileId:
     // Send to n8n for cleanup
     await sendToN8nWebhook(documentId, projectId, fileId, 'deleted');
     
-    console.log(`Successfully handled file deletion for document ${documentId}`);
+    // Successfully handled file deletion for document
   } catch (error) {
-    console.error(`Error handling file deletion for document ${documentId}:`, error);
+          // Error handling file deletion for document
     throw error;
   }
 }
@@ -130,7 +130,7 @@ async function sendToN8nWebhook(documentId: string, projectId: string, fileId: s
   try {
     const n8nWebhookUrl = Deno.env.get('N8N_WEBHOOK_URL');
     if (!n8nWebhookUrl) {
-      console.log('No N8N webhook URL configured, skipping n8n notification');
+      // No N8N webhook URL configured, skipping n8n notification
       return false;
     }
 
@@ -155,10 +155,10 @@ async function sendToN8nWebhook(documentId: string, projectId: string, fileId: s
       throw new Error(`N8N webhook failed: ${response.status} ${response.statusText}`);
     }
 
-    console.log(`Successfully sent to n8n webhook for document ${documentId}, action: ${action}`);
+    // Successfully sent to n8n webhook for document
     return true;
   } catch (error) {
-    console.error(`Error sending to n8n webhook for document ${documentId}:`, error);
+          // Error sending to n8n webhook for document
     return false;
   }
 }
@@ -207,7 +207,7 @@ async function checkFileChanges(fileId: string, accessToken: string): Promise<{ 
 
     return { changed: false, metadata: fileMetadata };
   } catch (error) {
-    console.error(`Error checking file changes for ${fileId}:`, error);
+          // Error checking file changes for file
     throw error;
   }
 }
@@ -224,7 +224,7 @@ async function pollDriveForFile(fileId: string, documentId: string): Promise<{ p
       .single();
     
     if (!watchStatus) {
-      console.log(`No active drive watch found for file ${fileId}`);
+      // No active drive watch found for file
       return { processed: false, skipped: true };
     }
     
@@ -234,7 +234,7 @@ async function pollDriveForFile(fileId: string, documentId: string): Promise<{ p
       const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000);
       
       if (lastWebhookTime > sixHoursAgo) {
-        console.log(`Skipping polling for file ${fileId} - webhook received recently at ${lastWebhookTime.toISOString()}`);
+        // Skipping polling for file - webhook received recently
         return { processed: false, skipped: true };
       }
     }
@@ -252,7 +252,7 @@ async function pollDriveForFile(fileId: string, documentId: string): Promise<{ p
     const changeResult = await checkFileChanges(fileId, accessToken);
     
     if (!changeResult.changed) {
-      console.log(`No changes detected for file ${fileId}`);
+      // No changes detected for file
       
       // Update last poll time
       await supabase
@@ -263,7 +263,7 @@ async function pollDriveForFile(fileId: string, documentId: string): Promise<{ p
       return { processed: true, skipped: false };
     }
     
-    console.log(`Changes detected for file ${fileId}, action: ${changeResult.action}`);
+    // Changes detected for file
     
     // Handle the change
     if (changeResult.action === 'deleted') {
@@ -298,11 +298,11 @@ async function pollDriveForFile(fileId: string, documentId: string): Promise<{ p
       })
     });
     
-    console.log(`Drive polling completed for file ${fileId}: ${changeResult.action}`);
+    // Drive polling completed for file
     
     return { processed: true, action: changeResult.action, skipped: false };
   } catch (error) {
-    console.error(`Error polling drive for file ${fileId}:`, error);
+          // Error polling drive for file
     
     // Log the error
     await supabase.rpc('log_drive_polling_activity', {
@@ -338,11 +338,11 @@ serve(async (req) => {
       });
     }
 
-    console.log(`Starting drive polling for file: ${fileId}, document: ${documentId}`);
+    // Starting drive polling for file
 
     const result = await pollDriveForFile(fileId, documentId);
 
-    console.log(`Drive polling completed for file ${fileId}:`, result);
+    // Drive polling completed for file
 
     return new Response(JSON.stringify({
       success: true,
@@ -354,7 +354,7 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('Drive polling service error:', error);
+    // Drive polling service error
     return new Response(JSON.stringify({ 
       error: error.message || 'Failed to run drive polling service' 
     }), {

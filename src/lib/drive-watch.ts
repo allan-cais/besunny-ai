@@ -48,7 +48,7 @@ export async function subscribeToGoogleDriveFile(
     
     return result;
   } catch (error) {
-    console.error('Error subscribing to Google Drive file:', error);
+          // Error subscribing to Google Drive file
     return {
       success: false,
       message: `Failed to subscribe to file: ${error.message}`,
@@ -57,12 +57,12 @@ export async function subscribeToGoogleDriveFile(
 }
 
 // Check if a document has an active Google Drive watch
-export function hasActiveDriveWatch(document: any): boolean {
+export function hasActiveDriveWatch(document: Document): boolean {
   return document.file_id && document.watch_active === true;
 }
 
 // Get the appropriate status badge for a document
-export function getDocumentStatusBadge(document: any) {
+export function getDocumentStatusBadge(document: Document) {
   if (!document.file_id) {
     return { label: 'No Drive Link', variant: 'secondary' as const };
   }
@@ -103,7 +103,7 @@ export function useDriveWatch() {
       
       return { success: true, message: 'Unsubscribed from file changes' };
     } catch (error) {
-      console.error('Error unsubscribing from file:', error);
+      // Error unsubscribing from file
       return {
         success: false,
         message: `Failed to unsubscribe: ${error.message}`,

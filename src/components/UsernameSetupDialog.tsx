@@ -113,7 +113,7 @@ const UsernameSetupDialog: React.FC<UsernameSetupDialogProps> = ({ open, onClose
 
       onClose();
     } catch (error) {
-      console.error('Error setting username:', error);
+      // Error setting username
       toast({
         title: 'Error',
         description: error.message || 'Failed to set username',
@@ -136,7 +136,7 @@ const UsernameSetupDialog: React.FC<UsernameSetupDialogProps> = ({ open, onClose
       });
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
-      console.error('Failed to copy:', error);
+      // Failed to copy
     }
   };
 

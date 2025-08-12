@@ -23,7 +23,7 @@ const DashboardLayout = () => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   // const [isChatSidebarCollapsed, setIsChatSidebarCollapsed] = useState(true); // REMOVED: Now project-specific
   // const [chats, setChats] = useState<DashboardChatSession[]>([]); // REMOVED: Now project-specific
-  const [projects, setProjects] = useState<any[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   // const [activeChatId, setActiveChatId] = useState<string | null>(null); // REMOVED: Now project-specific
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [createProjectDialogOpen, setCreateProjectDialogOpen] = useState(false);
@@ -46,7 +46,7 @@ const DashboardLayout = () => {
       const userProjects = await getProjectsForUser(user.id);
       setProjects(userProjects);
     } catch (error) {
-      console.error('Error loading user projects:', error);
+      // Error loading user projects
     }
   };
 
@@ -75,7 +75,7 @@ const DashboardLayout = () => {
         setActiveProjectId(dashboardChats[0].id);
       }
     } catch (error) {
-      console.error('Error loading chat sessions:', error);
+      // Error loading chat sessions
     }
   };
 
@@ -137,7 +137,7 @@ const DashboardLayout = () => {
       // setChats(prev => [newChat, ...prev]); // REMOVED: Now project-specific
       setActiveProjectId(newChat.id);
     } catch (error) {
-      console.error('Error creating chat session:', error);
+      // Error creating chat session
     }
   };
 
@@ -147,7 +147,7 @@ const DashboardLayout = () => {
       await updateChatSession(chatId, { name: newTitle });
       // setChats(prev => prev.map(chat => chat.id === chatId ? { ...chat, title: newTitle } : chat)); // REMOVED: Now project-specific
     } catch (error) {
-      console.error('Error renaming chat session:', error);
+      // Error renaming chat session
     }
   };
 
@@ -160,7 +160,7 @@ const DashboardLayout = () => {
         setActiveProjectId(projects.length > 1 ? projects[0].id : null);
       }
     } catch (error) {
-      console.error('Error deleting chat session:', error);
+      // Error deleting chat session
     }
   };
 
@@ -175,7 +175,7 @@ const DashboardLayout = () => {
     navigate(`/project/${projectId}`);
   };
 
-  const handleProjectCreated = (newProject: any) => {
+  const handleProjectCreated = (newProject: Project) => {
     setProjects(prev => [newProject, ...prev]);
     setActiveProjectId(newProject.id);
     // Navigate to the new project
@@ -238,7 +238,7 @@ const DashboardLayout = () => {
           : project
       ));
     } catch (error) {
-      console.error('Error renaming project:', error);
+      // Error renaming project
     }
   };
 

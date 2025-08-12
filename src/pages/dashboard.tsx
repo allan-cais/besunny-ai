@@ -13,34 +13,19 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Clock, Database, Bot, Video, Loader2 } from 'lucide-react';
-import { Meeting } from '@/lib/calendar';
-import { Document } from '@/lib/supabase';
+import type { Project, VirtualEmailActivity, TranscriptMetadata, BotConfiguration, Document, Meeting } from '@/types';
 import BotConfigurationModal from '@/components/dashboard/BotConfigurationModal';
 import ClassificationModal from '@/components/dashboard/ClassificationModal';
 import TranscriptModal from '@/components/dashboard/TranscriptModal';
 import EmailModal from '@/components/dashboard/EmailModal';
 import DocumentModal from '@/components/dashboard/DocumentModal';
 
-interface VirtualEmailActivity {
-  id: string;
-  type: 'email' | 'document' | 'spreadsheet' | 'presentation' | 'image' | 'folder' | 'meeting_transcript';
-  title: string;
-  summary: string;
-  source: string;
-  sender?: string;
-  file_size?: string;
-  created_at: string;
-  processed: boolean;
-  project_id?: string;
-  transcript_duration_seconds?: number;
-  transcript_metadata?: any;
-  rawTranscript?: any;
-}
+// VirtualEmailActivity interface is now imported from types
 
 const Dashboard = () => {
   const { user, session, loading: authLoading } = useAuth();
   const { getProjectsForUser } = useSupabase();
-  const [projects, setProjects] = useState<any[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [activeCenterPanel, setActiveCenterPanel] = useState('');
   const [activeFeedItemId, setActiveFeedItemId] = useState<string | null>(null);
@@ -60,8 +45,8 @@ const Dashboard = () => {
   const [updatingProject, setUpdatingProject] = useState<string | null>(null);
 
   // Modal states for data
-  const [selectedTranscript, setSelectedTranscript] = useState<any>(null);
-  const [selectedEmail, setSelectedEmail] = useState<any>(null);
+  const [selectedTranscript, setSelectedTranscript] = useState<Meeting | null>(null);
+  const [selectedEmail, setSelectedEmail] = useState<Document | null>(null);
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
   const [classificationActivity, setClassificationActivity] = useState<VirtualEmailActivity | null>(null);
 
@@ -113,7 +98,7 @@ const Dashboard = () => {
       setMeetingsLoading(true);
       const meetings = await calendarService.getCurrentWeekMeetings(session);
       setCurrentWeekMeetings(meetings);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setCurrentWeekMeetings([]);
     } finally {
       setMeetingsLoading(false);
@@ -627,11 +612,58 @@ const Dashboard = () => {
                       className="flex items-start space-x-3 p-3 rounded-md border border-stone-200 dark:border-zinc-700 hover:bg-stone-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
                       onClick={() => {
                         if (activity.type === 'meeting_transcript') {
-                          setSelectedTranscript(activity.rawTranscript);
+                          // Transform RawTranscript to Meeting format for TranscriptModal
+                          const meetingData: Meeting = {
+                            id: activity.rawTranscript?.id || activity.id,
+                            title: activity.title,
+                            description: activity.summary,
+                            start_time: new Date().toISOString(), // Default value
+                            end_time: new Date().toISOString(), // Default value
+                            meeting_url: '',
+                            user_id: user?.id || '',
+                            project_id: activity.project_id,
+                            bot_status: 'completed',
+                            transcript: activity.rawTranscript?.transcript || '',
+                            transcript_retrieved_at: activity.rawTranscript?.transcript_retrieved_at || activity.created_at,
+                            transcript_duration_seconds: activity.rawTranscript?.transcript_duration_seconds || activity.transcript_duration_seconds,
+                            transcript_metadata: activity.rawTranscript?.transcript_metadata || activity.transcript_metadata,
+                            created_at: activity.created_at,
+                            updated_at: activity.created_at,
+                            event_status: 'accepted'
+                          };
+                          setSelectedTranscript(meetingData);
                         } else if (activity.type === 'email') {
-                          setSelectedEmail(activity);
+                          // Transform VirtualEmailActivity to Document format for EmailModal
+                          const documentData: Document = {
+                            id: activity.id,
+                            title: activity.title,
+                            summary: activity.summary,
+                            source: activity.source,
+                            type: activity.type,
+                            author: activity.sender,
+                            file_size: activity.file_size,
+                            project_id: activity.project_id,
+                            created_at: activity.created_at,
+                            updated_at: activity.created_at, // Use created_at as fallback
+                            received_at: activity.created_at
+                          };
+                          setSelectedEmail(documentData);
                         } else {
-                          setSelectedDocument(activity as any);
+                          // Transform VirtualEmailActivity to Document format for DocumentModal
+                          const documentData: Document = {
+                            id: activity.id,
+                            title: activity.title,
+                            summary: activity.summary,
+                            source: activity.source,
+                            type: activity.type,
+                            author: activity.sender,
+                            file_size: activity.file_size,
+                            project_id: activity.project_id,
+                            created_at: activity.created_at,
+                            updated_at: activity.created_at, // Use created_at as fallback
+                            received_at: activity.created_at
+                          };
+                          setSelectedDocument(documentData);
                         }
                       }}
                     >

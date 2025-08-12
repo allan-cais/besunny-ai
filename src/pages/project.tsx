@@ -5,8 +5,9 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { supabaseService, Project, supabase } from '@/lib/supabase';
+import { supabaseService, supabase } from '@/lib/supabase';
 import { useSupabase } from '@/hooks/use-supabase';
+import type { Project, Meeting, Document, PersonData } from '@/types';
 import ProjectMeetingsCard from '@/components/dashboard/ProjectMeetingsCard';
 import PageHeader from '@/components/dashboard/PageHeader';
 import { Loader2, Brain, Tag, Users, MapPin, Calendar, FileText, Building, Clock, Database } from 'lucide-react';
@@ -22,38 +23,16 @@ const colorMap = {
   yellow: 'bg-yellow-300',
 };
 
-const mockData = {
-  decisionQueue: [
-    { role: 'EP', label: 'approve permit (blocks call sheet)', time: '17:00', tag: 'PRE' },
-    { role: 'Client', label: 'countersign SOW', time: '18:00', tag: 'ADM' },
-    { role: 'Director', label: 'lock storyboard', time: '09:00 tomorrow', tag: 'CRE' },
-    { role: 'AP', label: 'raise invoice #146', time: '12:00 tomorrow', tag: 'ADM' },
-  ],
-  adminAlerts: [
-    { text: 'W-9 missing', detail: '1st AC  due today' },
-    { text: 'Invoice #145', detail: '$25 000  overdue today' },
-  ],
-  riskLog: [
-    { color: 'red', text: 'Weather 70% rain 12 May' },
-    { color: 'orange', text: 'Budget trending +12%' },
-    { color: 'yellow', text: 'Talent clash 12 May' },
-  ],
-  commStream: [
-    { role: 'Client', item: 'Rough Cut V4', time: '10:42', note: 'Logo must hold 3s' },
-    { role: 'Director', item: 'Shot 17B', time: '09:15', note: 'Additional camera setup requested for Shot 17B to provide better coverage' },
-  ],
-};
+// Mock data removed - will be replaced with real data from API
 
 interface ExtendedProject extends Project {
   normalized_tags?: string[];
   categories?: string[];
   reference_keywords?: string[];
   notes?: string;
-  entity_patterns?: Record<string, unknown>;
-  classification_signals?: Record<string, unknown>;
-  pinecone_document_count?: number;
-  last_classification_at?: string | null;
-  classification_feedback?: Record<string, unknown>;
+  // entity_patterns and classification_signals are now properly typed from Project interface
+  // pinecone_document_count and last_classification_at are now properly typed from Project interface
+  // classification_feedback is now properly typed from Project interface
 }
 
 interface ProjectMeeting {
@@ -67,11 +46,12 @@ interface ProjectMeeting {
   notes?: string;
   meeting_url?: string;
   transcript_url?: string;
-  transcript?: string;
+  transcript: string;
   transcript_summary?: string;
   transcript_metadata?: Record<string, unknown>;
   transcript_duration_seconds?: number;
   transcript_retrieved_at?: string;
+  project_id?: string;
 }
 
 interface ProjectData {
@@ -81,12 +61,22 @@ interface ProjectData {
   created_at: string;
   status: string;
   size?: string;
-  source?: string;
+  source: string;
   content?: string;
-  summary?: string;
+  summary: string;
   sender?: string;
   file_size?: string;
   project_id?: string;
+  subject?: string;
+  body?: string;
+  recipients?: string[];
+  cc?: string[];
+  bcc?: string[];
+  attachments?: Array<{
+    name: string;
+    size: string;
+    type: string;
+  }>;
 }
 
 const ProjectDashboard = () => {
@@ -99,12 +89,9 @@ const ProjectDashboard = () => {
   const [projectData, setProjectData] = useState<ProjectData[]>([]);
   const [meetingsLoading, setMeetingsLoading] = useState(true);
   const [dataLoading, setDataLoading] = useState(true);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [selectedTranscript, setSelectedTranscript] = useState<any>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [selectedEmail, setSelectedEmail] = useState<any>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [selectedDocument, setSelectedDocument] = useState<any>(null);
+  const [selectedTranscript, setSelectedTranscript] = useState<ProjectMeeting | null>(null);
+  const [selectedEmail, setSelectedEmail] = useState<ProjectData | null>(null);
+  const [selectedDocument, setSelectedDocument] = useState<ProjectData | null>(null);
   const [selectedMeeting, setSelectedMeeting] = useState<ProjectMeeting | null>(null);
   const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([]);
   const { toast } = useToast();
@@ -123,7 +110,7 @@ const ProjectDashboard = () => {
         .order('start_time', { ascending: true });
 
       if (error) {
-        console.error('Error loading project meetings:', error);
+        // Error loading project meetings
         setProjectMeetings([]);
       } else {
         // Transform meetings (transcript data is already in the meeting object)
@@ -142,7 +129,7 @@ const ProjectDashboard = () => {
         setProjectMeetings(transformedMeetings);
       }
     } catch (error) {
-      console.error('Error loading project meetings:', error);
+      // Error loading project meetings
       setProjectMeetings([]);
     } finally {
       setMeetingsLoading(false);
@@ -161,13 +148,13 @@ const ProjectDashboard = () => {
         .order('created_at', { ascending: false });
 
       if (projectsError) {
-        console.error('Error loading projects:', projectsError);
+        // Error loading projects
         setProjects([]);
       } else {
         setProjects(projectsData || []);
       }
     } catch (error) {
-      console.error('Error in loadProjects:', error);
+      // Error in loadProjects
       setProjects([]);
     }
   };
@@ -185,7 +172,7 @@ const ProjectDashboard = () => {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Error loading project data:', error);
+        // Error loading project data
         setProjectData([]);
       } else {
         // Transform documents to ProjectData format with additional fields
@@ -198,15 +185,21 @@ const ProjectDashboard = () => {
           size: doc.file_size ? `${Math.round(doc.file_size / 1024)}KB` : undefined,
           source: doc.source || 'upload',
           content: doc.content,
-          summary: doc.summary,
+          summary: doc.summary || 'No summary available',
           sender: doc.sender,
           file_size: doc.file_size ? `${Math.round(doc.file_size / 1024)}KB` : undefined,
-          project_id: doc.project_id
+          project_id: doc.project_id,
+          subject: doc.title,
+          body: doc.content || doc.summary || 'No content available',
+          recipients: [],
+          cc: [],
+          bcc: [],
+          attachments: []
         }));
         setProjectData(transformedData);
       }
     } catch (error) {
-      console.error('Error loading project data:', error);
+      // Error loading project data
       setProjectData([]);
     } finally {
       setDataLoading(false);
@@ -225,7 +218,7 @@ const ProjectDashboard = () => {
           .single();
 
         if (error) {
-          console.error('Error fetching project:', error);
+          // Error fetching project
           setProject(null);
         } else {
           setProject(projectData);
@@ -243,7 +236,7 @@ const ProjectDashboard = () => {
           }
         }
       } catch (e) {
-        console.error('Error fetching project:', e);
+        // Error fetching project
         setProject(null);
       } finally {
         setLoading(false);
@@ -400,16 +393,14 @@ const ProjectDashboard = () => {
                 )} */}
 
                 {/* Companies/Agencies */}
-                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                {(project.entity_patterns as any)?.domains && (project.entity_patterns as any).domains.length > 0 && (
+                {project.entity_patterns?.domains && project.entity_patterns.domains.length > 0 && (
                   <div>
                     <h4 className="text-sm font-semibold font-mono mb-3 text-[#4a5565] dark:text-zinc-200 flex items-center">
                       <Building className="w-3 h-3 mr-2" />
                       COMPANIES & AGENCIES
                     </h4>
                     <div className="flex flex-wrap gap-2">
-                      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                      {(project.entity_patterns as any).domains.map((domain: string, index: number) => (
+                      {project.entity_patterns.domains.map((domain: string, index: number) => (
                         <Badge key={index} variant="outline" className="text-xs font-mono border-indigo-200 text-indigo-700 dark:border-indigo-700 dark:text-indigo-300">
                           {domain}
                         </Badge>
@@ -461,27 +452,27 @@ const ProjectDashboard = () => {
                       PROJECT TEAM
                     </h4>
                     <div className="space-y-2">
-                      {Object.entries(project.entity_patterns.people).some(([name, data]: [string, any]) => data.role === 'internal_lead') && (
+                      {Object.entries(project.entity_patterns.people || {}).some(([name, data]) => (data as Record<string, unknown>).role === 'internal_lead') && (
                         <div className="text-sm font-mono">
                           <span className="text-gray-600 dark:text-gray-400">Internal Lead: </span>
                           <span className="text-gray-700 dark:text-gray-300 font-medium">
-                            {Object.entries(project.entity_patterns.people).find(([name, data]: [string, any]) => data.role === 'internal_lead')?.[0]}
+                            {Object.entries(project.entity_patterns.people || {}).find(([name, data]) => (data as Record<string, unknown>).role === 'internal_lead')?.[0]}
                           </span>
                         </div>
                       )}
-                      {Object.entries(project.entity_patterns.people).some(([name, data]: [string, any]) => data.role === 'agency_lead') && (
+                      {Object.entries(project.entity_patterns.people || {}).some(([name, data]) => (data as Record<string, unknown>).role === 'agency_lead') && (
                         <div className="text-sm font-mono">
                           <span className="text-gray-600 dark:text-gray-400">Agency Lead: </span>
                           <span className="text-gray-700 dark:text-gray-300 font-medium">
-                            {Object.entries(project.entity_patterns.people).find(([name, data]: [string, any]) => data.role === 'agency_lead')?.[0]}
+                            {Object.entries(project.entity_patterns.people || {}).find(([name, data]) => (data as Record<string, unknown>).role === 'agency_lead')?.[0]}
                           </span>
                         </div>
                       )}
-                      {Object.entries(project.entity_patterns.people).some(([name, data]: [string, any]) => data.role === 'client_lead') && (
+                      {Object.entries(project.entity_patterns.people || {}).some(([name, data]) => (data as Record<string, unknown>).role === 'client_lead') && (
                         <div className="text-sm font-mono">
-                          <span className="text-gray-600 dark:text-gray-400">Client Lead: </span>
+                          <span className="text-gray-400">Client Lead: </span>
                           <span className="text-gray-700 dark:text-gray-300 font-medium">
-                            {Object.entries(project.entity_patterns.people).find(([name, data]: [string, any]) => data.role === 'client_lead')?.[0]}
+                            {Object.entries(project.entity_patterns.people || {}).find(([name, data]) => (data as Record<string, unknown>).role === 'client_lead')?.[0]}
                           </span>
                         </div>
                       )}
@@ -541,7 +532,22 @@ const ProjectDashboard = () => {
                         className="flex items-start space-x-3 p-3 rounded-md border border-stone-200 dark:border-zinc-700 hover:bg-stone-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
                         onClick={() => {
                           if (meeting.transcript) {
-                            setSelectedTranscript(meeting);
+                            // Transform ProjectMeeting to TranscriptModal format
+                            const transcriptData: ProjectMeeting = {
+                              id: meeting.id,
+                              title: meeting.title,
+                              start_time: meeting.start_time,
+                              end_time: meeting.end_time,
+                              status: meeting.status,
+                              meeting_url: meeting.meeting_url,
+                              transcript: meeting.transcript,
+                              transcript_summary: meeting.transcript_summary,
+                              transcript_metadata: meeting.transcript_metadata,
+                              transcript_duration_seconds: meeting.transcript_duration_seconds,
+                              transcript_retrieved_at: meeting.transcript_retrieved_at,
+                              project_id: meeting.project_id,
+                            };
+                            setSelectedTranscript(transcriptData);
                           } else {
                             // For meetings without transcripts, show a simple meeting detail modal
                             setSelectedMeeting(meeting);

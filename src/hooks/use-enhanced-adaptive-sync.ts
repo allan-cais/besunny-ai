@@ -4,7 +4,7 @@ import { useAuth } from '../providers/AuthProvider';
 
 export interface UseEnhancedAdaptiveSyncOptions {
   enabled?: boolean;
-  onSyncComplete?: (results: any[]) => void;
+  onSyncComplete?: (results: Record<string, unknown>[]) => void;
   onError?: (error: Error) => void;
   trackActivity?: boolean;
   trackVirtualEmailActivity?: boolean;
@@ -75,7 +75,7 @@ export function useEnhancedAdaptiveSync(options: UseEnhancedAdaptiveSyncOptions 
           enhancedAdaptiveSyncStrategy.recordActivity(user.id, 'app_load');
         }
       } catch (error) {
-        console.error('Failed to initialize enhanced adaptive sync:', error);
+        // Failed to initialize enhanced adaptive sync
         if (onError) {
           onError(error instanceof Error ? error : new Error('Failed to initialize enhanced adaptive sync'));
         }
@@ -140,7 +140,7 @@ export function useEnhancedAdaptiveSync(options: UseEnhancedAdaptiveSyncOptions 
         const activity = await enhancedAdaptiveSyncStrategy.getVirtualEmailActivityForUser(user.id);
         setVirtualEmailActivity(activity);
       } catch (error) {
-        console.error('Error updating virtual email activity:', error);
+        // Error updating virtual email activity
       }
     };
 

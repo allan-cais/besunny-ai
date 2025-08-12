@@ -9,7 +9,7 @@ interface EmailModalProps {
   email: {
     id: string;
     title: string;
-    summary: string;
+    summary?: string; // Make optional to match Document type
     sender?: string;
     created_at: string;
     source: string;
@@ -52,6 +52,9 @@ const EmailModal: React.FC<EmailModalProps> = ({
 
   if (!email) return null;
 
+  // Handle case where summary might be undefined
+  const emailSummary = email.summary || 'No summary available';
+
   const getCurrentProjectName = () => {
     if (!email.project_id) return null;
     const project = projects.find(p => p.id === email.project_id);
@@ -84,7 +87,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
   };
 
   const copyEmailContent = async () => {
-    const content = `Subject: ${email.subject || email.title}\n\nFrom: ${email.sender}\nDate: ${formatDateTime(email.created_at)}\n\n${email.body || email.summary}`;
+    const content = `Subject: ${email.subject || email.title}\n\nFrom: ${email.sender}\nDate: ${formatDateTime(email.created_at)}\n\n${email.body || emailSummary}`;
     try {
       await navigator.clipboard.writeText(content);
       // You could add a toast notification here
@@ -94,7 +97,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
   };
 
   const downloadEmail = () => {
-    const content = `Subject: ${email.subject || email.title}\n\nFrom: ${email.sender}\nDate: ${formatDateTime(email.created_at)}\n\n${email.body || email.summary}`;
+    const content = `Subject: ${email.subject || email.title}\n\nFrom: ${email.sender}\nDate: ${formatDateTime(email.created_at)}\n\n${email.body || emailSummary}`;
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -277,7 +280,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
             <div className="p-6">
               <div className="prose prose-sm max-w-none dark:prose-invert">
                 <div className="text-sm text-gray-700 dark:text-gray-300 font-mono leading-relaxed whitespace-pre-wrap">
-                  {email.body || email.summary}
+                  {email.body || emailSummary}
                 </div>
               </div>
             </div>

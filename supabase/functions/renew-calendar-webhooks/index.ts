@@ -104,11 +104,11 @@ async function renewWebhook(userId: string): Promise<{ success: boolean; error?:
         );
         
         if (!stopResponse.ok) {
-          console.error(`Failed to stop existing webhook: ${stopResponse.status}`);
+          // Failed to stop existing webhook
         }
       }
     } catch (stopError) {
-      console.error('Error stopping existing webhook:', stopError);
+              // Error stopping existing webhook
       // Continue anyway - the new webhook might still work
     }
     
@@ -165,7 +165,7 @@ async function renewWebhook(userId: string): Promise<{ success: boolean; error?:
         throw new Error(`Invalid expiration value: ${webhookData.expiration}`);
       }
     } catch (dateError) {
-      console.error('Date parsing error:', dateError);
+              // Date parsing error
       throw new Error(`Failed to parse expiration date: ${dateError.message}`);
     }
     
@@ -183,7 +183,7 @@ async function renewWebhook(userId: string): Promise<{ success: boolean; error?:
       .select();
     
     if (upsertError) {
-      console.error('Database upsert error:', upsertError);
+      // Database upsert error
       throw new Error(`Failed to save webhook to database: ${upsertError.message}`);
     }
     

@@ -24,8 +24,8 @@ interface VirtualEmailActivity {
   processed: boolean;
   project_id?: string;
   transcript_duration_seconds?: number;
-  transcript_metadata?: any;
-  rawTranscript?: any; // Store the full transcript data for detail view
+  transcript_metadata?: Record<string, unknown>;
+  rawTranscript?: Record<string, unknown>; // Store the full transcript data for detail view
 }
 
 const DataFeed = () => {
@@ -36,11 +36,11 @@ const DataFeed = () => {
   const [transcriptsLoading, setTranscriptsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'email' | 'drive' | 'transcripts'>('all');
-  const [selectedTranscript, setSelectedTranscript] = useState<any>(null);
-  const [selectedEmail, setSelectedEmail] = useState<any>(null);
+  const [selectedTranscript, setSelectedTranscript] = useState<Meeting | null>(null);
+  const [selectedEmail, setSelectedEmail] = useState<Document | null>(null);
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
-  const [mockDocuments, setMockDocuments] = useState<Document[]>([]);
-  const [projects, setProjects] = useState<any[]>([]);
+  // Mock documents state removed - will use real data only
+  const [projects, setProjects] = useState<Project[]>([]);
   const [classificationActivity, setClassificationActivity] = useState<VirtualEmailActivity | null>(null);
 
   useEffect(() => {
@@ -62,7 +62,7 @@ const DataFeed = () => {
         .order('created_at', { ascending: false });
 
       if (projectsError) {
-        console.error('Error loading projects:', projectsError);
+        // Error loading projects
         // Use a fallback project for demo
         setProjects([{ id: 'fallback-project', name: 'Demo Project' }]);
       } else {
@@ -75,7 +75,7 @@ const DataFeed = () => {
         }
       }
     } catch (error) {
-      console.error('Error in loadProjects:', error);
+      // Error in loadProjects
       setProjects([{ id: 'fallback-project', name: 'Demo Project' }]);
     }
   };
@@ -97,10 +97,10 @@ const DataFeed = () => {
         .limit(200); // Increased limit to get more documents
 
       if (documentsError) {
-        console.error('Error loading documents:', documentsError);
-        // Fallback to mock data
-        setDocuments(getMockDocuments());
-        setActivities(getMockVirtualEmailActivity());
+        // Error loading documents
+        // Fallback to empty arrays when no data available
+        setDocuments([]);
+        setActivities([]);
       } else {
         setDocuments(documentsData || []);
         
@@ -132,12 +132,12 @@ const DataFeed = () => {
         
         setActivities(documentActivities);
       }
-    } catch (error) {
-      console.error('Error loading documents:', error);
-      // Fallback to mock data
-      setDocuments(getMockDocuments());
-      setActivities(getMockVirtualEmailActivity());
-    } finally {
+          } catch (error) {
+        // Error loading documents
+        // Fallback to empty arrays when no data available
+        setDocuments([]);
+        setActivities([]);
+      } finally {
       setLoading(false);
     }
   };
@@ -157,64 +157,7 @@ const DataFeed = () => {
     return 'document';
   };
 
-  const getMockDocuments = (): Document[] => [
-    {
-      id: '2',
-      project_id: 'fallback-project',
-      title: 'Q1 Budget Review.xlsx',
-      summary: 'Comprehensive budget analysis for Q1 2025 including revenue projections, expense tracking, and variance analysis.',
-      source: 'google_drive',
-      author: 'Finance Team',
-      created_at: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-      status: 'active',
-      file_id: 'mock-file-id-2',
-      file_url: 'https://docs.google.com/spreadsheets/d/mock-file-id-2',
-      watch_active: true,
-      last_synced_at: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString()
-    },
-    {
-      id: '3',
-      project_id: 'fallback-project',
-      title: 'Product Roadmap 2025',
-      summary: 'This document outlines our product vision and planned feature releases for the next 12 months, including timelines and resource allocation.',
-      source: 'google_drive',
-      author: 'Product Team',
-      created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-      status: 'active',
-      file_id: 'mock-file-id-3',
-      file_url: 'https://docs.google.com/document/d/mock-file-id-3',
-      watch_active: true,
-      last_synced_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
-    },
-    {
-      id: '5',
-      project_id: 'fallback-project',
-      title: 'Marketing Campaign Assets',
-      summary: 'Collection of images, copy, and design files for our upcoming social media campaign. Please review and provide feedback.',
-      source: 'google_drive',
-      author: 'Marketing Team',
-      created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-      status: 'active',
-      file_id: 'mock-file-id-5',
-      file_url: 'https://drive.google.com/drive/folders/mock-file-id-5',
-      watch_active: true,
-      last_synced_at: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString()
-    },
-    {
-      id: '6',
-      project_id: 'fallback-project',
-      title: 'Board Meeting Presentation',
-      summary: 'Quarterly board meeting presentation covering financial results, strategic initiatives, and upcoming milestones.',
-      source: 'google_drive',
-      author: 'Executive Team',
-      created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-      status: 'active',
-      file_id: 'mock-file-id-6',
-      file_url: 'https://docs.google.com/presentation/d/mock-file-id-6',
-      watch_active: true,
-      last_synced_at: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString()
-    }
-  ];
+  // Mock documents function removed - will use real data only
 
   const getMockVirtualEmailActivity = (): VirtualEmailActivity[] => [
     {
@@ -660,7 +603,7 @@ Alex Rodriguez: Perfect. Meeting adjourned. Thanks everyone for your input and c
         .eq('id', activityId);
 
       if (error) {
-        console.error('Error updating project classification:', error);
+        // Error updating project classification
         // Revert local state if database update failed
         setActivities(prevActivities => 
           prevActivities.map(activity => 
@@ -678,7 +621,7 @@ Alex Rodriguez: Perfect. Meeting adjourned. Thanks everyone for your input and c
         );
       }
     } catch (error) {
-      console.error('Error in handleClassify:', error);
+      // Error in handleClassify
       // Revert local state if there was an error
       setActivities(prevActivities => 
         prevActivities.map(activity => 
@@ -847,8 +790,8 @@ Alex Rodriguez: Perfect. Meeting adjourned. Thanks everyone for your input and c
                 } else if (activity.type === 'email') {
                   setSelectedEmail(activity);
                 } else if (activity.type === 'document' || activity.type === 'spreadsheet' || activity.type === 'presentation' || activity.type === 'image' || activity.type === 'folder') {
-                  // Find the corresponding document (check both real and mock documents)
-                  const document = documents.find(doc => doc.id === activity.id) || mockDocuments.find(doc => doc.id === activity.id);
+                          // Find the corresponding document
+        const document = documents.find(doc => doc.id === activity.id);
                   if (document) {
                     // Always use the activity's project_id as it's the most up-to-date
                     // The activity state gets updated immediately when classification happens
@@ -936,9 +879,9 @@ Alex Rodriguez: Perfect. Meeting adjourned. Thanks everyone for your input and c
                       )}
                       
                       {/* File Watch Status for Google Drive files */}
-                      {activity.type !== 'email' && (documents.find(doc => doc.id === activity.id) || mockDocuments.find(doc => doc.id === activity.id)) && (
+                      {activity.type !== 'email' && documents.find(doc => doc.id === activity.id) && (
                         <FileWatchStatus 
-                          document={documents.find(doc => doc.id === activity.id) || mockDocuments.find(doc => doc.id === activity.id)!} 
+                          document={documents.find(doc => doc.id === activity.id)!} 
                           className="ml-auto"
                         />
                       )}

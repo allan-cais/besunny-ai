@@ -1,7 +1,22 @@
 import { createClient } from '@supabase/supabase-js';
+import { config } from '../config';
+import type { 
+  Project, 
+  Meeting, 
+  Document, 
+  ChatSession, 
+  TranscriptMetadata,
+  BotConfiguration,
+  EntityPatterns,
+  ClassificationSignals,
+  ClassificationFeedback
+} from '../types';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Re-export ChatMessage type for components that need it
+export type { ChatMessage } from '../types';
+
+const supabaseUrl = config.supabase.url;
+const supabaseAnonKey = config.supabase.anonKey;
 
 if (!supabaseUrl || !supabaseAnonKey) {
   // Supabase environment variables not configured
@@ -12,132 +27,8 @@ export const supabase = createClient(
   supabaseAnonKey || ''
 );
 
-// Database types for the master schema
-export interface User {
-  id: string;
-  email: string;
-  name?: string;
-  role?: string;
-  created_at: string;
-}
-
-export interface Project {
-  id: string;
-  name: string;
-  description?: string;
-  status?: string;
-  created_by?: string;
-  created_at: string;
-}
-
-export interface KnowledgeSpace {
-  id: string;
-  project_id: string;
-  name: string;
-  description?: string;
-  created_at: string;
-}
-
-export interface Document {
-  id: string;
-  project_id: string;
-  knowledge_space_id?: string;
-  source?: string;
-  source_id?: string;
-  title?: string;
-  summary?: string;
-  author?: string;
-  received_at?: string;
-  file_url?: string;
-  status?: 'active' | 'updated' | 'deleted' | 'error';
-  file_id?: string; // Google Drive file ID
-  last_synced_at?: string;
-  watch_active?: boolean;
-  created_at: string;
-  type?: 'email' | 'document' | 'spreadsheet' | 'presentation' | 'image' | 'folder' | 'meeting_transcript';
-  file_size?: string;
-  transcript_duration_seconds?: number;
-  transcript_metadata?: any;
-  meeting_id?: string;
-}
-
-export interface DocumentChunk {
-  id: string;
-  document_id: string;
-  project_id: string;
-  chunk_index?: number;
-  text?: string;
-  embedding_id?: string;
-  metadata?: Record<string, unknown>;
-  created_at: string;
-}
-
-export interface Tag {
-  id: string;
-  name?: string;
-  type?: string;
-  created_at: string;
-}
-
-export interface DocumentTag {
-  id: string;
-  document_id: string;
-  tag_id: string;
-  applied_by?: string;
-  created_at: string;
-}
-
-export interface Summary {
-  id: string;
-  project_id: string;
-  date?: string;
-  summary?: string;
-  alerts?: Record<string, unknown>;
-  references?: string[];
-  created_by?: string;
-  created_at: string;
-}
-
-export interface Receipt {
-  id: string;
-  project_id: string;
-  vendor?: string;
-  amount?: number;
-  date?: string;
-  category?: string;
-  receipt_image_url?: string;
-  document_id?: string;
-  created_at: string;
-}
-
-export interface ChatSession {
-  id: string;
-  user_id?: string;
-  project_id?: string;
-  started_at: string;
-  ended_at?: string;
-  name?: string;
-}
-
-export interface ChatMessage {
-  id: string;
-  session_id: string;
-  role?: string;
-  message?: string;
-  used_chunks?: string[];
-  created_at: string;
-}
-
-export interface AgentLog {
-  id: string;
-  agent_name?: string;
-  input_id?: string;
-  input_type?: string;
-  output?: Record<string, unknown>;
-  confidence?: number;
-  notes?: string;
-  created_at: string;
-}
+// Database types are now imported from types/index.ts
+// All interfaces are now imported from types/index.ts
 
 // Helper functions for common operations
 export const supabaseService = {
@@ -164,7 +55,7 @@ export const supabaseService = {
       .single();
 
     if (error) {
-      console.error('Error fetching user:', error);
+      // Error fetching user
       return null;
     }
 
@@ -180,7 +71,7 @@ export const supabaseService = {
       .single();
 
     if (error) {
-      console.error('Error creating project:', error);
+      // Error creating project
       throw error;
     }
 
@@ -194,7 +85,7 @@ export const supabaseService = {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Error fetching projects:', error);
+      // Error fetching projects
       throw error;
     }
 
@@ -209,7 +100,7 @@ export const supabaseService = {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Error fetching projects for user:', error);
+      // Error fetching projects for user
       throw error;
     }
 
@@ -225,7 +116,7 @@ export const supabaseService = {
       .single();
 
     if (error) {
-      console.error('Error updating project:', error);
+      // Error updating project
       throw error;
     }
 
@@ -241,13 +132,7 @@ export const supabaseService = {
       .eq('id', projectId);
 
     if (error) {
-      console.error('Error deleting project:', error);
-      console.error('Error details:', {
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-        code: error.code
-      });
+      // Error deleting project
       throw error;
     }
     
@@ -263,7 +148,7 @@ export const supabaseService = {
       .single();
 
     if (error) {
-      console.error('Error creating chat session:', error);
+      // Error creating chat session
       throw error;
     }
 
@@ -286,7 +171,7 @@ export const supabaseService = {
     const { data, error } = await query;
 
     if (error) {
-      console.error('Error fetching chat sessions:', error);
+      // Error fetching chat sessions
       throw error;
     }
 
@@ -300,7 +185,7 @@ export const supabaseService = {
       .eq('id', sessionId);
 
     if (error) {
-      console.error('Error ending chat session:', error);
+      // Error ending chat session
       throw error;
     }
   },
@@ -314,7 +199,7 @@ export const supabaseService = {
       .single();
 
     if (error) {
-      console.error('Error updating chat session:', error);
+      // Error updating chat session
       throw error;
     }
 
@@ -328,7 +213,7 @@ export const supabaseService = {
       .insert(messages);
 
     if (error) {
-      console.error('Error saving messages:', error);
+      // Error saving messages
       throw error;
     }
   },
@@ -342,7 +227,7 @@ export const supabaseService = {
       .limit(limit);
 
     if (error) {
-      console.error('Error fetching messages:', error);
+      // Error fetching messages
       throw error;
     }
 
@@ -358,7 +243,7 @@ export const supabaseService = {
       .single();
 
     if (error) {
-      console.error('Error creating document:', error);
+      // Error creating document
       throw error;
     }
 
@@ -373,7 +258,7 @@ export const supabaseService = {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Error fetching documents:', error);
+      // Error fetching documents
       throw error;
     }
 
@@ -391,7 +276,7 @@ export const supabaseService = {
     });
 
     if (error) {
-      console.error('Error subscribing to drive file:', error);
+      // Error subscribing to drive file
       throw error;
     }
 
@@ -407,7 +292,7 @@ export const supabaseService = {
       .single();
 
     if (error) {
-      console.error('Error updating document:', error);
+      // Error updating document
       throw error;
     }
 
@@ -469,7 +354,7 @@ export const supabaseService = {
       location: string;
       references: string;
     };
-  }): Promise<{ success: boolean; message: string; metadata?: any; error?: string }> {
+  }): Promise<{ success: boolean; message: string; metadata?: Record<string, unknown>; error?: string }> {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       
@@ -493,7 +378,7 @@ export const supabaseService = {
       const result = await response.json();
       return result;
     } catch (error) {
-      console.error('Error processing project onboarding:', error);
+      // Error processing project onboarding
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Unknown error',

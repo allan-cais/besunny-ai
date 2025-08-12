@@ -14,7 +14,7 @@ async function decryptApiKey(encryptedKey: string): Promise<string> {
     // Simple base64 decode for now - in production use proper encryption
     return atob(encryptedKey);
   } catch (error) {
-    console.error('Error decrypting API key:', error);
+          // Error decrypting API key
     throw new Error('Failed to decrypt API key');
   }
 }
@@ -327,13 +327,13 @@ serve(async (req) => {
                   const botData = await botResponse.json();
                   meeting.attendee_bot_id = botData.id;
                   meeting.bot_status = 'scheduled';
-                  console.log(`Auto-scheduled bot for meeting: ${event.id}`);
+                  // Auto-scheduled bot for meeting
                 } else {
-                  console.error('Failed to auto-schedule bot:', botResponse.status);
+                                      // Failed to auto-schedule bot
                 }
               }
             } catch (error) {
-              console.error('Error auto-scheduling bot:', error);
+                                // Error auto-scheduling bot
             }
           }
         }
@@ -353,7 +353,7 @@ serve(async (req) => {
             .select()
             .single();
           if (insertError) {
-            console.error('Failed to insert meeting:', insertError);
+            // Failed to insert meeting
           } else {
             meetings.push(insertedMeeting);
             newMeetings++;
@@ -387,7 +387,7 @@ serve(async (req) => {
             .select()
             .single();
           if (updateError) {
-            console.error('Failed to update meeting:', updateError);
+            // Failed to update meeting
           } else {
             meetings.push(updatedMeeting);
             updatedMeetings++;

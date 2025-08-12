@@ -59,7 +59,7 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
           setIsCollapsed(false);
         }
       } catch (error) {
-        console.error('Error loading existing chat:', error);
+        // Error loading existing chat
       }
     };
 
@@ -83,7 +83,7 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
           table: 'chat_messages',
           filter: `session_id=eq.${activeChatId}`
         },
-        (payload: any) => {
+        (payload: Record<string, unknown>) => {
           if (payload.new) {
             const newMessage = payload.new as SupabaseChatMessage;
             setMessages(prev => {
@@ -120,7 +120,7 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
       }
       setMessages(loadedMessages);
     } catch (error) {
-      console.error('Error loading messages:', error);
+      // Error loading messages
       setMessages([{
         id: crypto.randomUUID(),
         session_id: chatId,
@@ -148,7 +148,7 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
       await loadMessagesForChat(newSession.id);
       setIsCollapsed(false);
     } catch (error) {
-      console.error('Error creating chat session:', error);
+      // Error creating chat session
     }
   };
 
@@ -163,7 +163,7 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
       }));
       await saveMessages(messagesToSave);
     } catch (error) {
-      console.error('Error saving messages:', error);
+      // Error saving messages
     }
   };
 
@@ -233,7 +233,7 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
         
         if (!webhookResponse.ok) {
           const errorText = await webhookResponse.text();
-          console.error('N8N webhook error:', webhookResponse.status, webhookResponse.statusText, errorText);
+          // N8N webhook error
           throw new Error('Failed to get AI response');
         } else {
           const responseText = await webhookResponse.text();
@@ -281,7 +281,7 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
           }, assistantReply.length * 17.5 + 100); // Wait for streaming to complete (avg 17.5ms per char)
         }
       } catch (error) {
-        console.error('Error sending message:', error);
+        // Error sending message
         // Remove typing indicator and add error message
         setMessages(prev => {
           const withoutTyping = prev.filter(msg => !(msg.role === 'assistant' && (!msg.message || msg.message === "")));

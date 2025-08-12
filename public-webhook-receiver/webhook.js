@@ -20,11 +20,7 @@ exports.handler = async function(event, context) {
     };
   }
   
-  console.log('=== GOOGLE WEBHOOK RECEIVED ===');
-  console.log('Method:', event.httpMethod);
-  console.log('Headers:', event.headers);
-  console.log('Query:', event.queryStringParameters);
-  console.log('Body:', event.body);
+  // Google webhook received
   
   // Parse body if it exists
   let body = {};
@@ -32,7 +28,7 @@ exports.handler = async function(event, context) {
     try {
       body = JSON.parse(event.body);
     } catch (e) {
-      console.log('No JSON body or parse error');
+      // No JSON body or parse error
     }
   }
   
@@ -42,14 +38,11 @@ exports.handler = async function(event, context) {
   const resourceId = event.headers['x-goog-resource-id'];
   const resourceUri = event.headers['x-goog-resource-uri'];
   
-  console.log('Channel ID:', channelId);
-  console.log('Resource State:', resourceState);
-  console.log('Resource ID:', resourceId);
-  console.log('Resource URI:', resourceUri);
+      // Webhook details extracted
   
   // For sync events, just return OK
   if (resourceState === 'sync') {
-    console.log('Sync event received');
+    // Sync event received
     return {
       statusCode: 200,
       headers,
@@ -63,7 +56,7 @@ exports.handler = async function(event, context) {
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     
     if (!supabaseUrl || !serviceRoleKey) {
-      console.error('Missing environment variables: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+      // Missing environment variables
       return {
         statusCode: 500,
         headers,
@@ -71,7 +64,7 @@ exports.handler = async function(event, context) {
       };
     }
     
-    console.log('Forwarding to Supabase function...');
+    // Forwarding to Supabase function
     
     const response = await fetch(`${supabaseUrl}/functions/v1/google-calendar-webhook/notify`, {
       method: 'POST',
@@ -95,7 +88,7 @@ exports.handler = async function(event, context) {
     });
     
     const result = await response.json();
-    console.log('Supabase function response:', result);
+          // Supabase function response
     
     if (response.ok) {
       return {
@@ -109,7 +102,7 @@ exports.handler = async function(event, context) {
         })
       };
     } else {
-      console.error('Supabase function error:', result);
+      // Supabase function error
       return {
         statusCode: 200,
         headers,
@@ -123,7 +116,7 @@ exports.handler = async function(event, context) {
     }
     
   } catch (error) {
-    console.error('Error forwarding webhook:', error);
+    // Error forwarding webhook
     return {
       statusCode: 200,
       headers,

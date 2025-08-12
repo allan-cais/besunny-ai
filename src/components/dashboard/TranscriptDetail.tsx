@@ -43,7 +43,7 @@ const TranscriptDetail: React.FC<TranscriptDetailProps> = ({ transcript, onBack 
       await navigator.clipboard.writeText(transcript.transcript);
       // You could add a toast notification here
     } catch (error) {
-      console.error('Failed to copy transcript:', error);
+      // Failed to copy transcript
     }
   };
 

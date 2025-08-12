@@ -117,7 +117,7 @@ const BotConfigurationModal: React.FC<BotConfigurationModalProps> = ({
     await onDeploy(configuration);
   };
 
-  const updateConfiguration = (key: keyof BotConfiguration, value: any) => {
+  const updateConfiguration = (key: keyof BotConfiguration, value: unknown) => {
     setConfiguration(prev => ({
       ...prev,
       [key]: value

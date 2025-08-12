@@ -160,7 +160,7 @@ async function processVirtualEmailDetection(userEmail: string, messageId: string
       .single();
     
     if (userError || !user) {
-      console.error(`User not found for virtual email: ${virtualEmail.email}`);
+              // User not found for virtual email
       continue;
     }
     
@@ -181,7 +181,7 @@ async function processVirtualEmailDetection(userEmail: string, messageId: string
       .single();
     
     if (docError) {
-      console.error('Error creating document:', docError);
+              // Error creating document
       continue;
     }
     
@@ -205,10 +205,10 @@ async function processVirtualEmailDetection(userEmail: string, messageId: string
       });
       
       if (!n8nResponse.ok) {
-        console.error('Failed to send to n8n:', n8nResponse.status);
+        // Failed to send to n8n
       }
     } catch (error) {
-      console.error('Error sending to n8n:', error);
+              // Error sending to n8n
     }
     
     // Log the virtual email detection
@@ -238,7 +238,7 @@ async function pollGmailForUser(userEmail: string): Promise<{ processed: number;
       .single();
     
     if (!watchStatus) {
-      console.log(`No active Gmail watch found for ${userEmail}`);
+      // No active Gmail watch found
       return { processed: 0, detections: 0, skipped: true };
     }
     
@@ -248,7 +248,7 @@ async function pollGmailForUser(userEmail: string): Promise<{ processed: number;
       const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000);
       
       if (lastWebhookTime > sixHoursAgo) {
-        console.log(`Skipping polling for ${userEmail} - webhook received recently at ${lastWebhookTime.toISOString()}`);
+        // Skipping polling - webhook received recently
         return { processed: 0, detections: 0, skipped: true };
       }
     }
@@ -263,7 +263,7 @@ async function pollGmailForUser(userEmail: string): Promise<{ processed: number;
     const accessToken = await getAccessToken(jwt);
     
     if (!watchStatus) {
-      console.log(`No active Gmail watch found for ${userEmail}`);
+      // No active Gmail watch found
       return { processed: 0, detections: 0 };
     }
     
@@ -280,7 +280,7 @@ async function pollGmailForUser(userEmail: string): Promise<{ processed: number;
     if (!historyResponse.ok) {
       if (historyResponse.status === 404) {
         // History ID is too old, need to get a new one
-        console.log(`History ID ${watchStatus.history_id} is too old for ${userEmail}`);
+        // History ID is too old
         return { processed: 0, detections: 0 };
       }
       throw new Error(`Failed to get Gmail history: ${historyResponse.status}`);
@@ -305,14 +305,14 @@ async function pollGmailForUser(userEmail: string): Promise<{ processed: number;
           const virtualEmails = checkForVirtualEmails(toEmails, ccEmails);
           
           if (virtualEmails.length > 0) {
-            console.log(`Found virtual emails in message ${messageAdded.message.id}:`, virtualEmails);
+            // Found virtual emails in message
             await processVirtualEmailDetection(userEmail, messageAdded.message.id, virtualEmails);
             detections += virtualEmails.length;
           }
           
           processed++;
         } catch (error) {
-          console.error(`Error processing message ${messageAdded.message.id}:`, error);
+          // Error processing message
         }
       }
     }
@@ -331,7 +331,7 @@ async function pollGmailForUser(userEmail: string): Promise<{ processed: number;
     
     return { processed, detections, skipped: false };
   } catch (error) {
-    console.error(`Error polling Gmail for ${userEmail}:`, error);
+    // Error polling Gmail
     return { processed: 0, detections: 0, skipped: false };
   }
 }
@@ -358,7 +358,7 @@ serve(async (req) => {
       });
     }
 
-    console.log(`Polling Gmail for user: ${userEmail}`);
+    // Polling Gmail for user
     
     const result = await pollGmailForUser(userEmail);
     
@@ -372,7 +372,7 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('Gmail polling service error:', error);
+    // Gmail polling service error
     return new Response(JSON.stringify({ 
       error: error.message || 'Failed to poll Gmail' 
     }), {

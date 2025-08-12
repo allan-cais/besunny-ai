@@ -18,7 +18,7 @@ class BackgroundSyncService {
       try {
         await this.checkAndSetupCalendarSync();
       } catch (error) {
-        console.error('Background sync initial check failed:', error);
+        // Background sync initial check failed
       }
     }, 2000); // Wait 2 seconds
     
@@ -28,7 +28,7 @@ class BackgroundSyncService {
         await this.checkAndSetupCalendarSync();
         await this.renewExpiringWebhooks();
       } catch (error) {
-        console.error('Background sync periodic check failed:', error);
+        // Background sync periodic check failed
       }
     }, 5 * 60 * 1000); // Check every 5 minutes
   }
@@ -58,7 +58,7 @@ class BackgroundSyncService {
         .maybeSingle();
 
       if (credentialsError) {
-        console.error('Error checking Google credentials:', credentialsError);
+        // Error checking Google credentials
         return;
       }
 
@@ -75,7 +75,7 @@ class BackgroundSyncService {
         .maybeSingle();
 
       if (webhookError) {
-        console.error('Error checking webhook status:', webhookError);
+        // Error checking webhook status
         return;
       }
 
@@ -84,11 +84,11 @@ class BackgroundSyncService {
         try {
           await calendarService.initializeCalendarSync(this.currentUserId);
         } catch (error) {
-          console.error('Failed to set up calendar sync:', error);
+          // Failed to set up calendar sync
         }
       }
     } catch (error) {
-      console.error('Error in checkAndSetupCalendarSync:', error);
+              // Error in checkAndSetupCalendarSync
     }
   }
 
@@ -112,7 +112,7 @@ class BackgroundSyncService {
         .maybeSingle();
 
       if (error) {
-        console.error('Error checking for expiring webhook:', error);
+        // Error checking for expiring webhook
         return;
       }
 
@@ -124,10 +124,10 @@ class BackgroundSyncService {
       try {
         await calendarService.renewWatch(this.currentUserId);
       } catch (error) {
-        console.error('Failed to renew webhook:', error);
+        // Failed to renew webhook
       }
     } catch (error) {
-      console.error('Error in renewExpiringWebhooks:', error);
+              // Error in renewExpiringWebhooks
     }
   }
 
@@ -136,7 +136,7 @@ class BackgroundSyncService {
     try {
       await calendarService.initializeCalendarSync(userId);
     } catch (error) {
-      console.error(`Manual calendar sync failed for user ${userId}:`, error);
+              // Manual calendar sync failed for user
       throw error;
     }
   }

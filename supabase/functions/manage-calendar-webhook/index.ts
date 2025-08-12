@@ -7,14 +7,11 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
-  console.log('=== MANAGE-CALENDAR-WEBHOOK FUNCTION CALLED ===');
-  console.log('Method:', req.method);
-  console.log('URL:', req.url);
-  console.log('Headers:', Object.fromEntries(req.headers.entries()));
+  // MANAGE-CALENDAR-WEBHOOK FUNCTION CALLED
 
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    console.log('Handling CORS preflight request');
+    // Handling CORS preflight request
     return new Response('ok', { headers: corsHeaders })
   }
 
@@ -26,10 +23,10 @@ serve(async (req) => {
 
     // Get authorization header
     const authHeader = req.headers.get('Authorization')
-    console.log('Auth header present:', !!authHeader);
+    // Auth header present
     
     if (!authHeader) {
-      console.log('Missing authorization header');
+              // Missing authorization header
       return new Response(
         JSON.stringify({ error: 'Missing authorization header' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -37,21 +34,21 @@ serve(async (req) => {
     }
 
     // Verify JWT and get user
-    console.log('Verifying JWT...');
+          // Verifying JWT
     const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''))
     if (authError || !user) {
-      console.log('JWT verification failed:', authError);
+              // JWT verification failed
       return new Response(
         JSON.stringify({ error: 'Invalid token' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    console.log('JWT verified for user:', user.id);
+          // JWT verified for user
 
     const url = new URL(req.url)
     const action = url.searchParams.get('action')
-    console.log('Action requested:', action);
+    // Action requested
 
     if (action === 'stop') {
       return await handleStopWebhook(supabase, user.id)
@@ -62,7 +59,7 @@ serve(async (req) => {
     } else if (action === 'test') {
       return await handleTestWebhook(supabase, user.id)
     } else {
-      console.log('Invalid action:', action);
+              // Invalid action
       return new Response(
         JSON.stringify({ error: 'Invalid action. Use stop, recreate, verify, or test' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -70,7 +67,7 @@ serve(async (req) => {
     }
 
   } catch (error) {
-    console.error('Error in manage-calendar-webhook:', error)
+    // Error in manage-calendar-webhook
     return new Response(
       JSON.stringify({ error: 'Internal server error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -79,7 +76,7 @@ serve(async (req) => {
 })
 
 async function getGoogleCredentials(supabase: any, userId: string): Promise<any> {
-  console.log('Getting Google credentials for user:', userId);
+      // Getting Google credentials for user
   
   const { data, error } = await supabase
     .from('google_credentials')
@@ -88,20 +85,18 @@ async function getGoogleCredentials(supabase: any, userId: string): Promise<any>
     .single()
 
   if (error || !data) {
-    console.log('Google credentials not found:', error);
+          // Google credentials not found
     throw new Error('Google credentials not found')
   }
 
-  console.log('Found credentials, checking expiration...');
-  console.log('Current time:', Math.floor(Date.now() / 1000));
-  console.log('Token expires at:', data.expires_at);
+      // Found credentials, checking expiration
 
   // Check if token needs refresh (refresh if expired or expires within 5 minutes)
   const now = Math.floor(Date.now() / 1000)
   const fiveMinutesFromNow = now + (5 * 60)
   
   if (data.expires_at && data.expires_at <= fiveMinutesFromNow) {
-    console.log('Token needs refresh, refreshing...');
+          // Token needs refresh, refreshing
     
     // Refresh token
     const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
@@ -119,12 +114,12 @@ async function getGoogleCredentials(supabase: any, userId: string): Promise<any>
 
     if (!refreshResponse.ok) {
       const errorText = await refreshResponse.text();
-      console.log('Token refresh failed:', refreshResponse.status, errorText);
+              // Token refresh failed
       throw new Error(`Failed to refresh Google token: ${refreshResponse.status} - ${errorText}`)
     }
 
     const refreshData = await refreshResponse.json()
-    console.log('Token refreshed successfully');
+          // Token refreshed successfully
     
     // Update credentials in database
     const { error: updateError } = await supabase
@@ -136,7 +131,7 @@ async function getGoogleCredentials(supabase: any, userId: string): Promise<any>
       .eq('user_id', userId)
 
     if (updateError) {
-      console.log('Failed to update credentials in database:', updateError);
+              // Failed to update credentials in database
     }
 
     return {
@@ -146,7 +141,7 @@ async function getGoogleCredentials(supabase: any, userId: string): Promise<any>
     }
   }
 
-  console.log('Token is still valid');
+      // Token is still valid
   return data
 }
 
@@ -172,7 +167,7 @@ async function handleStopWebhook(supabase: any, userId: string) {
     const credentials = await getGoogleCredentials(supabase, userId)
 
     // Stop the webhook with Google
-    console.log('Stopping webhook with Google:', webhookData.webhook_id, webhookData.resource_id);
+    // Stopping webhook with Google
     const stopResponse = await fetch(
       `https://www.googleapis.com/calendar/v3/calendars/primary/events/stop`,
       {
@@ -216,7 +211,7 @@ async function handleStopWebhook(supabase: any, userId: string) {
     }
 
   } catch (error) {
-    console.error('Error stopping webhook:', error)
+          // Error stopping webhook
     return new Response(
       JSON.stringify({ success: false, error: error.message || String(error) }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -226,19 +221,18 @@ async function handleStopWebhook(supabase: any, userId: string) {
 
 async function handleRecreateWebhook(supabase: any, userId: string) {
   try {
-    console.log('Recreating webhook for user:', userId);
+    // Recreating webhook for user
     
     // Get Google credentials
     const credentials = await getGoogleCredentials(supabase, userId)
-    console.log('Got credentials, access token length:', credentials.access_token?.length);
+          // Got credentials, access token length
 
     // Create new webhook
     const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/google-calendar-webhook/notify?userId=${userId}`
     const channelId = `calendar-watch-${userId}-${Date.now()}`
     const expiration = Date.now() + (7 * 24 * 60 * 60 * 1000) // 7 days
 
-    console.log('Creating webhook with URL:', webhookUrl);
-    console.log('Channel ID:', channelId);
+          // Creating webhook with URL and Channel ID
 
     const watchRequest = {
       id: channelId,
@@ -250,9 +244,7 @@ async function handleRecreateWebhook(supabase: any, userId: string) {
       expiration: expiration,
     }
     
-    console.log('Watch request payload:', JSON.stringify(watchRequest, null, 2));
-
-    console.log('Making Google API call to create webhook...');
+    // Watch request payload and making Google API call
     const createResponse = await fetch(
       'https://www.googleapis.com/calendar/v3/calendars/primary/events/watch',
       {
@@ -265,7 +257,7 @@ async function handleRecreateWebhook(supabase: any, userId: string) {
       }
     )
     
-    console.log('Google API response status:', createResponse.status);
+    // Google API response status
 
     if (!createResponse.ok) {
       const errorText = await createResponse.text()
@@ -279,18 +271,18 @@ async function handleRecreateWebhook(supabase: any, userId: string) {
     }
 
     const watchData = await createResponse.json()
-    console.log('Google webhook response:', watchData);
+    // Google webhook response
     
     // Handle expiration time properly
     let expirationDate: Date;
     if (watchData.expiration) {
       // Google returns expiration as milliseconds since epoch
       expirationDate = new Date(parseInt(watchData.expiration));
-      console.log('Parsed expiration date:', expirationDate.toISOString());
+      // Parsed expiration date
     } else {
       // Fallback: use our calculated expiration
       expirationDate = new Date(expiration);
-      console.log('Using fallback expiration date:', expirationDate.toISOString());
+      // Using fallback expiration date
     }
 
     // Get sync token for initial sync
@@ -309,7 +301,7 @@ async function handleRecreateWebhook(supabase: any, userId: string) {
       syncToken = syncData.nextSyncToken
     }
 
-    console.log('Storing webhook in database...');
+    // Storing webhook in database
     // Store webhook info in database
     const { error: dbError } = await supabase
       .from('calendar_webhooks')
@@ -347,7 +339,7 @@ async function handleRecreateWebhook(supabase: any, userId: string) {
     )
 
   } catch (error) {
-    console.error('Error recreating webhook:', error)
+    // Error recreating webhook
     return new Response(
       JSON.stringify({ success: false, error: error.message || String(error) }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -477,7 +469,7 @@ async function handleVerifyWebhook(supabase: any, userId: string) {
     }
 
   } catch (error) {
-    console.error('Error verifying webhook:', error)
+    // Error verifying webhook
     return new Response(
       JSON.stringify({ success: false, error: error.message || String(error) }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -487,7 +479,7 @@ async function handleVerifyWebhook(supabase: any, userId: string) {
 
 async function handleTestWebhook(supabase: any, userId: string) {
   try {
-    console.log('Testing webhook for user:', userId);
+    // Testing webhook for user
     
     // Get current webhook info
     const { data: webhookData, error: webhookError } = await supabase
@@ -505,11 +497,11 @@ async function handleTestWebhook(supabase: any, userId: string) {
       )
     }
 
-    console.log('Found webhook:', webhookData);
+    // Found webhook
 
     // Test the webhook URL directly
     const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/google-calendar-webhook/notify?userId=${userId}`;
-    console.log('Testing webhook URL:', webhookUrl);
+    // Testing webhook URL
 
     // Use service role key for internal function-to-function communication
     const testResponse = await fetch(webhookUrl, {
@@ -529,9 +521,8 @@ async function handleTestWebhook(supabase: any, userId: string) {
       }),
     });
 
-    console.log('Test response status:', testResponse.status);
+    // Test response status and body
     const testResult = await testResponse.text();
-    console.log('Test response body:', testResult);
 
     if (testResponse.ok) {
       return new Response(
@@ -555,7 +546,7 @@ async function handleTestWebhook(supabase: any, userId: string) {
     }
 
   } catch (error) {
-    console.error('Error testing webhook:', error)
+    // Error testing webhook
     return new Response(
       JSON.stringify({ success: false, error: error.message || String(error) }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

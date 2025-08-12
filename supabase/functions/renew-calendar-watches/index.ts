@@ -73,7 +73,7 @@ async function getGoogleCredentials(userId: string): Promise<any> {
 
 async function renewWebhook(userId: string): Promise<{ success: boolean; error?: string; webhook_id?: string }> {
   try {
-    console.log('Renewing calendar watch for user:', userId);
+    // Renewing calendar watch for user
     
     // Get current watch info
     const { data: webhook, error: fetchError } = await supabase
@@ -85,7 +85,7 @@ async function renewWebhook(userId: string): Promise<{ success: boolean; error?:
       .single();
 
     if (fetchError || !webhook) {
-      console.log('No active watch found, setting up new one');
+              // No active watch found, setting up new one
       return await setupNewWatch(userId);
     }
 
@@ -95,7 +95,7 @@ async function renewWebhook(userId: string): Promise<{ success: boolean; error?:
     const renewalThreshold = 24 * 60 * 60 * 1000; // 24 hours
 
     if (expirationTime - now > renewalThreshold) {
-      console.log('Watch not expiring soon, no renewal needed');
+              // Watch not expiring soon, no renewal needed
       return { success: true, webhook_id: webhook.webhook_id };
     }
 
@@ -105,14 +105,14 @@ async function renewWebhook(userId: string): Promise<{ success: boolean; error?:
     // Set up new watch with current sync token
     return await setupNewWatch(userId, webhook.sync_token);
   } catch (error) {
-    console.error('Watch renewal error:', error);
+    // Watch renewal error
     return { success: false, error: error.message || String(error) };
   }
 }
 
 async function setupNewWatch(userId: string, syncToken?: string): Promise<{ success: boolean; error?: string; webhook_id?: string }> {
   try {
-    console.log('Setting up new calendar watch for user:', userId);
+    // Setting up new calendar watch for user
     
     const credentials = await getGoogleCredentials(userId);
     if (!credentials) {
@@ -156,7 +156,7 @@ async function setupNewWatch(userId: string, syncToken?: string): Promise<{ succ
     }
 
           const watchData = await response.json();
-      console.log('Watch setup response:', watchData);
+      // Watch setup response
 
       // Validate and parse expiration date
       let expirationDate: Date;
@@ -173,7 +173,7 @@ async function setupNewWatch(userId: string, syncToken?: string): Promise<{ succ
           throw new Error(`Invalid expiration value: ${watchData.expiration}`);
         }
       } catch (dateError) {
-        console.error('Date parsing error:', dateError);
+        // Date parsing error
         throw new Error(`Failed to parse expiration date: ${dateError.message}`);
       }
 
@@ -191,21 +191,21 @@ async function setupNewWatch(userId: string, syncToken?: string): Promise<{ succ
         .eq('google_calendar_id', 'primary');
 
     if (dbError) {
-      console.error('Database error storing watch:', dbError);
+      // Database error storing watch
       return { success: false, error: `Database error: ${dbError.message}` };
     }
 
-    console.log('Calendar watch setup successfully');
+    // Calendar watch setup successfully
     return { success: true, webhook_id: watchData.id };
   } catch (error) {
-    console.error('Watch setup error:', error);
+    // Watch setup error
     return { success: false, error: error.message || String(error) };
   }
 }
 
 async function stopWatch(userId: string, webhookId: string): Promise<{ success: boolean; error?: string }> {
   try {
-    console.log('Stopping calendar watch:', webhookId);
+    // Stopping calendar watch
     
     const credentials = await getGoogleCredentials(userId);
     if (!credentials) {
@@ -229,7 +229,7 @@ async function stopWatch(userId: string, webhookId: string): Promise<{ success: 
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.warn(`Failed to stop watch: ${response.status} - ${errorText}`);
+      // Failed to stop watch
       // Don't throw error, just log warning
     }
 
@@ -240,10 +240,10 @@ async function stopWatch(userId: string, webhookId: string): Promise<{ success: 
       .eq('user_id', userId)
       .eq('webhook_id', webhookId);
 
-    console.log('Calendar watch stopped successfully');
+    // Calendar watch stopped successfully
     return { success: true };
   } catch (error) {
-    console.error('Stop watch error:', error);
+    // Stop watch error
     return { success: false, error: error.message || String(error) };
   }
 }
@@ -260,7 +260,7 @@ serve(async (req) => {
       return new Response('Method not allowed', { status: 405, headers: corsHeaders });
     }
 
-    console.log('Starting calendar watch renewal process...');
+    // Starting calendar watch renewal process
 
     // Find all active webhooks that need renewal
     const { data: webhooks, error } = await supabase
@@ -274,7 +274,7 @@ serve(async (req) => {
     }
 
     if (!webhooks || webhooks.length === 0) {
-      console.log('No active webhooks found');
+      // No active webhooks found
       return new Response(JSON.stringify({ 
         renewed: 0, 
         failed: 0,
@@ -282,7 +282,7 @@ serve(async (req) => {
       }), { status: 200, headers: corsHeaders });
     }
 
-    console.log(`Found ${webhooks.length} active webhooks to check`);
+    // Found active webhooks to check
 
     let renewed = 0;
     let failed = 0;
@@ -315,7 +315,7 @@ serve(async (req) => {
       }
     }
 
-    console.log(`Watch renewal completed: ${renewed} renewed, ${failed} failed`);
+    // Watch renewal completed
 
     return new Response(JSON.stringify({
       renewed,
@@ -329,7 +329,7 @@ serve(async (req) => {
     });
 
   } catch (error: any) {
-    console.error('Watch renewal error:', error);
+    // Watch renewal error
     return new Response(JSON.stringify({
       error: error.message || String(error),
       renewed: 0,

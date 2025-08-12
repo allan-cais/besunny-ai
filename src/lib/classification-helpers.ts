@@ -14,8 +14,8 @@ export interface Project {
   categories?: string[];
   reference_keywords?: string[];
   notes?: string;
-  classification_signals?: any;
-  entity_patterns?: any;
+  classification_signals?: Record<string, unknown>;
+  entity_patterns?: Record<string, unknown>;
   created_by: string;
 }
 
@@ -58,8 +58,8 @@ export interface ClassificationPayload {
     categories?: string[];
     reference_keywords?: string[];
     notes?: string;
-    classification_signals?: any;
-    entity_patterns?: any;
+      classification_signals?: Record<string, unknown>;
+  entity_patterns?: Record<string, unknown>;
   }>;
 }
 
@@ -151,7 +151,7 @@ export async function getActiveProjectsForUser(supabase: any, userId: string): P
     .order('last_classification_at', { ascending: false, nullsLast: true });
   
   if (error) {
-    console.error('Error fetching projects:', error);
+          // Error fetching projects
     return [];
   }
   
@@ -205,7 +205,11 @@ export async function sendToN8nWebhook(
   payload: ClassificationPayload,
   webhookUrl?: string
 ): Promise<boolean> {
-  const n8nWebhookUrl = webhookUrl || Deno.env.get('N8N_CLASSIFICATION_WEBHOOK_URL');
+  // Handle both browser and Deno environments
+  let n8nWebhookUrl = webhookUrl;
+  if (typeof (globalThis as any).Deno !== 'undefined') {
+    n8nWebhookUrl = n8nWebhookUrl || (globalThis as any).Deno.env.get('N8N_CLASSIFICATION_WEBHOOK_URL');
+  }
   
   if (!n8nWebhookUrl) {
     return false;
@@ -223,7 +227,7 @@ export async function sendToN8nWebhook(
     });
     
     if (!response.ok) {
-      console.error(`N8N webhook failed: ${response.status} ${response.statusText}`);
+      // N8N webhook failed
       return false;
     }
     
@@ -232,7 +236,7 @@ export async function sendToN8nWebhook(
     
     return true;
   } catch (error) {
-    console.error('Failed to send to N8N webhook:', error);
+          // Failed to send to N8N webhook
     return false;
   }
 }
@@ -286,7 +290,7 @@ export async function updateDocumentClassification(
       }
     }
   } catch (error) {
-    console.error('Error updating document classification:', error);
+          // Error updating document classification
     throw error;
   }
 }
@@ -385,7 +389,7 @@ export async function logProcessingEvent(
         processed_at: new Date().toISOString()
       });
   } catch (error) {
-    console.error('Error logging processing event:', error);
+          // Error logging processing event
   }
 }
 

@@ -144,7 +144,7 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Set username error:', error);
+    // Set username error
     
     const errorResponse: SetUsernameResponse = {
       success: false,

@@ -53,7 +53,7 @@ const VirtualEmailSettings: React.FC = () => {
         .single();
 
       if (error) {
-        console.error('Error loading user data:', error);
+        // Error loading user data
         // Fallback to auth user data
         setUserData({
           email: user.email || '',
@@ -63,7 +63,7 @@ const VirtualEmailSettings: React.FC = () => {
         setUserData(data);
       }
     } catch (error) {
-      console.error('Error loading user data:', error);
+      // Error loading user data
     } finally {
       setIsLoading(false);
     }
@@ -81,7 +81,7 @@ const VirtualEmailSettings: React.FC = () => {
       });
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
-      console.error('Failed to copy:', error);
+      // Failed to copy
       toast({
         title: 'Error',
         description: 'Failed to copy to clipboard',
@@ -97,7 +97,7 @@ const VirtualEmailSettings: React.FC = () => {
       const status = await gmailWatchService.getGmailWatchStatus(userData.email);
       setGmailWatchStatus(status);
     } catch (error) {
-      console.error('Error loading Gmail watch status:', error);
+      // Error loading Gmail watch status
       // Set a default status to prevent UI errors
       setGmailWatchStatus({ isActive: false });
     }
@@ -108,7 +108,7 @@ const VirtualEmailSettings: React.FC = () => {
       const detections = await gmailWatchService.getVirtualEmailDetections(10);
       setVirtualEmailDetections(detections);
     } catch (error) {
-      console.error('Error loading virtual email detections:', error);
+      // Error loading virtual email detections
     }
   };
 
@@ -133,7 +133,7 @@ const VirtualEmailSettings: React.FC = () => {
         });
       }
     } catch (error) {
-      console.error('Error setting up Gmail watch:', error);
+      // Error setting up Gmail watch
       toast({
         title: 'Setup Failed',
         description: 'Failed to setup Gmail watch',
@@ -162,7 +162,7 @@ const VirtualEmailSettings: React.FC = () => {
         });
       }
     } catch (error) {
-      console.error('Error testing detection:', error);
+      // Error testing detection
       toast({
         title: 'Test Failed',
         description: 'Failed to send test email',

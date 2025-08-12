@@ -38,5 +38,5 @@ export interface MainWorkspaceProps {
   setActiveCenterPanel: (panel: string) => void;
   activeFeedItemId: string | null;
   setActiveFeedItemId: (id: string | null) => void;
-  projects: any[];
+  projects: Project[];
 } 

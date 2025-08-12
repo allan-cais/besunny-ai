@@ -53,25 +53,4 @@ SET transcript_processing_status = CASE
 END
 WHERE transcript_processing_status IS NULL;
 
--- Show current transcript status for the completed meeting
-SELECT 
-  id,
-  title,
-  bot_status,
-  transcript_retrieved_at,
-  transcript_processing_status,
-  transcript_duration_seconds,
-  CASE 
-    WHEN transcript IS NOT NULL THEN 'Has transcript text'
-    ELSE 'No transcript text'
-  END as transcript_text_status,
-  CASE 
-    WHEN real_time_transcript IS NOT NULL THEN 'Has raw transcript data'
-    ELSE 'No raw transcript data'
-  END as raw_transcript_status,
-  CASE 
-    WHEN transcript_metadata IS NOT NULL THEN 'Has metadata'
-    ELSE 'No metadata'
-  END as metadata_status
-FROM meetings 
-WHERE id = '4a9ad0d8-e8df-4ac1-b533-1d6be21d009e'; 
+-- Migration completed successfully 

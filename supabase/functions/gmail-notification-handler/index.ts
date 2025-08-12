@@ -169,7 +169,7 @@ async function processVirtualEmailDetection(userEmail: string, messageId: string
       .single();
     
     if (userError || !user) {
-      console.error(`User not found for virtual email: ${virtualEmail.email}`);
+              // User not found for virtual email
       continue;
     }
     
@@ -190,7 +190,7 @@ async function processVirtualEmailDetection(userEmail: string, messageId: string
       .single();
     
     if (docError) {
-      console.error('Error creating document:', docError);
+              // Error creating document
       continue;
     }
     
@@ -214,10 +214,10 @@ async function processVirtualEmailDetection(userEmail: string, messageId: string
       });
       
       if (!n8nResponse.ok) {
-        console.error('Failed to send to n8n:', n8nResponse.status);
+        // Failed to send to n8n
       }
     } catch (error) {
-      console.error('Error sending to n8n:', error);
+              // Error sending to n8n
     }
     
     // Log the virtual email detection
@@ -254,7 +254,7 @@ serve(async (req) => {
     const decodedData = JSON.parse(atob(notification.message.data));
     const { emailAddress, historyId } = decodedData;
     
-    console.log(`Processing Gmail notification for ${emailAddress}, historyId: ${historyId}`);
+    // Processing Gmail notification
     
     // Update webhook activity tracking
     await supabase
@@ -304,7 +304,7 @@ serve(async (req) => {
         const virtualEmails = checkForVirtualEmails(toEmails, ccEmails);
         
         if (virtualEmails.length > 0) {
-          console.log(`Found virtual emails in message ${messageAdded.message.id}:`, virtualEmails);
+                      // Found virtual emails in message
           await processVirtualEmailDetection(emailAddress, messageAdded.message.id, virtualEmails);
         }
       }
@@ -316,7 +316,7 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('Gmail notification handler error:', error);
+    // Gmail notification handler error
     return new Response(JSON.stringify({ 
       error: error.message || 'Failed to process Gmail notification' 
     }), {

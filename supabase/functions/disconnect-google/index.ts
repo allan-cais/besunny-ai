@@ -40,7 +40,7 @@ serve(async (req) => {
       .maybeSingle()
 
     if (credError) {
-      console.error('Database error fetching credentials:', credError)
+      // Database error fetching credentials
       throw new Error('Failed to fetch credentials')
     }
 

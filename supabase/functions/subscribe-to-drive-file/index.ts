@@ -103,7 +103,7 @@ async function getGoogleAccessToken() {
     const tokenData = await tokenResponse.json();
     return tokenData.access_token;
   } catch (error) {
-    console.error('Error getting Google access token:', error);
+          // Error getting Google access token
     throw error;
   }
 }
@@ -145,7 +145,7 @@ async function checkExistingWatch(fileId: string): Promise<boolean> {
     .rpc('get_active_drive_file_watch', { search_file_id: fileId });
   
   if (error) {
-    console.error('Error checking existing watch:', error);
+          // Error checking existing watch
     return false;
   }
   
@@ -224,7 +224,7 @@ async function handleSubscribeToDriveFile(request: SubscribeRequest): Promise<Su
     
     // For auto-setup, log the virtual email information
     if (autoSetup && virtualEmail && username) {
-      console.log(`Auto-setting up Drive watch for virtual email: ${virtualEmail} (username: ${username})`);
+      // Auto-setting up Drive watch for virtual email
     }
     
     // Get document and project information
@@ -270,7 +270,7 @@ async function handleSubscribeToDriveFile(request: SubscribeRequest): Promise<Su
     };
     
   } catch (error) {
-    console.error('Error in subscribeToDriveFile:', error);
+          // Error in subscribeToDriveFile
     return {
       success: false,
       message: `Failed to subscribe to drive file: ${error.message}`,
@@ -312,7 +312,7 @@ serve(async (req) => {
     );
     
   } catch (error) {
-    console.error('Error in subscribe-to-drive-file handler:', error);
+    // Error in subscribe-to-drive-file handler
     return new Response(
       JSON.stringify({ 
         success: false, 

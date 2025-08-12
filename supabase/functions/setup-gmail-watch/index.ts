@@ -104,16 +104,16 @@ async function setupGmailWatch(userEmail: string, accessToken: string): Promise<
     
     if (watchResponse.ok) {
       const watchData = await watchResponse.json();
-      console.log(`Push notification watch set up successfully for ${userEmail}`);
+      // Push notification watch set up successfully
       return {
         historyId: watchData.historyId,
         expiration: new Date(parseInt(watchData.expiration)).toISOString(),
       };
     } else {
-      console.warn(`Push notification watch failed for ${userEmail}, falling back to polling`);
+              // Push notification watch failed, falling back to polling
     }
   } catch (error) {
-    console.warn(`Push notification setup failed for ${userEmail}:`, error);
+            // Push notification setup failed
   }
   
   // Fallback: Get current history ID for polling
@@ -131,7 +131,7 @@ async function setupGmailWatch(userEmail: string, accessToken: string): Promise<
   const profileData = await profileResponse.json();
   const historyId = profileData.historyId;
   
-  console.log(`Using polling-based watch for ${userEmail} with history ID: ${historyId}`);
+      // Using polling-based watch
   return {
     historyId: historyId,
     expiration: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days
@@ -194,7 +194,7 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('Gmail watch setup error:', error);
+    // Gmail watch setup error
     return new Response(JSON.stringify({ 
       error: error.message || 'Failed to setup Gmail watch' 
     }), {

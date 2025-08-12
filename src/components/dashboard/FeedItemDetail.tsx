@@ -1,31 +1,7 @@
 import React from 'react';
 
-// Mock data for feed item details
-const mockFeedDetails = {
-  '1': {
-    type: 'email',
-    title: 'Superpower Launch Event - April 25th',
-    summary: 'This is an email thread between Jacob Peters, Sarah Johnson, and others regarding the Superpower Launch Event on April 25, 2025. The discussion covers event details, sponsorship options (Gold: $5,000; Silver: $2,500; Bronze: $1,000), and next steps. The team decides to go with the Gold tier ($5,000) for maximum brand visibility. The latest email requests feedback on project documents by Friday.',
-    nextStep: 'No action detected',
-    participants: ['Jacob Peters (jacob@superpower.com)'],
-    messageSummary: 'Sarah Johnson follows up on a meeting about the Superpower Launch Event, confirms selection of the Gold sponsorship tier ($5,000), and requests feedback on attached documents by Friday.',
-    messages: [
-      {
-        from: 'Sarah Johnson',
-        email: 'sarah.johnson@example.com',
-        date: 'Mar 18, 2025, 4:27 PM',
-        to: 'Jacob Peters',
-        cc: 'Marketing Team',
-        body: `Hi everyone,\n\nI wanted to follow up on our meeting about the Superpower Launch Event from last week.\nAs discussed, we need to finalize the project scope by the end of this month. We\'re planning to go with the Gold sponsorship tier ($5,000) as it offers the best visibility for our brand.\nPlease review the attached documents and provide your feedback by Friday. Let me know if you have any questions or concerns.\n\nBest regards,\nSarah`,
-        attachments: [
-          { name: 'marketing_assets.pdf', size: '8.7 MB' },
-          { name: 'event_timeline.xlsx', size: '1.2 MB' },
-        ],
-      },
-    ],
-  },
-  // Add more mock details for other items as needed
-};
+// Mock data removed - will use real data from API
+const mockFeedDetails: Record<string, unknown> = {};
 
 interface FeedItemDetailProps {
   id: string;

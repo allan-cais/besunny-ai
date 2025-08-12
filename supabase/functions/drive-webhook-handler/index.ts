@@ -46,7 +46,7 @@ async function getDocumentByChannelId(channelId: string): Promise<DocumentInfo |
     .rpc('get_document_by_channel_id', { search_channel_id: channelId });
   
   if (error || !data || data.length === 0) {
-    console.error('Error getting document by channel ID:', error);
+          // Error getting document by channel ID
     return null;
   }
   
@@ -104,7 +104,7 @@ async function checkVirtualEmailDocument(documentId: string): Promise<{ isVirtua
     
     return { isVirtualEmail: false };
   } catch (error) {
-    console.error('Error checking virtual email document:', error);
+          // Error checking virtual email document
     return { isVirtualEmail: false };
   }
 }
@@ -138,9 +138,9 @@ async function handleFileDeletion(documentId: string, projectId: string, fileId:
       .delete()
       .eq('document_id', documentId);
     
-    console.log(`File deletion handled for document ${documentId}`);
+    // File deletion handled for document
   } catch (error) {
-    console.error('Error handling file deletion:', error);
+          // Error handling file deletion
     throw error;
   }
 }
@@ -150,7 +150,7 @@ async function sendToN8nWebhook(documentId: string, projectId: string, fileId: s
   const n8nWebhookUrl = Deno.env.get('N8N_DRIVESYNC_WEBHOOK_URL');
   
   if (!n8nWebhookUrl) {
-    console.warn('N8N drivesync webhook URL not configured');
+    // N8N drivesync webhook URL not configured
     return false;
   }
   
@@ -172,15 +172,15 @@ async function sendToN8nWebhook(documentId: string, projectId: string, fileId: s
     });
     
     if (!response.ok) {
-      console.error(`N8N webhook failed: ${response.status} ${response.statusText}`);
+      // N8N webhook failed
       return false;
     }
     
     const responseText = await response.text();
-    console.log(`N8N webhook response: ${responseText}`);
+          // N8N webhook response
     return true;
   } catch (error) {
-    console.error('Failed to send to N8N webhook:', error);
+          // Failed to send to N8N webhook
     return false;
   }
 }
@@ -192,7 +192,7 @@ async function logWebhookEvent(logEntry: WebhookLogEntry): Promise<void> {
       .from('drive_webhook_logs')
       .insert(logEntry);
   } catch (error) {
-    console.error('Error logging webhook event:', error);
+          // Error logging webhook event
   }
 }
 
@@ -201,7 +201,7 @@ async function handleDriveWebhook(headers: DriveWebhookHeaders): Promise<{ succe
   try {
     const { 'X-Goog-Resource-ID': resourceId, 'X-Goog-Resource-State': resourceState, 'X-Goog-Channel-ID': channelId } = headers;
     
-    console.log(`Received Drive webhook: resourceId=${resourceId}, state=${resourceState}, channelId=${channelId}`);
+    // Received Drive webhook
     
     // Validate required headers
     if (!resourceId || !resourceState || !channelId) {
@@ -225,7 +225,7 @@ async function handleDriveWebhook(headers: DriveWebhookHeaders): Promise<{ succe
     // Check if this is a virtual email document and set up automatic Drive watch if needed
     const virtualEmailInfo = await checkVirtualEmailDocument(document_id);
     if (virtualEmailInfo.isVirtualEmail && !status.includes('watch_active')) {
-      console.log(`Setting up automatic Drive watch for virtual email document: ${document_id}`);
+              // Setting up automatic Drive watch for virtual email document
       
       // Set up automatic Drive watch for this file
       try {
@@ -246,12 +246,12 @@ async function handleDriveWebhook(headers: DriveWebhookHeaders): Promise<{ succe
         });
         
         if (watchResponse.ok) {
-          console.log(`Automatic Drive watch set up for virtual email document: ${document_id}`);
+          // Automatic Drive watch set up for virtual email document
         } else {
-          console.warn(`Failed to set up automatic Drive watch for document: ${document_id}`);
+                      // Failed to set up automatic Drive watch for document
         }
       } catch (error) {
-        console.error('Error setting up automatic Drive watch:', error);
+                    // Error setting up automatic Drive watch
       }
     }
     
@@ -329,7 +329,7 @@ async function handleDriveWebhook(headers: DriveWebhookHeaders): Promise<{ succe
     }
     
   } catch (error) {
-    console.error('Error in handleDriveWebhook:', error);
+          // Error in handleDriveWebhook
     return {
       success: false,
       message: `Failed to handle Drive webhook: ${error.message}`,
@@ -378,7 +378,7 @@ serve(async (req) => {
     );
     
   } catch (error) {
-    console.error('Error in drive-webhook-handler:', error);
+    // Error in drive-webhook-handler
     
     // Still return 200 to Google even on error to prevent retries
     return new Response(

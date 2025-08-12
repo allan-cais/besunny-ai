@@ -10,16 +10,16 @@ interface TranscriptModalProps {
   transcript: {
     id: string;
     title: string;
-    transcript: string;
+    transcript?: string; // Make optional to match Meeting type
     transcript_summary?: string;
-    transcript_metadata?: any;
+    transcript_metadata?: Record<string, unknown>;
     transcript_duration_seconds?: number;
     transcript_retrieved_at?: string;
     meeting_url?: string;
     start_time?: string;
     end_time?: string;
     transcript_audio_url?: string;
-    transcript_segments?: any[];
+    transcript_segments?: Record<string, unknown>[];
     transcript_participants?: string[];
     project_id?: string;
     source?: string;
@@ -50,6 +50,9 @@ const TranscriptModal: React.FC<TranscriptModalProps> = ({
   }, [transcript, isOpen]);
 
   if (!transcript) return null;
+
+  // Handle case where transcript might be undefined
+  const transcriptText = transcript.transcript || 'No transcript available';
 
   const getCurrentProjectName = () => {
     if (!transcript.project_id) return null;
@@ -104,7 +107,7 @@ const TranscriptModal: React.FC<TranscriptModalProps> = ({
 
   const copyTranscript = async () => {
     try {
-      await navigator.clipboard.writeText(transcript.transcript);
+      await navigator.clipboard.writeText(transcriptText);
       // You could add a toast notification here
     } catch (error) {
       // Handle copy error silently
@@ -112,7 +115,7 @@ const TranscriptModal: React.FC<TranscriptModalProps> = ({
   };
 
   const downloadTranscript = () => {
-    const blob = new Blob([transcript.transcript], { type: 'text/plain' });
+    const blob = new Blob([transcriptText], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -327,7 +330,7 @@ const TranscriptModal: React.FC<TranscriptModalProps> = ({
             {transcript.transcript_segments && transcript.transcript_segments.length > 0 ? (
               <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 max-h-96 overflow-y-auto scrollbar-hide border border-[#4a5565] dark:border-zinc-700">
                 <div className="space-y-3">
-                  {transcript.transcript_segments.map((segment: any, index: number) => (
+                                          {transcript.transcript_segments.map((segment: Record<string, unknown>, index: number) => (
                     <div key={index} className="flex items-start space-x-3">
                       <div className="flex-shrink-0">
                         <Badge variant="outline" className="text-xs font-mono">
@@ -350,7 +353,7 @@ const TranscriptModal: React.FC<TranscriptModalProps> = ({
               <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 border border-[#4a5565] dark:border-zinc-700">
                 <div className="prose prose-sm max-w-none dark:prose-invert">
                   <div className="text-sm text-gray-700 dark:text-gray-300 font-mono leading-relaxed whitespace-pre-wrap">
-                    {transcript.transcript}
+                    {transcriptText}
                   </div>
                 </div>
               </div>

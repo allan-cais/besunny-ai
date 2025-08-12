@@ -162,14 +162,14 @@ serve(async (req) => {
 
 // Core functions
 async function pollAllMeetings() {
-  console.log('🚀 Starting to poll all meetings');
+      // Starting to poll all meetings
   
   const { data: meetings, error } = await supabase
     .rpc('get_meetings_for_polling');
   
   if (error) throw error;
 
-  console.log(`📊 Found ${meetings?.length || 0} meetings to poll`);
+      // Found meetings to poll
 
   const results = [];
   for (const meeting of meetings || []) {
@@ -177,7 +177,7 @@ async function pollAllMeetings() {
       const result = await pollMeeting(meeting.id);
       results.push({ meetingId: meeting.id, ...result });
     } catch (error) {
-      console.error(`❌ Error polling meeting ${meeting.id}:`, error);
+              // Error polling meeting
       results.push({ meetingId: meeting.id, error: error.message });
     }
   }
@@ -236,7 +236,7 @@ async function pollMeeting(meetingId: string) {
       
       return { status: newStatus, transcriptRetrieved: true };
     } catch (error) {
-      console.error('Failed to retrieve transcript:', error);
+      // Failed to retrieve transcript
       return { status: newStatus, transcriptRetrieved: false };
     }
   }

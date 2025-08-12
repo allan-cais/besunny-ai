@@ -81,10 +81,7 @@ serve(async (req) => {
   const method = req.method;
 
   // Log all incoming requests for debugging
-  console.log('=== PUBLIC WEBHOOK FUNCTION CALLED ===');
-  console.log('Method:', method);
-  console.log('URL:', req.url);
-  console.log('Headers:', Object.fromEntries(req.headers.entries()));
+  // PUBLIC WEBHOOK FUNCTION CALLED
 
   // Webhook verification endpoint (GET /verify)
   if (url.pathname.endsWith('/verify') && method === 'GET') {
@@ -98,18 +95,15 @@ serve(async (req) => {
   // Webhook notification endpoint (POST /notify)
   if (url.pathname.endsWith('/notify') && method === 'POST') {
     try {
-      console.log('=== WEBHOOK NOTIFICATION RECEIVED ===');
-      console.log('Timestamp:', new Date().toISOString());
-      console.log('URL:', req.url);
-      console.log('Headers:', Object.fromEntries(req.headers.entries()));
+          // WEBHOOK NOTIFICATION RECEIVED
       
       // Try to parse body as JSON (for test/manual sync requests)
       let body: any = null;
       try {
         body = await req.json();
-        console.log('Body:', JSON.stringify(body, null, 2));
+        // Body content
       } catch (parseError) {
-        console.log('No JSON body found - this is likely a real Google Calendar webhook');
+        // No JSON body found - this is likely a real Google Calendar webhook
         // For real Google Calendar webhooks, the body is empty and info is in headers
       }
       
@@ -121,7 +115,7 @@ serve(async (req) => {
         // Check for X-Goog-Channel-ID header
         const channelId = req.headers.get('X-Goog-Channel-ID');
         if (channelId) {
-          console.log('Channel ID from header:', channelId);
+          // Channel ID from header
           // Try to find user by channel ID in database
           const { data: webhook } = await supabase
             .from('calendar_webhooks')
@@ -132,13 +126,13 @@ serve(async (req) => {
           
           if (webhook) {
             userId = webhook.user_id;
-            console.log('Found user ID from channel ID:', userId);
+            // Found user ID from channel ID
           }
         }
       }
       
       if (!userId) {
-        console.error('Could not determine userId from webhook notification');
+        // Could not determine userId from webhook notification
         // Log this as a failed webhook for debugging
         await supabase
           .from('calendar_sync_logs')
@@ -156,7 +150,7 @@ serve(async (req) => {
         }), { status: 200 }));
       }
       
-      console.log('Processing webhook notification for user:', userId);
+      // Processing webhook notification for user
       
       // Update webhook activity tracking
       await supabase
@@ -208,11 +202,11 @@ serve(async (req) => {
       for (const event of events) {
         try {
           // Process the calendar event (simplified for now)
-          console.log('Processing event:', event.id);
+          // Processing event
           processed++;
           
           // For now, just log the event
-          console.log('Event processed:', {
+                      // Event processed
             id: event.id,
             summary: event.summary,
             start: event.start,
@@ -220,7 +214,7 @@ serve(async (req) => {
           });
           
         } catch (error) {
-          console.error('Error processing event:', error);
+          // Error processing event
           errors++;
         }
       }
@@ -239,7 +233,7 @@ serve(async (req) => {
           sync_range_end: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
         });
       
-      console.log(`Webhook processing completed: ${processed} processed, ${created} created, ${updated} updated, ${errors} errors`);
+      // Webhook processing completed
       
       return withCORS(new Response(JSON.stringify({
         ok: true,
@@ -250,7 +244,7 @@ serve(async (req) => {
       }), { status: 200 }));
       
     } catch (error) {
-      console.error('Webhook processing error:', error);
+      // Webhook processing error
       
       // Log the error for debugging
       try {
@@ -264,7 +258,7 @@ serve(async (req) => {
             events_processed: 0,
           });
       } catch (logError) {
-        console.error('Failed to log webhook error:', logError);
+        // Failed to log webhook error
       }
       
       return withCORS(new Response(JSON.stringify({

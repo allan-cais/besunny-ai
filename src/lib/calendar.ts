@@ -1,11 +1,12 @@
 import { supabase } from './supabase';
+import type { GoogleCalendarEvent, GoogleCalendarEntryPoint, GoogleCalendarAttendee, GoogleCredentials, Meeting as MeetingType, TranscriptMetadata, BotConfiguration, Bot, AuthSession } from '../types';
 
 // Utility functions
-function extractMeetingUrl(event: any): string | null {
+function extractMeetingUrl(event: GoogleCalendarEvent): string | null {
   // Check for Google Meet URL in conferenceData
   if (event.conferenceData?.entryPoints) {
     const meetEntry = event.conferenceData.entryPoints.find(
-      (entry: any) => entry.entryPointType === 'video'
+      (entry: GoogleCalendarEntryPoint) => entry.entryPointType === 'video'
     );
     if (meetEntry?.uri) {
       return meetEntry.uri;
@@ -47,7 +48,7 @@ function stripHtml(html: string): string {
 }
 
 // Get Google credentials from database
-async function getGoogleCredentials(userId: string): Promise<any> {
+async function getGoogleCredentials(userId: string): Promise<GoogleCredentials> {
   const { data, error } = await supabase
     .from('google_credentials')
     .select('*')
@@ -82,7 +83,7 @@ async function getGoogleCredentials(userId: string): Promise<any> {
     
     if (!refreshResponse.ok) {
       const errorText = await refreshResponse.text();
-      console.error('Token refresh failed:', refreshResponse.status, errorText);
+      // Token refresh failed
       throw new Error(`Failed to refresh Google token: ${refreshResponse.status} - ${errorText}`);
     }
     
@@ -99,7 +100,7 @@ async function getGoogleCredentials(userId: string): Promise<any> {
       .eq('user_id', userId);
     
     if (updateError) {
-      console.error('Failed to update token in database:', updateError);
+      // Failed to update token in database
       throw new Error('Failed to update refreshed token');
     }
     
@@ -134,10 +135,10 @@ export interface Meeting {
       // Real-time transcription fields
     last_polled_at?: string;
     next_poll_at?: string;
-    real_time_transcript?: any;
+    real_time_transcript?: string;
     final_transcript_ready?: boolean;
-  transcript_metadata?: any;
-  bot_configuration?: any;
+  transcript_metadata?: TranscriptMetadata;
+  bot_configuration?: BotConfiguration;
   // Auto-scheduling fields
   bot_deployment_method?: 'manual' | 'automatic' | 'scheduled';
   auto_scheduled_via_email?: boolean;
@@ -149,26 +150,14 @@ export interface Meeting {
   transcript_retrieved_at?: string;
   transcript_participants?: string[];
   transcript_speakers?: string[];
-  transcript_segments?: any[];
+  transcript_segments?: string[];
   transcript_audio_url?: string;
   transcript_recording_url?: string;
   created_at: string;
   updated_at: string;
 }
 
-export interface Bot {
-  id: string;
-  user_id: string;
-  name: string;
-  description?: string;
-  avatar_url?: string;
-  provider: string;
-  provider_bot_id?: string;
-  settings?: any;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
+// Bot interface is now imported from types
 
 export const calendarService = {
   // Initial sync: Today forward only (for bot functionality)
@@ -273,7 +262,7 @@ export const calendarService = {
   },
 
   // Get current and upcoming meetings (for UI display)
-    async getCurrentWeekMeetings(session?: any): Promise<Meeting[]> {
+    async getCurrentWeekMeetings(session?: AuthSession): Promise<MeetingType[]> {
     try {
       // Use provided session or get from auth
       const currentSession = session || (await supabase.auth.getSession()).data.session;
@@ -306,7 +295,7 @@ export const calendarService = {
   },
 
   // Get ALL meetings for the current week (including assigned ones) - for debugging
-  async getAllCurrentWeekMeetings(session?: any): Promise<Meeting[]> {
+  async getAllCurrentWeekMeetings(session?: AuthSession): Promise<MeetingType[]> {
     // Use provided session or get from auth
     const currentSession = session || (await supabase.auth.getSession()).data.session;
     if (!currentSession) throw new Error('Not authenticated');
@@ -333,10 +322,10 @@ export const calendarService = {
   },
 
   // Get sync status and logs
-  async getSyncStatus(session?: any): Promise<{
+  async getSyncStatus(session?: AuthSession): Promise<{
     webhook_active: boolean;
     last_sync?: string;
-    sync_logs: any[];
+    sync_logs: Record<string, unknown>[];
     webhook_expires_at?: string;
   }> {
     // Use provided session or get from auth
@@ -434,7 +423,7 @@ export const calendarService = {
       .order('start_time', { ascending: true });
     
     if (error) {
-      console.error('Error fetching upcoming meetings:', error);
+      // Error fetching upcoming meetings
       throw error;
     }
     
@@ -586,7 +575,7 @@ export const calendarService = {
   // Get raw calendar events from Google
   async getRawCalendarEvents(daysPast: number = 7, daysFuture: number = 60): Promise<{
     ok: boolean;
-    events?: any[];
+    events?: GoogleCalendarEvent[];
     error?: string;
   }> {
     const session = (await supabase.auth.getSession()).data.session;
@@ -638,87 +627,9 @@ export const calendarService = {
     return result;
   },
 
-  // Test webhook notification specifically
-  async testWebhookNotification(): Promise<{
-    ok: boolean;
-    message?: string;
-    timestamp?: string;
-    error?: string;
-  }> {
-    const session = (await supabase.auth.getSession()).data.session;
-    if (!session) throw new Error('Not authenticated');
-    
-    const url = new URL(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-calendar-webhook/notify`);
-    
-    const response = await fetch(url.toString(), {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${session.access_token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        state: 'test',
-        userId: session.user.id,
-      }),
-    });
-    
-    const result = await response.json();
-    return result;
-  },
+  // Test webhook notification function removed for production
 
-  // Test webhook connectivity and get detailed status
-  async testWebhookConnectivity(): Promise<{
-    webhook_active: boolean;
-    webhook_url?: string;
-    last_sync?: string;
-    sync_logs: any[];
-    recent_errors: any[];
-    webhook_expires_at?: string;
-    connectivity_test?: boolean;
-  }> {
-    const session = (await supabase.auth.getSession()).data.session;
-    if (!session) throw new Error('Not authenticated');
-    
-    // Get webhook status
-    const { data: webhook, error: webhookError } = await supabase
-      .from('calendar_webhooks')
-      .select('*')
-      .eq('user_id', session.user.id)
-      .eq('is_active', true)
-      .maybeSingle();
-    
-    // Get recent sync logs
-    const { data: syncLogs } = await supabase
-      .from('calendar_sync_logs')
-      .select('*')
-      .eq('user_id', session.user.id)
-      .order('created_at', { ascending: false })
-      .limit(20);
-    
-    // Get recent errors
-    const recentErrors = syncLogs?.filter(log => log.status === 'failed') || [];
-    
-    // Test webhook connectivity by sending a test notification
-    let connectivityTest = false;
-    try {
-      const testResult = await this.simulateWebhookNotification();
-      connectivityTest = testResult.ok;
-    } catch (error) {
-      console.error('Webhook connectivity test failed:', error);
-    }
-    
-    const status = {
-      webhook_active: !!webhook,
-      webhook_url: webhook ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-calendar-webhook/notify?userId=${session.user.id}` : undefined,
-      last_sync: syncLogs?.find(log => log.status === 'completed')?.created_at || webhook?.updated_at,
-      sync_logs: syncLogs || [],
-      recent_errors: recentErrors,
-      webhook_expires_at: webhook?.expiration_time,
-      connectivity_test: connectivityTest,
-    };
-    
-    return status;
-  },
+  // Test webhook connectivity function removed for production
 
   // Enhanced calendar service with watch functionality
   async initializeCalendarSync(userId: string): Promise<{ success: boolean; error?: string; webhook_id?: string }> {
@@ -734,7 +645,7 @@ export const calendarService = {
         .maybeSingle();
       
       if (webhookError) {
-        console.error('Error checking for existing webhook:', webhookError);
+        // Error checking for existing webhook
       }
       
       
@@ -750,7 +661,7 @@ export const calendarService = {
           .limit(1);
         
         if (meetingsError) {
-          console.error('Error checking existing meetings:', meetingsError);
+          // Error checking existing meetings
         }
         
         
@@ -775,7 +686,7 @@ export const calendarService = {
             .eq('id', existingWebhook.id);
           
           if (updateError) {
-            console.error('Error updating webhook with sync token:', updateError);
+            // Error updating webhook with sync token
           }
           
           return { success: true, webhook_id: existingWebhook.webhook_id };
@@ -801,7 +712,7 @@ export const calendarService = {
       
       return { success: true, webhook_id: watchResult.webhook_id };
     } catch (error) {
-      console.error('Calendar sync initialization error:', error);
+      // Calendar sync initialization error
       return { success: false, error: error.message || String(error) };
     }
   },
@@ -812,7 +723,7 @@ export const calendarService = {
       
       const credentials = await getGoogleCredentials(userId);
       if (!credentials) {
-        console.error('No Google credentials found for user:', userId);
+        // No Google credentials found for user
         return { success: false, error: 'No Google credentials found' };
       }
       
@@ -1036,7 +947,7 @@ export const calendarService = {
 
       return { success: true, sync_token: nextSyncToken };
     } catch (error) {
-      console.error('Initial sync error:', error);
+      // Initial sync error
       return { success: false, error: error.message || String(error) };
     }
   },
@@ -1052,7 +963,7 @@ export const calendarService = {
         credentials = await getGoogleCredentials(userId);
 
       } catch (credError) {
-        console.error('Failed to get valid credentials:', credError);
+        // Failed to get valid credentials
         return { success: false, error: `Authentication failed: ${credError.message}. Please reconnect your Google account.` };
       }
       
@@ -1064,7 +975,14 @@ export const calendarService = {
       const channelId = `calendar-watch-${userId}-${Date.now()}`;
       const expiration = Date.now() + (7 * 24 * 60 * 60 * 1000); // 7 days
 
-      const watchRequest: any = {
+      const watchRequest: {
+      id: string;
+      type: string;
+      address: string;
+      token?: string;
+      expiration?: number;
+      params?: Record<string, string>;
+    } = {
         id: channelId,
         type: 'web_hook',
         address: webhookUrl,
@@ -1114,7 +1032,7 @@ export const calendarService = {
           throw new Error(`Invalid expiration value: ${watchData.expiration}`);
         }
       } catch (dateError) {
-        console.error('Date parsing error:', dateError);
+        // Date parsing error
         throw new Error(`Failed to parse expiration date: ${dateError.message}`);
       }
 
@@ -1134,13 +1052,13 @@ export const calendarService = {
         });
 
       if (dbError) {
-        console.error('Database error storing watch:', dbError);
+        // Database error storing watch
         return { success: false, error: `Database error: ${dbError.message}` };
       }
 
       return { success: true, webhook_id: watchData.id };
     } catch (error) {
-      console.error('Watch setup error:', error);
+      // Watch setup error
       return { success: false, error: error.message || String(error) };
     }
   },
@@ -1177,7 +1095,7 @@ export const calendarService = {
       // Set up new watch with current sync token
       return await this.setupWatch(userId, webhook.sync_token);
     } catch (error) {
-      console.error('Watch renewal error:', error);
+      // Watch renewal error
       return { success: false, error: error.message || String(error) };
     }
   },
@@ -1220,7 +1138,7 @@ export const calendarService = {
 
       return { success: true };
     } catch (error) {
-      console.error('Stop watch error:', error);
+      // Stop watch error
       return { success: false, error: error.message || String(error) };
     }
   },
@@ -1327,13 +1245,13 @@ export const calendarService = {
 
       return { success: true, next_sync_token: nextSyncToken };
     } catch (error) {
-      console.error('Incremental sync error:', error);
+      // Incremental sync error
       return { success: false, error: error.message || String(error) };
     }
   },
 
   // Process individual calendar event
-  async processCalendarEvent(event: any, userId: string, credentials: any): Promise<{ action: string; meetingId?: string }> {
+  async processCalendarEvent(event: GoogleCalendarEvent, userId: string, credentials: GoogleCredentials): Promise<{ action: string; meetingId?: string }> {
     const meetingUrl = extractMeetingUrl(event);
     
     if (!meetingUrl) {
@@ -1343,7 +1261,7 @@ export const calendarService = {
     // Determine attendee status
     let attendeeStatus = 'needsAction';
     if (Array.isArray(event.attendees)) {
-      const selfAttendee = event.attendees.find((a: any) => a.self);
+              const selfAttendee = event.attendees.find((a: GoogleCalendarAttendee) => a.self);
       if (selfAttendee && selfAttendee.responseStatus) {
         attendeeStatus = selfAttendee.responseStatus;
       }
@@ -1387,7 +1305,7 @@ export const calendarService = {
         .eq('id', existingMeeting.id);
       
       if (updateError) {
-        console.error('Error updating meeting:', updateError);
+        // Error updating meeting
         return { action: 'error_update', meetingId: existingMeeting.id };
       }
       
@@ -1401,7 +1319,7 @@ export const calendarService = {
         .single();
       
       if (insertError) {
-        console.error('Error creating meeting:', insertError);
+        // Error creating meeting
         return { action: 'error_create' };
       }
       
@@ -1421,7 +1339,7 @@ export const calendarService = {
         .eq('user_id', userId);
 
       if (findError) {
-        console.error('Error finding meeting for deletion:', findError);
+        // Error finding meeting for deletion
         return { success: false, error: findError.message };
       }
 
@@ -1450,7 +1368,7 @@ export const calendarService = {
             .in('id', meetingIds);
 
           if (updateError) {
-            console.error('Error updating cancelled meetings:', updateError);
+            // Error updating cancelled meetings
             return { success: false, error: updateError.message };
           }
         } else {
@@ -1461,7 +1379,7 @@ export const calendarService = {
             .in('id', meetingIds);
 
           if (deleteError) {
-            console.error('Error deleting meetings:', deleteError);
+            // Error deleting meetings
             return { success: false, error: deleteError.message };
           }
         }
@@ -1487,7 +1405,7 @@ export const calendarService = {
           .eq('id', meeting.id);
 
         if (updateError) {
-          console.error('Error updating cancelled meeting:', updateError);
+          // Error updating cancelled meeting
           return { success: false, error: updateError.message };
         }
       } else {
@@ -1498,14 +1416,14 @@ export const calendarService = {
           .eq('id', meeting.id);
 
         if (deleteError) {
-          console.error('Error deleting meeting:', deleteError);
+          // Error deleting meeting
           return { success: false, error: deleteError.message };
         }
       }
 
       return { success: true };
     } catch (error) {
-      console.error('Error handling deleted event:', error);
+      // Error handling deleted event
       return { success: false, error: error.message || String(error) };
     }
   },
@@ -1522,7 +1440,7 @@ export const calendarService = {
         .not('google_calendar_event_id', 'is', null);
       
       if (findError) {
-        console.error('Error finding meetings for cleanup:', findError);
+        // Error finding meetings for cleanup
         return { deleted: 0, cancelled: 0, error: findError.message };
       }
       
@@ -1563,46 +1481,14 @@ export const calendarService = {
 
       return { deleted, cancelled };
     } catch (error) {
-      console.error('Error cleaning up orphaned meetings:', error);
+      // Error cleaning up orphaned meetings
       return { deleted: 0, cancelled: 0, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   },
 
-  // Test Google Calendar API access
-  async testCalendarAccess(userId: string): Promise<{ success: boolean; error?: string }> {
-    try {
-      // Testing calendar access for user
-      
-      const credentials = await getGoogleCredentials(userId);
-      if (!credentials) {
-        return { success: false, error: 'No Google credentials found' };
-      }
+  // Test calendar access function removed for production,
 
-      // Test with a simple calendar API call
-      const response = await fetch(
-        'https://www.googleapis.com/calendar/v3/calendars/primary',
-        {
-          headers: {
-            'Authorization': `Bearer ${credentials.access_token}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Calendar API test failed:', response.status, errorText);
-        return { success: false, error: `Calendar API test failed: ${response.status} - ${errorText}` };
-      }
-
-              // Calendar API access test successful
-      return { success: true };
-    } catch (error) {
-      console.error('Calendar access test error:', error);
-      return { success: false, error: error.message || String(error) };
-    }
-  },
-
-  // Manual sync without cleanup (for debugging)
+  // Manual sync without cleanup
   async manualSyncWithoutCleanup(userId: string): Promise<{ success: boolean; error?: string; processed?: number }> {
     try {
       const credentials = await getGoogleCredentials(userId);
@@ -1649,12 +1535,12 @@ export const calendarService = {
 
       return { success: true, processed };
     } catch (error) {
-      console.error('Manual sync error:', error);
+      // Manual sync error
       return { success: false, error: error.message || String(error) };
     }
   },
 
-  // Force initial sync even if webhook exists (for debugging)
+  // Force initial sync even if webhook exists
   async forceInitialSync(userId: string): Promise<{ success: boolean; error?: string; webhook_id?: string }> {
     try {
       
@@ -1674,12 +1560,12 @@ export const calendarService = {
       
       return { success: true, webhook_id: watchResult.webhook_id };
     } catch (error) {
-      console.error('Force initial sync error:', error);
+      // Force initial sync error
       return { success: false, error: error.message || String(error) };
     }
   },
 
-  // Clear webhook and force fresh setup (for debugging)
+  // Clear webhook and force fresh setup
   async clearWebhookAndResync(userId: string): Promise<{ success: boolean; error?: string; webhook_id?: string }> {
     try {
       
@@ -1721,7 +1607,7 @@ export const calendarService = {
       
       return { success: true, webhook_id: watchResult.webhook_id };
     } catch (error) {
-      console.error('Clear and resync error:', error);
+      // Clear and resync error
       return { success: false, error: error.message || String(error) };
     }
   },
@@ -1741,7 +1627,7 @@ export const calendarService = {
         .eq('user_id', userId);
       
       if (webhookError) {
-        console.error('Error fetching webhooks:', webhookError);
+        // Error fetching webhooks
       } else if (webhooks && webhooks.length > 0) {
         for (const webhook of webhooks) {
           // Stop the webhook with Google
@@ -1762,7 +1648,7 @@ export const calendarService = {
           .eq('user_id', userId);
         
         if (deleteWebhookError) {
-          console.error('Error deleting webhooks:', deleteWebhookError);
+          // Error deleting webhooks
         } else {
           deletedWebhooks = webhooks.length;
         }
@@ -1775,7 +1661,7 @@ export const calendarService = {
         .eq('user_id', userId);
       
       if (meetingsError) {
-        console.error('Error fetching meetings:', meetingsError);
+        // Error fetching meetings
       } else if (meetings && meetings.length > 0) {
         const { error: deleteMeetingsError } = await supabase
           .from('meetings')
@@ -1783,7 +1669,7 @@ export const calendarService = {
           .eq('user_id', userId);
         
         if (deleteMeetingsError) {
-          console.error('Error deleting meetings:', deleteMeetingsError);
+          // Error deleting meetings
         } else {
           deletedMeetings = meetings.length;
         }
@@ -1796,7 +1682,7 @@ export const calendarService = {
         .eq('user_id', userId);
       
       if (syncLogsError) {
-        console.error('Error fetching sync logs:', syncLogsError);
+        // Error fetching sync logs
       } else if (syncLogs && syncLogs.length > 0) {
         const { error: deleteSyncLogsError } = await supabase
           .from('calendar_sync_logs')
@@ -1804,7 +1690,7 @@ export const calendarService = {
           .eq('user_id', userId);
         
         if (deleteSyncLogsError) {
-          console.error('Error deleting sync logs:', deleteSyncLogsError);
+          // Error deleting sync logs
         } else {
           deletedSyncLogs = syncLogs.length;
         }
@@ -1820,7 +1706,7 @@ export const calendarService = {
         }
       };
     } catch (error) {
-      console.error('Calendar cleanup error:', error);
+      // Calendar cleanup error
       return { 
         success: false, 
         error: error.message || String(error),
@@ -1834,8 +1720,8 @@ export const calendarService = {
     webhook_active: boolean;
     webhook_url?: string;
     last_sync?: string;
-    sync_logs: any[];
-    recent_errors: any[];
+      sync_logs: Record<string, unknown>[];
+  recent_errors: Record<string, unknown>[];
     expiration_time?: string;
     sync_token?: string;
   }> {
@@ -1883,7 +1769,7 @@ export const calendarService = {
         sync_token: webhook.sync_token,
       };
     } catch (error) {
-      console.error('Error getting watch status:', error);
+      // Error getting watch status
       return {
         webhook_active: false,
         sync_logs: [],
@@ -1996,7 +1882,7 @@ export const calendarService = {
         return { success: false, error: 'Webhook not found or invalid with Google' };
       }
     } catch (error) {
-      console.error('Webhook verification error:', error);
+      // Webhook verification error
       return { success: false, error: error.message || String(error) };
     }
   },

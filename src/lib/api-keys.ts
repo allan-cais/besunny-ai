@@ -8,7 +8,7 @@ export interface ApiKeyStatus {
 
 export const apiKeyService = {
   // Send a bot to a meeting via Edge Function (uses master API key)
-  async sendBotToMeeting(meetingUrl: string, options: any = {}): Promise<any> {
+  async sendBotToMeeting(meetingUrl: string, options: { bot_chat_message?: { message: string; to?: string } } = {}): Promise<Record<string, unknown>> {
     const session = (await supabase.auth.getSession()).data.session;
     if (!session) throw new Error('Not authenticated');
     
@@ -53,8 +53,8 @@ export const apiKeyService = {
 
     
     if (!result.ok) {
-      console.error('Attendee proxy error:', result);
-      console.error('Full error response data:', JSON.stringify(result.data, null, 2));
+      // Attendee proxy error
+      // Full error response data
       
       // Try to extract more detailed error information
       if (result.data && result.data.non_field_errors) {
@@ -63,7 +63,7 @@ export const apiKeyService = {
         throw new Error(`Attendee API error: ${result.data.error}`);
       } else if (result.data && typeof result.data === 'object') {
     
-        console.error('Error data keys:', Object.keys(result.data));
+        // Error data keys
         throw new Error(`Attendee API error: ${JSON.stringify(result.data)}`);
       } else if (result.error) {
         throw new Error(result.error);
@@ -74,7 +74,7 @@ export const apiKeyService = {
     
     // The result.data should contain the Attendee API response
     if (!result.data) {
-      console.error('No data in response:', result);
+      // No data in response
       throw new Error('No data received from Attendee API');
     }
     
@@ -83,7 +83,7 @@ export const apiKeyService = {
   },
 
   // Get bot details
-  async getBotDetails(botId: string): Promise<any> {
+  async getBotDetails(botId: string): Promise<Record<string, unknown>> {
     const session = (await supabase.auth.getSession()).data.session;
     if (!session) throw new Error('Not authenticated');
     const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/attendee-proxy/bot-details?bot_id=${botId}`, {
@@ -103,7 +103,7 @@ export const apiKeyService = {
   },
 
   // Update a scheduled bot (e.g., change join time)
-  async updateScheduledBot(botId: string, updates: any): Promise<any> {
+  async updateScheduledBot(botId: string, updates: Record<string, unknown>): Promise<Record<string, unknown>> {
     const session = (await supabase.auth.getSession()).data.session;
     if (!session) throw new Error('Not authenticated');
     const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/attendee-proxy/update-bot`, {
@@ -127,7 +127,7 @@ export const apiKeyService = {
   },
 
   // Delete a scheduled bot
-  async deleteScheduledBot(botId: string): Promise<any> {
+  async deleteScheduledBot(botId: string): Promise<Record<string, unknown>> {
     const session = (await supabase.auth.getSession()).data.session;
     if (!session) throw new Error('Not authenticated');
     const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/attendee-proxy/delete-bot`, {
@@ -150,7 +150,7 @@ export const apiKeyService = {
   },
 
   // Get meeting transcript
-  async getMeetingTranscript(botId: string, updatedAfter?: string): Promise<any> {
+  async getMeetingTranscript(botId: string, updatedAfter?: string): Promise<Record<string, unknown>> {
     const session = (await supabase.auth.getSession()).data.session;
     if (!session) throw new Error('Not authenticated');
     
@@ -176,7 +176,7 @@ export const apiKeyService = {
   },
 
   // Get chat messages
-  async getChatMessages(botId: string, cursor?: string, updatedAfter?: string): Promise<any> {
+  async getChatMessages(botId: string, cursor?: string, updatedAfter?: string): Promise<Record<string, unknown>> {
     const session = (await supabase.auth.getSession()).data.session;
     if (!session) throw new Error('Not authenticated');
     

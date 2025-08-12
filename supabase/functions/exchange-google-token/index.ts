@@ -173,7 +173,7 @@ serve(async (req) => {
       );
       
       if (updateError) {
-        console.warn('Failed to update user metadata:', updateError);
+        // Failed to update user metadata
         // Don't fail the whole operation if metadata update fails
       }
     }

@@ -44,29 +44,4 @@ $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = 'public';
 GRANT EXECUTE ON FUNCTION get_meetings_for_polling() TO authenticated;
 GRANT EXECUTE ON FUNCTION get_meetings_for_polling() TO service_role;
 
--- Test the function to see what meetings it now finds
-SELECT 
-  id,
-  title,
-  bot_status,
-  polling_enabled,
-  transcript_retrieved_at,
-  last_polled_at,
-  next_poll_at,
-  CASE 
-    WHEN bot_status = 'completed' AND transcript_retrieved_at IS NOT NULL THEN 'completed_with_transcript'
-    WHEN bot_status = 'completed' AND transcript_retrieved_at IS NULL THEN 'completed_needs_transcript'
-    WHEN next_poll_at IS NULL OR next_poll_at <= NOW() THEN 'ready_for_polling'
-    ELSE 'waiting'
-  END as polling_status
-FROM meetings 
-WHERE attendee_bot_id IS NOT NULL 
-  AND (
-    bot_status IN ('pending', 'bot_scheduled', 'bot_joined', 'transcribing')
-    OR
-    (bot_status = 'completed' 
-     AND transcript_retrieved_at IS NULL
-     AND last_polled_at IS NOT NULL
-     AND last_polled_at > NOW() - INTERVAL '1 hour')
-  )
-ORDER BY bot_status, next_poll_at; 
+-- Function created successfully 

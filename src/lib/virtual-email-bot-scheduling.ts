@@ -20,7 +20,7 @@ export interface VirtualEmailBotScheduling {
   getUserVirtualEmail(userId: string): Promise<string>;
   
   // Process incoming calendar events for virtual email attendees
-  processCalendarEventForVirtualEmail(eventData: any): Promise<{
+  processCalendarEventForVirtualEmail(eventData: Record<string, unknown>): Promise<{
     processed: boolean;
     meetingId?: string;
     autoScheduled?: boolean;
@@ -59,7 +59,7 @@ export const virtualEmailBotScheduling: VirtualEmailBotScheduling = {
         username
       };
     } catch (error) {
-      console.error('Error checking for virtual email attendees:', error);
+      // Error checking for virtual email attendees
       return { hasVirtualEmail: false };
     }
   },
@@ -115,7 +115,7 @@ export const virtualEmailBotScheduling: VirtualEmailBotScheduling = {
         botId: result.id || result.bot_id
       };
     } catch (error) {
-      console.error('Error auto-scheduling bot:', error);
+      // Error auto-scheduling bot
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error'
@@ -139,12 +139,12 @@ export const virtualEmailBotScheduling: VirtualEmailBotScheduling = {
       // Create virtual email using the username from the users table
       return `ai+${user.username}@besunny.ai`;
     } catch (error) {
-      console.error('Error getting user virtual email:', error);
+      // Error getting user virtual email
       throw error;
     }
   },
   
-  async processCalendarEventForVirtualEmail(eventData: any) {
+  async processCalendarEventForVirtualEmail(eventData: Record<string, unknown>) {
     try {
       // Check if event has virtual email attendees
       const attendees = eventData.attendees || [];
@@ -174,7 +174,7 @@ export const virtualEmailBotScheduling: VirtualEmailBotScheduling = {
         .single();
       
       if (userError || !user) {
-        console.error('User not found for virtual email:', virtualEmailAttendee);
+        // User not found for virtual email
         return { processed: false };
       }
       
@@ -237,7 +237,7 @@ export const virtualEmailBotScheduling: VirtualEmailBotScheduling = {
         autoScheduled: true
       };
     } catch (error) {
-      console.error('Error processing calendar event for virtual email:', error);
+      // Error processing calendar event for virtual email
       return { processed: false };
     }
   }

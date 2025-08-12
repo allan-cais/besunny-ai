@@ -98,8 +98,8 @@ const ProjectMeetingsCard: React.FC<ProjectMeetingsCardProps> = ({ projectId }) 
         loadedMeetings = await calendarService.getUpcomingMeetings();
       }
       setMeetings(loadedMeetings);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load meetings');
+    } catch (err: unknown) {
+      setError((err as Error).message || 'Failed to load meetings');
     } finally {
       setLoading(false);
     }
@@ -116,8 +116,8 @@ const ProjectMeetingsCard: React.FC<ProjectMeetingsCardProps> = ({ projectId }) 
       
       // Reload meetings after sync
       await loadMeetings();
-    } catch (err: any) {
-      setError(err.message || 'Failed to sync calendar events');
+    } catch (err: unknown) {
+      setError((err as Error).message || 'Failed to sync calendar events');
     } finally {
       setSyncing(false);
     }
@@ -153,8 +153,8 @@ const ProjectMeetingsCard: React.FC<ProjectMeetingsCardProps> = ({ projectId }) 
       
       // Reload meetings to show updated status
       await loadMeetings();
-    } catch (err: any) {
-      setError(err.message || 'Failed to send bot to meeting');
+    } catch (err: unknown) {
+      setError((err as Error).message || 'Failed to send bot to meeting');
     } finally {
       setSendingBot(null);
     }

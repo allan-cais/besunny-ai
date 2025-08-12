@@ -26,7 +26,7 @@ const UsernameSetupManager: React.FC = () => {
         .single();
 
       if (error) {
-        console.error('Error checking username status:', error);
+        // Error checking username status
         // If there's an error, we'll show the dialog anyway
         setShowDialog(true);
       } else if (!data?.username) {
@@ -36,7 +36,7 @@ const UsernameSetupManager: React.FC = () => {
 
       setHasChecked(true);
     } catch (error) {
-      console.error('Error checking username status:', error);
+      // Error checking username status
       setHasChecked(true);
     }
   };

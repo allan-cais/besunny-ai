@@ -8,9 +8,9 @@ import { Mail, FileText, MessageSquare, X, Edit3 } from 'lucide-react';
 interface ClassificationModalProps {
   activity: {
     id: string;
-    type: 'email' | 'document' | 'spreadsheet' | 'presentation' | 'image' | 'folder' | 'meeting_transcript';
+    type: string; // Allow any string type to match VirtualEmailActivity
     title: string;
-    summary: string;
+    summary?: string; // Make optional to match VirtualEmailActivity
     source: string;
     sender?: string;
     created_at: string;
@@ -69,6 +69,8 @@ const ClassificationModal: React.FC<ClassificationModalProps> = ({
         return 'Folder';
       case 'meeting_transcript':
         return 'Transcript';
+      case 'drive_file':
+        return 'Drive File';
       default:
         return 'File';
     }

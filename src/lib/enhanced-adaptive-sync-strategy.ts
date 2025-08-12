@@ -156,7 +156,7 @@ class EnhancedAdaptiveSyncStrategy {
         autoScheduledMeetings: autoScheduledMeetings?.length || 0,
       };
     } catch (error) {
-      console.error('Error getting virtual email activity:', error);
+              // Error getting virtual email activity
       return null;
     }
   }
@@ -270,7 +270,7 @@ class EnhancedAdaptiveSyncStrategy {
           break;
       }
     } catch (error) {
-      console.error(`Immediate sync failed for user ${userId}, service ${service}:`, error);
+              // Immediate sync failed for user and service
     }
   }
 
@@ -389,7 +389,7 @@ class EnhancedAdaptiveSyncStrategy {
       await this.updateVirtualEmailActivity(userId);
 
     } catch (error) {
-      console.error(`Background sync failed for user ${userId}:`, error);
+              // Background sync failed for user
     }
   }
 
@@ -406,7 +406,7 @@ class EnhancedAdaptiveSyncStrategy {
         state.hasVirtualEmailAttendees = virtualEmailActivity.autoScheduledMeetings > 0;
       }
     } catch (error) {
-      console.error('Error updating virtual email activity:', error);
+              // Error updating virtual email activity
     }
   }
 
@@ -685,7 +685,7 @@ class EnhancedAdaptiveSyncStrategy {
           // For now, we'll just mark as processed
           processed++;
         } catch (error) {
-          console.error(`Error polling meeting ${meeting.id}:`, error);
+          // Error polling meeting
         }
       }
 
@@ -822,7 +822,7 @@ class EnhancedAdaptiveSyncStrategy {
         return results;
       }
     } catch (error) {
-      console.error(`Manual sync failed for user ${userId}:`, error);
+              // Manual sync failed for user
       throw error;
     }
   }
