@@ -83,9 +83,10 @@ export interface ChatSession {
 export interface ChatMessage {
   id: string;
   session_id: string;
-  content: string;
+  message: string;
   role: 'user' | 'assistant' | 'system';
   created_at: string;
+  used_chunks?: string[];
 }
 
 // Enums
