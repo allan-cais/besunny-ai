@@ -4,17 +4,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Send, ChevronRight, MessageSquare } from 'lucide-react';
 import { useSupabase } from '@/hooks/use-supabase';
-import { ChatMessage as SupabaseChatMessage } from '@/lib/supabase';
+import { ChatMessage } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
-
-interface ChatMessage {
-  id: string;
-  session_id: string;
-  role?: string;
-  message?: string;
-  used_chunks?: string[];
-  created_at: string;
-}
 
 interface ProjectChatProps {
   projectId: string;
@@ -85,7 +76,7 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
         },
         (payload: Record<string, unknown>) => {
           if (payload.new) {
-            const newMessage = payload.new as SupabaseChatMessage;
+            const newMessage = payload.new as ChatMessage;
             setMessages(prev => {
               // Check if message already exists
               const exists = prev.some(msg => msg.id === newMessage.id);

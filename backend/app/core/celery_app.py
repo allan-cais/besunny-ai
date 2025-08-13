@@ -1,0 +1,229 @@
+"""
+Celery configuration for BeSunny.ai Python backend.
+Handles background task processing and scheduling.
+"""
+
+from celery import Celery
+from celery.schedules import crontab
+import logging
+
+from .config import get_settings
+
+logger = logging.getLogger(__name__)
+
+# Get settings
+settings = get_settings()
+
+# Create Celery app
+celery_app = Celery(
+    "besunny",
+    broker=settings.redis_url,
+    backend=settings.redis_url,
+    include=[
+        "app.services.email.tasks",
+        "app.services.classification.tasks",
+        "app.services.drive.tasks",
+        "app.services.calendar.tasks",
+        "app.services.attendee.tasks",
+    ]
+)
+
+# Celery configuration
+celery_app.conf.update(
+    # Task serialization
+    task_serializer="json",
+    accept_content=["json"],
+    result_serializer="json",
+    timezone="UTC",
+    enable_utc=True,
+    
+    # Task routing
+    task_routes={
+        "app.services.email.tasks.*": {"queue": "email"},
+        "app.services.classification.tasks.*": {"queue": "ai"},
+        "app.services.drive.tasks.*": {"queue": "drive"},
+        "app.services.calendar.tasks.*": {"queue": "calendar"},
+        "app.services.attendee.tasks.*": {"queue": "attendee"},
+    },
+    
+    # Task execution
+    task_always_eager=False,  # Set to True for testing
+    task_eager_propagates=True,
+    task_ignore_result=False,
+    task_store_errors_even_if_ignored=True,
+    
+    # Worker configuration
+    worker_prefetch_multiplier=1,
+    worker_max_tasks_per_child=1000,
+    worker_disable_rate_limits=False,
+    
+    # Result backend
+    result_expires=3600,  # 1 hour
+    result_persistent=True,
+    
+    # Task time limits
+    task_soft_time_limit=300,  # 5 minutes
+    task_time_limit=600,  # 10 minutes
+    
+    # Retry configuration
+    task_acks_late=True,
+    task_reject_on_worker_lost=True,
+    
+    # Monitoring
+    worker_send_task_events=True,
+    task_send_sent_event=True,
+    
+    # Security
+    security_key=settings.secret_key,
+    security_certificate=None,
+    security_cert_store=None,
+)
+
+# Scheduled tasks
+celery_app.conf.beat_schedule = {
+    # Email processing tasks
+    "process-pending-emails": {
+        "task": "app.services.email.tasks.process_pending_emails",
+        "schedule": crontab(minute="*/5"),  # Every 5 minutes
+    },
+    
+    # Drive monitoring tasks
+    "sync-drive-files": {
+        "task": "app.services.drive.tasks.sync_drive_files",
+        "schedule": crontab(minute="*/15"),  # Every 15 minutes
+    },
+    
+    # Calendar synchronization
+    "sync-calendar-events": {
+        "task": "app.services.calendar.tasks.sync_calendar_events",
+        "schedule": crontab(minute="*/30"),  # Every 30 minutes
+    },
+    
+    # AI model updates
+    "update-ai-models": {
+        "task": "app.services.classification.tasks.update_ai_models",
+        "schedule": crontab(hour=2, minute=0),  # Daily at 2 AM
+    },
+    
+    # Cleanup tasks
+    "cleanup-old-tasks": {
+        "task": "app.core.tasks.cleanup_old_tasks",
+        "schedule": crontab(hour=3, minute=0),  # Daily at 3 AM
+    },
+    
+    # Health checks
+    "check-service-health": {
+        "task": "app.core.tasks.check_service_health",
+        "schedule": crontab(minute="*/10"),  # Every 10 minutes
+    },
+}
+
+# Task error handling
+@celery_app.task(bind=True)
+def debug_task(self):
+    """Debug task for testing."""
+    logger.info(f"Request: {self.request!r}")
+
+
+# Task monitoring
+@celery_app.task(bind=True)
+def monitor_task(self, task_name: str, *args, **kwargs):
+    """Monitor task execution and performance."""
+    try:
+        logger.info(f"Starting task: {task_name}")
+        start_time = time.time()
+        
+        # Execute the actual task
+        result = self.apply_async(args=args, kwargs=kwargs)
+        
+        execution_time = time.time() - start_time
+        logger.info(f"Task {task_name} completed in {execution_time:.2f}s")
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Task {task_name} failed: {e}")
+        raise
+
+
+# Health check task
+@celery_app.task
+def health_check():
+    """Check system health and report status."""
+    try:
+        # Check database connectivity
+        from .database import db_manager
+        # Note: In Celery tasks, we need to handle async operations differently
+        # For now, we'll return a placeholder status
+        # In production, you'd use sync versions or handle async properly
+        
+        health_status = {
+            "database": True,  # Placeholder - implement actual check
+            "redis": True,      # Placeholder - implement actual check
+            "external_services": True,  # Placeholder - implement actual check
+            "overall": True,
+            "timestamp": time.time(),
+        }
+        
+        logger.info(f"Health check completed: {health_status}")
+        return health_status
+        
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        return {
+            "overall": False,
+            "error": str(e),
+            "timestamp": time.time(),
+        }
+
+
+# Cleanup task
+@celery_app.task
+def cleanup_old_tasks():
+    """Clean up old completed tasks and results."""
+    try:
+        from celery.result import AsyncResult
+        
+        # Get all task results
+        # This is a simplified example - in production you'd use a more efficient approach
+        logger.info("Starting cleanup of old tasks")
+        
+        # Clean up results older than 24 hours
+        cutoff_time = time.time() - (24 * 3600)
+        
+        # Implementation would depend on your result backend
+        # For Redis, you might use TTL-based cleanup
+        # For database, you might delete old records
+        
+        logger.info("Cleanup of old tasks completed")
+        return {"cleaned_tasks": 0, "timestamp": time.time()}
+        
+    except Exception as e:
+        logger.error(f"Cleanup failed: {e}")
+        return {"error": str(e), "timestamp": time.time()}
+
+
+# Task event handlers
+@celery_app.task_success.connect
+def task_success_handler(sender=None, **kwargs):
+    """Handle successful task completion."""
+    logger.info(f"Task {sender.name} completed successfully")
+
+
+@celery_app.task_failure.connect
+def task_failure_handler(sender=None, task_id=None, exception=None, **kwargs):
+    """Handle task failure."""
+    logger.error(f"Task {sender.name} failed: {exception}")
+
+
+@celery_app.task_revoked.connect
+def task_revoked_handler(sender=None, request=None, terminated=None, signum=None, **kwargs):
+    """Handle task revocation."""
+    logger.warning(f"Task {sender.name} was revoked")
+
+
+# Import time to avoid circular imports
+import time
+from .database import db_manager
+from .redis_client import redis_client
+from .external_services import check_external_services

@@ -1,6 +1,6 @@
 # Attendee Integration
 
-This document describes the implementation of the Attendee integration for the Kirit Askuno application.
+This document describes the implementation of the Attendee integration for the besunny.ai application.
 
 ## Overview
 

@@ -1,6 +1,6 @@
 # Google OAuth Login Implementation
 
-This document describes the implementation of Google OAuth login functionality for the Kirit Askuno application.
+This document describes the implementation of Google OAuth login functionality for the besunny.ai application.
 
 ## Overview
 
