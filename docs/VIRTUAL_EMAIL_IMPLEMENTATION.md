@@ -1,6 +1,6 @@
-# Virtual Email Addresses Implementation
+# Virtual Email Implementation
 
-This document describes the implementation of virtual inbound email addresses using Gmail plus-addressing for the Kirit Askuno application.
+This document describes the implementation of virtual inbound email addresses using Gmail plus-addressing for the besunny.ai application.
 
 ## Overview
 
