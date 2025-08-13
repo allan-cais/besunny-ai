@@ -286,12 +286,13 @@ export class DocumentService {
   }
 
   // Get documents needing classification
-  async getUnclassifiedDocuments(limit: number = 50): Promise<Document[]> {
+  async getUnclassifiedDocuments(userId: string, limit: number = 50): Promise<Document[]> {
     try {
       const { data: documents, error } = await supabase
         .from('documents')
         .select('*')
-        .is('project_id', null)
+        .eq('created_by', userId) // First filter: documents created by specific user
+        .is('project_id', null) // Second filter: only unclassified documents
         .order('created_at', { ascending: false })
         .limit(limit);
 

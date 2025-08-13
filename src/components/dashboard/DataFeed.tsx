@@ -88,11 +88,11 @@ const DataFeed = () => {
     try {
       setLoading(true);
       
-      // Load ALL documents from the documents table - no filtering at all
-      // This should return every document in the database
+      // Load documents created by the current user - filter by created_by first
       const { data: documentsData, error: documentsError } = await supabase
         .from('documents')
         .select('*')
+        .eq('created_by', user.id) // First filter: documents created by current user
         .order('created_at', { ascending: false })
         .limit(200); // Increased limit to get more documents
 
@@ -104,7 +104,7 @@ const DataFeed = () => {
       } else {
         setDocuments(documentsData || []);
         
-        // Transform documents to match our interface
+        // Transform user's documents to match our interface
         const documentActivities: VirtualEmailActivity[] = (documentsData || []).map(doc => ({
           id: doc.id,
           type: doc.type || getDocumentType(doc.source, doc),

@@ -113,11 +113,12 @@ const Dashboard = () => {
     try {
       setDataLoading(true);
       
-      // Load documents that don't have a project_id (unclassified)
+      // Load documents that don't have a project_id (unclassified) AND belong to the current user
       const { data: documentsData, error: documentsError } = await supabase
         .from('documents')
         .select('*')
-        .is('project_id', null) // Only unclassified documents
+        .eq('created_by', user.id) // First filter: documents created by current user
+        .is('project_id', null) // Second filter: only unclassified documents
         .order('created_at', { ascending: false })
         .limit(50);
 
