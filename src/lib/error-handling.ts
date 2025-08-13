@@ -30,6 +30,12 @@ export interface ErrorContext {
   timestamp: string;
   userAgent?: string;
   url?: string;
+  // Additional context properties for specific services
+  type?: string;
+  documentId?: string;
+  query?: string;
+  limit?: number;
+  watchActive?: boolean;
 }
 
 // Application error class
