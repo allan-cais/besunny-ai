@@ -12,11 +12,11 @@ This document provides a quick reference for Python backend development within t
 │   Frontend      │    │   Python API    │    │   External      │
 │   (React/TS)    │◄──►│   Gateway       │◄──►│   Services      │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         ▼                       ▼                       ▼
+         │                      │                      │
+         ▼                      ▼                      ▼
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Supabase      │    │   Python        │    │   AI/ML         │
-│   (Auth/DB)     │    │   Microservices │    │   Services      │
+│   Supabase      │    │  Python         │    │     AI/ML       │
+│   (Auth/DB)     │    │  Microservices  │    │    Services     │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 

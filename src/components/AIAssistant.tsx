@@ -3,24 +3,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send, ChevronRight, MessageSquare } from "lucide-react";
 import { useSupabase, useSupabaseSubscription } from "@/hooks/use-supabase";
-import { ChatMessage as SupabaseChatMessage } from "@/lib/supabase";
-
-interface ChatMessage {
-  id: string;
-  session_id: string;
-  role?: string;
-  message?: string;
-  used_chunks?: string[];
-  created_at: string;
-}
-
-interface ChatSession {
-  id: string;
-  user_id?: string;
-  project_id?: string;
-  started_at: string;
-  ended_at?: string;
-}
+import { ChatMessage, ChatSession } from "@/types";
 
 interface AIAssistantProps {
   isCollapsed: boolean;
@@ -65,7 +48,7 @@ const AIAssistant = ({
   // Real-time subscription for messages
   useSupabaseSubscription(activeChatId || '', (payload) => {
     if (payload.eventType === 'INSERT' && payload.new) {
-      const newMessage = payload.new as SupabaseChatMessage;
+      const newMessage = payload.new as ChatMessage;
       if (newMessage.session_id === activeChatId) {
         setMessages(prev => {
           // Check if message already exists

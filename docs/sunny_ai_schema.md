@@ -602,8 +602,6 @@ CREATE INDEX idx_user_activity_logs_created_at ON user_activity_logs(created_at)
 
 ## Row Level Security (RLS)
 
-**⚠️ CRITICAL SECURITY NOTE:** The documents table RLS policies are essential for user data isolation. Without proper `created_by` filtering, users can see documents from other users, which is a serious security vulnerability.
-
 ```sql
 -- Enable RLS on tables
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
@@ -646,102 +644,6 @@ CREATE POLICY "Users can insert own projects" ON projects FOR INSERT WITH CHECK 
 CREATE POLICY "Users can update own projects" ON projects FOR UPDATE USING (auth.uid() = user_id);
 CREATE POLICY "Users can delete own projects" ON projects FOR DELETE USING (auth.uid() = user_id);
 
--- Documents table policies - CRITICAL for user isolation
-CREATE POLICY "Users can view own documents" ON documents FOR SELECT USING (auth.uid() = created_by);
-CREATE POLICY "Users can insert own documents" ON documents FOR INSERT WITH CHECK (auth.uid() = created_by);
-CREATE POLICY "Users can update own documents" ON documents FOR UPDATE USING (auth.uid() = created_by);
-CREATE POLICY "Users can delete own documents" ON documents FOR DELETE USING (auth.uid() = created_by);
-
--- Document chunks table policies
-CREATE POLICY "Users can view own document chunks" ON document_chunks FOR SELECT USING (
-  EXISTS (
-    SELECT 1 FROM documents d 
-    WHERE d.id = document_chunks.document_id 
-    AND d.created_by = auth.uid()
-  )
-);
-CREATE POLICY "Users can insert own document chunks" ON document_chunks FOR INSERT WITH CHECK (
-  EXISTS (
-    SELECT 1 FROM documents d 
-    WHERE d.id = document_chunks.document_id 
-    AND d.created_by = auth.uid()
-  )
-);
-CREATE POLICY "Users can update own document chunks" ON document_chunks FOR UPDATE USING (
-  EXISTS (
-    SELECT 1 FROM documents d 
-    WHERE d.id = document_chunks.document_id 
-    AND d.created_by = auth.uid()
-  )
-);
-CREATE POLICY "Users can delete own document chunks" ON document_chunks FOR DELETE USING (
-  EXISTS (
-    SELECT 1 FROM documents d 
-    WHERE d.id = document_chunks.document_id 
-    AND d.created_by = auth.uid()
-  )
-);
-
--- Document tags table policies
-CREATE POLICY "Users can view own document tags" ON document_tags FOR SELECT USING (
-  EXISTS (
-    SELECT 1 FROM documents d 
-    WHERE d.id = document_tags.document_id 
-    AND d.created_by = auth.uid()
-  )
-);
-CREATE POLICY "Users can insert own document tags" ON document_tags FOR INSERT WITH CHECK (
-  EXISTS (
-    SELECT 1 FROM documents d 
-    WHERE d.id = document_tags.document_id 
-    AND d.created_by = auth.uid()
-  )
-);
-CREATE POLICY "Users can update own document tags" ON document_tags FOR UPDATE USING (
-  EXISTS (
-    SELECT 1 FROM documents d 
-    WHERE d.id = document_tags.document_id 
-    AND d.created_by = auth.uid()
-  )
-);
-CREATE POLICY "Users can delete own document tags" ON document_tags FOR DELETE USING (
-  EXISTS (
-    SELECT 1 FROM documents d 
-    WHERE d.id = document_tags.document_id 
-    AND d.created_by = auth.uid()
-  )
-);
-
--- Summaries table policies
-CREATE POLICY "Users can view own summaries" ON summaries FOR SELECT USING (
-  EXISTS (
-    SELECT 1 FROM documents d 
-    WHERE d.id = summaries.document_id 
-    AND d.created_by = auth.uid()
-  )
-);
-CREATE POLICY "Users can insert own summaries" ON summaries FOR INSERT WITH CHECK (
-  EXISTS (
-    SELECT 1 FROM documents d 
-    WHERE d.id = summaries.document_id 
-    AND d.created_by = auth.uid()
-  )
-);
-CREATE POLICY "Users can update own summaries" ON summaries FOR UPDATE USING (
-  EXISTS (
-    SELECT 1 FROM documents d 
-    WHERE d.id = summaries.document_id 
-    AND d.created_by = auth.uid()
-  )
-);
-CREATE POLICY "Users can delete own summaries" ON summaries FOR DELETE USING (
-  EXISTS (
-    SELECT 1 FROM documents d 
-    WHERE d.id = summaries.document_id 
-    AND d.created_by = auth.uid()
-  )
-);
-
 -- Add similar policies for other tables based on user_id or project_id relationships
 ```
 
@@ -778,40 +680,6 @@ CREATE TRIGGER update_sync_tracking_updated_at BEFORE UPDATE ON sync_tracking FO
 3. **Run the script** in your target database
 4. **Verify** that all tables, constraints, and indexes were created successfully
 5. **Test** your application with the new schema
-
-## Critical Security Implementation Notes
-
-### Document Filtering Order
-When querying documents, **ALWAYS** filter by `created_by` first, then by `project_id`:
-
-```sql
--- ✅ CORRECT: Filter by user first, then by project
-SELECT * FROM documents 
-WHERE created_by = 'user-uuid' 
-  AND project_id IS NULL;
-
--- ❌ WRONG: Only filtering by project can expose other users' documents
-SELECT * FROM documents 
-WHERE project_id IS NULL;
-```
-
-### Application-Level Security
-Even with RLS policies, ensure your application code always includes `created_by` filtering:
-
-```typescript
-// ✅ CORRECT: Always filter by current user
-const { data } = await supabase
-  .from('documents')
-  .select('*')
-  .eq('created_by', user.id)  // First filter: user isolation
-  .is('project_id', null);    // Second filter: unclassified only
-
-// ❌ WRONG: Missing user filter can expose other users' data
-const { data } = await supabase
-  .from('documents')
-  .select('*')
-  .is('project_id', null);
-```
 
 ## Notes
 

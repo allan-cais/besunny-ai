@@ -4,10 +4,46 @@
 
 This document outlines the strategic roadmap for integrating Python backend services into the BeSunny.ai ecosystem. The Python backend will complement the existing React/TypeScript frontend and Supabase infrastructure, providing enhanced AI capabilities, data processing, and microservice architecture.
 
+## Current System Analysis
+
+### Existing Services to Port
+Based on the current Supabase edge functions and N8N workflows, the following services need to be ported to Python:
+
+#### 1. Email & Document Processing
+- **process-inbound-emails**: Email ingestion and classification
+- **gmail-polling-service**: Gmail notification handling
+- **gmail-notification-handler**: Webhook processing for Gmail
+- **setup-gmail-watch**: Gmail push notification setup
+
+#### 2. Google Drive Integration
+- **drive-webhook-handler**: Drive file change notifications
+- **drive-polling-service**: Drive file monitoring
+- **subscribe-to-drive-file**: File watch setup
+- **drive-polling-cron**: Scheduled Drive synchronization
+
+#### 3. Calendar & Meeting Management
+- **calendar-webhook-public**: Public calendar webhook handling
+- **google-calendar-webhook**: Calendar event notifications
+- **calendar-polling-service**: Calendar synchronization
+- **auto-schedule-bots**: Meeting bot deployment
+- **attendee-service**: Attendee meeting bot integration
+
+#### 4. AI & Classification Services
+- **project-onboarding-ai**: AI-assisted project setup
+- **enhanced-adaptive-sync-service**: Intelligent synchronization
+- **N8N Classification Agent**: Document classification workflow
+- **Vector Embeddings**: RAG capabilities with Pinecone
+
+#### 5. Authentication & OAuth
+- **google-oauth-login**: Google OAuth flow
+- **exchange-google-token**: Token exchange
+- **refresh-google-token**: Token refresh
+- **disconnect-google**: Service disconnection
+
 ## Strategic Vision
 
 ### Phase 1: Foundation & Core Services (Q1 2024)
-**Goal**: Establish Python backend infrastructure and core AI services
+**Goal**: Establish Python backend infrastructure and port core email/document processing services
 
 #### 1.1 Python Backend Infrastructure
 - **FastAPI Application Setup**
@@ -15,31 +51,41 @@ This document outlines the strategic roadmap for integrating Python backend serv
   - Docker containerization
   - Environment management
   - Health checks and monitoring
+  - API Gateway implementation
 
 - **Database Integration**
-  - SQLAlchemy ORM setup
+  - SQLAlchemy ORM setup with async support
   - Connection pooling and optimization
   - Migration system (Alembic)
   - Data validation with Pydantic
+  - Supabase integration layer
 
 - **Authentication & Security**
   - JWT token handling
   - Supabase integration for user management
   - Role-based access control
   - API rate limiting
+  - OAuth flow management
 
-#### 1.2 Core AI Services
+#### 1.2 Core Email & Document Services
+- **Email Processing Service**
+  - Gmail webhook handling
+  - Email classification pipeline
+  - Virtual email system
+  - Document creation and storage
+
 - **Document Classification Service**
   - OpenAI GPT-4 integration
   - Document type detection
   - Content categorization
   - Confidence scoring
+  - Project assignment logic
 
-- **Content Processing Pipeline**
-  - Text extraction and cleaning
-  - Metadata extraction
-  - Content summarization
-  - Keyword extraction
+- **Google Drive Integration**
+  - File change monitoring
+  - Webhook processing
+  - File metadata extraction
+  - Automatic watch setup
 
 #### 1.3 Basic API Endpoints
 - **Document Management API**
@@ -53,27 +99,35 @@ This document outlines the strategic roadmap for integrating Python backend serv
   - Classification results storage
   - Project analytics endpoints
 
+- **Email Processing API**
+  - Email ingestion endpoints
+  - Classification status tracking
+  - Processing logs and monitoring
+
 ### Phase 2: Advanced AI & ML Services (Q2 2024)
 **Goal**: Implement advanced AI capabilities and machine learning pipelines
 
 #### 2.1 Enhanced AI Services
 - **Vector Embeddings & Search**
   - Sentence transformers integration
-  - Vector database setup (Pinecone/Weaviate)
+  - Pinecone vector database setup
   - Semantic search capabilities
   - Similarity matching algorithms
+  - RAG (Retrieval-Augmented Generation) implementation
 
 - **Advanced Document Analysis**
   - Named entity recognition
   - Document structure analysis
   - Table and chart extraction
   - Multi-language support
+  - Content summarization
 
 - **Meeting Intelligence**
   - Transcript analysis and summarization
   - Action item extraction
   - Participant sentiment analysis
   - Meeting outcome classification
+  - Attendee bot integration
 
 #### 2.2 Machine Learning Pipeline
 - **Custom Model Training**
@@ -95,6 +149,12 @@ This document outlines the strategic roadmap for integrating Python backend serv
   - Batch processing workflows
   - Task monitoring and retry logic
 
+- **Redis Integration**
+  - Caching layer
+  - Session management
+  - Real-time data storage
+  - Pub/Sub messaging
+
 ### Phase 3: Microservices & Scalability (Q3 2024)
 **Goal**: Implement microservice architecture and advanced scalability features
 
@@ -104,12 +164,15 @@ This document outlines the strategic roadmap for integrating Python backend serv
   - AI classification service
   - Analytics service
   - Integration service
+  - Email processing service
+  - Drive monitoring service
 
 - **Service Communication**
   - API Gateway implementation
   - Service discovery
   - Load balancing
   - Circuit breaker patterns
+  - Event-driven architecture
 
 #### 3.2 Advanced Integrations
 - **Google Services Enhancement**
@@ -117,12 +180,14 @@ This document outlines the strategic roadmap for integrating Python backend serv
   - Calendar intelligence
   - Gmail processing pipeline
   - OAuth token management
+  - Service account integration
 
 - **Third-party Integrations**
   - Slack integration for notifications
   - Microsoft Office 365 support
   - Dropbox integration
   - Custom webhook support
+  - N8N workflow integration
 
 #### 3.3 Performance & Monitoring
 - **Caching Strategy**
@@ -368,7 +433,7 @@ async def document_processing_websocket(
 - **OpenAI API**: GPT models for AI processing
 - **Google APIs**: Drive, Calendar, Gmail integration
 - **N8N**: Workflow automation
-- **Vector Databases**: Pinecone/Weaviate for embeddings
+- **Pinecone**: Vector database for embeddings
 
 ## Deployment Strategy
 
@@ -443,5 +508,25 @@ async def document_processing_websocket(
 2. **Integration Testing**: Test with existing frontend
 3. **Performance Optimization**: Optimize for production use
 4. **User Testing**: Gather feedback from beta users
+
+## Implementation Priority
+
+### High Priority (Phase 1)
+1. **Email Processing Service**: Port from Supabase edge functions
+2. **Document Classification**: Replace N8N classification agent
+3. **Google Drive Integration**: Port file monitoring services
+4. **Basic API Gateway**: Core REST endpoints
+
+### Medium Priority (Phase 2)
+1. **Vector Embeddings**: Pinecone integration
+2. **RAG Implementation**: Retrieval-augmented generation
+3. **Meeting Intelligence**: Attendee bot integration
+4. **Advanced Analytics**: Business intelligence features
+
+### Low Priority (Phase 3-4)
+1. **Microservice Decomposition**: Service architecture evolution
+2. **Enterprise Features**: Multi-tenancy and advanced security
+3. **Third-party Integrations**: Additional service connectors
+4. **Advanced ML Pipeline**: Custom model training
 
 This roadmap provides a comprehensive plan for integrating Python backend services into the BeSunny.ai ecosystem, ensuring scalability, performance, and maintainability while delivering enhanced AI capabilities to users.
