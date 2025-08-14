@@ -1,0 +1,24 @@
+# Railway configuration for besunny-ai frontend
+# Option 1: Use Nixpacks (recommended for simple deployments)
+[build]
+builder = "nixpacks"
+buildCommand = "npm run build"
+
+[deploy]
+startCommand = "npm start"
+healthcheckPath = "/"
+healthcheckTimeout = 300
+restartPolicyType = "on_failure"
+
+[deploy.envs]
+NODE_ENV = "production"
+PORT = "3000"
+VITE_SUPABASE_URL = "https://your-project.supabase.co"
+VITE_SUPABASE_ANON_KEY = "your-anon-key"
+VITE_GOOGLE_CLIENT_ID = "your-google-client-id"
+VITE_GOOGLE_CLIENT_SECRET = "your-google-client-secret"
+
+# Option 2: Use Dockerfile (uncomment the lines below if you prefer Docker)
+# [build]
+# builder = "dockerfile"
+# dockerfilePath = "Dockerfile"
