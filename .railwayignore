@@ -11,3 +11,5 @@ dist/
 coverage/
 .nyc_output/
 *.tsbuildinfo
+Dockerfile.backup
+.dockerignore.backup
