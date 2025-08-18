@@ -1,4 +1,10 @@
-# Ignore files that shouldn't be deployed to Railway
+# Hide backend from Railway's initial project detection
+# This prevents Railway from auto-generating a Dockerfile
+backend/
+supabase/
+database/
+
+# Ignore files that shouldn't be deployed
 *.md
 start-fullstack.sh
 env.*
@@ -14,11 +20,3 @@ env.*
 **/.venv/
 **/env/
 **/.env/
-
-# Keep backend files for Railway deployment
-# backend/
-# supabase/
-# database/
-# **/requirements.txt
-# **/pyproject.toml
-# **/*.py
