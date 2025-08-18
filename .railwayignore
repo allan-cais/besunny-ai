@@ -1,0 +1,8 @@
+# Ignore backend files for frontend-only Railway deployment
+backend/
+supabase/
+database/
+*.md
+start-fullstack.sh
+env.*
+.env*

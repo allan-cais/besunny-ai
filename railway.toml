@@ -1,6 +1,7 @@
 [build]
 builder = "nixpacks"
 buildCommand = "npm run build:staging"
+watchPatterns = ["src/**/*", "package.json", "package-lock.json"]
 
 [deploy]
 startCommand = "npm start"
@@ -11,3 +12,7 @@ restartPolicyMaxRetries = 10
 
 [deploy.envs]
 NODE_ENV = "production"
+
+# Explicitly ignore backend directory for frontend deployment
+[build.ignore]
+paths = ["backend/**/*", "supabase/**/*", "database/**/*"]
