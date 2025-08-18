@@ -5,7 +5,7 @@ FROM python:3.11-slim
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRECODE=1
 ENV PYTHONPATH=/app/backend
-ENV NODE_ENV=production
+ENV NODE_ENV=development
 
 # Set work directory
 WORKDIR /app
@@ -23,8 +23,8 @@ RUN apt-get update && apt-get install -y \
 # Copy package files for frontend
 COPY package*.json ./
 
-# Install frontend dependencies
-RUN npm ci
+# Install ALL frontend dependencies (including dev dependencies for build)
+RUN npm ci --include=dev
 
 # Copy frontend source
 COPY src/ ./src/
@@ -35,8 +35,8 @@ COPY tailwind.config.ts ./
 COPY tsconfig*.json ./
 COPY postcss.config.js ./
 
-# Build frontend (this will create the dist folder)
-RUN npm run build:production
+# Verify vite is available and build frontend
+RUN npx vite --version && npm run build:production
 
 # Copy backend files
 COPY backend/ ./backend/
