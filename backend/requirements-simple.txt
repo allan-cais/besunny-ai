@@ -1,0 +1,21 @@
+# Minimal requirements for BeSunny.ai Backend
+# Only essential packages to get the build working
+
+# Core web framework
+fastapi
+uvicorn[standard]
+
+# Essential utilities
+pydantic
+python-dotenv
+
+# Database (essential)
+sqlalchemy
+psycopg2-binary
+
+# Supabase (critical)
+supabase
+
+# Basic utilities
+httpx
+structlog
