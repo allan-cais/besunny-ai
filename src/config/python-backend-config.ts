@@ -1,109 +1,161 @@
-// Python Backend Configuration
-// Centralizes configuration for Python backend integration
+/**
+ * Python Backend Configuration
+ * Environment-specific configuration for Python backend services
+ */
 
-export const PYTHON_BACKEND_CONFIG = {
-  // Base configuration with safe fallbacks
-  baseUrl: import.meta.env.VITE_PYTHON_BACKEND_URL || 'http://localhost:8000',
-  timeout: parseInt(import.meta.env.VITE_PYTHON_BACKEND_TIMEOUT || '30000') || 30000,
-  retries: parseInt(import.meta.env.VITE_PYTHON_BACKEND_RETRIES || '3') || 3,
-  retryDelay: parseInt(import.meta.env.VITE_PYTHON_BACKEND_RETRY_DELAY || '1000') || 1000,
-  
-  // Feature flags with safe fallbacks
-  isEnabled: import.meta.env.VITE_ENABLE_PYTHON_BACKEND === 'true',
-  
-  // API endpoints with safe fallbacks
-  endpoints: {
-    base: import.meta.env.VITE_PYTHON_BACKEND_URL || 'http://localhost:8000',
-    api: `${import.meta.env.VITE_PYTHON_BACKEND_URL || 'http://localhost:8000'}/api/v1`,
-    health: `${import.meta.env.VITE_PYTHON_BACKEND_URL || 'http://localhost:8000'}/health`,
-    websockets: `${import.meta.env.VITE_PYTHON_BACKEND_URL || 'http://localhost:8000'}/ws`,
-  },
-  
-  // Service-specific endpoints
-  services: {
-    auth: {
-      googleOAuth: '/auth/google/oauth/callback',
-      googleTokenRefresh: '/auth/google/oauth/refresh',
-    },
-    projects: '/projects',
-    documents: '/documents',
-    attendee: '/attendee',
-    calendar: '/calendar',
-    drive: '/drive',
-    emails: '/emails',
-    classification: '/classification',
-    ai: '/ai',
-    embeddings: '/embeddings',
-    meetingIntelligence: '/meeting-intelligence',
-    user: '/user',
-    gmailWatch: '/gmail-watch',
-    driveSubscription: '/drive-subscription',
-    microservices: '/microservices',
-  },
-  
-  // Health check configuration
-  health: {
-    checkInterval: 30000, // 30 seconds
-    timeout: 10000, // 10 seconds
-    retries: 3,
-  },
-  
-  // Authentication configuration
-  auth: {
-    tokenHeader: 'Authorization',
-    tokenPrefix: 'Bearer',
-    refreshThreshold: 5 * 60 * 1000, // 5 minutes before expiry
-  },
-  
-  // Error handling configuration
-  errors: {
-    maxRetries: 3,
-    backoffMultiplier: 2,
-    maxBackoffDelay: 30000, // 30 seconds
-  },
-} as const;
+export interface PythonBackendConfig {
+  baseUrl: string;
+  timeout: number;
+  retryAttempts: number;
+  healthCheckInterval: number;
+  enableLogging: boolean;
+  enableMetrics: boolean;
+}
 
-// Helper functions with safe fallbacks
-export const getPythonBackendUrl = (endpoint: string): string => {
-  try {
-    return `${PYTHON_BACKEND_CONFIG.baseUrl}${endpoint}`;
-  } catch (error) {
-    console.warn('⚠️ Error building Python backend URL:', error);
-    return `http://localhost:8000${endpoint}`;
-  }
+// Environment detection
+const isDevelopment = import.meta.env.DEV;
+const isProduction = import.meta.env.PROD;
+const isStaging = import.meta.env.MODE === 'staging';
+
+// Get environment variables
+const getEnvVar = (key: string, defaultValue: string): string => {
+  return import.meta.env[key] || defaultValue;
 };
 
-export const getPythonBackendApiUrl = (endpoint: string): string => {
-  try {
-    return `${PYTHON_BACKEND_CONFIG.endpoints.api}${endpoint}`;
-  } catch (error) {
-    console.warn('⚠️ Error building Python backend API URL:', error);
-    return `http://localhost:8000/api/v1${endpoint}`;
-  }
+// Base configuration
+const baseConfig: PythonBackendConfig = {
+  baseUrl: '',
+  timeout: 30000, // 30 seconds
+  retryAttempts: 3,
+  healthCheckInterval: 60000, // 1 minute
+  enableLogging: true,
+  enableMetrics: true,
 };
 
-export const isPythonBackendEnabled = (): boolean => {
-  try {
-    return PYTHON_BACKEND_CONFIG.isEnabled || false;
-  } catch (error) {
-    console.warn('⚠️ Error checking Python backend status:', error);
+// Development configuration
+const developmentConfig: PythonBackendConfig = {
+  ...baseConfig,
+  baseUrl: getEnvVar('VITE_PYTHON_BACKEND_URL', 'http://localhost:8000'),
+  timeout: 60000, // Longer timeout for development
+  retryAttempts: 5,
+  healthCheckInterval: 30000, // More frequent health checks in development
+  enableLogging: true,
+  enableMetrics: true,
+};
+
+// Staging configuration
+const stagingConfig: PythonBackendConfig = {
+  ...baseConfig,
+  baseUrl: getEnvVar('VITE_PYTHON_BACKEND_URL', 'https://besunny-ai-staging.railway.app'),
+  timeout: 30000,
+  retryAttempts: 3,
+  healthCheckInterval: 60000,
+  enableLogging: true,
+  enableMetrics: true,
+};
+
+// Production configuration
+const productionConfig: PythonBackendConfig = {
+  ...baseConfig,
+  baseUrl: getEnvVar('VITE_PYTHON_BACKEND_URL', 'https://besunny-ai.railway.app'),
+  timeout: 30000,
+  retryAttempts: 3,
+  healthCheckInterval: 120000, // Less frequent health checks in production
+  enableLogging: false, // Disable verbose logging in production
+  enableMetrics: true,
+};
+
+// Select configuration based on environment
+let config: PythonBackendConfig;
+
+if (isDevelopment) {
+  config = developmentConfig;
+} else if (isStaging) {
+  config = stagingConfig;
+} else if (isProduction) {
+  config = productionConfig;
+} else {
+  // Fallback to development
+  config = developmentConfig;
+}
+
+// Validate configuration
+if (!config.baseUrl) {
+  console.warn('Python backend URL not configured. Using fallback URL.');
+  config.baseUrl = 'http://localhost:8000';
+}
+
+// Export configuration
+export const pythonBackendConfig = config;
+
+// Export environment info
+export const environmentInfo = {
+  isDevelopment,
+  isProduction,
+  isStaging,
+  mode: import.meta.env.MODE,
+  baseUrl: config.baseUrl,
+};
+
+// Export configuration getters
+export const getPythonBackendConfig = (): PythonBackendConfig => config;
+
+export const getBaseUrl = (): string => config.baseUrl;
+
+export const getTimeout = (): number => config.timeout;
+
+export const getRetryAttempts = (): number => config.retryAttempts;
+
+export const getHealthCheckInterval = (): number => config.healthCheckInterval;
+
+// Configuration validation
+export const validateConfig = (): boolean => {
+  const errors: string[] = [];
+  
+  if (!config.baseUrl) {
+    errors.push('Base URL is required');
+  }
+  
+  if (config.timeout <= 0) {
+    errors.push('Timeout must be positive');
+  }
+  
+  if (config.retryAttempts < 0) {
+    errors.push('Retry attempts cannot be negative');
+  }
+  
+  if (config.healthCheckInterval <= 0) {
+    errors.push('Health check interval must be positive');
+  }
+  
+  if (errors.length > 0) {
+    console.error('Configuration validation failed:', errors);
     return false;
   }
+  
+  return true;
 };
 
-export const isPythonBackendAvailable = async (): Promise<boolean> => {
-  try {
-    if (!isPythonBackendEnabled()) {
-      return false;
-    }
-    
-    const response = await fetch(PYTHON_BACKEND_CONFIG.endpoints.health, {
-      method: 'GET',
-      signal: AbortSignal.timeout(PYTHON_BACKEND_CONFIG.health.timeout),
-    });
-    return response.ok;
-  } catch (error) {
-    console.warn('⚠️ Python backend health check failed:', error);
-    return false;
+// Configuration override for testing
+export const overrideConfig = (overrides: Partial<PythonBackendConfig>): void => {
+  Object.assign(config, overrides);
+};
+
+// Reset configuration to defaults
+export const resetConfig = (): void => {
+  if (isDevelopment) {
+    Object.assign(config, developmentConfig);
+  } else if (isStaging) {
+    Object.assign(config, stagingConfig);
+  } else if (isProduction) {
+    Object.assign(config, productionConfig);
   }
 };
+
+// Log configuration (only in development)
+if (isDevelopment) {
+  console.log('Python Backend Configuration:', {
+    ...config,
+    environment: environmentInfo,
+  });
+}

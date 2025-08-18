@@ -1,336 +1,305 @@
-// Python Backend API Client
-// Provides integration with the Python backend services for BeSunny.ai
+/**
+ * Python Backend API Integration Service
+ * Connects React frontend to Python backend v15 APIs
+ */
 
-import { config } from '../config';
-import type { 
-  Meeting, 
-  Document, 
-  Project, 
-  GoogleCalendarEvent,
-  CalendarSyncRequest,
-  CalendarWebhookRequest,
-  MeetingBotRequest,
-  DocumentCreate,
-  DocumentUpdate,
-  ProjectCreate,
-  ProjectUpdate
-} from '../types';
+export interface PythonBackendConfig {
+  baseUrl: string;
+  timeout: number;
+  retryAttempts: number;
+}
 
-// Python backend configuration
-const PYTHON_BACKEND_CONFIG = {
-  baseUrl: import.meta.env.VITE_PYTHON_BACKEND_URL || 'http://localhost:8000',
-  timeout: 30000,
-  retries: 3,
-  retryDelay: 1000,
-};
-
-// API response wrapper
-interface ApiResponse<T = any> {
+export interface ApiResponse<T = any> {
   success: boolean;
   data?: T;
   error?: string;
   message?: string;
-  status?: number;
 }
 
-// Python backend API client
+export interface UserProfile {
+  id: string;
+  email: string;
+  username: string;
+  full_name: string;
+  timezone: string;
+  preferences: UserPreferences;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserPreferences {
+  theme: 'light' | 'dark' | 'system';
+  language: string;
+  notifications: {
+    email: boolean;
+    push: boolean;
+    sms: boolean;
+  };
+  privacy: {
+    profile_visibility: 'public' | 'private' | 'team';
+    data_sharing: boolean;
+  };
+  ai_preferences: {
+    model_preference: string;
+    response_length: 'short' | 'medium' | 'long';
+    creativity_level: 'low' | 'medium' | 'high';
+  };
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  description: string;
+  visibility: 'private' | 'team' | 'public';
+  owner_id: string;
+  members: ProjectMember[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectMember {
+  user_id: string;
+  role: 'owner' | 'admin' | 'member' | 'viewer';
+  permissions: string[];
+}
+
+export interface AIOrchestrationRequest {
+  prompt: string;
+  context?: string;
+  project_id?: string;
+  user_id: string;
+  model_preference?: string;
+}
+
+export interface AIOrchestrationResponse {
+  response: string;
+  model_used: string;
+  tokens_used: number;
+  confidence_score: number;
+  suggestions?: string[];
+}
+
 export class PythonBackendAPI {
-  private baseUrl: string;
-  private defaultHeaders: Record<string, string>;
+  private config: PythonBackendConfig;
+  private authToken: string | null = null;
 
-  constructor() {
-    this.baseUrl = PYTHON_BACKEND_CONFIG.baseUrl;
-    this.defaultHeaders = {
-      'Content-Type': 'application/json',
-    };
+  constructor(config: PythonBackendConfig) {
+    this.config = config;
   }
 
-  // Set authentication token
-  setAuthToken(token: string): void {
-    this.defaultHeaders['Authorization'] = `Bearer ${token}`;
+  setAuthToken(token: string) {
+    this.authToken = token;
   }
 
-  // Clear authentication token
-  clearAuthToken(): void {
-    delete this.defaultHeaders['Authorization'];
+  clearAuthToken() {
+    this.authToken = null;
   }
 
-  // Make API call with retry logic
   private async makeRequest<T>(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
-    const url = `${this.baseUrl}${endpoint}`;
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), PYTHON_BACKEND_CONFIG.timeout);
+    const url = `${this.config.baseUrl}${endpoint}`;
+    
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    };
+
+    if (this.authToken) {
+      headers['Authorization'] = `Bearer ${this.authToken}`;
+    }
+
+    const config: RequestInit = {
+      ...options,
+      headers,
+      signal: AbortSignal.timeout(this.config.timeout),
+    };
 
     try {
-      const response = await fetch(url, {
-        ...options,
-        headers: {
-          ...this.defaultHeaders,
-          ...options.headers,
-        },
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
+      const response = await fetch(url, config);
+      
       if (!response.ok) {
-        const errorText = await response.text();
-        return {
-          success: false,
-          error: `HTTP ${response.status}: ${response.statusText}`,
-          message: errorText,
-          status: response.status,
-        };
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
       const data = await response.json();
-      return {
-        success: true,
-        data,
-        status: response.status,
-      };
+      return { success: true, data };
     } catch (error) {
-      clearTimeout(timeoutId);
-      
-      if (error instanceof Error) {
-        if (error.name === 'AbortError') {
-          return {
-            success: false,
-            error: 'Request timeout',
-            status: 408,
-          };
-        }
-        return {
-          success: false,
-          error: error.message,
-          status: 500,
-        };
-      }
-      
+      console.error(`API request failed for ${endpoint}:`, error);
       return {
         success: false,
-        error: 'Unknown error',
-        status: 500,
+        error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }
 
-  // Calendar API endpoints
-  async setupCalendarWebhook(request: CalendarWebhookRequest): Promise<ApiResponse<{ webhook_id: string }>> {
-    return this.makeRequest('/api/v1/calendar/webhook', {
-      method: 'POST',
-      body: JSON.stringify(request),
-    });
+  // Health Check
+  async checkHealth(): Promise<ApiResponse> {
+    return this.makeRequest('/health');
   }
 
-  async syncCalendarEvents(request: CalendarSyncRequest): Promise<ApiResponse<{ events_synced: number }>> {
-    return this.makeRequest('/api/v1/calendar/sync', {
-      method: 'POST',
-      body: JSON.stringify(request),
-    });
+  // User Management APIs
+  async getUserProfile(userId: string): Promise<ApiResponse<UserProfile>> {
+    return this.makeRequest(`/v1/user/profile/${userId}`);
   }
 
-  async getUserMeetings(projectId?: string, status?: string): Promise<ApiResponse<{ meetings: Meeting[]; total_count: number }>> {
-    const params = new URLSearchParams();
-    if (projectId) params.append('project_id', projectId);
-    if (status) params.append('status', status);
-    
-    return this.makeRequest(`/api/v1/calendar/meetings?${params.toString()}`);
-  }
-
-  async getMeetingDetails(meetingId: string): Promise<ApiResponse<Meeting>> {
-    return this.makeRequest(`/api/v1/calendar/meetings/${meetingId}`);
-  }
-
-  async scheduleMeetingBot(meetingId: string, request: MeetingBotRequest): Promise<ApiResponse<{ message: string }>> {
-    return this.makeRequest(`/api/v1/calendar/meetings/${meetingId}/bot`, {
-      method: 'POST',
-      body: JSON.stringify(request),
-    });
-  }
-
-  async getActiveWebhooks(): Promise<ApiResponse<any[]>> {
-    return this.makeRequest('/api/v1/calendar/webhooks/active');
-  }
-
-  async getWebhookLogs(webhookId?: string, limit: number = 100): Promise<ApiResponse<any[]>> {
-    const params = new URLSearchParams();
-    if (webhookId) params.append('webhook_id', webhookId);
-    params.append('limit', limit.toString());
-    
-    return this.makeRequest(`/api/v1/calendar/webhooks/logs?${params.toString()}`);
-  }
-
-  async handleCalendarWebhook(webhookData: any): Promise<ApiResponse<{ status: string }>> {
-    return this.makeRequest('/api/v1/calendar/webhook', {
-      method: 'POST',
-      body: JSON.stringify(webhookData),
-    });
-  }
-
-  async cleanupExpiredWebhooks(): Promise<ApiResponse<{ message: string }>> {
-    return this.makeRequest('/api/v1/calendar/cleanup/expired-webhooks', {
-      method: 'POST',
-    });
-  }
-
-  async getCalendarSyncStatus(userId: string): Promise<ApiResponse<any>> {
-    return this.makeRequest(`/api/v1/calendar/status/${userId}`);
-  }
-
-  async getCalendarEventDetails(eventId: string, calendarId: string = 'primary'): Promise<ApiResponse<any>> {
-    return this.makeRequest(`/api/v1/calendar/events/${eventId}?calendar_id=${calendarId}`);
-  }
-
-  // Documents API endpoints
-  async createDocument(document: DocumentCreate): Promise<ApiResponse<Document>> {
-    return this.makeRequest('/api/v1/documents', {
-      method: 'POST',
-      body: JSON.stringify(document),
-    });
-  }
-
-  async getDocuments(
-    projectId?: string,
-    limit: number = 50,
-    offset: number = 0,
-    search?: string
-  ): Promise<ApiResponse<{ documents: Document[]; total: number }>> {
-    const params = new URLSearchParams();
-    if (projectId) params.append('project_id', projectId);
-    params.append('limit', limit.toString());
-    params.append('offset', offset.toString());
-    if (search) params.append('search', search);
-    
-    return this.makeRequest(`/api/v1/documents?${params.toString()}`);
-  }
-
-  async getDocument(documentId: string): Promise<ApiResponse<Document>> {
-    return this.makeRequest(`/api/v1/documents/${documentId}`);
-  }
-
-  async updateDocument(documentId: string, updates: DocumentUpdate): Promise<ApiResponse<Document>> {
-    return this.makeRequest(`/api/v1/documents/${documentId}`, {
+  async updateUserProfile(
+    userId: string,
+    profile: Partial<UserProfile>
+  ): Promise<ApiResponse<UserProfile>> {
+    return this.makeRequest(`/v1/user/profile/${userId}`, {
       method: 'PUT',
-      body: JSON.stringify(updates),
+      body: JSON.stringify(profile),
     });
   }
 
-  async deleteDocument(documentId: string): Promise<ApiResponse<{ message: string }>> {
-    return this.makeRequest(`/api/v1/documents/${documentId}`, {
-      method: 'DELETE',
+  async updateUserPreferences(
+    userId: string,
+    preferences: Partial<UserPreferences>
+  ): Promise<ApiResponse<UserPreferences>> {
+    return this.makeRequest(`/v1/user/preferences/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify(preferences),
     });
   }
 
-  async classifyDocument(documentId: string): Promise<ApiResponse<{ classification_result: any }>> {
-    return this.makeRequest(`/api/v1/documents/${documentId}/classify`, {
-      method: 'POST',
-    });
+  // Project Management APIs
+  async getProjects(userId: string): Promise<ApiResponse<Project[]>> {
+    return this.makeRequest(`/v1/projects/user/${userId}`);
   }
 
-  // Projects API endpoints
-  async createProject(project: ProjectCreate): Promise<ApiResponse<Project>> {
-    return this.makeRequest('/api/v1/projects', {
+  async getProject(projectId: string): Promise<ApiResponse<Project>> {
+    return this.makeRequest(`/v1/projects/${projectId}`);
+  }
+
+  async createProject(project: Omit<Project, 'id' | 'created_at' | 'updated_at'>): Promise<ApiResponse<Project>> {
+    return this.makeRequest('/v1/projects', {
       method: 'POST',
       body: JSON.stringify(project),
     });
   }
 
-  async getProjects(limit: number = 50, offset: number = 0): Promise<ApiResponse<{ projects: Project[]; total: number }>> {
-    const params = new URLSearchParams();
-    params.append('limit', limit.toString());
-    params.append('offset', offset.toString());
-    
-    return this.makeRequest(`/api/v1/projects?${params.toString()}`);
-  }
-
-  async getProject(projectId: string): Promise<ApiResponse<Project>> {
-    return this.makeRequest(`/api/v1/projects/${projectId}`);
-  }
-
-  async updateProject(projectId: string, updates: ProjectUpdate): Promise<ApiResponse<Project>> {
-    return this.makeRequest(`/api/v1/projects/${projectId}`, {
+  async updateProject(
+    projectId: string,
+    updates: Partial<Project>
+  ): Promise<ApiResponse<Project>> {
+    return this.makeRequest(`/v1/projects/${projectId}`, {
       method: 'PUT',
       body: JSON.stringify(updates),
     });
   }
 
-  async deleteProject(projectId: string): Promise<ApiResponse<{ message: string }>> {
-    return this.makeRequest(`/api/v1/projects/${projectId}`, {
+  async deleteProject(projectId: string): Promise<ApiResponse> {
+    return this.makeRequest(`/v1/projects/${projectId}`, {
       method: 'DELETE',
     });
   }
 
-  async getProjectDocuments(projectId: string): Promise<ApiResponse<{ documents: Document[]; total: number }>> {
-    return this.makeRequest(`/api/v1/projects/${projectId}/documents`);
-  }
-
-  // Drive API endpoints
-  async setupDriveWebhook(fileId: string): Promise<ApiResponse<{ webhook_id: string }>> {
-    return this.makeRequest('/api/v1/drive/webhook', {
+  async addProjectMember(
+    projectId: string,
+    member: Omit<ProjectMember, 'user_id'>
+  ): Promise<ApiResponse<ProjectMember>> {
+    return this.makeRequest(`/v1/projects/${projectId}/members`, {
       method: 'POST',
-      body: JSON.stringify({ file_id: fileId }),
+      body: JSON.stringify(member),
     });
   }
 
-  async getDriveFileChanges(fileId: string): Promise<ApiResponse<any[]>> {
-    return this.makeRequest(`/api/v1/drive/files/${fileId}/changes`);
-  }
-
-  async syncDriveFiles(): Promise<ApiResponse<{ files_synced: number }>> {
-    return this.makeRequest('/api/v1/drive/sync', {
-      method: 'POST',
+  async removeProjectMember(
+    projectId: string,
+    userId: string
+  ): Promise<ApiResponse> {
+    return this.makeRequest(`/v1/projects/${projectId}/members/${userId}`, {
+      method: 'DELETE',
     });
   }
 
-  // Email API endpoints
-  async processInboundEmail(emailData: any): Promise<ApiResponse<{ document_id: string }>> {
-    return this.makeRequest('/api/v1/emails/process', {
+  // AI Orchestration APIs
+  async orchestrateAI(request: AIOrchestrationRequest): Promise<ApiResponse<AIOrchestrationResponse>> {
+    return this.makeRequest('/v1/ai/orchestrate', {
       method: 'POST',
-      body: JSON.stringify(emailData),
+      body: JSON.stringify(request),
     });
   }
 
-  async getEmailProcessingStatus(emailId: string): Promise<ApiResponse<any>> {
-    return this.makeRequest(`/api/v1/emails/${emailId}/status`);
+  async getAIHistory(userId: string): Promise<ApiResponse<AIOrchestrationResponse[]>> {
+    return this.makeRequest(`/v1/ai/history/${userId}`);
   }
 
-  // Classification API endpoints
-  async classifyContent(content: string, contentType: string): Promise<ApiResponse<{ classification: any }>> {
-    return this.makeRequest('/api/v1/classification/classify', {
+  // Performance Monitoring APIs
+  async getSystemHealth(): Promise<ApiResponse> {
+    return this.makeRequest('/v1/performance/health');
+  }
+
+  async getServiceHealth(): Promise<ApiResponse> {
+    return this.makeRequest('/v1/performance/services');
+  }
+
+  // Utility Methods
+  async retryRequest<T>(
+    endpoint: string,
+    options: RequestInit = {},
+    maxRetries: number = this.config.retryAttempts
+  ): Promise<ApiResponse<T>> {
+    let lastError: string | undefined;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      const result = await this.makeRequest<T>(endpoint, options);
+      
+      if (result.success) {
+        return result;
+      }
+      
+      lastError = result.error;
+      
+      if (attempt < maxRetries) {
+        // Exponential backoff
+        const delay = Math.pow(2, attempt) * 1000;
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+    
+    return {
+      success: false,
+      error: `Request failed after ${maxRetries} attempts. Last error: ${lastError}`,
+    };
+  }
+
+  // Batch Operations
+  async batchGetProjects(projectIds: string[]): Promise<ApiResponse<Project[]>> {
+    return this.makeRequest('/v1/projects/batch', {
       method: 'POST',
-      body: JSON.stringify({ content, content_type: contentType }),
+      body: JSON.stringify({ project_ids: projectIds }),
     });
   }
 
-  // Attendee API endpoints
-  async scheduleAttendeeBot(meetingId: string, botConfig: any): Promise<ApiResponse<{ bot_id: string }>> {
-    return this.makeRequest('/api/v1/attendee/schedule', {
-      method: 'POST',
-      body: JSON.stringify({ meeting_id: meetingId, bot_config: botConfig }),
+  async batchUpdateUsers(updates: Array<{ userId: string; updates: Partial<UserProfile> }>): Promise<ApiResponse<UserProfile[]>> {
+    return this.makeRequest('/v1/user/batch-update', {
+      method: 'PUT',
+      body: JSON.stringify({ updates }),
     });
-  }
-
-  async getAttendeeBotStatus(botId: string): Promise<ApiResponse<any>> {
-    return this.makeRequest(`/api/v1/attendee/bots/${botId}/status`);
-  }
-
-  // Health check
-  async healthCheck(): Promise<ApiResponse<{ status: string; service: string; version: string }>> {
-    return this.makeRequest('/health');
-  }
-
-  // API v1 health check
-  async apiHealthCheck(): Promise<ApiResponse<{ status: string; version: string; endpoints: string[] }>> {
-    return this.makeRequest('/api/v1/health');
   }
 }
 
-// Create and export default instance
-export const pythonBackendAPI = new PythonBackendAPI();
+// Default configuration
+export const defaultPythonBackendConfig: PythonBackendConfig = {
+  baseUrl: process.env.NODE_ENV === 'production' 
+    ? 'https://your-railway-app.railway.app' 
+    : 'http://localhost:8000',
+  timeout: 30000, // 30 seconds
+  retryAttempts: 3,
+};
 
-// Export the class for custom instances
-export default PythonBackendAPI;
+// Create and export default instance
+export const pythonBackendAPI = new PythonBackendAPI(defaultPythonBackendConfig);
+
+// Export types for use in components
+export type {
+  UserProfile,
+  UserPreferences,
+  Project,
+  ProjectMember,
+  AIOrchestrationRequest,
+  AIOrchestrationResponse,
+};
