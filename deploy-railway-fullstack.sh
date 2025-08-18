@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# BeSunny.ai Railway Full Stack v17 Deployment Script
+# BeSunny.ai Railway Full Stack Deployment Script
 # Specialized for Railway platform deployment
 
-echo "🚂 Deploying BeSunny.ai Full Stack v17 on Railway..."
-echo "===================================================="
+echo "🚂 Deploying BeSunny.ai Full Stack on Railway..."
+echo "================================================"
 
 # Colors for output
 RED='\033[0;31m'
@@ -40,10 +40,10 @@ print_status "Starting Railway full stack deployment..."
 
 # Step 1: Verify Backend Status
 print_status "Step 1: Verifying Backend Status..."
-if [ -f "backend/test_app_v17.py" ] && [ -f "backend/start_v17.py" ]; then
-    print_success "Backend v17 files found"
+if [ -f "backend/start.py" ] && [ -f "backend/app/main.py" ]; then
+    print_success "Backend files found"
 else
-    print_error "Backend v17 files missing. Please ensure test_app_v17.py and start_v17.py exist."
+    print_error "Backend files missing. Please ensure start.py and app/main.py exist."
     exit 1
 fi
 
@@ -163,7 +163,7 @@ fi
 
 print_success "Full Stack Railway Deployment Complete!"
 echo ""
-echo "🎉 Your BeSunny.ai Full Stack v17 is now live on Railway!"
+echo "🎉 Your BeSunny.ai Full Stack is now live on Railway!"
 echo ""
 echo "🔧 Backend (Railway): $BACKEND_URL"
 echo "📱 Frontend (Railway): $FRONTEND_URL"

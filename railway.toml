@@ -1,8 +1,8 @@
-# Railway Configuration - Full Stack v17 Deployment
+# Railway Configuration - Full Stack Deployment
 # Deploying both frontend and backend on Railway
 
 [deploy]
-startCommand = "python start_v17.py"
+startCommand = "python start.py"
 healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"

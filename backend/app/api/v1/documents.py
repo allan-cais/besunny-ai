@@ -7,7 +7,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from datetime import datetime
 
-from ...core.database import get_supabase
+from ...core.supabase_config import get_supabase_client
 from ...models.schemas.document import (
     Document,
     DocumentCreate,
@@ -28,7 +28,7 @@ async def create_document(
 ):
     """Create a new document."""
     try:
-        supabase = get_supabase()
+        supabase = get_supabase_client()
         
         # Add user and creation metadata
         doc_data = document.dict()
@@ -59,7 +59,7 @@ async def list_documents(
 ):
     """List documents for the current user."""
     try:
-        supabase = get_supabase()
+        supabase = get_supabase_client()
         
         # Start with base query - ALWAYS filter by user first for security
         query = supabase.table('documents').select('*').eq('created_by', current_user.id)
@@ -97,7 +97,7 @@ async def get_document(
 ):
     """Get a specific document by ID."""
     try:
-        supabase = get_supabase()
+        supabase = get_supabase_client()
         
         # Get document - ALWAYS filter by user first for security
         result = await supabase.table('documents').select('*').eq('id', document_id).eq('created_by', current_user.id).single().execute()

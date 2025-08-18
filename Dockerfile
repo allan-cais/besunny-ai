@@ -1,4 +1,4 @@
-# Railway Full Stack v17 - Python Backend + React Frontend
+# Railway Full Stack - Python Backend + React Frontend
 FROM python:3.11-slim
 
 # Set environment variables
@@ -66,4 +66,4 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=120s --retries=10 \
     CMD curl -f http://localhost:$PORT/health || curl -f http://localhost:8000/health || exit 1
 
 # Run application from backend directory
-CMD ["python", "start_v17.py"]
+CMD ["python", "start.py"]

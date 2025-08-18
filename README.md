@@ -1,154 +1,199 @@
-# BeSunny.ai - Intelligent Workspace
+# BeSunny.ai - Full Stack AI Platform
 
-A modern, intelligent development workspace built with React, TypeScript, Python FastAPI, and Supabase.
+A comprehensive AI-powered platform that integrates Google services, AI orchestration, and intelligent document processing to streamline your workflow.
 
-## 🚀 **Quick Start - One Command**
+## 🚀 Features
 
-```bash
-npm run dev:fullstack
+- **🤖 AI Orchestration** - Intelligent document classification and processing
+- **📅 Google Calendar Integration** - Smart scheduling and meeting management
+- **📁 Google Drive Integration** - Automated file monitoring and processing
+- **📧 Gmail Integration** - Intelligent email classification and organization
+- **👥 Attendee Management** - Automated meeting bot integration
+- **🔍 Vector Search** - Semantic document search and retrieval
+- **📊 Real-time Analytics** - Live insights and performance monitoring
+
+## 🏗️ Architecture
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   React         │    │   Python        │    │   External      │
+│   Frontend      │◄──►│   Backend       │◄──►│   Services      │
+│   (TypeScript)  │    │   (FastAPI)     │    │   (Google, AI)  │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+          │                       │                       │
+          ▼                       ▼                       ▼
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Supabase      │    │   Redis         │    │   Vector DB     │
+│   (Auth/DB)     │    │   (Cache/Tasks) │    │   (Pinecone)    │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
-This single command starts your entire full-stack application:
-- ✅ **Frontend**: React app with hot reloading
-- ✅ **Backend**: Python FastAPI server
-- ✅ **Redis**: Caching and session management
-- ✅ **All dependencies and health checks**
+## 🚀 Quick Start
 
-## 🏗️ **Architecture**
+### Prerequisites
+- Node.js 18+ and npm
+- Python 3.11+
+- Docker (optional, for local development)
+- Supabase account
+- Google Cloud Platform account
+- OpenAI API key
 
-- **Frontend**: React 18 + TypeScript + Vite
-- **Backend**: Python FastAPI + Celery + Redis
-- **Database**: Supabase (PostgreSQL + Auth)
-- **Infrastructure**: Docker Compose with profiles
+### 1. Clone the Repository
+```bash
+git clone <repository-url>
+cd besunny-ai
+```
 
-## 🔧 **Prerequisites**
+### 2. Frontend Setup
+```bash
+# Install dependencies
+npm install
 
-- **Docker** - For backend services
-- **Node.js 18+** - For frontend
-- **Supabase Project** - Your database and auth provider
+# Start development server
+npm run dev
+```
 
-## 📋 **Setup**
-
-### 1. **Configure Environment Variables**
+### 3. Backend Setup
 ```bash
 cd backend
+
+# Install Python dependencies
+pip install -r requirements.txt
+
+# Copy environment template
 cp env.example .env
+# Edit .env with your API keys
+
+# Start the backend
+python start.py
 ```
 
-Edit `backend/.env` with your actual values:
+### 4. Environment Configuration
+Create `.env` files in both root and backend directories with:
+- Supabase credentials
+- Google OAuth credentials
+- OpenAI API key
+- Other service API keys
+
+## 🔧 Development
+
+### Frontend Development
 ```bash
-# Required
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-SUPABASE_ANON_KEY=your-anon-key
-
-# Optional but recommended
-OPENAI_API_KEY=sk-your-openai-api-key
-GOOGLE_CLIENT_ID=your-google-client-id
-GOOGLE_CLIENT_SECRET=your-google-client-secret
-PINECONE_API_KEY=your-pinecone-api-key
+npm run dev          # Start development server
+npm run build        # Build for production
+npm run preview      # Preview production build
+npm run lint         # Run ESLint
+npm run type-check   # Run TypeScript checks
 ```
 
-### 2. **Start Full Stack**
+### Backend Development
 ```bash
-npm run dev:fullstack
+cd backend
+python start.py      # Start development server
+pytest               # Run tests
+black .              # Format code
+isort .              # Sort imports
 ```
 
-## 🎮 **Available Commands**
-
-| Command | Description |
-|---------|-------------|
-| `npm run dev:fullstack` | Start everything (recommended) |
-| `npm run dev:backend` | Start only backend services |
-| `npm run dev:backend:logs` | View backend logs |
-| `npm run dev:backend:stop` | Stop backend services |
-| `npm run prod:deploy` | Deploy production stack |
-| `npm run prod:scale` | Scale production services |
-
-## 🌐 **Access Points**
-
-| Service | URL | Description |
-|---------|-----|-------------|
-| **Frontend** | http://localhost:3000 | React app |
-| **Backend API** | http://localhost:8000 | Python FastAPI |
-| **API Docs** | http://localhost:8000/docs | Swagger UI |
-| **Health Check** | http://localhost:8000/health | Backend status |
-| **Redis Commander** | http://localhost:8081 | Redis debugging |
-
-## 🐳 **Docker Profiles**
-
-### **Development Profile** (`--profile development`)
-- Redis + Backend + Celery + Redis Commander
-- Lightweight setup for local development
-
-### **Production Profile** (`--profile production`)
-- Redis + Backend + Celery + Nginx + Prometheus + Grafana
-- Full-featured setup for production deployment
-
-## 🔄 **Environment Switching**
-
-### **Development Mode:**
+### Full Stack Development
 ```bash
-ENVIRONMENT=development
-DEBUG=true
-WORKERS=1
-ENABLE_METRICS=false
+# Start both frontend and backend
+./start-fullstack.sh
 ```
 
-### **Production Mode:**
+## 📚 API Documentation
+
+- **Frontend**: http://localhost:3000
+- **Backend API**: http://localhost:8000
+- **API Docs**: http://localhost:8000/docs
+- **Health Check**: http://localhost:8000/health
+
+## 🚀 Deployment
+
+### Railway Deployment (Recommended)
 ```bash
-ENVIRONMENT=production
-DEBUG=false
-WORKERS=8
-ENABLE_METRICS=true
+# Deploy full stack to Railway
+./deploy-railway-fullstack.sh
 ```
 
-## 🏗️ **Project Structure**
-
-```
-├── src/                    # React frontend
-├── backend/               # Python backend
-│   ├── app/              # FastAPI application
-│   ├── docker-compose.yml # Unified Docker setup
-│   └── env.example       # Environment template
-├── start-fullstack.sh    # Startup script
-└── package.json          # NPM scripts
-```
-
-## 🚀 **Deployment**
-
-### **Local Testing:**
+### Manual Deployment
 ```bash
-npm run test:full          # Test production stack locally
+# Build and deploy frontend
+./deploy-frontend.sh
+
+# Deploy backend
+./deploy-railway-fullstack.sh
 ```
 
-### **Production Deploy:**
+### Docker Deployment
 ```bash
-npm run prod:deploy        # Deploy production stack
-npm run prod:scale         # Scale to 3 backends + 2 workers
+# Build and run with Docker
+docker build -t besunny-ai .
+docker run -p 8000:8000 besunny-ai
 ```
 
-## 🆘 **Troubleshooting**
+## 🧪 Testing
 
-### **Backend Won't Start:**
 ```bash
-npm run dev:backend:logs   # Check logs
-npm run dev:backend:stop   # Stop services
-npm run dev:backend        # Restart
+# Frontend tests
+npm test
+
+# Backend tests
+cd backend
+pytest
+
+# Full stack tests
+./test-fullstack.sh
 ```
 
-### **Port Conflicts:**
-```bash
-lsof -i :8000              # Check if port 8000 is in use
-lsof -i :6379              # Check if port 6379 is in use
+## 📁 Project Structure
+
+```
+besunny-ai/
+├── src/                    # React frontend source
+│   ├── components/         # React components
+│   ├── pages/             # Page components
+│   ├── hooks/             # Custom React hooks
+│   ├── lib/               # Utility libraries
+│   └── config/            # Configuration files
+├── backend/                # Python backend
+│   ├── app/               # FastAPI application
+│   ├── services/          # Business logic services
+│   ├── models/            # Data models
+│   └── tests/             # Backend tests
+├── supabase/               # Supabase configuration
+├── database/               # Database migrations
+└── docs/                   # Documentation
 ```
 
-## 🎯 **Key Features**
+## 🔌 Integrations
 
-- **Unified Setup**: One Docker Compose file for both development and production
-- **Profile-Based**: Switch between environments with simple flags
-- **Health Checks**: Automatic service health monitoring
-- **Hot Reloading**: Frontend and backend development with live updates
-- **Production Ready**: Test production stack locally before deployment
+- **Google Services**: Calendar, Drive, Gmail
+- **AI Services**: OpenAI GPT, Vector embeddings
+- **Database**: Supabase (PostgreSQL)
+- **Authentication**: Supabase Auth + Google OAuth
+- **Caching**: Redis
+- **Vector DB**: Pinecone
 
-**Your complete full-stack development environment in one unified setup!** 🚀
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests for new functionality
+5. Ensure all tests pass
+6. Submit a pull request
+
+## 📄 License
+
+This project is part of the BeSunny.ai platform.
+
+## 🆘 Support
+
+- **Documentation**: Check the `/docs` folder
+- **Issues**: Create GitHub issues for bugs or feature requests
+- **Discussions**: Use GitHub Discussions for questions
+
+---
+
+**Built with ❤️ by the BeSunny.ai team**

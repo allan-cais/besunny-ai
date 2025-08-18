@@ -3,8 +3,8 @@
 # BeSunny.ai Build and Deploy Script
 # Builds frontend locally and deploys to Railway
 
-echo "🔨 Building and Deploying BeSunny.ai Full Stack v17..."
-echo "===================================================="
+echo "🔨 Building and Deploying BeSunny.ai Full Stack..."
+echo "================================================"
 
 # Colors for output
 GREEN='\033[0;32m'

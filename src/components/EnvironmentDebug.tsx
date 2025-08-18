@@ -1,6 +1,6 @@
 import React from 'react';
 import { config, features } from '@/config';
-import { PYTHON_BACKEND_CONFIG } from '@/config/python-backend-config';
+import { pythonBackendConfig } from '@/config/python-backend-config';
 
 interface EnvironmentDebugProps {
   show?: boolean;
@@ -55,10 +55,16 @@ export const EnvironmentDebug: React.FC<EnvironmentDebugProps> = ({ show = false
         <div className="mt-2">
           <strong>Python Backend Config:</strong>
           <div className="ml-2">
-            Base URL: {PYTHON_BACKEND_CONFIG.baseUrl}
+            Base URL: {pythonBackendConfig.baseUrl}
           </div>
           <div className="ml-2">
-            Enabled: {PYTHON_BACKEND_CONFIG.isEnabled ? '✅' : '❌'}
+            Timeout: {pythonBackendConfig.timeout}ms
+          </div>
+          <div className="ml-2">
+            Retry Attempts: {pythonBackendConfig.retryAttempts}
+          </div>
+          <div className="ml-2">
+            Health Check Interval: {pythonBackendConfig.healthCheckInterval}ms
           </div>
         </div>
       </div>

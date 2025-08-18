@@ -43,10 +43,10 @@ const developmentConfig: PythonBackendConfig = {
   enableMetrics: true,
 };
 
-// Staging configuration - Updated to use v17 backend
+// Staging configuration
 const stagingConfig: PythonBackendConfig = {
   ...baseConfig,
-  baseUrl: getEnvVar('VITE_PYTHON_BACKEND_URL', 'https://besunny-ai-v17.railway.app'),
+  baseUrl: getEnvVar('VITE_PYTHON_BACKEND_URL', 'https://besunny-ai.railway.app'),
   timeout: 30000,
   retryAttempts: 3,
   healthCheckInterval: 60000,
@@ -54,10 +54,10 @@ const stagingConfig: PythonBackendConfig = {
   enableMetrics: true,
 };
 
-// Production configuration - Updated to use v17 backend
+// Production configuration
 const productionConfig: PythonBackendConfig = {
   ...baseConfig,
-  baseUrl: getEnvVar('VITE_PYTHON_BACKEND_URL', 'https://besunny-ai-v17.railway.app'),
+  baseUrl: getEnvVar('VITE_PYTHON_BACKEND_URL', 'https://besunny-ai.railway.app'),
   timeout: 30000,
   retryAttempts: 3,
   healthCheckInterval: 120000, // Less frequent health checks in production

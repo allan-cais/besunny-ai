@@ -236,3 +236,9 @@ async def get_database_health() -> bool:
 async def get_database_status() -> dict:
     """Get database status (backward compatibility)."""
     return await get_db_info()
+
+# Supabase compatibility function
+def get_supabase():
+    """Get Supabase client (backward compatibility)."""
+    from .supabase_config import get_supabase_client
+    return get_supabase_client()

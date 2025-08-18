@@ -125,7 +125,7 @@ export const BackendConnectionTest: React.FC = () => {
             {allTestsPassed && <Badge variant="default" className="bg-green-500">All Tests Passed</Badge>}
           </CardTitle>
           <CardDescription>
-            Testing connection to BeSunny.ai Backend v17 at {backendUrl}
+            Testing connection to BeSunny.ai Backend at {backendUrl}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -186,7 +186,7 @@ export const BackendConnectionTest: React.FC = () => {
             <Alert className="border-green-200 bg-green-50">
               <CheckCircle className="h-4 w-4 text-green-600" />
               <AlertDescription className="text-green-800">
-                🎉 All backend tests passed! Your v17 backend is fully operational and ready for frontend integration.
+                🎉 All backend tests passed! Your backend is fully operational and ready for frontend integration.
               </AlertDescription>
             </Alert>
           )}
