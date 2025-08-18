@@ -37,7 +37,7 @@ echo "🌐 Deploying Frontend Service..."
 echo "📁 Switching to frontend project..."
 railway link --project besunny-ai-frontend
 echo "🚀 Deploying frontend..."
-railway up --service frontend
+railway up --service frontend --config .railway/railway-frontend.toml
 
 echo ""
 echo "🐍 Deploying Backend Service..."
@@ -46,7 +46,7 @@ echo "🐍 Deploying Backend Service..."
 echo "📁 Switching to backend project..."
 railway link --project besunny-ai-backend
 echo "🚀 Deploying backend..."
-railway up --service backend
+railway up --service backend --config .railway/railway-backend.toml
 
 echo ""
 echo "✅ Deployment complete!"

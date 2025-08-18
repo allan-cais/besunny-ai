@@ -1,5 +1,5 @@
 # Railway Configuration - Frontend Service Only
-# Deploying React frontend as a static site on Railway
+# This file should be used when deploying the frontend service
 
 [deploy]
 startCommand = "npx serve -s dist -l $PORT"
@@ -8,20 +8,24 @@ healthcheckTimeout = 30
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 5
 
-# Specify the output directory for the build
-[build.output]
-path = "dist"
-
 # Frontend build configuration
 [build]
 builder = "nixpacks"
 buildCommand = "npm install && npm run build:production"
 watchPatterns = ["src/**/*", "package.json", "vite.config.ts"]
 
-# Source directory for frontend - be more explicit
+# Source directory for frontend - explicit root
 [build.source]
 path = "."
-exclude = ["backend/**", "supabase/**", "database/**", "docs/**", "*.md", "Dockerfile*", "railway*.toml", "deploy-*.sh"]
+exclude = ["backend/**", "supabase/**", "database/**", "docs/**", "*.md", "Dockerfile*", "railway*.toml", "deploy-*.sh", ".railway/**"]
+
+# Set working directory for the service
+[deploy.workingDirectory]
+path = "."
+
+# Specify the output directory for the build
+[build.output]
+path = "dist"
 
 # Force Node.js detection and exclude Python files
 [build.detection]

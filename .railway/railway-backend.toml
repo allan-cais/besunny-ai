@@ -1,5 +1,5 @@
 # Railway Configuration - Backend Service Only
-# Deploying Python FastAPI backend on Railway
+# This file should be used when deploying the backend service
 
 [deploy]
 startCommand = "python start.py"
@@ -11,13 +11,17 @@ restartPolicyMaxRetries = 10
 # Backend build configuration
 [build]
 builder = "nixpacks"
-buildCommand = "cd backend && pip install -r requirements.txt"
-watchPatterns = ["backend/**/*", "requirements.txt"]
+buildCommand = "pip install -r requirements.txt"
+watchPatterns = ["**/*.py", "requirements.txt"]
 
-# Source directory for backend - be more explicit
+# Source directory for backend - explicit root
 [build.source]
+path = "."
+exclude = ["src/**", "public/**", "package*.json", "vite.config.ts", "tailwind.config.ts", "tsconfig*.json", "*.md", "Dockerfile*", "railway*.toml", "deploy-*.sh", ".railway/**", "node_modules/**", "dist/**"]
+
+# Set working directory for the service
+[deploy.workingDirectory]
 path = "backend"
-exclude = ["**/__pycache__/**", "**/*.pyc", "**/.pytest_cache/**", "**/tests/**", "**/venv/**"]
 
 # Force Python detection and exclude Node.js files
 [build.detection]
