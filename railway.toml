@@ -13,4 +13,8 @@ frontend = "npm start"
 
 # Force source building, ignore any Dockerfiles
 [build.ignore]
-files = ["Dockerfile*", "docker-compose*.yml"]
+files = ["Dockerfile*", "docker-compose*.yml", "docker/*"]
+
+# Explicitly disable Docker detection
+[build.docker]
+enabled = false
