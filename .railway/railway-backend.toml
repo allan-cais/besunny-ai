@@ -17,16 +17,17 @@ watchPatterns = ["**/*.py", "requirements.txt"]
 # Source directory for backend - explicit root
 [build.source]
 path = "."
-exclude = ["src/**", "public/**", "package*.json", "vite.config.ts", "tailwind.config.ts", "tsconfig*.json", "*.md", "Dockerfile*", "railway*.toml", "deploy-*.sh", ".railway/**", "node_modules/**", "dist/**"]
+exclude = ["src/**", "public/**", "package*.json", "vite.config.ts", "tailwind.config.ts", "tsconfig*.json", "*.md", "Dockerfile*", "railway*.toml", "deploy-*.sh", ".railway/**", "node_modules/**", "dist/**", "**/deno.json", "**/*.deno"]
 
 # Set working directory for the service
 [deploy.workingDirectory]
 path = "backend"
 
-# Force Python detection and exclude Node.js files
+# Force Python detection and exclude Node.js/Deno files
 [build.detection]
 python = true
 node = false
+deno = false
 
 # Environment variables for backend
 [deploy.envs]

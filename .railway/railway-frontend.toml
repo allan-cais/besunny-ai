@@ -17,7 +17,7 @@ watchPatterns = ["src/**/*", "package.json", "vite.config.ts"]
 # Source directory for frontend - explicit root
 [build.source]
 path = "."
-exclude = ["backend/**", "supabase/**", "database/**", "docs/**", "*.md", "Dockerfile*", "railway*.toml", "deploy-*.sh", ".railway/**"]
+exclude = ["backend/**", "supabase/**", "database/**", "docs/**", "*.md", "Dockerfile*", "railway*.toml", "deploy-*.sh", ".railway/**", "**/deno.json", "**/*.deno"]
 
 # Set working directory for the service
 [deploy.workingDirectory]
@@ -27,10 +27,11 @@ path = "."
 [build.output]
 path = "dist"
 
-# Force Node.js detection and exclude Python files
+# Force Node.js detection and exclude Python/Deno files
 [build.detection]
 node = true
 python = false
+deno = false
 
 # Environment variables for frontend
 [deploy.envs]
