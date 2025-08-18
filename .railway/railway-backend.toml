@@ -2,7 +2,7 @@
 # This file should be used when deploying the backend service
 
 [deploy]
-startCommand = "python start.py"
+startCommand = "cd backend && python start.py"
 healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"
@@ -34,7 +34,7 @@ PYTHON_VERSION = "3.11"
 ENVIRONMENT = "production"
 DEBUG = "false"
 HOST = "0.0.0.0"
-PORT = "8000"
+PORT = "$PORT"
 WORKERS = "1"
 ENABLE_METRICS = "false"
 LOG_LEVEL = "INFO"
