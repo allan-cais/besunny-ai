@@ -22,7 +22,7 @@ FROM python:3.11-slim
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRECODE=1
-ENV PYTHONPATH=/app
+ENV PYTHONPATH=/app/backend
 
 # Set work directory
 WORKDIR /app
@@ -46,7 +46,7 @@ WORKDIR /app/backend
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements-minimal.txt
 
-# Set working directory to backend for the application
+# Set working directory to backend for the application (since test_app_v15.py is in backend)
 WORKDIR /app/backend
 
 # Create non-root user
@@ -61,5 +61,5 @@ EXPOSE $PORT
 HEALTHCHECK --interval=30s --timeout=30s --start-period=120s --retries=10 \
     CMD curl -f http://localhost:$PORT/health || curl -f http://localhost:8000/health || exit 1
 
-# Run application
+# Run application from backend directory
 CMD ["python", "test_app_v15.py"]
