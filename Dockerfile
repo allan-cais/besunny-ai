@@ -44,7 +44,7 @@ COPY backend/ ./backend/
 # Install Python dependencies
 WORKDIR /app/backend
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements-minimal.txt
+    pip install --no-cache-dir -r requirements.txt
 
 # Create static directory and copy frontend build
 RUN mkdir -p /app/backend/app/static
