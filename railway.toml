@@ -1,5 +1,6 @@
 [build]
 builder = "nixpacks"
+buildCommand = "echo 'Using Nixpacks source building'"
 
 [deploy]
 startCommand = "python backend/start.py"
@@ -9,3 +10,7 @@ healthcheckTimeout = 300
 [deploy.startCommand]
 backend = "python backend/start.py"
 frontend = "npm start"
+
+# Force source building, ignore any Dockerfiles
+[build.ignore]
+files = ["Dockerfile*", "docker-compose*.yml"]
