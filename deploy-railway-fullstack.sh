@@ -90,8 +90,8 @@ else
     print_warning "curl not available. Skipping backend health check."
 fi
 
-# Step 5: Build Frontend
-print_status "Step 5: Building Frontend..."
+# Step 5: Build Frontend Locally
+print_status "Step 5: Building Frontend Locally..."
 print_status "Installing dependencies..."
 npm install
 
@@ -108,7 +108,13 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-print_success "Frontend built successfully"
+# Verify the dist folder was created
+if [ ! -d "dist" ]; then
+    print_error "Frontend build failed - dist folder not found"
+    exit 1
+fi
+
+print_success "Frontend built successfully in dist/ folder"
 
 # Step 6: Deploy to Railway
 print_status "Step 6: Deploying Full Stack to Railway..."
@@ -194,3 +200,8 @@ echo "   - Use 'railway logs' to monitor deployment"
 echo "   - Use 'railway status' to check service status"
 echo "   - Use 'railway variables' to manage environment variables"
 echo "   - Everything is now in one place on Railway!"
+echo ""
+echo "🔧 Build Process:"
+echo "   - Frontend built locally: ✅ dist/ folder created"
+echo "   - Docker copies pre-built files: ✅ No build errors"
+echo "   - Backend serves static files: ✅ Full stack ready"
