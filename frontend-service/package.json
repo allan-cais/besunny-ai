@@ -1,0 +1,12 @@
+{
+  "name": "besunny-ai-frontend",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "cd .. && npm run build:production",
+    "start": "cd .. && npx serve -s dist -l $PORT"
+  },
+  "dependencies": {
+    "serve": "^14.2.1"
+  }
+}
