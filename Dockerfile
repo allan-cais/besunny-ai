@@ -1,23 +1,44 @@
-# Railway Full Stack v17 - Python Backend + Pre-built React Frontend
+# Railway Full Stack v17 - Python Backend + React Frontend
 FROM python:3.11-slim
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRECODE=1
 ENV PYTHONPATH=/app/backend
+ENV NODE_ENV=production
 
 # Set work directory
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies including Node.js
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
     libpq-dev \
     curl \
+    nodejs \
+    npm \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy backend files first
+# Copy package files for frontend
+COPY package*.json ./
+
+# Install frontend dependencies
+RUN npm ci
+
+# Copy frontend source
+COPY src/ ./src/
+COPY public/ ./public/
+COPY index.html ./
+COPY vite.config.ts ./
+COPY tailwind.config.ts ./
+COPY tsconfig*.json ./
+COPY postcss.config.js ./
+
+# Build frontend (this will create the dist folder)
+RUN npm run build:production
+
+# Copy backend files
 COPY backend/ ./backend/
 
 # Install Python dependencies
@@ -25,11 +46,9 @@ WORKDIR /app/backend
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements-minimal.txt
 
-# Create static directory for frontend files
+# Create static directory and copy frontend build
 RUN mkdir -p /app/backend/app/static
-
-# Copy pre-built frontend files (built locally)
-COPY dist/ /app/backend/app/static/
+RUN cp -r /app/dist/* /app/backend/app/static/
 
 # Set working directory to backend for the application
 WORKDIR /app/backend

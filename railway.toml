@@ -8,10 +8,11 @@ healthcheckTimeout = 300
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 10
 
-# Frontend build configuration
+# Frontend build configuration - This tells Railway to build automatically
 [build]
 builder = "nixpacks"
 buildCommand = "npm install && npm run build:production"
+watchPatterns = ["src/**/*", "package.json", "vite.config.ts"]
 
 # Environment variables for full stack
 [deploy.envs]
