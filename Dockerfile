@@ -1,8 +1,8 @@
-# Default Dockerfile for BeSunny.ai
-# This builds the frontend by default
-# For backend, use: docker build -f Dockerfile.backend .
+# Multi-service Dockerfile for BeSunny.ai
+# This builds both frontend and backend in one container for Railway deployment
 
-FROM node:18-alpine AS builder
+# Use Node.js for building frontend and Python for backend
+FROM node:18-alpine AS frontend-builder
 
 # Set working directory
 WORKDIR /app
@@ -10,23 +10,39 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install all dependencies (including dev dependencies for build)
+# Install all dependencies
 RUN npm ci
 
 # Copy source code
 COPY . .
 
-# Build the application
+# Build the frontend
 RUN npm run build:production
 
-# Production stage
-FROM nginx:alpine
+# Python stage for backend
+FROM python:3.11-slim
 
-# Copy built files from build stage
-COPY --from=builder /app/dist /usr/share/nginx/html
+# Set working directory
+WORKDIR /app
 
-# Expose port 80
-EXPOSE 80
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
 
-# Start nginx
-CMD ["nginx", "-g", "daemon off;"]
+# Copy requirements and install Python dependencies
+COPY backend/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy backend code
+COPY backend/ .
+
+# Copy built frontend from frontend-builder stage
+COPY --from=frontend-builder /app/dist ./app/static
+
+# Expose port
+EXPOSE 8000
+
+# Start the backend (which will serve both API and frontend)
+CMD ["python", "start.py"]
