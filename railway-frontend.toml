@@ -1,0 +1,34 @@
+# Railway Configuration - Frontend Service Only
+# Deploying React frontend as a static site on Railway
+
+[deploy]
+startCommand = "npx serve -s dist -l $PORT"
+healthcheckPath = "/"
+healthcheckTimeout = 30
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 5
+
+# Specify the output directory for the build
+[build.output]
+path = "dist"
+
+# Frontend build configuration
+[build]
+builder = "nixpacks"
+buildCommand = "npm install && npm run build:production"
+watchPatterns = ["src/**/*", "package.json", "vite.config.ts"]
+
+# Source directory for frontend
+[build.source]
+path = "."
+exclude = ["backend/**", "supabase/**", "database/**", "docs/**", "*.md", "Dockerfile*", "railway*.toml", "deploy-*.sh"]
+
+# Environment variables for frontend
+[deploy.envs]
+NODE_ENV = "production"
+ENVIRONMENT = "production"
+VITE_APP_NAME = "BeSunny.ai"
+VITE_APP_VERSION = "17.0.0"
+VITE_ENVIRONMENT = "production"
+# This will be set to your backend service URL
+VITE_PYTHON_BACKEND_URL = "https://your-backend-service.railway.app"
