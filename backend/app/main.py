@@ -125,6 +125,34 @@ async def lifespan(app: FastAPI):
             logger.warning(f"Performance Monitoring Service initialization failed: {e}")
             logger.info("Application will continue without performance monitoring")
         
+        # Initialize User Management Service
+        try:
+            from .services.user.user_management_service import UserManagementService
+            
+            # Initialize user management in background
+            logger.info("Initializing User Management Service...")
+            user_manager = UserManagementService()
+            asyncio.create_task(user_manager.initialize())
+            logger.info("User Management Service configured for background initialization")
+            
+        except Exception as e:
+            logger.warning(f"User Management Service initialization failed: {e}")
+            logger.info("Application will continue without user management")
+        
+        # Initialize Project Management Service
+        try:
+            from .services.project.project_management_service import ProjectManagementService
+            
+            # Initialize project management in background
+            logger.info("Initializing Project Management Service...")
+            project_manager = ProjectManagementService()
+            asyncio.create_task(project_manager.initialize())
+            logger.info("Project Management Service configured for background initialization")
+            
+        except Exception as e:
+            logger.warning(f"Project Management Service initialization failed: {e}")
+            logger.info("Application will continue without project management")
+        
         logger.info("Application startup completed")
         yield
         

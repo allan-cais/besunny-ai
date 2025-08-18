@@ -15,8 +15,8 @@ class DatabaseSettings(BaseSettings):
     """Database configuration settings."""
     
     database_url: str = Field(
-        default="sqlite:///./besunny_dev.db",
-        description="Database connection URL"
+        default="",  # Will be set from Supabase configuration
+        description="Database connection URL (Supabase preferred)"
     )
     database_pool_size: int = Field(
         default=20,
