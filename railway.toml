@@ -1,18 +1,21 @@
+# Railway Configuration for Single Service Full Stack
+# One service that builds frontend and runs backend
+
 [build]
 builder = "nixpacks"
-buildCommand = "npm run build:staging"
-watchPatterns = ["src/**/*", "package.json", "package-lock.json"]
+buildCommand = "chmod +x build-for-railway.sh && ./build-for-railway.sh"
+watchPatterns = ["src/**/*", "package.json", "package-lock.json", "backend/**/*"]
+
+[build.nixpacks]
+providers = ["nodejs", "python"]
 
 [deploy]
-startCommand = "npm start"
-healthcheckPath = "/"
+startCommand = "cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 10
 
 [deploy.envs]
 NODE_ENV = "production"
-
-# Explicitly ignore backend directory for frontend deployment
-[build.ignore]
-paths = ["backend/**/*", "supabase/**/*", "database/**/*"]
+PYTHON_VERSION = "3.11"

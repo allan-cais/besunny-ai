@@ -7,11 +7,14 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.exceptions import RequestValidationError
 import time
 import logging
 import structlog
+import os
+from pathlib import Path
 
 from .core.config import get_settings, is_development
 from .core.database import init_db, close_db
@@ -272,6 +275,11 @@ def create_app() -> FastAPI:
     app.include_router(api_v1_router, prefix="/api/v1")
     app.include_router(websocket_router, prefix="/ws")
     
+    # Mount static files
+    static_dir = Path(__file__).parent / "static"
+    if static_dir.exists():
+        app.mount("/static", StaticFiles(directory=static_dir), name="static")
+    
     # Health check endpoint
     @app.get("/health")
     async def health_check():
@@ -381,24 +389,41 @@ def create_app() -> FastAPI:
     @app.get("/")
     async def root():
         """Root endpoint."""
-        return {
-            "message": "Welcome to BeSunny.ai Python Backend",
-            "service": settings.app_name,
-            "version": settings.app_version,
-            "docs": "/docs" if is_development() else None,
-            "ai_services": {
-                "classification": "/api/v1/classification",
-                "ai": "/api/v1/ai",
-                "embeddings": "/api/v1/embeddings",
-                "meeting_intelligence": "/api/v1/meeting-intelligence"
-            },
-            "microservices": {
-                "service_registry": "/api/v1/microservices/registry/status",
-                "api_gateway": "/api/v1/microservices/gateway/status",
-                "observability": "/api/v1/microservices/observability/health",
-                "cache": "/api/v1/microservices/cache/status"
+        if static_dir.exists():
+            return FileResponse(static_dir / "index.html")
+        else:
+            return {
+                "message": "Welcome to BeSunny.ai Python Backend",
+                "service": settings.app_name,
+                "version": settings.app_version,
+                "docs": "/docs" if is_development() else None,
+                "ai_services": {
+                    "classification": "/api/v1/classification",
+                    "ai": "/api/v1/ai",
+                    "embeddings": "/api/v1/embeddings",
+                    "meeting_intelligence": "/api/v1/meeting-intelligence"
+                },
+                "microservices": {
+                    "service_registry": "/api/v1/microservices/registry/status",
+                    "api_gateway": "/api/v1/microservices/gateway/status",
+                    "observability": "/api/v1/microservices/observability/health",
+                    "cache": "/api/v1/microservices/cache/status"
+                }
             }
-        }
+    
+    # Catch-all route for React Router (must be last)
+    @app.get("/{full_path:path}")
+    async def catch_all(full_path: str):
+        """Catch-all route to serve React app for client-side routing."""
+        if static_dir.exists():
+            # Check if it's a static file request
+            static_file = static_dir / full_path
+            if static_file.exists() and static_file.is_file():
+                return FileResponse(static_file)
+            # Otherwise serve index.html for client-side routing
+            return FileResponse(static_dir / "index.html")
+        else:
+            raise HTTPException(status_code=404, detail="Not found")
     
     return app
 

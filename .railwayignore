@@ -6,3 +6,22 @@ database/
 start-fullstack.sh
 env.*
 .env*
+
+# Ignore all Docker-related files
+**/Dockerfile*
+**/docker-compose*
+**/dockerfile*
+
+# Ignore backend-specific files
+**/requirements.txt
+**/pyproject.toml
+**/__pycache__/
+**/*.py
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/.Python
+**/venv/
+**/.venv/
+**/env/
+**/.env/
