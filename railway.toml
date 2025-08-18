@@ -3,7 +3,7 @@
 
 [build]
 builder = "nixpacks"
-buildCommand = "npm ci && npm run build:staging && mkdir -p backend/app/static && cp -r dist/* backend/app/static/ && mv backend backend_hidden && cd backend_hidden && pip install -r requirements-minimal.txt"
+buildCommand = "npm ci && npm run build:staging && mkdir -p backend_temp/app/static && cp -r dist/* backend_temp/app/static/ && cd backend_temp && pip install -r requirements-minimal.txt"
 watchPatterns = ["src/**/*", "package.json", "package-lock.json"]
 
 # Force Nixpacks configuration
@@ -13,7 +13,7 @@ nodejsVersion = "18"
 pythonVersion = "3.11"
 
 [deploy]
-startCommand = "cd backend_hidden && python start.py"
+startCommand = "cd backend_temp && python start.py"
 healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"

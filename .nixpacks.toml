@@ -7,11 +7,10 @@ cmds = ["npm ci"]
 [phases.build]
 cmds = [
   "npm run build:staging",
-  "mkdir -p backend/app/static",
-  "cp -r dist/* backend/app/static/",
-  "mv backend backend_hidden",
-  "cd backend_hidden && pip install -r requirements-minimal.txt"
+  "mkdir -p backend_temp/app/static",
+  "cp -r dist/* backend_temp/app/static/",
+  "cd backend_temp && pip install -r requirements-minimal.txt"
 ]
 
 [start]
-cmd = "cd backend_hidden && python start.py"
+cmd = "cd backend_temp && python start.py"
