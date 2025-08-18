@@ -93,8 +93,12 @@ The backend is configured for Railway deployment with the `start.py` script as t
 ### Docker Deployment
 Use the provided Dockerfile for containerized deployment:
 ```bash
-docker build -t besunny-backend .
-docker run -p 8000:8000 besunny-backend
+# From project root
+docker build -f Dockerfile.backend -t besunny-backend:latest .
+docker run -p 8000:8000 besunny-backend:latest
+
+# Or use Docker Compose (recommended)
+docker-compose up backend
 ```
 
 ## 🔍 Monitoring

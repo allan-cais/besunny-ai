@@ -127,9 +127,13 @@ isort .              # Sort imports
 
 ### Docker Deployment
 ```bash
-# Build and run with Docker
-docker build -t besunny-ai .
-docker run -p 8000:8000 besunny-ai
+# Build and run with Docker Compose (Recommended)
+docker-compose up
+
+# Or build and run individually
+./docker-build.sh
+docker run -p 3000:80 besunny-frontend:latest
+docker run -p 8000:8000 besunny-backend:latest
 ```
 
 ## 🧪 Testing
