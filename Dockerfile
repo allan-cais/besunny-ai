@@ -54,12 +54,12 @@ RUN useradd --create-home --shell /bin/bash app && \
     chown -R app:app /app
 USER app
 
-# Expose port
-EXPOSE 8000
+# Expose port (Railway will set the actual port via $PORT)
+EXPOSE $PORT
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+# Health check with longer start period and better error handling
+HEALTHCHECK --interval=30s --timeout=30s --start-period=120s --retries=10 \
+    CMD curl -f http://localhost:$PORT/health || curl -f http://localhost:8000/health || exit 1
 
 # Run application
 CMD ["python", "start.py"]

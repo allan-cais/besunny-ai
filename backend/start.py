@@ -33,11 +33,16 @@ def main():
         host = os.environ.get('HOST', '0.0.0.0')
         
         print(f"🚀 Starting BeSunny.ai Backend on {host}:{port}")
+        print(f"📊 Environment: {os.environ.get('ENVIRONMENT', 'unknown')}")
+        print(f"🔧 Debug mode: {os.environ.get('DEBUG', 'unknown')}")
+        print(f"🌐 CORS origins: {os.environ.get('CORS_ORIGINS', 'unknown')}")
+        
         uvicorn.run(
             app,
             host=host,
             port=port,
-            log_level="info"
+            log_level="info",
+            access_log=True
         )
         
     except ImportError as e:
