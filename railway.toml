@@ -1,5 +1,5 @@
-# Railway Configuration - Using Docker for deployment
-# Since Railway keeps auto-generating Dockerfiles, we'll use our own
+# Railway Configuration - Full Stack v17 Deployment
+# Deploying both frontend and backend on Railway
 
 [deploy]
 startCommand = "python start_v17.py"
@@ -8,6 +8,12 @@ healthcheckTimeout = 300
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 10
 
+# Frontend build configuration
+[build]
+builder = "nixpacks"
+buildCommand = "npm install && npm run build:production"
+
+# Environment variables for full stack
 [deploy.envs]
 NODE_ENV = "production"
 PYTHON_VERSION = "3.11"
@@ -28,3 +34,9 @@ SUPABASE_URL = "https://placeholder.supabase.co"
 SUPABASE_SERVICE_ROLE_KEY = "placeholder-key"
 SUPABASE_ANON_KEY = "placeholder-key"
 REDIS_URL = "redis://localhost:6379/0"
+
+# Frontend environment variables
+VITE_PYTHON_BACKEND_URL = "https://your-railway-backend.railway.app"
+VITE_APP_NAME = "BeSunny.ai"
+VITE_APP_VERSION = "17.0.0"
+VITE_ENVIRONMENT = "production"
