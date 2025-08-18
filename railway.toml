@@ -9,6 +9,7 @@ watchPatterns = ["src/**/*", "package.json", "package-lock.json", "backend/**/*"
 [build.nixpacks]
 providers = ["nodejs", "python"]
 nodejsVersion = "18"
+pythonVersion = "3.11"
 
 [deploy]
 startCommand = "cd backend && python start.py"

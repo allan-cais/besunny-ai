@@ -1,22 +1,11 @@
-# Ignore backend files for frontend-only Railway deployment
-backend/
-supabase/
-database/
+# Ignore files that shouldn't be deployed to Railway
 *.md
 start-fullstack.sh
 env.*
 .env*
 
-# Ignore all Docker-related files
-**/Dockerfile*
-**/docker-compose*
-**/dockerfile*
-
-# Ignore backend-specific files
-**/requirements.txt
-**/pyproject.toml
+# Ignore development files
 **/__pycache__/
-**/*.py
 **/*.pyc
 **/*.pyo
 **/*.pyd
@@ -25,3 +14,11 @@ env.*
 **/.venv/
 **/env/
 **/.env/
+
+# Keep backend files for Railway deployment
+# backend/
+# supabase/
+# database/
+# **/requirements.txt
+# **/pyproject.toml
+# **/*.py
