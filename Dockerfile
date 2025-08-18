@@ -1,22 +1,4 @@
-# Multi-stage build for Railway deployment
-FROM node:18-alpine AS frontend-builder
-
-# Set working directory
-WORKDIR /app
-
-# Copy package files
-COPY package*.json ./
-
-# Install dependencies
-RUN npm ci
-
-# Copy source code
-COPY . .
-
-# Build frontend
-RUN npm run build:staging
-
-# Python runtime stage
+# Python runtime for Railway deployment
 FROM python:3.11-slim
 
 # Set environment variables
@@ -35,8 +17,8 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy built frontend from previous stage
-COPY --from=frontend-builder /app/dist ./app/static
+# Create static directory for potential frontend files
+RUN mkdir -p /app/app/static
 
 # Copy backend files
 COPY backend/ ./backend/
@@ -46,7 +28,7 @@ WORKDIR /app/backend
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements-minimal.txt
 
-# Set working directory to backend for the application (since test_app_v15.py is in backend)
+# Set working directory to backend for the application (since test_app_v16.py is in backend)
 WORKDIR /app/backend
 
 # Create non-root user
