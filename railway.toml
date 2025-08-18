@@ -2,7 +2,7 @@
 # Since Railway keeps auto-generating Dockerfiles, we'll use our own
 
 [deploy]
-startCommand = "python test_app_v11.py"
+startCommand = "python test_app_v12.py"
 healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"
