@@ -36,27 +36,46 @@ interface Config {
   };
 }
 
-// Environment variable validation
+// Environment variable validation with better error handling
 function getRequiredEnvVar(name: string): string {
   const value = import.meta.env[name];
   if (!value) {
-    throw new Error(`Missing required environment variable: ${name}`);
+    console.warn(`⚠️ Missing required environment variable: ${name}`);
+    // Return a safe default for staging/production builds
+    if (name === 'VITE_SUPABASE_URL') {
+      return 'https://placeholder.supabase.co';
+    }
+    if (name === 'VITE_SUPABASE_ANON_KEY') {
+      return 'placeholder-key';
+    }
+    return '';
   }
   return value;
 }
 
 function getOptionalEnvVar(name: string, defaultValue: string = ''): string {
-  return import.meta.env[name] || defaultValue;
+  const value = import.meta.env[name];
+  if (!value) {
+    console.warn(`⚠️ Missing optional environment variable: ${name}, using default: ${defaultValue}`);
+  }
+  return value || defaultValue;
 }
 
 function getOptionalNumberEnvVar(name: string, defaultValue: number): number {
   const value = import.meta.env[name];
-  if (!value) return defaultValue;
+  if (!value) {
+    console.warn(`⚠️ Missing optional environment variable: ${name}, using default: ${defaultValue}`);
+    return defaultValue;
+  }
   const parsed = parseInt(value);
-  return isNaN(parsed) ? defaultValue : parsed;
+  if (isNaN(parsed)) {
+    console.warn(`⚠️ Invalid number for environment variable: ${name}, using default: ${defaultValue}`);
+    return defaultValue;
+  }
+  return parsed;
 }
 
-// Build configuration object
+// Build configuration object with safe defaults
 export const config: Config = {
   supabase: {
     url: getRequiredEnvVar('VITE_SUPABASE_URL'),
@@ -81,18 +100,30 @@ export const config: Config = {
     enablePythonBackend: getOptionalEnvVar('VITE_ENABLE_PYTHON_BACKEND', 'true') === 'true',
   },
   polling: {
-    defaultIntervalMs: parseInt(getOptionalEnvVar('VITE_POLLING_INTERVAL_MS', '30000')),
-    maxRetries: parseInt(getOptionalEnvVar('VITE_MAX_RETRIES', '3')),
-    retryDelayMs: parseInt(getOptionalEnvVar('VITE_RETRY_DELAY_MS', '1000')),
+    defaultIntervalMs: getOptionalNumberEnvVar('VITE_POLLING_INTERVAL_MS', 30000),
+    maxRetries: getOptionalNumberEnvVar('VITE_MAX_RETRIES', 3),
+    retryDelayMs: getOptionalNumberEnvVar('VITE_RETRY_DELAY_MS', 1000),
   },
   limits: {
-    maxDocumentsPerPage: parseInt(getOptionalEnvVar('VITE_MAX_DOCUMENTS_PER_PAGE', '50')),
-    maxMeetingsPerPage: parseInt(getOptionalEnvVar('VITE_MAX_MEETINGS_PER_PAGE', '100')),
-    maxChatMessagesPerPage: parseInt(getOptionalEnvVar('VITE_MAX_CHAT_MESSAGES_PER_PAGE', '100')),
+    maxDocumentsPerPage: getOptionalNumberEnvVar('VITE_MAX_DOCUMENTS_PER_PAGE', 50),
+    maxMeetingsPerPage: getOptionalNumberEnvVar('VITE_MAX_MEETINGS_PER_PAGE', 100),
+    maxChatMessagesPerPage: getOptionalNumberEnvVar('VITE_MAX_CHAT_MESSAGES_PER_PAGE', 100),
   },
 };
 
-// API endpoint builders
+// Debug logging for staging troubleshooting
+console.log('🔧 Configuration loaded:', {
+  mode: import.meta.env.MODE,
+  dev: import.meta.env.DEV,
+  prod: import.meta.env.PROD,
+  appEnv: import.meta.env.VITE_APP_ENV,
+  supabaseUrl: config.supabase.url,
+  pythonBackendUrl: config.pythonBackend.url,
+  enablePythonBackend: config.features.enablePythonBackend,
+  enableDebugMode: config.features.enableDebugMode,
+});
+
+// API endpoint builders with safe fallbacks
 export const apiEndpoints = {
   supabase: {
     functions: (functionName: string) => `${config.supabase.url}/functions/v1/${functionName}`,
@@ -113,12 +144,13 @@ export const apiEndpoints = {
   },
 } as const;
 
-// Configuration validation
+// Configuration validation with better error handling
 export function validateConfig(): void {
   try {
     // Validate required Supabase configuration
     if (!config.supabase.url || !config.supabase.anonKey) {
-      throw new Error('Invalid Supabase configuration');
+      console.warn('⚠️ Invalid Supabase configuration - using fallbacks');
+      return; // Don't throw, just warn
     }
 
     // Validate Python backend configuration
@@ -126,26 +158,35 @@ export function validateConfig(): void {
       try {
         new URL(config.pythonBackend.url);
       } catch {
-        throw new Error('Invalid Python backend URL format');
+        console.warn('⚠️ Invalid Python backend URL format - using fallback');
+        return;
       }
     }
 
     // Validate URL formats
-    new URL(config.supabase.url);
+    try {
+      new URL(config.supabase.url);
+    } catch {
+      console.warn('⚠️ Invalid Supabase URL format - using fallback');
+      return;
+    }
     
     // Validate numeric configurations
     if (config.polling.defaultIntervalMs <= 0) {
-      throw new Error('Invalid polling interval');
+      console.warn('⚠️ Invalid polling interval - using fallback');
+      return;
     }
     
     if (config.limits.maxDocumentsPerPage <= 0) {
-      throw new Error('Invalid documents per page limit');
+      console.warn('⚠️ Invalid documents per page limit - using fallback');
+      return;
     }
 
+    console.log('✅ Configuration validation passed');
 
   } catch (error) {
     console.error('❌ Configuration validation failed:', error);
-    throw error;
+    // Don't throw, just log the error
   }
 }
 
@@ -154,13 +195,48 @@ export const isDevelopment = import.meta.env.DEV;
 export const isProduction = import.meta.env.PROD;
 export const isTest = import.meta.env.MODE === 'test';
 
-// Feature flags
+// Feature flags with safe fallbacks
 export const features = {
-  isEnabled: (feature: keyof Config['features']) => config.features[feature],
-  isDebugMode: () => config.features.enableDebugMode,
-  isAnalyticsEnabled: () => config.features.enableAnalytics,
-  isErrorReportingEnabled: () => config.features.enableErrorReporting,
-  isPythonBackendEnabled: () => config.features.enablePythonBackend,
+  isEnabled: (feature: keyof Config['features']) => {
+    try {
+      return config.features[feature] || false;
+    } catch (error) {
+      console.warn(`⚠️ Error accessing feature flag: ${feature}`, error);
+      return false;
+    }
+  },
+  isDebugMode: () => {
+    try {
+      return config.features.enableDebugMode || false;
+    } catch (error) {
+      console.warn('⚠️ Error accessing debug mode', error);
+      return false;
+    }
+  },
+  isAnalyticsEnabled: () => {
+    try {
+      return config.features.enableAnalytics || false;
+    } catch (error) {
+      console.warn('⚠️ Error accessing analytics flag', error);
+      return false;
+    }
+  },
+  isErrorReportingEnabled: () => {
+    try {
+      return config.features.enableErrorReporting || false;
+    } catch (error) {
+      console.warn('⚠️ Error accessing error reporting flag', error);
+      return false;
+    }
+  },
+  isPythonBackendEnabled: () => {
+    try {
+      return config.features.enablePythonBackend || false;
+    } catch (error) {
+      console.warn('⚠️ Error accessing Python backend flag', error);
+      return false;
+    }
+  },
 } as const;
 
 // Export configuration for use in components

@@ -16,6 +16,7 @@ import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import ProjectDashboard from "./pages/project";
 import SettingsPage from "./pages/settings";
+import EnvironmentDebug from "./components/EnvironmentDebug";
 
 const queryClient = new QueryClient();
 
@@ -86,6 +87,9 @@ const App = () => (
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
+          
+          {/* Temporary debug component for staging troubleshooting */}
+          <EnvironmentDebug show={true} />
         </TooltipProvider>
       </ThemeProvider>
     </AuthProvider>

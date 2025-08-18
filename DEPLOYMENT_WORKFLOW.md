@@ -51,6 +51,7 @@ git push origin main
 # env.staging
 VITE_APP_ENV=staging
 VITE_PYTHON_BACKEND_URL=https://your-staging-backend.railway.app
+VITE_ENABLE_PYTHON_BACKEND=true
 VITE_ENABLE_DEBUG_MODE=true
 VITE_ENABLE_ANALYTICS=false
 ```
@@ -60,6 +61,7 @@ VITE_ENABLE_ANALYTICS=false
 # env.production  
 VITE_APP_ENV=production
 VITE_PYTHON_BACKEND_URL=https://your-production-backend.railway.app
+VITE_ENABLE_PYTHON_BACKEND=true
 VITE_ENABLE_DEBUG_MODE=false
 VITE_ENABLE_ANALYTICS=true
 ```
