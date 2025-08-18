@@ -9,8 +9,9 @@ cmds = [
   "npm run build:staging",
   "mkdir -p backend/app/static",
   "cp -r dist/* backend/app/static/",
-  "cd backend && pip install -r requirements-minimal.txt"
+  "mv backend backend_hidden",
+  "cd backend_hidden && pip install -r requirements-minimal.txt"
 ]
 
 [start]
-cmd = "cd backend && python start.py"
+cmd = "cd backend_hidden && python start.py"

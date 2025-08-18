@@ -1,18 +1,19 @@
-# Railway Configuration for Single Service Full Stack
-# One service that builds frontend and runs backend
+# Railway Configuration - Force Nixpacks usage
+# This prevents Railway from auto-detecting and generating Dockerfiles
 
 [build]
 builder = "nixpacks"
-buildCommand = "npm ci && npm run build:staging && mkdir -p backend/app/static && cp -r dist/* backend/app/static/ && cd backend && pip install -r requirements-minimal.txt"
-watchPatterns = ["src/**/*", "package.json", "package-lock.json", "backend/**/*"]
+buildCommand = "npm ci && npm run build:staging && mkdir -p backend/app/static && cp -r dist/* backend/app/static/ && mv backend backend_hidden && cd backend_hidden && pip install -r requirements-minimal.txt"
+watchPatterns = ["src/**/*", "package.json", "package-lock.json"]
 
+# Force Nixpacks configuration
 [build.nixpacks]
 providers = ["nodejs", "python"]
 nodejsVersion = "18"
 pythonVersion = "3.11"
 
 [deploy]
-startCommand = "cd backend && python start.py"
+startCommand = "cd backend_hidden && python start.py"
 healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"
