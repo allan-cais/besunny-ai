@@ -1,272 +1,218 @@
 import React, { useState, useEffect } from 'react';
-import { pythonBackendConfig } from '../config/python-backend-config';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
-import { Loader2, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { Loader2, CheckCircle, XCircle, AlertCircle, RefreshCw } from 'lucide-react';
+import { productionConfig, healthCheckConfig, apiEndpoints } from '../config/production-config';
 
-interface BackendStatus {
-  health: 'loading' | 'healthy' | 'unhealthy' | 'error';
-  frontendTest: 'loading' | 'success' | 'error';
-  v1Health: 'loading' | 'success' | 'error';
-  apiTest: 'loading' | 'success' | 'error';
+interface HealthStatus {
+  status: 'loading' | 'healthy' | 'unhealthy' | 'error';
+  message: string;
+  timestamp: number;
+  responseTime: number;
 }
 
-interface TestResult {
-  status: 'loading' | 'success' | 'error';
-  data?: any;
-  error?: string;
+interface BackendHealth {
+  main: HealthStatus;
+  status: HealthStatus;
+  ready: HealthStatus;
+  live: HealthStatus;
+  frontendTest: HealthStatus;
 }
 
 export const BackendConnectionTest: React.FC = () => {
-  const [backendStatus, setBackendStatus] = useState<BackendStatus>({
-    health: 'loading',
-    frontendTest: 'loading',
-    v1Health: 'loading',
-    apiTest: 'loading',
+  const [health, setHealth] = useState<BackendHealth>({
+    main: { status: 'loading', message: 'Checking...', timestamp: 0, responseTime: 0 },
+    status: { status: 'loading', message: 'Checking...', timestamp: 0, responseTime: 0 },
+    ready: { status: 'loading', message: 'Checking...', timestamp: 0, responseTime: 0 },
+    live: { status: 'loading', message: 'Checking...', timestamp: 0, responseTime: 0 },
+    frontendTest: { status: 'loading', message: 'Checking...', timestamp: 0, responseTime: 0 }
   });
 
-  const [testResults, setTestResults] = useState<Record<string, TestResult>>({});
   const [isRunning, setIsRunning] = useState(false);
+  const [lastCheck, setLastCheck] = useState<number>(0);
 
-  const backendUrl = pythonBackendConfig.baseUrl;
+  const backendUrl = productionConfig.backend.baseUrl;
 
-  const runTest = async (endpoint: string, testName: string): Promise<TestResult> => {
+  const checkEndpoint = async (endpoint: string, name: keyof BackendHealth): Promise<HealthStatus> => {
+    const startTime = Date.now();
+    
     try {
-      const response = await fetch(`${backendUrl}${endpoint}`);
+      const response = await fetch(`${backendUrl}${endpoint}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(healthCheckConfig.timeout)
+      });
+
+      const responseTime = Date.now() - startTime;
+      
       if (response.ok) {
         const data = await response.json();
-        return { status: 'success', data };
+        return {
+          status: 'healthy',
+          message: data.message || 'Endpoint is healthy',
+          timestamp: Date.now(),
+          responseTime
+        };
       } else {
-        return { status: 'error', error: `HTTP ${response.status}: ${response.statusText}` };
+        return {
+          status: 'unhealthy',
+          message: `HTTP ${response.status}: ${response.statusText}`,
+          timestamp: Date.now(),
+          responseTime
+        };
       }
     } catch (error) {
-      return { status: 'error', error: error instanceof Error ? error.message : 'Unknown error' };
+      const responseTime = Date.now() - startTime;
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      
+      return {
+        status: 'error',
+        message: `Connection failed: ${message}`,
+        timestamp: Date.now(),
+        responseTime
+      };
     }
   };
 
-  const runAllTests = async () => {
+  const runHealthChecks = async () => {
     setIsRunning(true);
-    setBackendStatus({
-      health: 'loading',
-      frontendTest: 'loading',
-      v1Health: 'loading',
-      apiTest: 'loading',
+    setLastCheck(Date.now());
+
+    // Run all health checks in parallel for maximum efficiency
+    const healthChecks = await Promise.allSettled([
+      checkEndpoint(apiEndpoints.health, 'main'),
+      checkEndpoint(apiEndpoints.healthStatus, 'status'),
+      checkEndpoint(apiEndpoints.healthReady, 'ready'),
+      checkEndpoint(apiEndpoints.healthLive, 'live'),
+      checkEndpoint(apiEndpoints.frontendTest, 'frontendTest')
+    ]);
+
+    // Update health status
+    setHealth({
+      main: healthChecks[0].status === 'fulfilled' ? healthChecks[0].value : { status: 'error', message: 'Check failed', timestamp: Date.now(), responseTime: 0 },
+      status: healthChecks[1].status === 'fulfilled' ? healthChecks[1].value : { status: 'error', message: 'Check failed', timestamp: Date.now(), responseTime: 0 },
+      ready: healthChecks[2].status === 'fulfilled' ? healthChecks[2].value : { status: 'error', message: 'Check failed', timestamp: Date.now(), responseTime: 0 },
+      live: healthChecks[3].status === 'fulfilled' ? healthChecks[3].value : { status: 'error', message: 'Check failed', timestamp: Date.now(), responseTime: 0 },
+      frontendTest: healthChecks[4].status === 'fulfilled' ? healthChecks[4].value : { status: 'error', message: 'Check failed', timestamp: Date.now(), responseTime: 0 }
     });
-
-    // Test 1: Health Check
-    const healthResult = await runTest('/health', 'Health Check');
-    setBackendStatus(prev => ({ ...prev, health: healthResult.status === 'success' ? 'healthy' : 'unhealthy' }));
-    setTestResults(prev => ({ ...prev, health: healthResult }));
-
-    // Test 2: Frontend Integration Test
-    const frontendResult = await runTest('/api/frontend-test', 'Frontend Integration');
-    setBackendStatus(prev => ({ ...prev, frontendTest: frontendResult.status === 'success' ? 'success' : 'error' }));
-    setTestResults(prev => ({ ...prev, frontendTest: frontendResult }));
-
-    // Test 3: V1 Health Check
-    const v1Result = await runTest('/v1/health', 'V1 Router Health');
-    setBackendStatus(prev => ({ ...prev, v1Health: v1Result.status === 'success' ? 'success' : 'error' }));
-    setTestResults(prev => ({ ...prev, v1Health: v1Result }));
-
-    // Test 4: API Test
-    const apiResult = await runTest('/api/test', 'Basic API');
-    setBackendStatus(prev => ({ ...prev, apiTest: apiResult.status === 'success' ? 'success' : 'error' }));
-    setTestResults(prev => ({ ...prev, apiTest: apiResult }));
 
     setIsRunning(false);
   };
 
   useEffect(() => {
-    runAllTests();
+    runHealthChecks();
+    
+    // Set up periodic health checks
+    const interval = setInterval(runHealthChecks, healthCheckConfig.interval);
+    return () => clearInterval(interval);
   }, []);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'healthy':
-      case 'success':
         return <CheckCircle className="h-4 w-4 text-green-500" />;
       case 'unhealthy':
+        return <AlertCircle className="h-4 w-4 text-yellow-500" />;
       case 'error':
         return <XCircle className="h-4 w-4 text-red-500" />;
-      case 'loading':
-        return <Loader2 className="h-4 w-4 animate-spin text-blue-500" />;
       default:
-        return <AlertCircle className="h-4 w-4 text-yellow-500" />;
+        return <Loader2 className="h-4 w-4 animate-spin text-blue-500" />;
     }
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'healthy':
-      case 'success':
-        return <Badge variant="default" className="bg-green-500">Success</Badge>;
+        return <Badge variant="default" className="bg-green-100 text-green-800">Healthy</Badge>;
       case 'unhealthy':
+        return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">Unhealthy</Badge>;
       case 'error':
         return <Badge variant="destructive">Error</Badge>;
-      case 'loading':
-        return <Badge variant="secondary">Loading</Badge>;
       default:
-        return <Badge variant="outline">Unknown</Badge>;
+        return <Badge variant="outline">Loading</Badge>;
     }
   };
 
-  const allTestsPassed = Object.values(backendStatus).every(status => 
-    status === 'healthy' || status === 'success'
-  );
+  const overallStatus = Object.values(health).every(h => h.status === 'healthy') ? 'healthy' : 'degraded';
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            🔗 Backend Connection Test
-            {allTestsPassed && <Badge variant="default" className="bg-green-500">All Tests Passed</Badge>}
-          </CardTitle>
-          <CardDescription>
-            Testing connection to BeSunny.ai Backend at {backendUrl}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Health Check */}
-            <div className="flex items-center justify-between p-3 border rounded-lg">
-              <div className="flex items-center gap-2">
-                {getStatusIcon(backendStatus.health)}
-                <span>Health Check</span>
-              </div>
-              {getStatusBadge(backendStatus.health)}
-            </div>
-
-            {/* Frontend Test */}
-            <div className="flex items-center justify-between p-3 border rounded-lg">
-              <div className="flex items-center gap-2">
-                {getStatusIcon(backendStatus.frontendTest)}
-                <span>Frontend Integration</span>
-              </div>
-              {getStatusBadge(backendStatus.frontendTest)}
-            </div>
-
-            {/* V1 Health */}
-            <div className="flex items-center justify-between p-3 border rounded-lg">
-              <div className="flex items-center gap-2">
-                {getStatusIcon(backendStatus.v1Health)}
-                <span>V1 Router</span>
-              </div>
-              {getStatusBadge(backendStatus.v1Health)}
-            </div>
-
-            {/* API Test */}
-            <div className="flex items-center justify-between p-3 border rounded-lg">
-              <div className="flex items-center gap-2">
-                {getStatusIcon(backendStatus.apiTest)}
-                <span>Basic API</span>
-              </div>
-              {getStatusBadge(backendStatus.apiTest)}
-            </div>
+    <Card className="w-full">
+      <CardHeader>
+        <CardTitle className="flex items-center justify-between">
+          <span>Backend Health Monitor</span>
+          <div className="flex items-center gap-2">
+            {getStatusBadge(overallStatus)}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={runHealthChecks}
+              disabled={isRunning}
+            >
+              <RefreshCw className={`h-4 w-4 ${isRunning ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
           </div>
-
-          <Button 
-            onClick={runAllTests} 
-            disabled={isRunning}
-            className="w-full"
-          >
-            {isRunning ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Running Tests...
-              </>
-            ) : (
-              'Run Tests Again'
-            )}
-          </Button>
-
-          {allTestsPassed && (
-            <Alert className="border-green-200 bg-green-50">
-              <CheckCircle className="h-4 w-4 text-green-600" />
-              <AlertDescription className="text-green-800">
-                🎉 All backend tests passed! Your backend is fully operational and ready for frontend integration.
-              </AlertDescription>
-            </Alert>
+        </CardTitle>
+        <CardDescription>
+          Real-time monitoring of backend service health and connectivity
+          {lastCheck > 0 && (
+            <span className="block text-xs text-muted-foreground mt-1">
+              Last checked: {new Date(lastCheck).toLocaleTimeString()}
+            </span>
           )}
-        </CardContent>
-      </Card>
-
-      {/* Detailed Test Results */}
-      <Card>
-        <CardHeader>
-          <CardTitle>📊 Detailed Test Results</CardTitle>
-          <CardDescription>View detailed responses from each endpoint</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {Object.entries(testResults).map(([testName, result]) => (
-            <div key={testName} className="border rounded-lg p-4">
-              <h4 className="font-semibold mb-2 capitalize">{testName}</h4>
-              {result.status === 'loading' && (
-                <div className="flex items-center gap-2 text-blue-600">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Loading...
-                </div>
-              )}
-              {result.status === 'success' && result.data && (
-                <div className="space-y-2">
-                  <Badge variant="default" className="bg-green-500">Success</Badge>
-                  <pre className="bg-gray-100 p-3 rounded text-sm overflow-x-auto">
-                    {JSON.stringify(result.data, null, 2)}
-                  </pre>
-                </div>
-              )}
-              {result.status === 'error' && result.error && (
-                <div className="space-y-2">
-                  <Badge variant="destructive">Error</Badge>
-                  <p className="text-red-600">{result.error}</p>
-                </div>
-              )}
-            </div>
+        </CardDescription>
+      </CardHeader>
+      
+      <CardContent className="space-y-4">
+        {/* Health Status Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Object.entries(health).map(([key, status]) => (
+            <Card key={key} className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="font-medium capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</h4>
+                {getStatusIcon(status.status)}
+              </div>
+              <p className="text-sm text-muted-foreground mb-2">{status.message}</p>
+              <div className="flex items-center justify-between text-xs">
+                <span>Response: {status.responseTime}ms</span>
+                <span>{new Date(status.timestamp).toLocaleTimeString()}</span>
+              </div>
+            </Card>
           ))}
-        </CardContent>
-      </Card>
+        </div>
 
-      {/* Connection Info */}
-      <Card>
-        <CardHeader>
-          <CardTitle>🔧 Connection Information</CardTitle>
-          <CardDescription>Backend configuration and endpoints</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Overall Status */}
+        <Alert className={overallStatus === 'healthy' ? 'border-green-200 bg-green-50' : 'border-yellow-200 bg-yellow-50'}>
+          <AlertDescription>
+            <strong>Overall Status:</strong> {overallStatus === 'healthy' ? 'All systems operational' : 'Some systems experiencing issues'}
+          </AlertDescription>
+        </Alert>
+
+        {/* Configuration Info */}
+        <Card className="p-4 bg-muted/50">
+          <h4 className="font-medium mb-2">Configuration</h4>
+          <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <label className="text-sm font-medium text-gray-600">Backend URL</label>
-              <p className="text-sm font-mono bg-gray-100 p-2 rounded">{backendUrl}</p>
+              <span className="font-medium">Backend URL:</span>
+              <span className="ml-2 font-mono text-xs">{backendUrl}</span>
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-600">Environment</label>
-              <p className="text-sm">{pythonBackendConfig.enableLogging ? 'Development' : 'Production'}</p>
+              <span className="font-medium">Check Interval:</span>
+              <span className="ml-2">{healthCheckConfig.interval / 1000}s</span>
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-600">Timeout</label>
-              <p className="text-sm">{pythonBackendConfig.timeout}ms</p>
+              <span className="font-medium">Timeout:</span>
+              <span className="ml-2">{healthCheckConfig.timeout / 1000}s</span>
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-600">Retry Attempts</label>
-              <p className="text-sm">{pythonBackendConfig.retryAttempts}</p>
+              <span className="font-medium">Retries:</span>
+              <span className="ml-2">{healthCheckConfig.retries}</span>
             </div>
           </div>
-          
-          <div className="pt-2">
-            <label className="text-sm font-medium text-gray-600">Available Endpoints</label>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
-              <code className="text-xs bg-gray-100 p-1 rounded">/health</code>
-              <code className="text-xs bg-gray-100 p-1 rounded">/api/frontend-test</code>
-              <code className="text-xs bg-gray-100 p-1 rounded">/v1/health</code>
-              <code className="text-xs bg-gray-100 p-1 rounded">/api/test</code>
-              <code className="text-xs bg-gray-100 p-1 rounded">/docs</code>
-              <code className="text-xs bg-gray-100 p-1 rounded">/</code>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+        </Card>
+      </CardContent>
+    </Card>
   );
 };

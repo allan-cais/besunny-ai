@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse
 from typing import List, Optional, Dict, Any
 import logging
+import time
 
 from ...services.ai.ai_service import (
     AIService,
@@ -346,30 +347,42 @@ async def get_available_models(current_user: dict = Depends(get_current_user)):
 @router.get("/health")
 async def ai_service_health_check():
     """
-    Health check for AI service.
+    Lightweight health check for AI service.
     
-    This endpoint verifies that the AI services are functioning properly
-    and can process requests.
+    This endpoint verifies that the AI service configuration
+    is valid without initializing heavy services.
     """
     try:
-        ai_service = AIService()
+        # Check if OpenAI API key is configured
+        from ...core.config import get_settings
+        settings = get_settings()
         
-        # Test basic functionality with a simple prompt
-        test_response = await ai_service.client.chat.completions.create(
-            model=ai_service.model,
-            messages=[
-                {"role": "user", "content": "Hello, this is a health check."}
-            ],
-            max_tokens=10
-        )
+        has_openai_key = bool(settings.openai_api_key)
+        has_model_config = bool(settings.openai_model)
         
-        return {
-            "status": "healthy",
-            "service": "ai",
-            "model": ai_service.model,
-            "response_time": "operational",
-            "timestamp": "2024-01-01T00:00:00Z"  # This would be actual timestamp in production
-        }
+        if has_openai_key and has_model_config:
+            return {
+                "status": "healthy",
+                "service": "ai",
+                "configuration": "valid",
+                "model": settings.openai_model,
+                "message": "AI service is properly configured",
+                "timestamp": time.time()
+            }
+        else:
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "status": "unhealthy",
+                    "service": "ai",
+                    "error": "Missing required configuration",
+                    "missing": {
+                        "openai_api_key": not has_openai_key,
+                        "openai_model": not has_model_config
+                    },
+                    "timestamp": time.time()
+                }
+            )
         
     except Exception as e:
         logger.error(f"AI service health check failed: {str(e)}")
@@ -378,7 +391,8 @@ async def ai_service_health_check():
             content={
                 "status": "unhealthy",
                 "service": "ai",
-                "error": str(e)
+                "error": str(e),
+                "timestamp": time.time()
             }
         )
 

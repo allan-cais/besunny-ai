@@ -1,430 +1,374 @@
-// Python Backend Services
-// Comprehensive service layer that replaces Supabase edge functions with Python backend API calls
+/**
+ * Python Backend Services Wrapper
+ * Optimized for maximum efficiency and reliability
+ */
 
-import { config } from '../config';
-import { PythonBackendAPI } from './python-backend-api';
-import type { 
-  User, 
-  Project, 
-  Document, 
-  Meeting, 
-  ChatMessage, 
-  ChatSession,
-  GoogleCalendarEvent,
-  CalendarSyncRequest,
-  DocumentCreate,
-  DocumentUpdate,
-  ProjectCreate,
-  ProjectUpdate,
-  BotDeploymentRequest,
-  ClassificationRequest,
-  EmailProcessingResult
-} from '../types';
+import { PythonBackendAPI, ApiResponse, UserProfile, UserPreferences, Project, AIResponse } from './python-backend-api';
 
-// API response wrapper
-interface ApiResponse<T = any> {
-  success: boolean;
-  data?: T;
+export interface BackendHealthStatus {
+  isConnected: boolean;
+  isHealthy: boolean;
+  lastCheck: number;
+  responseTime: number;
   error?: string;
-  message?: string;
-  status?: number;
 }
 
-// Python Backend Services
+export interface BackendMetrics {
+  totalRequests: number;
+  successfulRequests: number;
+  failedRequests: number;
+  averageResponseTime: number;
+  lastRequestTime: number;
+}
+
 export class PythonBackendServices {
   private api: PythonBackendAPI;
+  private healthStatus: BackendHealthStatus;
+  private metrics: BackendMetrics;
+  private healthCheckInterval: NodeJS.Timeout | null = null;
 
   constructor() {
     this.api = new PythonBackendAPI();
-  }
-
-  // Set authentication token
-  setAuthToken(token: string): void {
-    this.api.setAuthToken(token);
-  }
-
-  // Clear authentication token
-  clearAuthToken(): void {
-    this.api.clearAuthToken();
-  }
-
-  // ============================================================================
-  // AUTHENTICATION SERVICES
-  // ============================================================================
-
-  /**
-   * Handle Google OAuth callback
-   */
-  async handleGoogleOAuthCallback(code: string): Promise<ApiResponse<any>> {
-    return this.api.post('/auth/google/oauth/callback', { code });
-  }
-
-  /**
-   * Refresh Google OAuth tokens
-   */
-  async refreshGoogleOAuthTokens(userId: string): Promise<ApiResponse<any>> {
-    return this.api.post(`/auth/google/oauth/refresh?user_id=${userId}`);
-  }
-
-  /**
-   * Exchange Google token
-   */
-  async exchangeGoogleToken(code: string): Promise<ApiResponse<any>> {
-    return this.api.post('/auth/google/oauth/callback', { code });
-  }
-
-  // ============================================================================
-  // PROJECT SERVICES
-  // ============================================================================
-
-  /**
-   * Create a new project
-   */
-  async createProject(project: ProjectCreate): Promise<ApiResponse<Project>> {
-    return this.api.post('/projects', project);
-  }
-
-  /**
-   * Get all projects for the current user
-   */
-  async getProjects(limit: number = 100, offset: number = 0): Promise<ApiResponse<Project[]>> {
-    return this.api.get(`/projects?limit=${limit}&offset=${offset}`);
-  }
-
-  /**
-   * Get a specific project by ID
-   */
-  async getProject(projectId: string): Promise<ApiResponse<Project>> {
-    return this.api.get(`/projects/${projectId}`);
-  }
-
-  /**
-   * Update a project
-   */
-  async updateProject(projectId: string, updates: ProjectUpdate): Promise<ApiResponse<Project>> {
-    return this.api.put(`/projects/${projectId}`, updates);
-  }
-
-  /**
-   * Delete a project
-   */
-  async deleteProject(projectId: string): Promise<ApiResponse<void>> {
-    return this.api.delete(`/projects/${projectId}`);
-  }
-
-  /**
-   * Process project onboarding with AI
-   */
-  async processProjectOnboarding(payload: {
-    project_id: string;
-    user_id: string;
-    summary: {
-      project_name: string;
-      overview: string;
-      keywords: string[];
-      deliverables: string;
-      contacts: {
-        internal_lead: string;
-        agency_lead: string;
-        client_lead: string;
-      };
-      shoot_date: string;
-      location: string;
-      references: string;
+    this.healthStatus = {
+      isConnected: false,
+      isHealthy: false,
+      lastCheck: 0,
+      responseTime: 0,
     };
-  }): Promise<ApiResponse<any>> {
-    return this.api.post('/ai/projects/onboarding', payload);
+    this.metrics = {
+      totalRequests: 0,
+      successfulRequests: 0,
+      failedRequests: 0,
+      averageResponseTime: 0,
+      lastRequestTime: 0,
+    };
   }
 
   // ============================================================================
-  // DOCUMENT SERVICES
+  // INITIALIZATION & HEALTH MONITORING
   // ============================================================================
 
-  /**
-   * Create a new document
-   */
-  async createDocument(document: DocumentCreate): Promise<ApiResponse<Document>> {
-    return this.api.post('/documents', document);
+  async initialize(): Promise<void> {
+    try {
+      // Initial health check
+      await this.checkHealth();
+      
+      // Start periodic health monitoring
+      this.startHealthMonitoring();
+      
+      console.log('Python Backend Services initialized successfully');
+    } catch (error) {
+      console.error('Failed to initialize Python Backend Services:', error);
+      throw error;
+    }
   }
 
-  /**
-   * Get documents for a project
-   */
-  async getProjectDocuments(projectId: string, limit: number = 50, offset: number = 0): Promise<ApiResponse<Document[]>> {
-    return this.api.get(`/documents?project_id=${projectId}&limit=${limit}&offset=${offset}`);
-  }
-
-  /**
-   * Get a specific document by ID
-   */
-  async getDocument(documentId: string): Promise<ApiResponse<Document>> {
-    return this.api.get(`/documents/${documentId}`);
-  }
-
-  /**
-   * Update a document
-   */
-  async updateDocument(documentId: string, updates: DocumentUpdate): Promise<ApiResponse<Document>> {
-    return this.api.put(`/documents/${documentId}`, updates);
-  }
-
-  /**
-   * Delete a document
-   */
-  async deleteDocument(documentId: string): Promise<ApiResponse<void>> {
-    return this.api.delete(`/documents/${documentId}`);
-  }
-
-  /**
-   * Classify a document using AI
-   */
-  async classifyDocument(request: ClassificationRequest): Promise<ApiResponse<any>> {
-    return this.api.post('/classification/documents/classify', request);
-  }
-
-  /**
-   * Analyze document content
-   */
-  async analyzeDocument(content: string, analysisType: string = 'comprehensive', projectContext?: string): Promise<ApiResponse<any>> {
-    return this.api.post('/ai/documents/analyze', {
-      content,
-      analysis_type: analysisType,
-      project_context: projectContext
-    });
-  }
-
-  // ============================================================================
-  // ATTENDEE SERVICES
-  // ============================================================================
-
-  /**
-   * Send a bot to a meeting
-   */
-  async sendBotToMeeting(request: BotDeploymentRequest): Promise<ApiResponse<any>> {
-    return this.api.post('/attendee/send-bot', request);
-  }
-
-  /**
-   * Get bot status
-   */
-  async getBotStatus(botId: string): Promise<ApiResponse<any>> {
-    return this.api.get(`/attendee/bot-status/${botId}`);
-  }
-
-  /**
-   * Get meeting transcript
-   */
-  async getTranscript(botId: string): Promise<ApiResponse<any>> {
-    return this.api.get(`/attendee/transcript/${botId}`);
-  }
-
-  /**
-   * Poll all meetings
-   */
-  async pollAllMeetings(): Promise<ApiResponse<any[]>> {
-    return this.api.post('/attendee/poll-all');
-  }
-
-  /**
-   * Auto-schedule bots
-   */
-  async autoScheduleBots(forceSchedule: boolean = false): Promise<ApiResponse<any>> {
-    return this.api.post('/attendee/auto-schedule', { force_schedule: forceSchedule });
-  }
-
-  // ============================================================================
-  // CALENDAR SERVICES
-  // ============================================================================
-
-  /**
-   * Get calendar events
-   */
-  async getCalendarEvents(limit: number = 100, offset: number = 0): Promise<ApiResponse<GoogleCalendarEvent[]>> {
-    return this.api.get(`/calendar/events?limit=${limit}&offset=${offset}`);
-  }
-
-  /**
-   * Sync calendar
-   */
-  async syncCalendar(request: CalendarSyncRequest): Promise<ApiResponse<any>> {
-    return this.api.post('/calendar/sync', request);
-  }
-
-  /**
-   * Get calendar webhook status
-   */
-  async getCalendarWebhookStatus(): Promise<ApiResponse<any>> {
-    return this.api.get('/calendar/webhook/status');
-  }
-
-  /**
-   * Renew calendar webhooks
-   */
-  async renewCalendarWebhooks(): Promise<ApiResponse<any>> {
-    return this.api.post('/calendar/webhook/renew');
-  }
-
-  // ============================================================================
-  // DRIVE SERVICES
-  // ============================================================================
-
-  /**
-   * Get drive files
-   */
-  async getDriveFiles(limit: number = 100, offset: number = 0): Promise<ApiResponse<any[]>> {
-    return this.api.get(`/drive/files?limit=${limit}&offset=${offset}`);
-  }
-
-  /**
-   * Subscribe to drive file changes
-   */
-  async subscribeToDriveFile(fileId: string): Promise<ApiResponse<any>> {
-    return this.api.post('/drive/subscription', { file_id: fileId });
-  }
-
-  /**
-   * Get drive webhook status
-   */
-  async getDriveWebhookStatus(): Promise<ApiResponse<any>> {
-    return this.api.get('/drive/webhook/status');
-  }
-
-  /**
-   * Renew drive watches
-   */
-  async renewDriveWatches(): Promise<ApiResponse<any>> {
-    return this.api.post('/drive/watch/renew');
-  }
-
-  // ============================================================================
-  // EMAIL SERVICES
-  // ============================================================================
-
-  /**
-   * Process inbound emails
-   */
-  async processInboundEmails(messages: any[]): Promise<ApiResponse<EmailProcessingResult[]>> {
-    return this.api.post('/emails/process', messages);
-  }
-
-  /**
-   * Get emails
-   */
-  async getEmails(projectId?: string, limit: number = 100, offset: number = 0): Promise<ApiResponse<any[]>> {
-    const params = new URLSearchParams({
-      limit: limit.toString(),
-      offset: offset.toString()
-    });
-    if (projectId) params.append('project_id', projectId);
+  async destroy(): Promise<void> {
+    if (this.healthCheckInterval) {
+      clearInterval(this.healthCheckInterval);
+      this.healthCheckInterval = null;
+    }
     
-    return this.api.get(`/emails?${params.toString()}`);
+    this.healthStatus = {
+      isConnected: false,
+      isHealthy: false,
+      lastCheck: 0,
+      responseTime: 0,
+    };
+    
+    console.log('Python Backend Services destroyed');
   }
 
-  /**
-   * Setup Gmail watch
-   */
-  async setupGmailWatch(): Promise<ApiResponse<any>> {
-    return this.api.post('/gmail-watch/setup');
-  }
-
-  /**
-   * Get Gmail watch status
-   */
-  async getGmailWatchStatus(): Promise<ApiResponse<any>> {
-    return this.api.get('/gmail-watch/status');
-  }
-
-  // ============================================================================
-  // USER SERVICES
-  // ============================================================================
-
-  /**
-   * Set username
-   */
-  async setUsername(username: string): Promise<ApiResponse<any>> {
-    return this.api.post('/user/set-username', { username });
-  }
-
-  /**
-   * Get current user
-   */
-  async getCurrentUser(): Promise<ApiResponse<User>> {
-    return this.api.get('/user/me');
-  }
-
-  /**
-   * Update user profile
-   */
-  async updateUserProfile(updates: Partial<User>): Promise<ApiResponse<User>> {
-    return this.api.put('/user/me', updates);
-  }
-
-  // ============================================================================
-  // AI SERVICES
-  // ============================================================================
-
-  /**
-   * Get AI service status
-   */
-  async getAIStatus(): Promise<ApiResponse<any>> {
-    return this.api.get('/ai/status');
-  }
-
-  /**
-   * Process AI request
-   */
-  async processAIRequest(request: any): Promise<ApiResponse<any>> {
-    return this.api.post('/ai/process', request);
-  }
-
-  /**
-   * Get embeddings for text
-   */
-  async getEmbeddings(text: string): Promise<ApiResponse<any>> {
-    return this.api.post('/embeddings/generate', { text });
-  }
-
-  // ============================================================================
-  // MICROSERVICES STATUS
-  // ============================================================================
-
-  /**
-   * Get microservices status
-   */
-  async getMicroservicesStatus(): Promise<ApiResponse<any>> {
-    return this.api.get('/microservices/registry/status');
-  }
-
-  /**
-   * Get API gateway status
-   */
-  async getAPIGatewayStatus(): Promise<ApiResponse<any>> {
-    return this.api.get('/microservices/gateway/status');
+  private startHealthMonitoring(): void {
+    // Check health every 30 seconds
+    this.healthCheckInterval = setInterval(async () => {
+      try {
+        await this.checkHealth();
+      } catch (error) {
+        console.warn('Health check failed:', error);
+      }
+    }, 30000);
   }
 
   // ============================================================================
   // HEALTH CHECKS
   // ============================================================================
 
-  /**
-   * Check backend health
-   */
-  async checkHealth(): Promise<ApiResponse<any>> {
-    return this.api.get('/health');
+  async checkHealth(): Promise<BackendHealthStatus> {
+    const startTime = Date.now();
+    
+    try {
+      const response = await this.api.checkHealth();
+      const responseTime = Date.now() - startTime;
+      
+      this.healthStatus = {
+        isConnected: true,
+        isHealthy: response.success,
+        lastCheck: Date.now(),
+        responseTime,
+        error: response.success ? undefined : response.error,
+      };
+      
+      this.updateMetrics(response.success, responseTime);
+      
+      return this.healthStatus;
+    } catch (error) {
+      const responseTime = Date.now() - startTime;
+      
+      this.healthStatus = {
+        isConnected: false,
+        isHealthy: false,
+        lastCheck: Date.now(),
+        responseTime,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+      
+      this.updateMetrics(false, responseTime);
+      
+      return this.healthStatus;
+    }
   }
 
-  /**
-   * Check AI services health
-   */
-  async checkAIHealth(): Promise<ApiResponse<any>> {
-    return this.api.get('/health/ai');
+  async checkComprehensiveHealth(): Promise<{
+    main: ApiResponse;
+    status: ApiResponse;
+    ready: ApiResponse;
+    live: ApiResponse;
+    frontendTest: ApiResponse;
+  }> {
+    const [main, status, ready, live, frontendTest] = await Promise.allSettled([
+      this.api.checkHealth(),
+      this.api.checkHealthStatus(),
+      this.api.checkHealthReady(),
+      this.api.checkHealthLive(),
+      this.api.checkFrontendTest(),
+    ]);
+
+    return {
+      main: main.status === 'fulfilled' ? main.value : { success: false, error: 'Check failed' },
+      status: status.status === 'fulfilled' ? status.value : { success: false, error: 'Check failed' },
+      ready: ready.status === 'fulfilled' ? ready.value : { success: false, error: 'Check failed' },
+      live: live.status === 'fulfilled' ? live.value : { success: false, error: 'Check failed' },
+      frontendTest: frontendTest.status === 'fulfilled' ? frontendTest.value : { success: false, error: 'Check failed' },
+    };
   }
 
-  /**
-   * Check microservices health
-   */
-  async checkMicroservicesHealth(): Promise<ApiResponse<any>> {
-    return this.api.get('/health/microservices');
+  getHealthStatus(): BackendHealthStatus {
+    return { ...this.healthStatus };
+  }
+
+  getMetrics(): BackendMetrics {
+    return { ...this.metrics };
+  }
+
+  private updateMetrics(success: boolean, responseTime: number): void {
+    this.metrics.totalRequests++;
+    
+    if (success) {
+      this.metrics.successfulRequests++;
+    } else {
+      this.metrics.failedRequests++;
+    }
+    
+    // Update average response time
+    const totalTime = this.metrics.averageResponseTime * (this.metrics.totalRequests - 1) + responseTime;
+    this.metrics.averageResponseTime = totalTime / this.metrics.totalRequests;
+    
+    this.metrics.lastRequestTime = Date.now();
+  }
+
+  // ============================================================================
+  // USER MANAGEMENT
+  // ============================================================================
+
+  async getUserProfile(userId: string): Promise<ApiResponse<UserProfile>> {
+    try {
+      const response = await this.api.getUserProfile(userId);
+      this.updateMetrics(response.success, 0);
+      return response;
+    } catch (error) {
+      this.updateMetrics(false, 0);
+      throw error;
+    }
+  }
+
+  async updateUserProfile(userId: string, data: Partial<UserProfile>): Promise<ApiResponse<UserProfile>> {
+    try {
+      const response = await this.api.updateUserProfile(userId, data);
+      this.updateMetrics(response.success, 0);
+      return response;
+    } catch (error) {
+      this.updateMetrics(false, 0);
+      throw error;
+    }
+  }
+
+  async getUserPreferences(userId: string): Promise<ApiResponse<UserPreferences>> {
+    try {
+      const response = await this.api.getUserPreferences(userId);
+      this.updateMetrics(response.success, 0);
+      return response;
+    } catch (error) {
+      this.updateMetrics(false, 0);
+      throw error;
+    }
+  }
+
+  async updateUserPreferences(userId: string, data: Partial<UserPreferences>): Promise<ApiResponse<UserPreferences>> {
+    try {
+      const response = await this.api.updateUserPreferences(userId, data);
+      this.updateMetrics(response.success, 0);
+      return response;
+    } catch (error) {
+      this.updateMetrics(false, 0);
+      throw error;
+    }
+  }
+
+  // ============================================================================
+  // PROJECT MANAGEMENT
+  // ============================================================================
+
+  async getProjects(userId: string): Promise<ApiResponse<Project[]>> {
+    try {
+      const response = await this.api.getProjects(userId);
+      this.updateMetrics(response.success, 0);
+      return response;
+    } catch (error) {
+      this.updateMetrics(false, 0);
+      throw error;
+    }
+  }
+
+  async getProject(projectId: string): Promise<ApiResponse<Project>> {
+    try {
+      const response = await this.api.getProject(projectId);
+      this.updateMetrics(response.success, 0);
+      return response;
+    } catch (error) {
+      this.updateMetrics(false, 0);
+      throw error;
+    }
+  }
+
+  async createProject(data: Omit<Project, 'id' | 'created_at' | 'updated_at'>): Promise<ApiResponse<Project>> {
+    try {
+      const response = await this.api.createProject(data);
+      this.updateMetrics(response.success, 0);
+      return response;
+    } catch (error) {
+      this.updateMetrics(false, 0);
+      throw error;
+    }
+  }
+
+  async updateProject(projectId: string, data: Partial<Project>): Promise<ApiResponse<Project>> {
+    try {
+      const response = await this.api.updateProject(projectId, data);
+      this.updateMetrics(response.success, 0);
+      return response;
+    } catch (error) {
+      this.updateMetrics(false, 0);
+      throw error;
+    }
+  }
+
+  async deleteProject(projectId: string): Promise<ApiResponse> {
+    try {
+      const response = await this.api.deleteProject(projectId);
+      this.updateMetrics(response.success, 0);
+      return response;
+    } catch (error) {
+      this.updateMetrics(false, 0);
+      throw error;
+    }
+  }
+
+  // ============================================================================
+  // AI SERVICES
+  // ============================================================================
+
+  async generateAIResponse(prompt: string, userId: string, model?: string): Promise<ApiResponse<AIResponse>> {
+    try {
+      const response = await this.api.generateAIResponse(prompt, userId, model);
+      this.updateMetrics(response.success, 0);
+      return response;
+    } catch (error) {
+      this.updateMetrics(false, 0);
+      throw error;
+    }
+  }
+
+  async getAIHistory(userId: string, limit = 50): Promise<ApiResponse<AIResponse[]>> {
+    try {
+      const response = await this.api.getAIHistory(userId, limit);
+      this.updateMetrics(response.success, 0);
+      return response;
+    } catch (error) {
+      this.updateMetrics(false, 0);
+      throw error;
+    }
+  }
+
+  // ============================================================================
+  // DOCUMENT MANAGEMENT
+  // ============================================================================
+
+  async getDocuments(userId: string, projectId?: string, limit = 50): Promise<ApiResponse<any[]>> {
+    try {
+      const response = await this.api.getDocuments(userId, projectId, limit);
+      this.updateMetrics(response.success, 0);
+      return response;
+    } catch (error) {
+      this.updateMetrics(false, 0);
+      throw error;
+    }
+  }
+
+  async uploadDocument(file: File, userId: string, projectId?: string): Promise<ApiResponse<any>> {
+    try {
+      const response = await this.api.uploadDocument(file, userId, projectId);
+      this.updateMetrics(response.success, 0);
+      return response;
+    } catch (error) {
+      this.updateMetrics(false, 0);
+      throw error;
+    }
+  }
+
+  // ============================================================================
+  // UTILITY METHODS
+  // ============================================================================
+
+  async ping(): Promise<ApiResponse> {
+    try {
+      const response = await this.api.ping();
+      this.updateMetrics(response.success, 0);
+      return response;
+    } catch (error) {
+      this.updateMetrics(false, 0);
+      throw error;
+    }
+  }
+
+  getBaseUrl(): string {
+    return this.api.getBaseUrl();
+  }
+
+  isHealthy(): boolean {
+    return this.healthStatus.isHealthy;
+  }
+
+  isConnected(): boolean {
+    return this.healthStatus.isConnected;
+  }
+
+  getLastHealthCheck(): number {
+    return this.healthStatus.lastCheck;
+  }
+
+  getError(): string | undefined {
+    return this.healthStatus.error;
   }
 }
 

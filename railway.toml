@@ -1,6 +1,6 @@
 [build]
 builder = "nixpacks"
-buildCommand = "echo 'Using Nixpacks source building'"
+buildCommand = "echo 'Building BeSunny.ai Python Backend with Nixpacks'"
 
 # Force source building, ignore any Dockerfiles
 [build.ignore]
@@ -10,7 +10,13 @@ files = ["Dockerfile*", "docker-compose*.yml", "docker/*"]
 [build.docker]
 enabled = false
 
-# Health check configuration
+# Health check configuration - optimized for reliability
 [deploy]
 healthcheckPath = "/health"
 healthcheckTimeout = 300
+healthcheckInterval = 30
+
+# Environment configuration
+[deploy.environment]
+ENVIRONMENT = "production"
+DEBUG = "false"

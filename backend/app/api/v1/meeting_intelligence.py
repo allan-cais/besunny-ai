@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse
 from typing import List, Optional, Dict, Any
 import logging
+import time
 
 from ...services.ai.meeting_intelligence_service import (
     MeetingIntelligenceService,
@@ -421,34 +422,27 @@ async def get_meeting_analytics(
 @router.get("/health")
 async def meeting_intelligence_health_check():
     """
-    Health check for meeting intelligence service.
+    Lightweight health check for meeting intelligence service.
     
     This endpoint verifies that the meeting intelligence services
-    are functioning properly and can process transcript analysis.
+    are properly configured without initializing heavy services.
     """
     try:
-        meeting_intelligence_service = MeetingIntelligenceService()
-        await meeting_intelligence_service.initialize()
+        # Check if required configuration is available
+        from ...core.config import get_settings
+        settings = get_settings()
         
-        # Test basic functionality
-        test_transcript = MeetingTranscript(
-            meeting_id="health_check",
-            transcript_id="health_check",
-            duration_seconds=60,
-            participants=["Test User"],
-            segments=[]
-        )
+        has_openai_key = bool(settings.openai_api_key)
+        has_model_config = bool(settings.openai_model)
         
-        # Test summary generation
-        summary = await meeting_intelligence_service.generate_meeting_summary(test_transcript)
-        
-        if summary and summary != "Failed to generate meeting summary.":
+        if has_openai_key and has_model_config:
             return {
                 "status": "healthy",
                 "service": "meeting_intelligence",
-                "ai_service": "operational",
-                "embedding_service": "operational",
-                "transcript_processing": "operational"
+                "configuration": "valid",
+                "model": settings.openai_model,
+                "message": "Meeting intelligence service is properly configured",
+                "timestamp": time.time()
             }
         else:
             return JSONResponse(
@@ -456,7 +450,12 @@ async def meeting_intelligence_health_check():
                 content={
                     "status": "unhealthy",
                     "service": "meeting_intelligence",
-                    "error": "Summary generation test failed"
+                    "error": "Missing required configuration",
+                    "missing": {
+                        "openai_api_key": not has_openai_key,
+                        "openai_model": not has_model_config
+                    },
+                    "timestamp": time.time()
                 }
             )
         
@@ -467,7 +466,8 @@ async def meeting_intelligence_health_check():
             content={
                 "status": "unhealthy",
                 "service": "meeting_intelligence",
-                "error": str(e)
+                "error": str(e),
+                "timestamp": time.time()
             }
         )
 

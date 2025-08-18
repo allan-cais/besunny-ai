@@ -1,305 +1,312 @@
 /**
- * Python Backend API Integration Service
- * Connects React frontend to Python backend v15 APIs
+ * Python Backend API Wrapper
+ * Optimized for maximum efficiency and reliability
  */
 
-export interface PythonBackendConfig {
-  baseUrl: string;
-  timeout: number;
-  retryAttempts: number;
-}
+import { productionConfig, healthCheckConfig } from '../config/production-config';
 
 export interface ApiResponse<T = any> {
   success: boolean;
   data?: T;
   error?: string;
-  message?: string;
+  statusCode?: number;
+  timestamp?: number;
 }
 
 export interface UserProfile {
   id: string;
   email: string;
-  username: string;
-  full_name: string;
-  timezone: string;
-  preferences: UserPreferences;
+  name: string;
+  avatar_url?: string;
   created_at: string;
   updated_at: string;
 }
 
 export interface UserPreferences {
+  id: string;
+  user_id: string;
   theme: 'light' | 'dark' | 'system';
+  notifications: boolean;
   language: string;
-  notifications: {
-    email: boolean;
-    push: boolean;
-    sms: boolean;
-  };
-  privacy: {
-    profile_visibility: 'public' | 'private' | 'team';
-    data_sharing: boolean;
-  };
-  ai_preferences: {
-    model_preference: string;
-    response_length: 'short' | 'medium' | 'long';
-    creativity_level: 'low' | 'medium' | 'high';
-  };
+  timezone: string;
 }
 
 export interface Project {
   id: string;
   name: string;
-  description: string;
-  visibility: 'private' | 'team' | 'public';
+  description?: string;
   owner_id: string;
-  members: ProjectMember[];
   created_at: string;
   updated_at: string;
+  status: 'active' | 'archived' | 'deleted';
 }
 
-export interface ProjectMember {
+export interface AIResponse {
+  id: string;
   user_id: string;
-  role: 'owner' | 'admin' | 'member' | 'viewer';
-  permissions: string[];
-}
-
-export interface AIOrchestrationRequest {
   prompt: string;
-  context?: string;
-  project_id?: string;
-  user_id: string;
-  model_preference?: string;
-}
-
-export interface AIOrchestrationResponse {
   response: string;
-  model_used: string;
+  model: string;
   tokens_used: number;
-  confidence_score: number;
-  suggestions?: string[];
+  created_at: string;
 }
 
 export class PythonBackendAPI {
-  private config: PythonBackendConfig;
-  private authToken: string | null = null;
+  private baseUrl: string;
+  private timeout: number;
+  private retries: number;
+  private retryDelay: number;
 
-  constructor(config: PythonBackendConfig) {
-    this.config = config;
-  }
-
-  setAuthToken(token: string) {
-    this.authToken = token;
-  }
-
-  clearAuthToken() {
-    this.authToken = null;
+  constructor() {
+    this.baseUrl = productionConfig.backend.baseUrl;
+    this.timeout = productionConfig.backend.timeout;
+    this.retries = productionConfig.backend.retries;
+    this.retryDelay = productionConfig.backend.retryDelay;
   }
 
   private async makeRequest<T>(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
-    const url = `${this.config.baseUrl}${endpoint}`;
-    
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    };
-
-    if (this.authToken) {
-      headers['Authorization'] = `Bearer ${this.authToken}`;
-    }
-
-    const config: RequestInit = {
-      ...options,
-      headers,
-      signal: AbortSignal.timeout(this.config.timeout),
-    };
+    const url = `${this.baseUrl}${endpoint}`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
     try {
-      const response = await fetch(url, config);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          ...options.headers,
+        },
+      });
 
-      const data = await response.json();
-      return { success: true, data };
+      clearTimeout(timeoutId);
+
+      if (response.ok) {
+        const data = await response.json();
+        return {
+          success: true,
+          data,
+          statusCode: response.status,
+          timestamp: Date.now(),
+        };
+      } else {
+        return {
+          success: false,
+          error: `HTTP ${response.status}: ${response.statusText}`,
+          statusCode: response.status,
+          timestamp: Date.now(),
+        };
+      }
     } catch (error) {
-      console.error(`API request failed for ${endpoint}:`, error);
+      clearTimeout(timeoutId);
+      
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          return {
+            success: false,
+            error: 'Request timeout',
+            timestamp: Date.now(),
+          };
+        }
+        return {
+          success: false,
+          error: error.message,
+          timestamp: Date.now(),
+        };
+      }
+      
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: 'Unknown error occurred',
+        timestamp: Date.now(),
       };
     }
   }
 
-  // Health Check
-  async checkHealth(): Promise<ApiResponse> {
-    return this.makeRequest('/health');
-  }
-
-  // User Management APIs
-  async getUserProfile(userId: string): Promise<ApiResponse<UserProfile>> {
-    return this.makeRequest(`/v1/user/profile/${userId}`);
-  }
-
-  async updateUserProfile(
-    userId: string,
-    profile: Partial<UserProfile>
-  ): Promise<ApiResponse<UserProfile>> {
-    return this.makeRequest(`/v1/user/profile/${userId}`, {
-      method: 'PUT',
-      body: JSON.stringify(profile),
-    });
-  }
-
-  async updateUserPreferences(
-    userId: string,
-    preferences: Partial<UserPreferences>
-  ): Promise<ApiResponse<UserPreferences>> {
-    return this.makeRequest(`/v1/user/preferences/${userId}`, {
-      method: 'PUT',
-      body: JSON.stringify(preferences),
-    });
-  }
-
-  // Project Management APIs
-  async getProjects(userId: string): Promise<ApiResponse<Project[]>> {
-    return this.makeRequest(`/v1/projects/user/${userId}`);
-  }
-
-  async getProject(projectId: string): Promise<ApiResponse<Project>> {
-    return this.makeRequest(`/v1/projects/${projectId}`);
-  }
-
-  async createProject(project: Omit<Project, 'id' | 'created_at' | 'updated_at'>): Promise<ApiResponse<Project>> {
-    return this.makeRequest('/v1/projects', {
-      method: 'POST',
-      body: JSON.stringify(project),
-    });
-  }
-
-  async updateProject(
-    projectId: string,
-    updates: Partial<Project>
-  ): Promise<ApiResponse<Project>> {
-    return this.makeRequest(`/v1/projects/${projectId}`, {
-      method: 'PUT',
-      body: JSON.stringify(updates),
-    });
-  }
-
-  async deleteProject(projectId: string): Promise<ApiResponse> {
-    return this.makeRequest(`/v1/projects/${projectId}`, {
-      method: 'DELETE',
-    });
-  }
-
-  async addProjectMember(
-    projectId: string,
-    member: Omit<ProjectMember, 'user_id'>
-  ): Promise<ApiResponse<ProjectMember>> {
-    return this.makeRequest(`/v1/projects/${projectId}/members`, {
-      method: 'POST',
-      body: JSON.stringify(member),
-    });
-  }
-
-  async removeProjectMember(
-    projectId: string,
-    userId: string
-  ): Promise<ApiResponse> {
-    return this.makeRequest(`/v1/projects/${projectId}/members/${userId}`, {
-      method: 'DELETE',
-    });
-  }
-
-  // AI Orchestration APIs
-  async orchestrateAI(request: AIOrchestrationRequest): Promise<ApiResponse<AIOrchestrationResponse>> {
-    return this.makeRequest('/v1/ai/orchestrate', {
-      method: 'POST',
-      body: JSON.stringify(request),
-    });
-  }
-
-  async getAIHistory(userId: string): Promise<ApiResponse<AIOrchestrationResponse[]>> {
-    return this.makeRequest(`/v1/ai/history/${userId}`);
-  }
-
-  // Performance Monitoring APIs
-  async getSystemHealth(): Promise<ApiResponse> {
-    return this.makeRequest('/v1/performance/health');
-  }
-
-  async getServiceHealth(): Promise<ApiResponse> {
-    return this.makeRequest('/v1/performance/services');
-  }
-
-  // Utility Methods
-  async retryRequest<T>(
+  private async makeRequestWithRetry<T>(
     endpoint: string,
-    options: RequestInit = {},
-    maxRetries: number = this.config.retryAttempts
+    options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
-    let lastError: string | undefined;
+    let lastError: string = '';
     
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      const result = await this.makeRequest<T>(endpoint, options);
+    for (let attempt = 1; attempt <= this.retries; attempt++) {
+      const response = await this.makeRequest<T>(endpoint, options);
       
-      if (result.success) {
-        return result;
+      if (response.success) {
+        return response;
       }
       
-      lastError = result.error;
+      lastError = response.error || 'Unknown error';
       
-      if (attempt < maxRetries) {
-        // Exponential backoff
-        const delay = Math.pow(2, attempt) * 1000;
-        await new Promise(resolve => setTimeout(resolve, delay));
+      // Don't retry on client errors (4xx)
+      if (response.statusCode && response.statusCode >= 400 && response.statusCode < 500) {
+        break;
+      }
+      
+      // Wait before retrying (except on last attempt)
+      if (attempt < this.retries) {
+        await new Promise(resolve => setTimeout(resolve, this.retryDelay));
       }
     }
     
     return {
       success: false,
-      error: `Request failed after ${maxRetries} attempts. Last error: ${lastError}`,
+      error: `Failed after ${this.retries} attempts. Last error: ${lastError}`,
+      timestamp: Date.now(),
     };
   }
 
-  // Batch Operations
-  async batchGetProjects(projectIds: string[]): Promise<ApiResponse<Project[]>> {
-    return this.makeRequest('/v1/projects/batch', {
-      method: 'POST',
-      body: JSON.stringify({ project_ids: projectIds }),
+  // ============================================================================
+  // HEALTH CHECKS
+  // ============================================================================
+
+  async checkHealth(): Promise<ApiResponse> {
+    return this.makeRequest('/health');
+  }
+
+  async checkHealthStatus(): Promise<ApiResponse> {
+    return this.makeRequest('/health/status');
+  }
+
+  async checkHealthReady(): Promise<ApiResponse> {
+    return this.makeRequest('/health/ready');
+  }
+
+  async checkHealthLive(): Promise<ApiResponse> {
+    return this.makeRequest('/health/live');
+  }
+
+  async checkFrontendTest(): Promise<ApiResponse> {
+    return this.makeRequest('/api/frontend-test');
+  }
+
+  // ============================================================================
+  // USER MANAGEMENT
+  // ============================================================================
+
+  async getUserProfile(userId: string): Promise<ApiResponse<UserProfile>> {
+    return this.makeRequestWithRetry(`/api/v1/user/profile/${userId}`);
+  }
+
+  async updateUserProfile(userId: string, data: Partial<UserProfile>): Promise<ApiResponse<UserProfile>> {
+    return this.makeRequestWithRetry(`/api/v1/user/profile/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
     });
   }
 
-  async batchUpdateUsers(updates: Array<{ userId: string; updates: Partial<UserProfile> }>): Promise<ApiResponse<UserProfile[]>> {
-    return this.makeRequest('/v1/user/batch-update', {
+  async getUserPreferences(userId: string): Promise<ApiResponse<UserPreferences>> {
+    return this.makeRequestWithRetry(`/api/v1/user/preferences/${userId}`);
+  }
+
+  async updateUserPreferences(userId: string, data: Partial<UserPreferences>): Promise<ApiResponse<UserPreferences>> {
+    return this.makeRequestWithRetry(`/api/v1/user/preferences/${userId}`, {
       method: 'PUT',
-      body: JSON.stringify({ updates }),
+      body: JSON.stringify(data),
     });
+  }
+
+  // ============================================================================
+  // PROJECT MANAGEMENT
+  // ============================================================================
+
+  async getProjects(userId: string): Promise<ApiResponse<Project[]>> {
+    return this.makeRequestWithRetry(`/api/v1/projects?user_id=${userId}`);
+  }
+
+  async getProject(projectId: string): Promise<ApiResponse<Project>> {
+    return this.makeRequestWithRetry(`/api/v1/projects/${projectId}`);
+  }
+
+  async createProject(data: Omit<Project, 'id' | 'created_at' | 'updated_at'>): Promise<ApiResponse<Project>> {
+    return this.makeRequestWithRetry('/api/v1/projects', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateProject(projectId: string, data: Partial<Project>): Promise<ApiResponse<Project>> {
+    return this.makeRequestWithRetry(`/api/v1/projects/${projectId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteProject(projectId: string): Promise<ApiResponse> {
+    return this.makeRequestWithRetry(`/api/v1/projects/${projectId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // ============================================================================
+  // AI SERVICES
+  // ============================================================================
+
+  async generateAIResponse(prompt: string, userId: string, model?: string): Promise<ApiResponse<AIResponse>> {
+    return this.makeRequestWithRetry('/api/v1/ai/generate', {
+      method: 'POST',
+      body: JSON.stringify({
+        prompt,
+        user_id: userId,
+        model: model || 'gpt-4',
+      }),
+    });
+  }
+
+  async getAIHistory(userId: string, limit = 50): Promise<ApiResponse<AIResponse[]>> {
+    return this.makeRequestWithRetry(`/api/v1/ai/history?user_id=${userId}&limit=${limit}`);
+  }
+
+  // ============================================================================
+  // DOCUMENT MANAGEMENT
+  // ============================================================================
+
+  async getDocuments(userId: string, projectId?: string, limit = 50): Promise<ApiResponse<any[]>> {
+    const params = new URLSearchParams({
+      user_id: userId,
+      limit: limit.toString(),
+    });
+    
+    if (projectId) {
+      params.append('project_id', projectId);
+    }
+    
+    return this.makeRequestWithRetry(`/api/v1/documents?${params}`);
+  }
+
+  async uploadDocument(file: File, userId: string, projectId?: string): Promise<ApiResponse<any>> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('user_id', userId);
+    
+    if (projectId) {
+      formData.append('project_id', projectId);
+    }
+    
+    return this.makeRequestWithRetry('/api/v1/documents/upload', {
+      method: 'POST',
+      body: formData,
+      headers: {}, // Let browser set content-type for FormData
+    });
+  }
+
+  // ============================================================================
+  // UTILITY METHODS
+  // ============================================================================
+
+  async ping(): Promise<ApiResponse> {
+    return this.makeRequest('/');
+  }
+
+  getBaseUrl(): string {
+    return this.baseUrl;
+  }
+
+  isHealthy(): boolean {
+    // Basic health check - can be enhanced with actual health status
+    return this.baseUrl.length > 0;
   }
 }
-
-// Default configuration
-export const defaultPythonBackendConfig: PythonBackendConfig = {
-  baseUrl: process.env.NODE_ENV === 'production' 
-    ? 'https://your-railway-app.railway.app' 
-    : 'http://localhost:8000',
-  timeout: 30000, // 30 seconds
-  retryAttempts: 3,
-};
-
-// Create and export default instance
-export const pythonBackendAPI = new PythonBackendAPI(defaultPythonBackendConfig);
-
-// Export types for use in components
-export type {
-  UserProfile,
-  UserPreferences,
-  Project,
-  ProjectMember,
-  AIOrchestrationRequest,
-  AIOrchestrationResponse,
-};

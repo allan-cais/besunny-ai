@@ -1,27 +1,27 @@
 """
 Configuration management for BeSunny.ai Python backend.
-Handles environment variables and application settings.
+Optimized for maximum efficiency and reliability.
 """
 
 import os
-from typing import Optional
+from typing import Optional, List
 from pydantic import Field
 from pydantic_settings import BaseSettings
 
 class DatabaseSettings(BaseSettings):
     """Database configuration settings."""
-    database_url: str = Field(default="postgresql+asyncpg://user:pass@localhost/dbname", env="DATABASE_URL")
+    database_url: str = Field(default="", env="DATABASE_URL")
     database_echo: bool = Field(default=False, env="DATABASE_ECHO")
     database_pool_size: int = Field(default=5, env="DATABASE_POOL_SIZE")
     database_max_overflow: int = Field(default=10, env="DATABASE_MAX_OVERFLOW")
 
 class RedisSettings(BaseSettings):
     """Redis configuration settings."""
-    redis_url: str = Field(default="redis://localhost:6379/0", env="REDIS_URL")
+    redis_url: str = Field(default="", env="REDIS_URL")
     redis_max_connections: int = Field(default=10, env="REDIS_MAX_CONNECTIONS")
 
 class Settings(BaseSettings):
-    """Main application settings."""
+    """Main application settings - optimized for efficiency."""
     app_name: str = Field(default="BeSunny.ai Backend", env="APP_NAME")
     app_version: str = Field(default="1.0.0", env="APP_VERSION")
     environment: str = Field(default="production", env="ENVIRONMENT")
@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     algorithm: str = Field(default="HS256", env="ALGORITHM")
     access_token_expire_minutes: int = Field(default=30, env="ACCESS_TOKEN_EXPIRE_MINUTES")
     
-    # CORS
+    # CORS - optimized for production
     cors_origins: str = Field(default="*", env="CORS_ORIGINS")
     cors_allow_credentials: bool = Field(default=False, env="CORS_ALLOW_CREDENTIALS")
     
@@ -47,17 +47,10 @@ class Settings(BaseSettings):
     supabase_anon_key: Optional[str] = Field(default=None, env="SUPABASE_ANON_KEY")
     supabase_service_role_key: Optional[str] = Field(default=None, env="SUPABASE_SERVICE_ROLE_KEY")
     
-    # Audit and logging
-    audit_log_retention_days: int = Field(default=90, env="AUDIT_LOG_RETENTION_DAYS")
-    audit_log_level: str = Field(default="INFO", env="AUDIT_LOG_LEVEL")
-    
-    # Business Intelligence
-    bi_cache_ttl: int = Field(default=3600, env="BI_CACHE_TTL")
-    bi_max_cache_size: int = Field(default=1000, env="BI_MAX_CACHE_SIZE")
-    
-    # Workflow
-    workflow_execution_timeout: int = Field(default=300, env="WORKFLOW_EXECUTION_TIMEOUT")
-    workflow_max_retries: int = Field(default=3, env="WORKFLOW_MAX_RETRIES")
+    # OpenAI - essential for AI services
+    openai_api_key: Optional[str] = Field(default=None, env="OPENAI_API_KEY")
+    openai_model: str = Field(default="gpt-4", env="OPENAI_MODEL")
+    openai_max_tokens: int = Field(default=1000, env="OPENAI_MAX_TOKENS")
     
     # Google OAuth
     google_client_id: Optional[str] = Field(default=None, env="GOOGLE_CLIENT_ID")
@@ -65,15 +58,17 @@ class Settings(BaseSettings):
     google_project_id: Optional[str] = Field(default=None, env="GOOGLE_PROJECT_ID")
     google_login_redirect_uri: Optional[str] = Field(default=None, env="GOOGLE_LOGIN_REDIRECT_URI")
     
-    # OpenAI
-    openai_api_key: Optional[str] = Field(default=None, env="OPENAI_API_KEY")
-    openai_model: str = Field(default="gpt-4", env="OPENAI_MODEL")
-    openai_max_tokens: int = Field(default=1000, env="OPENAI_MAX_TOKENS")
+    # Performance settings
+    max_concurrent_requests: int = Field(default=100, env="MAX_CONCURRENT_REQUESTS")
+    request_timeout: int = Field(default=30, env="REQUEST_TIMEOUT")
+    
+    # Health check settings
+    health_check_timeout: int = Field(default=5, env="HEALTH_CHECK_TIMEOUT")
     
     class Config:
         env_file = ".env"
         case_sensitive = False
-        extra = "ignore"  # Allow extra fields from .env
+        extra = "ignore"
 
 # Global settings instance
 _settings: Optional[Settings] = None
@@ -92,3 +87,14 @@ def is_development() -> bool:
 def is_production() -> bool:
     """Check if running in production mode."""
     return get_settings().environment.lower() == "production"
+
+def is_testing() -> bool:
+    """Check if running in testing mode."""
+    return get_settings().environment.lower() == "testing"
+
+def get_cors_origins() -> List[str]:
+    """Get CORS origins as a list."""
+    cors_origins = get_settings().cors_origins
+    if cors_origins == "*":
+        return ["*"]
+    return [origin.strip() for origin in cors_origins.split(",") if origin.strip()]

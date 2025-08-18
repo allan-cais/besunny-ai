@@ -351,30 +351,31 @@ async def get_comprehensive_health(
     observability: ObservabilityManager = Depends(get_observability),
     redis: RedisManager = Depends(get_redis)
 ) -> Dict[str, Any]:
-    """Get comprehensive health status of all microservice components."""
+    """Get lightweight health status of microservice components."""
     try:
-        registry_status = await registry.get_registry_status()
-        gateway_status = await gateway.get_gateway_status()
-        observability_health = await observability.get_system_health()
-        redis_health = await redis.health_check()
+        # Quick configuration checks without heavy initialization
+        from ...core.config import get_settings
+        settings = get_settings()
         
-        # Determine overall health
+        # Check basic configuration
+        has_database = bool(settings.database.database_url and settings.database.database_url != "postgresql+asyncpg://user:pass@localhost/dbname")
+        has_redis = bool(settings.redis.redis_url and settings.redis.redis_url != "redis://localhost:6379/0")
+        has_openai = bool(settings.openai_api_key)
+        
+        # Determine overall health based on configuration
         overall_status = "healthy"
-        if not redis_health:
+        if not has_openai:
             overall_status = "degraded"
         
         return {
             "status": overall_status,
             "timestamp": datetime.utcnow().isoformat(),
-            "components": {
-                "service_registry": registry_status,
-                "api_gateway": gateway_status,
-                "observability": observability_health,
-                "redis_cache": {
-                    "status": "healthy" if redis_health else "unhealthy",
-                    "health_check": redis_health
-                }
-            }
+            "configuration": {
+                "database": "configured" if has_database else "not_configured",
+                "redis": "configured" if has_redis else "not_configured",
+                "openai": "configured" if has_openai else "not_configured"
+            },
+            "message": "Microservices configuration check completed"
         }
     except Exception as e:
         return {

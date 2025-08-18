@@ -1,144 +1,104 @@
-/**
- * Production Configuration for BeSunny.ai Frontend
- * Connects to deployed v16 backend on Railway
- */
+// Production configuration for BeSunny.ai
+// Optimized for maximum efficiency and reliability
 
-export interface ProductionConfig {
+export const productionConfig = {
+  // Core application settings
+  app: {
+    name: 'BeSunny.ai',
+    version: '1.0.0',
+    environment: 'production'
+  },
+
+  // Backend configuration
   backend: {
-    baseUrl: string;
-    healthEndpoint: string;
-    apiVersion: string;
-  };
-  frontend: {
-    buildMode: 'staging' | 'production';
-    analytics: boolean;
-    errorReporting: boolean;
-  };
+    baseUrl: process.env.VITE_PYTHON_BACKEND_URL || 'http://localhost:8000',
+    timeout: 30000,
+    retries: 3,
+    retryDelay: 1000
+  },
+
+  // Supabase configuration
+  supabase: {
+    url: process.env.VITE_SUPABASE_URL || '',
+    anonKey: process.env.VITE_SUPABASE_ANON_KEY || '',
+    serviceRoleKey: process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || ''
+  },
+
+  // Feature flags
   features: {
-    userManagement: boolean;
-    projectManagement: boolean;
-    aiOrchestration: boolean;
-    realTimeUpdates: boolean;
-  };
-}
+    pythonBackend: process.env.VITE_ENABLE_PYTHON_BACKEND === 'true',
+    analytics: process.env.VITE_ENABLE_ANALYTICS === 'true',
+    errorReporting: process.env.VITE_ENABLE_ERROR_REPORTING === 'true'
+  },
 
-// Get the current Railway backend URL from environment
-const getBackendUrl = (): string => {
-  // Check if we're in production/staging environment
-  if (import.meta.env.PROD) {
-    // In production, use the Railway URL
-    return import.meta.env.VITE_RAILWAY_BACKEND_URL || 'https://besunny-ai-production.up.railway.app';
-  } else if (import.meta.env.MODE === 'staging') {
-    // In staging, use staging Railway URL
-    return import.meta.env.VITE_RAILWAY_STAGING_URL || 'https://besunny-ai-staging.up.railway.app';
-  } else {
-    // In development, use local backend
-    return 'http://localhost:8000';
+  // Performance settings
+  performance: {
+    pollingInterval: parseInt(process.env.VITE_POLLING_INTERVAL_MS || '30000'),
+    maxRetries: parseInt(process.env.VITE_MAX_RETRIES || '3'),
+    retryDelay: parseInt(process.env.VITE_RETRY_DELAY_MS || '1000')
+  },
+
+  // UI limits
+  limits: {
+    maxDocumentsPerPage: parseInt(process.env.VITE_MAX_DOCUMENTS_PER_PAGE || '50'),
+    maxMeetingsPerPage: parseInt(process.env.VITE_MAX_MEETINGS_PER_PAGE || '100'),
+    maxChatMessagesPerPage: parseInt(process.env.VITE_MAX_CHAT_MESSAGES_PER_PAGE || '100')
   }
-};
-
-// Production configuration
-export const productionConfig: ProductionConfig = {
-  backend: {
-    baseUrl: getBackendUrl(),
-    healthEndpoint: '/health',
-    apiVersion: 'v1',
-  },
-  frontend: {
-    buildMode: import.meta.env.MODE === 'production' ? 'production' : 'staging',
-    analytics: import.meta.env.PROD,
-    errorReporting: import.meta.env.PROD,
-  },
-  features: {
-    userManagement: true,
-    projectManagement: true,
-    aiOrchestration: true,
-    realTimeUpdates: true,
-  },
-};
-
-// Environment-specific overrides
-export const getConfig = (): ProductionConfig => {
-  const config = { ...productionConfig };
-  
-  // Override for development
-  if (import.meta.env.DEV) {
-    config.backend.baseUrl = 'http://localhost:8000';
-    config.frontend.analytics = false;
-    config.frontend.errorReporting = false;
-  }
-  
-  return config;
 };
 
 // Configuration validation
 export const validateConfig = (): boolean => {
-  const config = getConfig();
-  
-  if (!config.backend.baseUrl) {
-    console.error('Backend URL is required');
-    return false;
+  const required = [
+    productionConfig.supabase.url,
+    productionConfig.supabase.anonKey
+  ];
+
+  for (const value of required) {
+    if (!value) {
+      console.error('Missing required configuration:', value);
+      return false;
+    }
   }
-  
-  if (!config.backend.baseUrl.startsWith('http')) {
-    console.error('Backend URL must be a valid HTTP URL');
-    return false;
-  }
-  
+
   return true;
 };
 
-// Health check configuration
+// Health check configuration - optimized for reliability
 export const healthCheckConfig = {
   interval: 30000, // 30 seconds
   timeout: 10000,  // 10 seconds
   retries: 3,
   endpoints: [
     '/health',
-    '/status',
-    '/api/frontend-test'
+    '/health/status',
+    '/health/ready',
+    '/health/live'
   ]
 };
 
 // API endpoints configuration
 export const apiEndpoints = {
   health: '/health',
-  status: '/status',
-  frontendTest: '/api/frontend-test',
-  user: {
-    profile: '/v1/user/profile',
-    preferences: '/v1/user/preferences',
-    update: '/v1/user/update',
-  },
-  project: {
-    list: '/v1/projects',
-    create: '/v1/projects',
-    get: '/v1/projects',
-    update: '/v1/projects',
-    delete: '/v1/projects',
-    members: '/v1/projects/members',
-  },
-  ai: {
-    orchestrate: '/v1/ai/orchestrate',
-    history: '/v1/ai/history',
-  },
-  performance: {
-    health: '/v1/performance/health',
-    services: '/v1/performance/services',
-  }
+  healthStatus: '/health/status',
+  healthReady: '/health/ready',
+  healthLive: '/health/live',
+  frontendTest: '/api/frontend-test'
 };
 
-// Export configuration getters
-export const getBackendConfig = () => getConfig().backend;
-export const getFrontendConfig = () => getConfig().frontend;
-export const getFeatureConfig = () => getConfig().features;
+// Error handling configuration
+export const errorConfig = {
+  maxRetries: 3,
+  retryDelay: 1000,
+  timeout: 30000,
+  showUserErrors: true,
+  logErrors: true
+};
 
-// Log configuration in development
-if (import.meta.env.DEV) {
-  console.log('🔧 Production Configuration:', {
-    backend: getConfig().backend,
-    frontend: getConfig().frontend,
-    features: getConfig().features,
-  });
-}
+// Performance monitoring configuration
+export const performanceConfig = {
+  enableMetrics: true,
+  sampleRate: 0.1, // 10% of requests
+  maxMetrics: 1000,
+  flushInterval: 60000 // 1 minute
+};
 

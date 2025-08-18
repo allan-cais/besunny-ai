@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse
 from typing import List, Optional
 import logging
+import time
 
 from ...services.ai.classification_service import (
     ClassificationService,
@@ -249,25 +250,42 @@ async def update_classification_model(
 @router.get("/health")
 async def classification_health_check():
     """
-    Health check for classification service.
+    Lightweight health check for classification service.
     
     This endpoint verifies that the AI classification services
-    are functioning properly.
+    are properly configured without initializing heavy services.
     """
     try:
-        classification_service = ClassificationService()
-        await classification_service.initialize()
+        # Check if required configuration is available
+        from ...core.config import get_settings
+        settings = get_settings()
         
-        # Test basic functionality
-        test_result = await classification_service.get_classification_analytics()
+        has_openai_key = bool(settings.openai_api_key)
+        has_model_config = bool(settings.openai_model)
         
-        return {
-            "status": "healthy",
-            "service": "classification",
-            "ai_service": "operational",
-            "embedding_service": "operational",
-            "timestamp": test_result.get("timestamp")
-        }
+        if has_openai_key and has_model_config:
+            return {
+                "status": "healthy",
+                "service": "classification",
+                "configuration": "valid",
+                "model": settings.openai_model,
+                "message": "Classification service is properly configured",
+                "timestamp": time.time()
+            }
+        else:
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "status": "unhealthy",
+                    "service": "classification",
+                    "error": "Missing required configuration",
+                    "missing": {
+                        "openai_api_key": not has_openai_key,
+                        "openai_model": not has_model_config
+                    },
+                    "timestamp": time.time()
+                }
+            )
         
     except Exception as e:
         logger.error(f"Classification health check failed: {str(e)}")
@@ -276,7 +294,8 @@ async def classification_health_check():
             content={
                 "status": "unhealthy",
                 "service": "classification",
-                "error": str(e)
+                "error": str(e),
+                "timestamp": time.time()
             }
         )
 

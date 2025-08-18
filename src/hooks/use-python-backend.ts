@@ -1,594 +1,216 @@
 /**
- * React Hook for Python Backend API Integration
- * Provides easy access to Python backend services with state management
+ * Python Backend Hook
+ * Optimized for maximum efficiency and reliability
  */
 
-import { useState, useCallback, useEffect, useRef } from 'react';
-import { 
-  pythonBackendAPI, 
-  type ApiResponse,
-  type UserProfile,
-  type UserPreferences,
-  type Project,
-  type ProjectMember,
-  type AIOrchestrationRequest,
-  type AIOrchestrationResponse,
-  type PythonBackendConfig
-} from '../lib/python-backend-api';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { pythonBackendServices, BackendHealthStatus, BackendMetrics } from '../lib/python-backend-services';
+import { productionConfig } from '../config/production-config';
 
 export interface UsePythonBackendOptions {
-  config?: Partial<PythonBackendConfig>;
   autoConnect?: boolean;
-  retryOnFailure?: boolean;
+  autoHealthCheck?: boolean;
+  healthCheckInterval?: number;
 }
 
 export interface UsePythonBackendReturn {
   // Connection state
   isConnected: boolean;
   isConnecting: boolean;
-  connectionError: string | null;
+  isHealthy: boolean;
   
-  // API state
-  isLoading: boolean;
-  error: string | null;
+  // Health status
+  health: BackendHealthStatus | null;
+  metrics: BackendMetrics | null;
   
-  // Health check
-  health: {
-    status: string;
-    version: string;
-    timestamp: number;
-  } | null;
-  
-  // User management
-  userProfile: UserProfile | null;
-  userPreferences: UserPreferences | null;
-  
-  // Project management
-  projects: Project[];
-  currentProject: Project | null;
-  
-  // AI orchestration
-  aiResponse: AIOrchestrationResponse | null;
-  aiHistory: AIOrchestrationResponse[];
-  
-  // Connection methods
+  // Connection management
   connect: () => Promise<void>;
   disconnect: () => void;
+  checkConnection: () => Promise<void>;
   
-  // Health methods
-  checkHealth: () => Promise<void>;
-  
-  // User methods
-  fetchUserProfile: (userId: string) => Promise<void>;
-  updateUserProfile: (userId: string, profile: Partial<UserProfile>) => Promise<void>;
-  updateUserPreferences: (userId: string, preferences: Partial<UserPreferences>) => Promise<void>;
-  
-  // Project methods
-  fetchProjects: (userId: string) => Promise<void>;
-  fetchProject: (projectId: string) => Promise<void>;
-  createProject: (project: Omit<Project, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
-  updateProject: (projectId: string, updates: Partial<Project>) => Promise<void>;
-  deleteProject: (projectId: string) => Promise<void>;
-  addProjectMember: (projectId: string, member: Omit<ProjectMember, 'user_id'>) => Promise<void>;
-  removeProjectMember: (projectId: string, userId: string) => Promise<void>;
-  
-  // AI methods
-  orchestrateAI: (request: AIOrchestrationRequest) => Promise<void>;
-  fetchAIHistory: (userId: string) => Promise<void>;
-  
-  // Utility methods
+  // Error handling
+  error: string | null;
   clearError: () => void;
-  retryLastOperation: () => Promise<void>;
+  
+  // Utility
+  baseUrl: string;
+  isEnabled: boolean;
 }
 
 export function usePythonBackend(options: UsePythonBackendOptions = {}): UsePythonBackendReturn {
   const {
-    config = {},
     autoConnect = true,
-    retryOnFailure = true,
+    autoHealthCheck = true,
+    healthCheckInterval = 30000, // 30 seconds
   } = options;
 
   // State
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [connectionError, setConnectionError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isHealthy, setIsHealthy] = useState(false);
+  const [health, setHealth] = useState<BackendHealthStatus | null>(null);
+  const [metrics, setMetrics] = useState<BackendMetrics | null>(null);
   const [error, setError] = useState<string | null>(null);
-  
-  // Data state
-  const [health, setHealth] = useState<any>(null);
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [userPreferences, setUserPreferences] = useState<UserPreferences | null>(null);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [currentProject, setCurrentProject] = useState<Project | null>(null);
-  const [aiResponse, setAiResponse] = useState<AIOrchestrationResponse | null>(null);
-  const [aiHistory, setAiHistory] = useState<AIOrchestrationResponse[]>([]);
-  
-  // Refs for tracking operations
-  const lastOperation = useRef<{ type: string; params: any[] } | null>(null);
-  const apiInstance = useRef(pythonBackendAPI);
 
-  // Update API configuration
-  useEffect(() => {
-    if (config.baseUrl) {
-      apiInstance.current = new (apiInstance.current.constructor as any)({
-        ...apiInstance.current,
-        ...config,
-      });
-    }
-  }, [config]);
+  // Refs
+  const healthCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isInitializedRef = useRef(false);
 
-  // Auto-connect on mount
-  useEffect(() => {
-    if (autoConnect) {
-      connect();
+  // Check if Python backend is enabled
+  const isEnabled = productionConfig.features.pythonBackend;
+
+  // Get base URL
+  const baseUrl = productionConfig.backend.baseUrl;
+
+  // Initialize services
+  const initializeServices = useCallback(async () => {
+    if (!isEnabled || isInitializedRef.current) return;
+    
+    try {
+      await pythonBackendServices.initialize();
+      isInitializedRef.current = true;
+    } catch (err) {
+      console.error('Failed to initialize Python backend services:', err);
+      setError(err instanceof Error ? err.message : 'Initialization failed');
     }
-  }, [autoConnect]);
+  }, [isEnabled]);
 
   // Connection management
   const connect = useCallback(async () => {
-    if (isConnecting || isConnected) return;
+    if (!isEnabled || isConnecting || isConnected) return;
     
     setIsConnecting(true);
-    setConnectionError(null);
+    setError(null);
     
     try {
-      // Test connection with health check
-      const healthResponse = await apiInstance.current.checkHealth();
+      await initializeServices();
       
-      if (healthResponse.success) {
-        setIsConnected(true);
-        setHealth(healthResponse.data);
-        setConnectionError(null);
-      } else {
-        throw new Error(healthResponse.error || 'Health check failed');
+      // Test connection with health check
+      const healthStatus = await pythonBackendServices.checkHealth();
+      
+      setIsConnected(healthStatus.isConnected);
+      setIsHealthy(healthStatus.isHealthy);
+      setHealth(healthStatus);
+      setError(healthStatus.error || null);
+      
+      if (healthStatus.isConnected && healthStatus.isHealthy) {
+        console.log('Python backend connected successfully');
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Connection failed';
-      setConnectionError(errorMessage);
+      setError(errorMessage);
       setIsConnected(false);
+      setIsHealthy(false);
+      console.error('Python backend connection failed:', err);
     } finally {
       setIsConnecting(false);
     }
-  }, [isConnecting, isConnected]);
+  }, [isEnabled, isConnecting, isConnected, initializeServices]);
 
   const disconnect = useCallback(() => {
     setIsConnected(false);
-    setConnectionError(null);
+    setIsHealthy(false);
     setHealth(null);
-    // Clear all data
-    setUserProfile(null);
-    setUserPreferences(null);
-    setProjects([]);
-    setCurrentProject(null);
-    setAiResponse(null);
-    setAiHistory([]);
+    setMetrics(null);
+    setError(null);
+    
+    if (healthCheckIntervalRef.current) {
+      clearInterval(healthCheckIntervalRef.current);
+      healthCheckIntervalRef.current = null;
+    }
+    
+    console.log('Python backend disconnected');
   }, []);
 
-  // Health check
-  const checkHealth = useCallback(async () => {
-    if (!isConnected) return;
+  const checkConnection = useCallback(async () => {
+    if (!isEnabled || !isConnected) return;
     
     try {
-      const response = await apiInstance.current.checkHealth();
-      if (response.success) {
-        setHealth(response.data);
+      const healthStatus = await pythonBackendServices.checkHealth();
+      const currentMetrics = pythonBackendServices.getMetrics();
+      
+      setHealth(healthStatus);
+      setMetrics(currentMetrics);
+      setIsHealthy(healthStatus.isHealthy);
+      setError(healthStatus.error || null);
+      
+      // Update connection state if health check fails
+      if (!healthStatus.isConnected) {
+        setIsConnected(false);
       }
     } catch (err) {
-      console.error('Health check failed:', err);
-    }
-  }, [isConnected]);
-
-  // User management methods
-  const fetchUserProfile = useCallback(async (userId: string) => {
-    if (!isConnected) return;
-    
-    setIsLoading(true);
-    setError(null);
-    lastOperation.current = { type: 'fetchUserProfile', params: [userId] };
-    
-    try {
-      const response = await apiInstance.current.getUserProfile(userId);
-      if (response.success && response.data) {
-        setUserProfile(response.data);
-        setUserPreferences(response.data.preferences);
-      } else {
-        throw new Error(response.error || 'Failed to fetch user profile');
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      const errorMessage = err instanceof Error ? err.message : 'Health check failed';
       setError(errorMessage);
-    } finally {
-      setIsLoading(false);
+      setIsHealthy(false);
+      console.error('Python backend health check failed:', err);
     }
-  }, [isConnected]);
+  }, [isEnabled, isConnected]);
 
-  const updateUserProfile = useCallback(async (userId: string, profile: Partial<UserProfile>) => {
-    if (!isConnected) return;
-    
-    setIsLoading(true);
-    setError(null);
-    lastOperation.current = { type: 'updateUserProfile', params: [userId, profile] };
-    
-    try {
-      const response = await apiInstance.current.updateUserProfile(userId, profile);
-      if (response.success && response.data) {
-        setUserProfile(response.data);
-        setUserPreferences(response.data.preferences);
-      } else {
-        throw new Error(response.error || 'Failed to update user profile');
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      setError(errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [isConnected]);
-
-  const updateUserPreferences = useCallback(async (userId: string, preferences: Partial<UserPreferences>) => {
-    if (!isConnected) return;
-    
-    setIsLoading(true);
-    setError(null);
-    lastOperation.current = { type: 'updateUserPreferences', params: [userId, preferences] };
-    
-    try {
-      const response = await apiInstance.current.updateUserPreferences(userId, preferences);
-      if (response.success && response.data) {
-        setUserPreferences(response.data);
-        // Update user profile preferences as well
-        setUserProfile(prev => prev ? { ...prev, preferences: response.data! } : null);
-      } else {
-        throw new Error(response.error || 'Failed to update user preferences');
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      setError(errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [isConnected]);
-
-  // Project management methods
-  const fetchProjects = useCallback(async (userId: string) => {
-    if (!isConnected) return;
-    
-    setIsLoading(true);
-    setError(null);
-    lastOperation.current = { type: 'fetchProjects', params: [userId] };
-    
-    try {
-      const response = await apiInstance.current.getProjects(userId);
-      if (response.success && response.data) {
-        setProjects(response.data);
-      } else {
-        throw new Error(response.error || 'Failed to fetch projects');
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      setError(errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [isConnected]);
-
-  const fetchProject = useCallback(async (projectId: string) => {
-    if (!isConnected) return;
-    
-    setIsLoading(true);
-    setError(null);
-    lastOperation.current = { type: 'fetchProject', params: [projectId] };
-    
-    try {
-      const response = await apiInstance.current.getProject(projectId);
-      if (response.success && response.data) {
-        setCurrentProject(response.data);
-      } else {
-        throw new Error(response.error || 'Failed to fetch project');
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      setError(errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [isConnected]);
-
-  const createProject = useCallback(async (project: Omit<Project, 'id' | 'created_at' | 'updated_at'>) => {
-    if (!isConnected) return;
-    
-    setIsLoading(true);
-    setError(null);
-    lastOperation.current = { type: 'createProject', params: [project] };
-    
-    try {
-      const response = await apiInstance.current.createProject(project);
-      if (response.success && response.data) {
-        setProjects(prev => [...prev, response.data!]);
-        setCurrentProject(response.data);
-      } else {
-        throw new Error(response.error || 'Failed to create project');
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      setError(errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [isConnected]);
-
-  const updateProject = useCallback(async (projectId: string, updates: Partial<Project>) => {
-    if (!isConnected) return;
-    
-    setIsLoading(true);
-    setError(null);
-    lastOperation.current = { type: 'updateProject', params: [projectId, updates] };
-    
-    try {
-      const response = await apiInstance.current.updateProject(projectId, updates);
-      if (response.success && response.data) {
-        const updatedProject = response.data;
-        setProjects(prev => prev.map(p => p.id === projectId ? updatedProject : p));
-        if (currentProject?.id === projectId) {
-          setCurrentProject(updatedProject);
-        }
-      } else {
-        throw new Error(response.error || 'Failed to update project');
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      setError(errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [isConnected, currentProject]);
-
-  const deleteProject = useCallback(async (projectId: string) => {
-    if (!isConnected) return;
-    
-    setIsLoading(true);
-    setError(null);
-    lastOperation.current = { type: 'deleteProject', params: [projectId] };
-    
-    try {
-      const response = await apiInstance.current.deleteProject(projectId);
-      if (response.success) {
-        setProjects(prev => prev.filter(p => p.id !== projectId));
-        if (currentProject?.id === projectId) {
-          setCurrentProject(null);
-        }
-      } else {
-        throw new Error(response.error || 'Failed to delete project');
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      setError(errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [isConnected, currentProject]);
-
-  const addProjectMember = useCallback(async (projectId: string, member: Omit<ProjectMember, 'user_id'>) => {
-    if (!isConnected) return;
-    
-    setIsLoading(true);
-    setError(null);
-    lastOperation.current = { type: 'addProjectMember', params: [projectId, member] };
-    
-    try {
-      const response = await apiInstance.current.addProjectMember(projectId, member);
-      if (response.success && response.data) {
-        // Update projects list
-        setProjects(prev => prev.map(p => {
-          if (p.id === projectId) {
-            return { ...p, members: [...p.members, response.data!] };
-          }
-          return p;
-        }));
-        
-        // Update current project if it's the one being modified
-        if (currentProject?.id === projectId) {
-          setCurrentProject(prev => prev ? {
-            ...prev,
-            members: [...prev.members, response.data!]
-          } : null);
-        }
-      } else {
-        throw new Error(response.error || 'Failed to add project member');
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      setError(errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [isConnected, currentProject]);
-
-  const removeProjectMember = useCallback(async (projectId: string, userId: string) => {
-    if (!isConnected) return;
-    
-    setIsLoading(true);
-    setError(null);
-    lastOperation.current = { type: 'removeProjectMember', params: [projectId, userId] };
-    
-    try {
-      const response = await apiInstance.current.removeProjectMember(projectId, userId);
-      if (response.success) {
-        // Update projects list
-        setProjects(prev => prev.map(p => {
-          if (p.id === projectId) {
-            return { ...p, members: p.members.filter(m => m.user_id !== userId) };
-          }
-          return p;
-        }));
-        
-        // Update current project if it's the one being modified
-        if (currentProject?.id === projectId) {
-          setCurrentProject(prev => prev ? {
-            ...prev,
-            members: prev.members.filter(m => m.user_id !== userId)
-          } : null);
-        }
-      } else {
-        throw new Error(response.error || 'Failed to remove project member');
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      setError(errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [isConnected, currentProject]);
-
-  // AI orchestration methods
-  const orchestrateAI = useCallback(async (request: AIOrchestrationRequest) => {
-    if (!isConnected) return;
-    
-    setIsLoading(true);
-    setError(null);
-    lastOperation.current = { type: 'orchestrateAI', params: [request] };
-    
-    try {
-      const response = await apiInstance.current.orchestrateAI(request);
-      if (response.success && response.data) {
-        setAiResponse(response.data);
-        setAiHistory(prev => [response.data!, ...prev]);
-      } else {
-        throw new Error(response.error || 'AI orchestration failed');
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      setError(errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [isConnected]);
-
-  const fetchAIHistory = useCallback(async (userId: string) => {
-    if (!isConnected) return;
-    
-    setIsLoading(true);
-    setError(null);
-    lastOperation.current = { type: 'fetchAIHistory', params: [userId] };
-    
-    try {
-      const response = await apiInstance.current.getAIHistory(userId);
-      if (response.success && response.data) {
-        setAiHistory(response.data);
-      } else {
-        throw new Error(response.error || 'Failed to fetch AI history');
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      setError(errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [isConnected]);
-
-  // Utility methods
+  // Error handling
   const clearError = useCallback(() => {
     setError(null);
-    setConnectionError(null);
   }, []);
 
-  const retryLastOperation = useCallback(async () => {
-    if (!lastOperation.current) return;
-    
-    const { type, params } = lastOperation.current;
-    
-    switch (type) {
-      case 'fetchUserProfile':
-        await fetchUserProfile(params[0]);
-        break;
-      case 'updateUserProfile':
-        await updateUserProfile(params[0], params[1]);
-        break;
-      case 'updateUserPreferences':
-        await updateUserPreferences(params[0], params[1]);
-        break;
-      case 'fetchProjects':
-        await fetchProjects(params[0]);
-        break;
-      case 'fetchProject':
-        await fetchProject(params[0]);
-        break;
-      case 'createProject':
-        await createProject(params[0]);
-        break;
-      case 'updateProject':
-        await updateProject(params[0], params[1]);
-        break;
-      case 'deleteProject':
-        await deleteProject(params[0]);
-        break;
-      case 'addProjectMember':
-        await addProjectMember(params[0], params[1]);
-        break;
-      case 'removeProjectMember':
-        await removeProjectMember(params[0], params[1]);
-        break;
-      case 'orchestrateAI':
-        await orchestrateAI(params[0]);
-        break;
-      case 'fetchAIHistory':
-        await fetchAIHistory(params[0]);
-        break;
-      default:
-        console.warn('Unknown operation type for retry:', type);
-    }
-  }, [
-    fetchUserProfile, updateUserProfile, updateUserPreferences,
-    fetchProjects, fetchProject, createProject, updateProject, deleteProject,
-    addProjectMember, removeProjectMember, orchestrateAI, fetchAIHistory
-  ]);
-
-  // Periodic health check
+  // Auto-connect effect
   useEffect(() => {
-    if (!isConnected) return;
+    if (autoConnect && isEnabled) {
+      connect();
+    }
     
-    const interval = setInterval(checkHealth, 60000); // Check every minute
+    return () => {
+      if (healthCheckIntervalRef.current) {
+        clearInterval(healthCheckIntervalRef.current);
+      }
+    };
+  }, [autoConnect, isEnabled, connect]);
+
+  // Auto health check effect
+  useEffect(() => {
+    if (!autoHealthCheck || !isConnected || !isEnabled) return;
     
-    return () => clearInterval(interval);
-  }, [isConnected, checkHealth]);
+    // Initial health check
+    checkConnection();
+    
+    // Set up periodic health checks
+    healthCheckIntervalRef.current = setInterval(checkConnection, healthCheckInterval);
+    
+    return () => {
+      if (healthCheckIntervalRef.current) {
+        clearInterval(healthCheckIntervalRef.current);
+      }
+    };
+  }, [autoHealthCheck, isConnected, isEnabled, healthCheckInterval, checkConnection]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (healthCheckIntervalRef.current) {
+        clearInterval(healthCheckIntervalRef.current);
+      }
+    };
+  }, []);
 
   return {
     // Connection state
     isConnected,
     isConnecting,
-    connectionError,
+    isHealthy,
     
-    // API state
-    isLoading,
-    error,
-    
-    // Data
+    // Health status
     health,
-    userProfile,
-    userPreferences,
-    projects,
-    currentProject,
-    aiResponse,
-    aiHistory,
+    metrics,
     
-    // Methods
+    // Connection management
     connect,
     disconnect,
-    checkHealth,
-    fetchUserProfile,
-    updateUserProfile,
-    updateUserPreferences,
-    fetchProjects,
-    fetchProject,
-    createProject,
-    updateProject,
-    deleteProject,
-    addProjectMember,
-    removeProjectMember,
-    orchestrateAI,
-    fetchAIHistory,
+    checkConnection,
+    
+    // Error handling
+    error,
     clearError,
-    retryLastOperation,
+    
+    // Utility
+    baseUrl,
+    isEnabled,
   };
 }
