@@ -1,19 +1,8 @@
-# Railway Configuration - Force Nixpacks usage
-# This prevents Railway from auto-detecting and generating Dockerfiles
-
-[build]
-builder = "nixpacks"
-buildCommand = "npm ci && npm run build:staging && mkdir -p backend_temp/app/static && cp -r dist/* backend_temp/app/static/ && cd backend_temp && pip install -r requirements-minimal.txt"
-watchPatterns = ["src/**/*", "package.json", "package-lock.json"]
-
-# Force Nixpacks configuration
-[build.nixpacks]
-providers = ["nodejs", "python"]
-nodejsVersion = "18"
-pythonVersion = "3.11"
+# Railway Configuration - Using Docker for deployment
+# Since Railway keeps auto-generating Dockerfiles, we'll use our own
 
 [deploy]
-startCommand = "cd backend_temp && python start.py"
+startCommand = "cd backend && python start.py"
 healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"
