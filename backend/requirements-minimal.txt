@@ -25,3 +25,12 @@ structlog==23.2.0
 
 # HTTP client
 httpx==0.25.2
+
+# Security and authentication
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.1.2
+
+# Additional utilities
+python-multipart==0.0.6
+email-validator==2.1.0
