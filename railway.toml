@@ -1,14 +1,10 @@
 [build]
-builder = "nixpacks"
-buildCommand = "echo 'Building BeSunny.ai Python Backend with Nixpacks'"
+builder = "dockerfile"
+dockerfilePath = "docker/Dockerfile.backend"
 
-# Force source building, ignore any Dockerfiles
-[build.ignore]
-files = ["Dockerfile*", "docker-compose*.yml", "docker/*"]
-
-# Explicitly disable Docker detection
+# Docker build configuration
 [build.docker]
-enabled = false
+enabled = true
 
 # Health check configuration - optimized for reliability
 [deploy]
