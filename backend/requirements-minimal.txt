@@ -10,10 +10,17 @@ pydantic==2.5.0
 pydantic-settings==2.1.0
 python-dotenv==1.0.0
 
+# Database (needed by core modules)
+sqlalchemy==2.0.23
+asyncpg==0.29.0
+
+# Redis (needed by core modules)
+redis==5.0.1
+
 # Basic middleware
 python-multipart==0.0.6
 
-# Logging
+# Logging (needed by core modules)
 structlog==23.2.0
 
 # HTTP client
