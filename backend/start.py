@@ -27,6 +27,16 @@ def main():
         
         # Import and run uvicorn
         import uvicorn
+        
+        # Fix Python path for relative imports
+        import sys
+        from pathlib import Path
+        
+        # Add the backend directory to Python path so relative imports work
+        backend_dir = Path(__file__).parent
+        sys.path.insert(0, str(backend_dir))
+        
+        # Now import the app with relative imports working
         from app.main import app
         
         port = int(os.environ.get('PORT', 8000))
