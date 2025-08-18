@@ -31,6 +31,10 @@ supabase/.temp/
 # Ignore environment files and local Supabase state
 .env
 .env.local
+.env.staging
+.env.production
+env.staging
+env.production
 
 # Google Cloud Keys
 service-account-key.json

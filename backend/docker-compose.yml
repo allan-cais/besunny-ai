@@ -1,15 +1,42 @@
 version: '3.8'
 
 services:
-  # Python Backend
+  # ============================================================================
+  # CORE INFRASTRUCTURE SERVICES
+  # ============================================================================
+  
+  # Redis Cache and Session Management
+  redis:
+    image: redis:7-alpine
+    container_name: besunny-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory ${REDIS_MAX_MEMORY:-256mb} --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - besunny-network
+    restart: unless-stopped
+
+  # ============================================================================
+  # BACKEND SERVICES
+  # ============================================================================
+  
+  # Main Backend Service
   backend:
     build: .
+    container_name: besunny-backend
     ports:
       - "8000:8000"
     environment:
-      - DEBUG=true
-      - ENVIRONMENT=development
-      - DATABASE_URL=postgresql://postgres:password@postgres:5432/besunny
+      - DEBUG=${DEBUG:-true}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - DATABASE_URL=${SUPABASE_URL}
       - REDIS_URL=redis://redis:6379/0
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
@@ -23,48 +50,41 @@ services:
       - PINECONE_ENVIRONMENT=${PINECONE_ENVIRONMENT}
       - PINECONE_INDEX_NAME=${PINECONE_INDEX_NAME}
       - N8N_CLASSIFICATION_WEBHOOK_URL=${N8N_CLASSIFICATION_WEBHOOK_URL}
+      - N8N_API_KEY=${N8N_API_KEY}
       - ATTENDEE_API_KEY=${ATTENDEE_API_KEY}
+      - ATTENDEE_BASE_URL=${ATTENDEE_BASE_URL:-https://app.attendee.dev}
+      - VIRTUAL_EMAIL_DOMAIN=${VIRTUAL_EMAIL_DOMAIN:-virtual.besunny.ai}
+      - WORKERS=${WORKERS:-1}
+      - ENABLE_METRICS=${ENABLE_METRICS:-false}
+      - METRICS_PORT=9090
     volumes:
       - .:/app
       - /app/__pycache__
       - /app/.pytest_cache
     depends_on:
-      - postgres
-      - redis
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - besunny-network
     restart: unless-stopped
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-
-  # PostgreSQL Database
-  postgres:
-    image: postgres:15
-    environment:
-      - POSTGRES_DB=besunny
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=password
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
-    restart: unless-stopped
-
-  # Redis Cache
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    restart: unless-stopped
-    command: redis-server --appendonly yes
+    profiles:
+      - development
+      - production
 
   # Celery Worker
   celery:
     build: .
+    container_name: besunny-celery
     environment:
-      - DEBUG=true
-      - ENVIRONMENT=development
-      - DATABASE_URL=postgresql://postgres:password@postgres:5432/besunny
+      - DEBUG=${DEBUG:-true}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - DATABASE_URL=${SUPABASE_URL}
       - REDIS_URL=redis://redis:6379/0
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
@@ -78,65 +98,121 @@ services:
       - PINECONE_ENVIRONMENT=${PINECONE_ENVIRONMENT}
       - PINECONE_INDEX_NAME=${PINECONE_INDEX_NAME}
       - N8N_CLASSIFICATION_WEBHOOK_URL=${N8N_CLASSIFICATION_WEBHOOK_URL}
+      - N8N_API_KEY=${N8N_API_KEY}
       - ATTENDEE_API_KEY=${ATTENDEE_API_KEY}
+      - ATTENDEE_BASE_URL=${ATTENDEE_BASE_URL:-https://app.attendee.dev}
+      - VIRTUAL_EMAIL_DOMAIN=${VIRTUAL_EMAIL_DOMAIN:-virtual.besunny.ai}
     volumes:
       - .:/app
     depends_on:
-      - postgres
-      - redis
+      redis:
+        condition: service_healthy
+    networks:
+      - besunny-network
     restart: unless-stopped
-    command: celery -A app.core.celery_app worker --loglevel=info
+    command: celery -A app.core.celery_app worker --loglevel=info --concurrency=${WORKERS:-1}
+    profiles:
+      - development
+      - production
 
-  # Celery Beat (Scheduler)
-  celery-beat:
-    build: .
-    environment:
-      - DEBUG=true
-      - ENVIRONMENT=development
-      - DATABASE_URL=postgresql://postgres:password@postgres:5432/besunny
-      - REDIS_URL=redis://redis:6379/0
-      - SUPABASE_URL=${SUPABASE_URL}
-      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
-      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
-      - SECRET_KEY=${SECRET_KEY}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
-      - GOOGLE_PROJECT_ID=${GOOGLE_PROJECT_ID}
-      - PINECONE_API_KEY=${PINECONE_API_KEY}
-      - PINECONE_ENVIRONMENT=${PINECONE_ENVIRONMENT}
-      - PINECONE_INDEX_NAME=${PINECONE_INDEX_NAME}
-      - N8N_CLASSIFICATION_WEBHOOK_URL=${N8N_CLASSIFICATION_WEBHOOK_URL}
-      - ATTENDEE_API_KEY=${ATTENDEE_API_KEY}
-    volumes:
-      - .:/app
-    depends_on:
-      - postgres
-      - redis
-    restart: unless-stopped
-    command: celery -A app.core.celery_app beat --loglevel=info
-
-  # Flower (Celery Monitoring)
-  flower:
-    build: .
+  # ============================================================================
+  # PRODUCTION SERVICES (Only when production profile is active)
+  # ============================================================================
+  
+  # Load Balancer (Nginx)
+  nginx:
+    image: nginx:alpine
+    container_name: besunny-nginx
     ports:
-      - "5555:5555"
-    environment:
-      - DEBUG=true
-      - ENVIRONMENT=development
-      - REDIS_URL=redis://redis:6379/0
+      - "80:80"
+      - "443:443"
     volumes:
-      - .:/app
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - backend
+    networks:
+      - besunny-network
+    restart: unless-stopped
+    profiles:
+      - production
+
+  # Monitoring Stack
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: besunny-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - besunny-network
+    restart: unless-stopped
+    profiles:
+      - production
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: besunny-grafana
+    ports:
+      - "3001:3000"  # Changed to avoid conflict with frontend
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    depends_on:
+      - prometheus
+    networks:
+      - besunny-network
+    restart: unless-stopped
+    profiles:
+      - production
+
+  # ============================================================================
+  # DEVELOPMENT TOOLS (Only when development profile is active)
+  # ============================================================================
+  
+  # Redis Commander (Optional - for Redis debugging)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: besunny-redis-commander
+    ports:
+      - "8081:8081"
+    environment:
+      - REDIS_HOSTS=local:redis:6379
     depends_on:
       - redis
-      - celery
+    networks:
+      - besunny-network
     restart: unless-stopped
-    command: celery -A app.core.celery_app flower --port=5555
+    profiles:
+      - development
 
+# ============================================================================
+# VOLUMES
+# ============================================================================
 volumes:
-  postgres_data:
   redis_data:
+  prometheus_data:
+  grafana_data:
 
+# ============================================================================
+# NETWORKS
+# ============================================================================
 networks:
-  default:
-    name: besunny-network
+  besunny-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

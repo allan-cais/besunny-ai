@@ -4,6 +4,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Sun, Moon, Monitor } from "lucide-react";
 import { useTheme } from "@/providers/ThemeProvider";
 import UserAccountMenu from "@/components/auth/UserAccountMenu";
+import PythonBackendStatus from "@/components/PythonBackendStatus";
 
 const Header = () => {
   const { theme, setTheme } = useTheme();
@@ -12,6 +13,7 @@ const Header = () => {
     <header className="relative h-[61px] border-b border-[#4a5565] dark:border-zinc-700 bg-stone-100 dark:bg-zinc-800 px-6 flex items-center justify-between flex-shrink-0">
               <h2 className="font-mono text-lg font-bold tracking-tight">sunny.ai</h2>
       <div className="flex items-center space-x-4">
+        <PythonBackendStatus />
         <UserAccountMenu />
         <ToggleGroup 
           type="single" 

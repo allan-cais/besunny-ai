@@ -96,7 +96,7 @@ export type DocumentType = 'email' | 'meeting_transcript' | 'document' | 'drive_
 
 export type SyncStatus = 'idle' | 'syncing' | 'completed' | 'failed';
 
-export type WebhookStatus = 'active' | 'expired' | 'failed' | 'pending';
+export type WebhookStatusType = 'active' | 'expired' | 'failed' | 'pending';
 
 // Complex Types
 export interface EntityPatterns {
@@ -135,10 +135,13 @@ export interface TranscriptMetadata {
   segments?: TranscriptSegment[];
   audio_url?: string;
   recording_url?: string;
-  processing_status: 'pending' | 'processing' | 'completed' | 'failed' | 'not_available';
+  processing_status?: 'pending' | 'processing' | 'completed' | 'failed' | 'not_available';
   quality_score?: number;
   language?: string;
   confidence_score?: number;
+  word_count?: number;
+  bot_id?: string;
+  [key: string]: unknown; // Allow additional properties
 }
 
 export interface Participant {
@@ -171,6 +174,14 @@ export interface BotConfiguration {
   recording_settings?: RecordingSettings;
   teams_settings?: TeamsSettings;
   debug_settings?: DebugSettings;
+  // Additional properties for the modal
+  bot_name?: string;
+  bot_chat_message?: string;
+  chat_message_recipient?: 'everyone' | 'specific_user' | 'everyone_but_host';
+  to_user_uuid?: string;
+  auto_join?: boolean;
+  recording_enabled?: boolean;
+  transcription_language?: string;
 }
 
 export interface TranscriptionSettings {
@@ -198,7 +209,7 @@ export interface DebugSettings {
 }
 
 // API Response Types
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
@@ -248,6 +259,23 @@ export interface ErrorLog {
   error_message: string;
   stack_trace?: string;
   created_at: string;
+}
+
+// Enhanced API Response Types
+export interface PaginatedApiResponse<T> extends ApiResponse<T[]> {
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+export interface ErrorApiResponse extends ApiResponse<never> {
+  success: false;
+  error: string;
+  errorCode?: string;
+  details?: Record<string, unknown>;
 }
 
 // Google Integration Types
@@ -372,4 +400,50 @@ export interface AIChatSession {
   project_id?: string;
   started_at: string;
   ended_at?: string;
+}
+
+// Project Onboarding Types
+export interface ProjectOnboardingRequest {
+  projectId: string;
+  userId: string;
+  metadata: {
+    name: string;
+    description: string;
+    references: string;
+  };
+}
+
+export interface ProjectOnboardingResponse {
+  success: boolean;
+  message: string;
+  recommendations?: string[];
+}
+
+// Enhanced Project Types
+export interface ExtendedProject extends Project {
+  normalized_tags?: string[];
+  categories?: string[];
+  reference_keywords?: string[];
+  notes?: string;
+  status?: 'active' | 'archived' | 'draft';
+  priority?: 'low' | 'medium' | 'high' | 'critical';
+  tags?: string[];
+  created_by?: string;
+  last_activity_at?: string;
+}
+
+// Bot Configuration Types
+export interface BotConfigurationRequest {
+  meetingId: string;
+  userId: string;
+  configuration: BotConfiguration;
+}
+
+export interface BotDeploymentResult {
+  success: boolean;
+  botId?: string;
+  meetingId: string;
+  status: BotStatus;
+  error?: string;
+  deploymentUrl?: string;
 }

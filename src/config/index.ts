@@ -7,6 +7,12 @@ interface Config {
     anonKey: string;
     serviceRoleKey?: string;
   };
+  pythonBackend: {
+    url: string;
+    timeout: number;
+    retries: number;
+    retryDelay: number;
+  };
   api: {
     n8nWebhookUrl: string;
     openaiApiKey?: string;
@@ -16,6 +22,7 @@ interface Config {
     enableDebugMode: boolean;
     enableAnalytics: boolean;
     enableErrorReporting: boolean;
+    enablePythonBackend: boolean;
   };
   polling: {
     defaultIntervalMs: number;
@@ -42,12 +49,25 @@ function getOptionalEnvVar(name: string, defaultValue: string = ''): string {
   return import.meta.env[name] || defaultValue;
 }
 
+function getOptionalNumberEnvVar(name: string, defaultValue: number): number {
+  const value = import.meta.env[name];
+  if (!value) return defaultValue;
+  const parsed = parseInt(value);
+  return isNaN(parsed) ? defaultValue : parsed;
+}
+
 // Build configuration object
 export const config: Config = {
   supabase: {
     url: getRequiredEnvVar('VITE_SUPABASE_URL'),
     anonKey: getRequiredEnvVar('VITE_SUPABASE_ANON_KEY'),
     serviceRoleKey: getOptionalEnvVar('VITE_SUPABASE_SERVICE_ROLE_KEY'),
+  },
+  pythonBackend: {
+    url: getOptionalEnvVar('VITE_PYTHON_BACKEND_URL', 'http://localhost:8000'),
+    timeout: getOptionalNumberEnvVar('VITE_PYTHON_BACKEND_TIMEOUT', 30000),
+    retries: getOptionalNumberEnvVar('VITE_PYTHON_BACKEND_RETRIES', 3),
+    retryDelay: getOptionalNumberEnvVar('VITE_PYTHON_BACKEND_RETRY_DELAY', 1000),
   },
   api: {
     n8nWebhookUrl: getOptionalEnvVar('VITE_N8N_WEBHOOK_URL', 'https://n8n.customaistudio.io/webhook/kirit-rag-webhook'),
@@ -58,6 +78,7 @@ export const config: Config = {
     enableDebugMode: import.meta.env.DEV || false,
     enableAnalytics: getOptionalEnvVar('VITE_ENABLE_ANALYTICS', 'false') === 'true',
     enableErrorReporting: getOptionalEnvVar('VITE_ENABLE_ERROR_REPORTING', 'false') === 'true',
+    enablePythonBackend: getOptionalEnvVar('VITE_ENABLE_PYTHON_BACKEND', 'true') === 'true',
   },
   polling: {
     defaultIntervalMs: parseInt(getOptionalEnvVar('VITE_POLLING_INTERVAL_MS', '30000')),
@@ -79,6 +100,12 @@ export const apiEndpoints = {
     rest: `${config.supabase.url}/rest/v1`,
     realtime: `${config.supabase.url}/realtime/v1`,
   },
+  pythonBackend: {
+    base: config.pythonBackend.url,
+    api: `${config.pythonBackend.url}/api/v1`,
+    health: `${config.pythonBackend.url}/health`,
+    websockets: `${config.pythonBackend.url}/ws`,
+  },
   google: {
     calendar: 'https://www.googleapis.com/calendar/v3',
     gmail: 'https://www.googleapis.com/gmail/v1',
@@ -94,6 +121,15 @@ export function validateConfig(): void {
       throw new Error('Invalid Supabase configuration');
     }
 
+    // Validate Python backend configuration
+    if (config.features.enablePythonBackend) {
+      try {
+        new URL(config.pythonBackend.url);
+      } catch {
+        throw new Error('Invalid Python backend URL format');
+      }
+    }
+
     // Validate URL formats
     new URL(config.supabase.url);
     
@@ -106,7 +142,7 @@ export function validateConfig(): void {
       throw new Error('Invalid documents per page limit');
     }
 
-    console.log('✅ Configuration validated successfully');
+
   } catch (error) {
     console.error('❌ Configuration validation failed:', error);
     throw error;
@@ -124,6 +160,7 @@ export const features = {
   isDebugMode: () => config.features.enableDebugMode,
   isAnalyticsEnabled: () => config.features.enableAnalytics,
   isErrorReportingEnabled: () => config.features.enableErrorReporting,
+  isPythonBackendEnabled: () => config.features.enablePythonBackend,
 } as const;
 
 // Export configuration for use in components

@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Mail, FileText, Folder, Image, File, Calendar, Clock, Search, Filter, MessageSquare, Play } from 'lucide-react';
 import { useAuth } from '@/providers/AuthProvider';
-import { supabase, Document } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
+import type { Document, Meeting, Project, TranscriptMetadata } from '@/types';
 import FileWatchStatus from '@/components/FileWatchStatus';
 import TranscriptModal from './TranscriptModal';
 import EmailModal from './EmailModal';
@@ -24,8 +25,40 @@ interface VirtualEmailActivity {
   processed: boolean;
   project_id?: string;
   transcript_duration_seconds?: number;
-  transcript_metadata?: Record<string, unknown>;
-  rawTranscript?: Record<string, unknown>; // Store the full transcript data for detail view
+  transcript_metadata?: TranscriptMetadata;
+  rawTranscript?: {
+    id: string;
+    title: string;
+    transcript: string;
+    transcript_summary: string;
+    transcript_metadata?: TranscriptMetadata;
+    transcript_duration_seconds?: number;
+    transcript_retrieved_at: string;
+    final_transcript_ready?: boolean;
+    start_time?: string;
+    end_time?: string;
+    meeting_url?: string;
+  };
+}
+
+// Simple project type for fallback
+interface SimpleProject {
+  id: string;
+  name: string;
+}
+
+// Interface for transcript data in the modal
+interface TranscriptModalData {
+  id: string;
+  title: string;
+  transcript?: string;
+  transcript_summary?: string;
+  transcript_metadata?: TranscriptMetadata;
+  transcript_duration_seconds?: number;
+  transcript_retrieved_at: string;
+  project_id?: string;
+  source: string;
+  bot_name?: string;
 }
 
 const DataFeed = () => {
@@ -36,11 +69,11 @@ const DataFeed = () => {
   const [transcriptsLoading, setTranscriptsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'email' | 'drive' | 'transcripts'>('all');
-  const [selectedTranscript, setSelectedTranscript] = useState<Meeting | null>(null);
+  const [selectedTranscript, setSelectedTranscript] = useState<TranscriptModalData | null>(null);
   const [selectedEmail, setSelectedEmail] = useState<Document | null>(null);
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
   // Mock documents state removed - will use real data only
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [projects, setProjects] = useState<SimpleProject[]>([]);
   const [classificationActivity, setClassificationActivity] = useState<VirtualEmailActivity | null>(null);
 
   useEffect(() => {
@@ -75,7 +108,9 @@ const DataFeed = () => {
         }
       }
     } catch (error) {
-      // Error in loadProjects
+      console.error('Failed to load projects:', error);
+      // Error loading projects
+      // Use a fallback project for demo
       setProjects([{ id: 'fallback-project', name: 'Demo Project' }]);
     }
   };
@@ -97,6 +132,7 @@ const DataFeed = () => {
         .limit(200); // Increased limit to get more documents
 
       if (documentsError) {
+        console.error('Failed to load documents:', documentsError);
         // Error loading documents
         // Fallback to empty arrays when no data available
         setDocuments([]);
@@ -133,6 +169,7 @@ const DataFeed = () => {
         setActivities(documentActivities);
       }
           } catch (error) {
+        console.error('Failed to load documents:', error);
         // Error loading documents
         // Fallback to empty arrays when no data available
         setDocuments([]);
@@ -780,18 +817,24 @@ Alex Rodriguez: Perfect. Meeting adjourned. Thanks everyone for your input and c
                 
                 if (activity.type === 'meeting_transcript' && activity.rawTranscript) {
                   // Merge activity data with rawTranscript data for the modal
-                  const transcriptData = {
-                    ...activity.rawTranscript,
+                  const transcriptData: TranscriptModalData = {
+                    id: activity.rawTranscript.id,
+                    title: activity.rawTranscript.title,
+                    transcript: activity.rawTranscript.transcript,
+                    transcript_summary: activity.rawTranscript.transcript_summary,
+                    transcript_metadata: activity.rawTranscript.transcript_metadata,
+                    transcript_duration_seconds: activity.rawTranscript.transcript_duration_seconds,
+                    transcript_retrieved_at: activity.rawTranscript.transcript_retrieved_at,
                     project_id: activity.project_id,
                     source: activity.source,
                     bot_name: activity.rawTranscript.transcript_metadata?.bot_id || 'SunnyAI Notetaker'
                   };
                   setSelectedTranscript(transcriptData);
                 } else if (activity.type === 'email') {
-                  setSelectedEmail(activity);
+                  setSelectedEmail(activity as unknown as Document);
                 } else if (activity.type === 'document' || activity.type === 'spreadsheet' || activity.type === 'presentation' || activity.type === 'image' || activity.type === 'folder') {
-                          // Find the corresponding document
-        const document = documents.find(doc => doc.id === activity.id);
+                  // Find the corresponding document
+                  const document = documents.find(doc => doc.id === activity.id);
                   if (document) {
                     // Always use the activity's project_id as it's the most up-to-date
                     // The activity state gets updated immediately when classification happens

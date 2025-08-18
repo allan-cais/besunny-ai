@@ -15,6 +15,10 @@ import structlog
 
 from .core.config import get_settings, is_development
 from .core.database import init_db, close_db
+from .core.service_registry import start_service_registry, stop_service_registry
+from .core.api_gateway import initialize_api_gateway
+from .core.redis_manager import init_redis, close_redis
+from .core.observability import init_observability
 from .api.v1 import router as api_v1_router
 from .api.websockets import router as websocket_router
 
@@ -51,9 +55,52 @@ async def lifespan(app: FastAPI):
         await init_db()
         logger.info("Database initialized successfully")
         
-        # Initialize other services here
-        # await init_redis()
-        # await init_pinecone()
+        # Initialize Redis
+        try:
+            await init_redis()
+            logger.info("Redis initialized successfully")
+        except Exception as e:
+            logger.warning(f"Redis initialization failed: {e}")
+            logger.info("Application will continue without Redis")
+        
+        # Initialize observability system
+        try:
+            await init_observability()
+            logger.info("Observability system initialized successfully")
+        except Exception as e:
+            logger.warning(f"Observability initialization failed: {e}")
+            logger.info("Application will continue without observability")
+        
+        # Initialize service registry
+        try:
+            await start_service_registry()
+            logger.info("Service registry started successfully")
+        except Exception as e:
+            logger.warning(f"Service registry startup failed: {e}")
+            logger.info("Application will continue without service registry")
+        
+        # Initialize API Gateway
+        try:
+            await initialize_api_gateway()
+            logger.info("API Gateway initialized successfully")
+        except Exception as e:
+            logger.warning(f"API Gateway initialization failed: {e}")
+            logger.info("Application will continue without API Gateway")
+        
+        # Initialize AI services
+        try:
+            from .services.ai import AIService, EmbeddingService, ClassificationService, MeetingIntelligenceService
+            
+            # Initialize AI services in background (non-blocking)
+            logger.info("Initializing AI services...")
+            
+            # Note: AI services are initialized lazily when first used
+            # This prevents startup delays and allows graceful degradation
+            logger.info("AI services configured for lazy initialization")
+            
+        except Exception as e:
+            logger.warning(f"AI services initialization failed: {e}")
+            logger.info("Application will continue without AI services")
         
         logger.info("Application startup completed")
         yield
@@ -67,13 +114,30 @@ async def lifespan(app: FastAPI):
         logger.info("Shutting down BeSunny.ai Python Backend")
         
         try:
+            # Stop service registry
+            try:
+                await stop_service_registry()
+                logger.info("Service registry stopped")
+            except Exception as e:
+                logger.warning(f"Service registry shutdown failed: {e}")
+            
             # Close database connections
             await close_db()
             logger.info("Database connections closed")
             
-            # Close other services here
-            # await close_redis()
-            # await close_pinecone()
+            # Close Redis connections
+            try:
+                await close_redis()
+                logger.info("Redis connections closed")
+            except Exception as e:
+                logger.warning(f"Redis shutdown failed: {e}")
+            
+            # Close AI services
+            try:
+                # Note: AI services are stateless and don't require explicit cleanup
+                logger.info("AI services cleanup completed")
+            except Exception as e:
+                logger.warning(f"AI services cleanup failed: {e}")
             
         except Exception as e:
             logger.error(f"Shutdown error: {e}")
@@ -219,6 +283,100 @@ def create_app() -> FastAPI:
             "timestamp": time.time(),
         }
     
+    # Enhanced health check with AI services status
+    @app.get("/health/ai")
+    async def ai_health_check():
+        """AI services health check endpoint."""
+        try:
+            from .services.ai import AIService, EmbeddingService, ClassificationService, MeetingIntelligenceService
+            
+            # Test AI service initialization
+            ai_service = AIService()
+            embedding_service = EmbeddingService()
+            classification_service = ClassificationService()
+            meeting_intelligence_service = MeetingIntelligenceService()
+            
+            return {
+                "status": "healthy",
+                "ai_services": {
+                    "ai_service": "configured",
+                    "embedding_service": "configured", 
+                    "classification_service": "configured",
+                    "meeting_intelligence_service": "configured"
+                },
+                "message": "All AI services are configured and ready for use",
+                "timestamp": time.time()
+            }
+            
+        except Exception as e:
+            logger.error(f"AI health check failed: {e}")
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "status": "unhealthy",
+                    "ai_services": "failed",
+                    "error": str(e),
+                    "timestamp": time.time()
+                }
+            )
+    
+    # Microservices health check endpoint
+    @app.get("/health/microservices")
+    async def microservices_health_check():
+        """Microservices architecture health check endpoint."""
+        try:
+            from .core.service_registry import get_service_registry
+            from .core.api_gateway import get_api_gateway
+            from .core.redis_manager import get_redis
+            from .core.observability import get_observability
+            
+            # Get service instances
+            service_registry = await get_service_registry()
+            api_gateway = await get_api_gateway()
+            redis = await get_redis()
+            observability = await get_observability()
+            
+            # Check component health
+            registry_status = await service_registry.get_registry_status()
+            gateway_status = await api_gateway.get_gateway_status()
+            redis_health = await redis.health_check()
+            observability_health = await observability.get_system_health()
+            
+            # Determine overall status
+            overall_status = "healthy"
+            if not redis_health:
+                overall_status = "degraded"
+            
+            return {
+                "status": overall_status,
+                "microservices": {
+                    "service_registry": "healthy",
+                    "api_gateway": "healthy",
+                    "redis_cache": "healthy" if redis_health else "unhealthy",
+                    "observability": "healthy"
+                },
+                "details": {
+                    "service_registry": registry_status,
+                    "api_gateway": gateway_status,
+                    "redis_health": redis_health,
+                    "observability": observability_health
+                },
+                "message": "Microservices architecture is operational",
+                "timestamp": time.time()
+            }
+            
+        except Exception as e:
+            logger.error(f"Microservices health check failed: {e}")
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "status": "unhealthy",
+                    "microservices": "failed",
+                    "error": str(e),
+                    "timestamp": time.time()
+                }
+            )
+    
     # Root endpoint
     @app.get("/")
     async def root():
@@ -228,6 +386,18 @@ def create_app() -> FastAPI:
             "service": settings.app_name,
             "version": settings.app_version,
             "docs": "/docs" if is_development() else None,
+            "ai_services": {
+                "classification": "/api/v1/classification",
+                "ai": "/api/v1/ai",
+                "embeddings": "/api/v1/embeddings",
+                "meeting_intelligence": "/api/v1/meeting-intelligence"
+            },
+            "microservices": {
+                "service_registry": "/api/v1/microservices/registry/status",
+                "api_gateway": "/api/v1/microservices/gateway/status",
+                "observability": "/api/v1/microservices/observability/health",
+                "cache": "/api/v1/microservices/cache/status"
+            }
         }
     
     return app

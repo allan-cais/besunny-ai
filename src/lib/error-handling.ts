@@ -124,8 +124,9 @@ export class DefaultErrorHandler implements ErrorHandler {
       console.error(logMessage);
     } else if (logLevel === 'warn') {
       console.warn(logMessage);
-    } else {
-      console.log(logMessage);
+    } else if (logLevel === 'info') {
+      // Use console.info for informational messages
+      console.info(logMessage);
     }
   }
 
@@ -149,17 +150,17 @@ export class DefaultErrorHandler implements ErrorHandler {
     }
   }
 
-  private getLogLevel(severity: ErrorSeverity): 'log' | 'warn' | 'error' {
+  private getLogLevel(severity: ErrorSeverity): 'info' | 'warn' | 'error' {
     switch (severity) {
       case ErrorSeverity.LOW:
-        return 'log';
+        return 'info';
       case ErrorSeverity.MEDIUM:
         return 'warn';
       case ErrorSeverity.HIGH:
       case ErrorSeverity.CRITICAL:
         return 'error';
       default:
-        return 'log';
+        return 'info';
     }
   }
 

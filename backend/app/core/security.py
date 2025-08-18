@@ -145,6 +145,38 @@ async def get_current_active_user(
     return current_user
 
 
+async def get_current_user_optional(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)
+) -> Optional[dict]:
+    """Dependency to get current user if authenticated, None otherwise."""
+    if not credentials:
+        return None
+    
+    try:
+        token = credentials.credentials
+        payload = security_manager.verify_token(token)
+        
+        if payload is None:
+            return None
+        
+        user_id: str = payload.get("sub")
+        if user_id is None:
+            return None
+        
+        # In a real implementation, you would fetch user from database here
+        # For now, we'll return the payload
+        return {
+            "id": user_id,
+            "email": payload.get("email"),
+            "username": payload.get("username"),
+            "permissions": payload.get("permissions", []),
+        }
+        
+    except Exception as e:
+        logger.warning(f"Optional authentication failed: {e}")
+        return None
+
+
 def require_permission(permission: str):
     """Decorator to require specific permission."""
     def permission_dependency(current_user: dict = Depends(get_current_user)):

@@ -267,20 +267,35 @@ export const supabaseService = {
 
   // Google Drive File Watch operations
   async subscribeToDriveFile(userId: string, documentId: string, fileId: string): Promise<{ success: boolean; message: string; watch_id?: string }> {
-    const { data, error } = await supabase.functions.invoke('subscribe-to-drive-file', {
-      body: {
-        user_id: userId,
-        document_id: documentId,
-        file_id: fileId,
-      },
-    });
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.access_token) {
+        throw new Error('No active session');
+      }
 
-    if (error) {
+      const response = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/drive-subscription/subscribe`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          file_id: fileId,
+          document_id: documentId,
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      return result;
+    } catch (error) {
       // Error subscribing to drive file
       throw error;
     }
-
-    return data;
   },
 
   async updateDocument(documentId: string, updates: Partial<Document>): Promise<Document> {
@@ -362,7 +377,7 @@ export const supabaseService = {
         throw new Error('No active session');
       }
 
-      const response = await fetch(`${supabaseUrl}/functions/v1/project-onboarding-ai`, {
+      const response = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/ai/projects/onboarding`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

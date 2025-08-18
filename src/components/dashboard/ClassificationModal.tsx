@@ -84,14 +84,24 @@ const ClassificationModal: React.FC<ClassificationModalProps> = ({
 
   const handleClassify = () => {
     if (selectedProjectId) {
-      onClassify(activity.id, selectedProjectId);
-      onClose();
+      try {
+        onClassify(activity.id, selectedProjectId);
+        onClose();
+      } catch (error) {
+        console.error('Failed to classify activity:', error);
+        // Could add toast notification here for user feedback
+      }
     }
   };
 
   const handleRemoveClassification = () => {
-    onClassify(activity.id, ''); // Empty string to remove classification
-    onClose();
+    try {
+      onClassify(activity.id, ''); // Empty string to remove classification
+      onClose();
+    } catch (error) {
+      console.error('Failed to remove classification:', error);
+      // Could add toast notification here for user feedback
+    }
   };
 
   return (

@@ -95,6 +95,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
       await navigator.clipboard.writeText(content);
       // You could add a toast notification here
     } catch (error) {
+      console.error('Failed to copy document content:', error);
       // Handle copy error silently
     }
   };

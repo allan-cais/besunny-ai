@@ -1,31 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { 
-  Calendar, 
-  Video, 
-  Clock, 
-  Send, 
-  Loader2,
-  ExternalLink,
-  Bot
-} from 'lucide-react';
-import { Meeting } from '@/lib/calendar';
-import { apiKeyService } from '@/lib/api-keys';
-import { calendarService } from '@/lib/calendar';
-import { Project } from '@/lib/supabase';
-import BotConfigurationModal from './BotConfigurationModal';
-import { useAuth } from '@/providers/AuthProvider';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/providers/AuthProvider';
+import { useToast } from '@/hooks/use-toast';
+import { attendeeService } from '@/lib/attendee-service';
+import type { Meeting, Project, BotConfiguration } from '@/types';
+import { Loader2, Bot, Calendar, Clock, Users, MapPin, ExternalLink, Settings, Plus, Filter, Search, Send } from 'lucide-react';
+import BotConfigurationModal from './BotConfigurationModal';
 
 interface CalendarViewProps {
   meetings: Meeting[];
@@ -51,6 +36,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
   const [updatingProject, setUpdatingProject] = useState<string | null>(null);
   const [configModalOpen, setConfigModalOpen] = useState(false);
   const [meetingForConfig, setMeetingForConfig] = useState<Meeting | null>(null);
+  const { toast } = useToast();
 
   // Set up real-time subscription to meetings table for immediate UI updates
   useEffect(() => {
@@ -72,14 +58,14 @@ const CalendarView: React.FC<CalendarViewProps> = ({
             const updatedMeeting = payload.new as Meeting;
             
             // Update selected meeting if it's the one that changed
-            if (selectedMeeting && selectedMeeting.id === updatedMeeting.id) {
-              setSelectedMeeting(updatedMeeting);
-            }
+            setSelectedMeeting(prev => 
+              prev && prev.id === updatedMeeting.id ? updatedMeeting : prev
+            );
             
             // Update meeting for config if it's the one that changed
-            if (meetingForConfig && meetingForConfig.id === updatedMeeting.id) {
-              setMeetingForConfig(updatedMeeting);
-            }
+            setMeetingForConfig(prev => 
+              prev && prev.id === updatedMeeting.id ? updatedMeeting : prev
+            );
           }
         }
       )
@@ -88,7 +74,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.id, selectedMeeting?.id, meetingForConfig?.id]);
+  }, [user?.id]);
 
   const getEventStatusBadge = (eventStatus: Meeting['event_status']) => {
     switch (eventStatus) {
@@ -145,98 +131,39 @@ const CalendarView: React.FC<CalendarViewProps> = ({
     return badge;
   };
 
-  const sendBotToMeeting = async (meeting: Meeting, configuration?: Record<string, unknown>) => {
+  const sendBotToMeeting = async (meeting: Meeting, configuration?: BotConfiguration) => {
     if (!meeting.meeting_url) return;
     try {
       setSendingBot(meeting.id);
       
-      // Build basic bot options - only essential configuration
-      const botOptions: Record<string, unknown> = {
-        // Basic required fields
+      const result = await attendeeService.sendBotToMeeting({
         meeting_url: meeting.meeting_url,
-        bot_name: configuration?.bot_name || meeting.bot_name || 'Sunny AI Assistant',
-        
-        // Chat message configuration
-        bot_chat_message: {
-          to: configuration?.chat_message_recipient || 'everyone',
-          message: configuration?.bot_chat_message || meeting.bot_chat_message || 'Hi, I\'m here to transcribe this meeting!',
-          ...(configuration?.to_user_uuid && { to_user_uuid: configuration.to_user_uuid })
-        },
-        
-        // Future scheduling
-        join_at: (() => {
-          const meetingStartTime = new Date(meeting.start_time);
-          const joinAtTime = new Date(meetingStartTime.getTime() - 2 * 60 * 1000); // Join 2 minutes before start
-          return joinAtTime.toISOString();
-        })(),
-        
-        // Advanced features - left as defaults (not included in API call)
-        // transcription_settings, recording_settings, teams_settings, debug_settings,
-        // automatic_leave_settings, webhooks, metadata, deduplication_key, custom_settings
-        // will all use Attendee API defaults
-      };
-      
-      // Note: transcription_settings.language is not supported by Attendee API
-      // Language will use API defaults
-
-      const result = await apiKeyService.sendBotToMeeting(meeting.meeting_url, botOptions);
-      
-      // Handle different possible response structures from Attendee API
-      let attendeeBotId = null;
-      if (result && typeof result === 'object') {
-        // Try different possible field names for the bot ID
-        attendeeBotId = result.id || result.bot_id || result.botId || result.bot_id;
-      }
-      
-      if (!attendeeBotId) {
-        throw new Error('Failed to get bot ID from Attendee API response');
-      }
-      
-      // Create a bot record in the bots table with basic settings
-      const botRecord = await calendarService.createBot({
-        name: configuration?.bot_name || meeting.bot_name || 'Sunny AI Assistant',
-        description: 'Basic transcription bot with essential configuration',
-        provider: 'attendee',
-        provider_bot_id: attendeeBotId,
-        settings: {
-          attendee_bot_id: attendeeBotId,
-          created_via: 'manual_deployment',
-          meeting_id: meeting.id,
-          configuration: configuration || {},
-          join_at: botOptions.join_at,
-          meeting_start_time: meeting.start_time,
-          // Advanced settings not stored - using API defaults
-        },
-        is_active: true
+        bot_name: configuration?.transcription_settings?.language || meeting.bot_name || 'AI Assistant',
+        bot_chat_message: configuration?.transcription_settings?.enable_speaker_diarization ? 'Hi, I\'m here to transcribe this meeting!' : 'Hi, I\'m here to transcribe this meeting!'
       });
       
-      // Update the meeting with the bot UUID and status
-      await calendarService.updateBotStatus(
-        meeting.id, 
-        'bot_scheduled', 
-        botRecord.id // Use the UUID from the bots table
-      );
-      
-      // Also update the deployment method and configuration
-      await calendarService.updateMeeting(meeting.id, {
-        bot_deployment_method: 'manual',
-        bot_configuration: configuration || {}
-      });
-      
-      // Immediately update the local state to show the new bot status
-      if (onMeetingStateUpdate) {
-        onMeetingStateUpdate(meeting.id, {
+      await supabase
+        .from('meetings')
+        .update({
+          attendee_bot_id: result.botId,
           bot_status: 'bot_scheduled',
-          attendee_bot_id: botRecord.id,
-          bot_deployment_method: 'manual',
-          bot_configuration: configuration || {}
-        });
-      }
-      
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', meeting.id);
+
       onMeetingUpdate();
-    } catch (err: unknown) {
-      // Error sending bot to meeting
-      // Handle error silently
+      
+      toast({
+        title: "Bot deployed successfully!",
+        description: `Bot will join the meeting 2 minutes before it starts.`,
+      });
+    } catch (error) {
+      console.error('Failed to deploy bot:', error);
+      toast({
+        title: "Failed to deploy bot",
+        description: "Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setSendingBot(null);
     }
@@ -247,7 +174,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
     setConfigModalOpen(true);
   };
 
-  const handleDeployWithConfiguration = async (configuration: Record<string, unknown>) => {
+  const handleDeployWithConfiguration = async (configuration: BotConfiguration) => {
     if (meetingForConfig) {
       await sendBotToMeeting(meetingForConfig, configuration);
       setConfigModalOpen(false);
@@ -266,7 +193,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({
   const handleProjectChange = async (meetingId: string, projectId: string) => {
     try {
       setUpdatingProject(meetingId);
-      await calendarService.associateMeetingWithProject(meetingId, projectId);
+      await supabase
+        .from('meetings')
+        .update({ project_id: projectId === 'none' ? null : projectId })
+        .eq('id', meetingId);
       if (selectedMeeting && selectedMeeting.id === meetingId) {
         setSelectedMeeting({
           ...selectedMeeting,
@@ -275,12 +205,18 @@ const CalendarView: React.FC<CalendarViewProps> = ({
       }
       onMeetingUpdate();
     } catch (error) {
-      // Handle error silently
+      console.error('Failed to update meeting project:', error);
+      toast({
+        title: "Failed to assign meeting",
+        description: "Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setUpdatingProject(null);
     }
   };
 
+  // Update selected meeting when meetings change
   useEffect(() => {
     if (selectedMeeting) {
       const updatedMeeting = meetings.find(m => m.id === selectedMeeting.id);
@@ -288,7 +224,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
         setSelectedMeeting(updatedMeeting);
       }
     }
-  }, [meetings, selectedMeeting]);
+  }, [meetings, selectedMeeting?.id]);
 
   const formatTime = (dateTime: string) => {
     const date = new Date(dateTime);
@@ -379,17 +315,17 @@ const CalendarView: React.FC<CalendarViewProps> = ({
                       }}
                       className="font-mono"
                     >
-                      <Video className="w-4 h-4" />
+                      <ExternalLink className="w-4 h-4" />
                       <span className="ml-1">Join Meeting</span>
                     </Button>
                   )}
-                  {meeting.transcript_url && (
+                  {meeting.transcript && (
                     <Button
                       size="sm"
                       variant="outline"
                       onClick={e => {
                         e.stopPropagation();
-                        window.open(meeting.transcript_url, '_blank');
+                        window.open(meeting.transcript, '_blank');
                       }}
                       className="font-mono"
                     >
@@ -436,9 +372,20 @@ const CalendarView: React.FC<CalendarViewProps> = ({
               <div>
                 <h4 className="font-medium text-sm mb-2 text-[#4a5565] dark:text-zinc-50 font-mono">Meeting URL</h4>
                 <div className="flex items-center space-x-2">
-                  <Video className="w-4 h-4 text-gray-500" />
+                  <ExternalLink className="w-4 h-4 text-gray-500" />
                   <span className="text-sm text-blue-600 dark:text-blue-400 truncate font-mono">
                     {selectedMeeting.meeting_url}
+                  </span>
+                </div>
+              </div>
+            )}
+            {selectedMeeting?.transcript && (
+              <div>
+                <h4 className="font-medium text-sm mb-2 text-[#4a5565] dark:text-zinc-50 font-mono">Transcript</h4>
+                <div className="flex items-center space-x-2">
+                  <ExternalLink className="w-4 h-4 text-gray-500" />
+                  <span className="text-sm text-blue-600 dark:text-blue-400 truncate font-mono">
+                    {selectedMeeting.transcript}
                   </span>
                 </div>
               </div>

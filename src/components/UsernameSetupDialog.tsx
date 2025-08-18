@@ -91,7 +91,8 @@ const UsernameSetupDialog: React.FC<UsernameSetupDialogProps> = ({ open, onClose
         throw new Error('No valid session found');
       }
 
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/set-username`, {
+      // Use Python backend instead of Supabase edge function
+      const response = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/user/set-username`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { MessageSquare, Clock, Calendar, ExternalLink, Copy, Download } from 'lucide-react';
+import type { TranscriptMetadata } from '@/types';
 
 interface TranscriptDetailProps {
   transcript: {
@@ -10,7 +11,7 @@ interface TranscriptDetailProps {
     title: string;
     transcript: string;
     transcript_summary: string;
-    transcript_metadata: any;
+    transcript_metadata: TranscriptMetadata;
     transcript_duration_seconds: number;
     transcript_retrieved_at: string;
     meeting_url?: string;
@@ -43,6 +44,7 @@ const TranscriptDetail: React.FC<TranscriptDetailProps> = ({ transcript, onBack 
       await navigator.clipboard.writeText(transcript.transcript);
       // You could add a toast notification here
     } catch (error) {
+      console.error('Failed to copy transcript:', error);
       // Failed to copy transcript
     }
   };

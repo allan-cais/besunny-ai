@@ -41,7 +41,7 @@ export const apiKeyService = {
     
 
     
-    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/attendee-proxy/send-bot`, {
+    const response = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/attendee/send-bot`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

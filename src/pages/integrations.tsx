@@ -229,8 +229,8 @@ const IntegrationsPage: React.FC = () => {
         throw new Error('No valid session found');
       }
 
-      // POST the code to the backend Edge Function
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/exchange-google-token`, {
+      // POST the code to the Python backend
+      const response = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/auth/google/oauth/callback`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

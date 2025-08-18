@@ -7,9 +7,22 @@
     "dev": "vite",
     "build": "vite build",
     "build:dev": "vite build --mode development",
+    "build:staging": "vite build --mode staging",
+    "build:production": "vite build --mode production",
     "lint": "eslint .",
     "preview": "vite preview",
-    "start": "vite preview --host 0.0.0.0 --port ${PORT:-3000}"
+    "start": "vite preview --host 0.0.0.0 --port ${PORT:-3000}",
+    "dev:fullstack": "./start-fullstack.sh",
+    "dev:backend": "cd backend && docker-compose --profile development up --build",
+    "dev:backend:logs": "cd backend && docker-compose --profile development logs -f",
+    "dev:backend:stop": "cd backend && docker-compose --profile development down",
+    "dev:redis": "cd backend && docker-compose --profile development up redis -d",
+    "dev:redis:stop": "cd backend && docker-compose --profile development stop redis",
+    "prod:deploy": "cd backend && docker-compose --profile production up --build -d",
+    "prod:logs": "cd backend && docker-compose --profile production logs -f",
+    "prod:stop": "cd backend && docker-compose --profile production down",
+    "prod:scale": "cd backend && docker-compose --profile production up --scale backend=3 --scale celery=2 -d",
+    "test:full": "cd backend && docker-compose --profile production up --build -d && sleep 30 && curl -f http://localhost:8000/health && echo '✅ All services healthy' && docker-compose --profile production down"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",

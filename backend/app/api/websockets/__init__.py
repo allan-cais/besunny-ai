@@ -8,8 +8,8 @@ from typing import List
 import json
 import logging
 
-from ..core.security import get_current_user
-from ..core.database import get_supabase
+from ...core.security import get_current_user
+from ...core.database import get_supabase
 
 logger = logging.getLogger(__name__)
 

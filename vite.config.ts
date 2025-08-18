@@ -32,4 +32,11 @@ export default defineConfig(({ command, mode }) => ({
     port: 3000,
     host: true,
   },
+  // Environment-specific configuration
+  define: {
+    __APP_ENV__: JSON.stringify(mode),
+    __IS_DEV__: mode === "development",
+    __IS_STAGING__: mode === "staging",
+    __IS_PROD__: mode === "production",
+  },
 }));

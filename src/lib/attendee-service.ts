@@ -41,7 +41,7 @@ class AttendeeServiceImpl implements AttendeeService {
     const session = (await supabase.auth.getSession()).data.session;
     if (!session) throw new Error('Not authenticated');
 
-    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/attendee-service${endpoint}`, {
+    const response = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/attendee${endpoint}`, {
       headers: {
         'Authorization': `Bearer ${session.access_token}`,
         'Content-Type': 'application/json',

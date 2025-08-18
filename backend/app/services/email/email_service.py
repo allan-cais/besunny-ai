@@ -78,13 +78,13 @@ class EmailProcessingService:
             if not user:
                 # Log the attempt but don't create a document
                 await self._log_email_processing(
-                    gmail_message.id,
-                    to_header,
-                    username,
-                    subject_header,
-                    from_header,
-                    'user_not_found',
-                    f"User not found for username: {username}"
+                    gmail_message_id=gmail_message.id,
+                    inbound_address=to_header,
+                    extracted_username=username,
+                    subject=subject_header,
+                    sender=from_header,
+                    status='user_not_found',
+                    error_message=f"User not found for username: {username}"
                 )
                 
                 return EmailProcessingResult(
@@ -120,15 +120,15 @@ class EmailProcessingService:
             )
             
             # Update document with classification result
-            if classification_result and classification_result.classified_project_id:
+            if classification_result and isinstance(classification_result, dict) and classification_result.get('classified_project_id'):
                 await self._update_document_project(
                     document_id, 
-                    classification_result.classified_project_id
+                    classification_result['classified_project_id']
                 )
                 
                 # Update project classification tracking
                 await self._update_project_classification_tracking(
-                    classification_result.classified_project_id
+                    classification_result['classified_project_id']
                 )
             
             # Check for Drive file sharing and set up automatic Drive watch
@@ -138,13 +138,13 @@ class EmailProcessingService:
             
             # Log the processing
             await self._log_email_processing(
-                user.id,
-                gmail_message.id,
-                to_header,
-                username,
-                subject_header,
-                from_header,
-                'processed',
+                user_id=user.id,
+                gmail_message_id=gmail_message.id,
+                inbound_address=to_header,
+                extracted_username=username,
+                subject=subject_header,
+                sender=from_header,
+                status='processed',
                 document_id=document_id,
                 classification_success=bool(classification_result)
             )
@@ -162,14 +162,14 @@ class EmailProcessingService:
             
             # Log the error
             await self._log_email_processing(
-                gmail_message.id,
-                self._get_header_value(gmail_message.payload.headers, 'to') or 'unknown',
-                self._extract_username_from_email(
+                gmail_message_id=gmail_message.id,
+                inbound_address=self._get_header_value(gmail_message.payload.headers, 'to') or 'unknown',
+                extracted_username=self._extract_username_from_email(
                     self._get_header_value(gmail_message.payload.headers, 'to') or ''
                 ),
-                self._get_header_value(gmail_message.payload.headers, 'subject'),
-                self._get_header_value(gmail_message.payload.headers, 'from'),
-                'failed',
+                subject=self._get_header_value(gmail_message.payload.headers, 'subject'),
+                sender=self._get_header_value(gmail_message.payload.headers, 'from'),
+                status='failed',
                 error_message=str(e)
             )
             
@@ -196,7 +196,7 @@ class EmailProcessingService:
         local_part = parts[0]
         
         # Check if it contains a plus sign (plus-addressing)
-        if local_part.includes('+'):
+        if '+' in local_part:
             plus_parts = local_part.split('+')
             if len(plus_parts) >= 2:
                 return plus_parts[1]  # Return the part after the plus sign
@@ -394,8 +394,7 @@ class EmailProcessingService:
                         file_id = file_id_match.group(1)
                         logger.info(f"Setting up automatic Drive watch for file: {file_id}")
                         
-                        # TODO: Implement Drive watch setup
-                        # This would call the Drive monitoring service
+                        # Drive watch setup will be implemented in future iteration
                         # await self.drive_service.setup_file_watch(file_id, document_id)
                         
         except Exception as e:
@@ -404,12 +403,12 @@ class EmailProcessingService:
     async def _log_email_processing(
         self,
         user_id: Optional[str] = None,
-        gmail_message_id: str = None,
-        inbound_address: str = None,
-        extracted_username: str = None,
-        subject: str = None,
-        sender: str = None,
-        status: str = None,
+        gmail_message_id: Optional[str] = None,
+        inbound_address: Optional[str] = None,
+        extracted_username: Optional[str] = None,
+        subject: Optional[str] = None,
+        sender: Optional[str] = None,
+        status: Optional[str] = None,
         document_id: Optional[str] = None,
         classification_success: Optional[bool] = None,
         error_message: Optional[str] = None

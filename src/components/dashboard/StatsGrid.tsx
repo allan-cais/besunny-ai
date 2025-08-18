@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Card } from '@/components/ui/card';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
 import { useAuth } from '@/providers/AuthProvider';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -23,74 +23,71 @@ const StatsGrid = () => {
   });
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchDashboardStats = async () => {
-      if (!user) return;
+  const fetchDashboardStats = useCallback(async () => {
+    if (!user) return;
 
-      try {
-        // Fetch total documents for the user
-        const { data: totalDocs, error: totalError } = await supabase
-          .from('documents')
-          .select('id, project_id, classification_source')
-          .eq('created_by', user.id);
+    try {
+      // Fetch total documents for the user
+      const { data: totalDocs, error: totalError } = await supabase
+        .from('documents')
+        .select('id, project_id, classification_source')
+        .eq('created_by', user.id);
 
-        if (totalError) {
-          throw totalError;
-        }
-
-        // Fetch active projects for the user
-        const { data: projects, error: projectsError } = await supabase
-          .from('projects')
-          .select('id')
-          .eq('created_by', user.id);
-
-        if (projectsError) {
-          throw projectsError;
-        }
-
-        // Count AI-classified documents (those classified by the system, not manually by user)
-        const aiClassifiedDocs = totalDocs?.filter(doc => 
-          doc.project_id && 
-          (doc.classification_source === 'ai' || 
-           doc.classification_source === 'auto' ||
-           doc.classification_source === 'system')
-        ) || [];
-
-
-
-        const total = totalDocs?.length || 0;
-        const aiClassified = aiClassifiedDocs.length;
-        const accuracy = total > 0 ? Math.round((aiClassified / total) * 100) : 0;
-
-
-
-        // For now, we'll simulate a trend based on recent activity
-        // In a real implementation, you'd compare this to historical data
-        const trend = accuracy > 85 ? 'up' : accuracy < 70 ? 'down' : 'stable';
-
-        setDashboardStats({
-          totalDocuments: total,
-          classifiedDocuments: aiClassified,
-          accuracy,
-          trend,
-          activeProjects: projects?.length || 0
-        });
-      } catch (error) {
-        // Set to zero if there's an error
-        setDashboardStats({
-          totalDocuments: 0,
-          classifiedDocuments: 0,
-          accuracy: 0,
-          trend: 'stable',
-          activeProjects: 0
-        });
-      } finally {
-        setLoading(false);
+      if (totalError) {
+        throw totalError;
       }
-    };
 
+      // Fetch active projects for the user
+      const { data: projects, error: projectsError } = await supabase
+        .from('projects')
+        .select('id')
+        .eq('created_by', user.id);
+
+      if (projectsError) {
+        throw projectsError;
+      }
+
+      // Count AI-classified documents (those classified by the system, not manually by user)
+      const aiClassifiedDocs = totalDocs?.filter(doc => 
+        doc.project_id && 
+        (doc.classification_source === 'ai' || 
+         doc.classification_source === 'auto' ||
+         doc.classification_source === 'system')
+      ) || [];
+
+      const total = totalDocs?.length || 0;
+      const aiClassified = aiClassifiedDocs.length;
+      const accuracy = total > 0 ? Math.round((aiClassified / total) * 100) : 0;
+
+      // For now, we'll simulate a trend based on recent activity
+      // In a real implementation, you'd compare this to historical data
+      const trend = accuracy > 85 ? 'up' : accuracy < 70 ? 'down' : 'stable';
+
+      setDashboardStats({
+        totalDocuments: total,
+        classifiedDocuments: aiClassified,
+        accuracy,
+        trend,
+        activeProjects: projects?.length || 0
+      });
+    } catch (error) {
+      console.error('Failed to fetch dashboard stats:', error);
+      // Set to zero if there's an error
+      setDashboardStats({
+        totalDocuments: 0,
+        classifiedDocuments: 0,
+        accuracy: 0,
+        trend: 'stable',
+        activeProjects: 0
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
     fetchDashboardStats();
-  }, [user, supabase]);
+  }, [fetchDashboardStats]);
 
   const getAccuracyColor = (accuracy: number) => {
     if (accuracy >= 90) return 'text-green-600 dark:text-green-400';

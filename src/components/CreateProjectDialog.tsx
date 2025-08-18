@@ -11,8 +11,8 @@ import {
 } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Send, CheckCircle, Edit3, ArrowRight } from 'lucide-react';
-import { useSupabase } from '@/hooks/use-supabase';
-import { Project, supabase, supabaseService } from '@/lib/supabase';
+import { usePythonBackend } from '@/hooks/use-python-backend';
+import { Project } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 
 interface ProjectOnboardingData {
@@ -135,7 +135,7 @@ const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
   const editInputRef = useRef<HTMLInputElement>(null);
   const editTextareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const { createProject } = useSupabase();
+  const { createProject, processProjectOnboarding } = usePythonBackend();
 
   // Initialize chat when dialog opens
   useEffect(() => {
@@ -384,13 +384,15 @@ const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
         }
       };
 
-      // Process project onboarding with AI (background processing)
+      // Process project onboarding with AI using Python backend
       try {
-        const aiResult = await supabaseService.processProjectOnboarding(webhookPayload);
+        const aiResult = await processProjectOnboarding(webhookPayload);
         if (!aiResult.success) {
+          console.warn('AI processing failed:', aiResult.error);
         }
       } catch (aiError) {
         // Don't throw error - AI processing is optional for project creation
+        console.warn('AI processing error:', aiError);
       }
 
       // Show success toast

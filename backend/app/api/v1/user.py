@@ -1,0 +1,222 @@
+"""
+User API endpoints for BeSunny.ai Python backend.
+Handles username management and user utility functions.
+"""
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Dict, Any, Optional
+from pydantic import BaseModel
+
+from ...services.user.username_service import UsernameService
+from ...core.security import get_current_user
+from ...models.schemas.user import User
+
+router = APIRouter()
+
+
+class UsernameRequest(BaseModel):
+    """Username setting request."""
+    username: str
+
+
+class UsernameResponse(BaseModel):
+    """Username setting response."""
+    success: bool
+    username: Optional[str] = None
+    virtual_email: Optional[str] = None
+    error_message: Optional[str] = None
+
+
+class UsernameValidationResponse(BaseModel):
+    """Username validation response."""
+    is_valid: bool
+    is_available: bool
+    suggestions: Optional[list] = None
+    error_message: Optional[str] = None
+
+
+@router.post("/username/set", response_model=UsernameResponse)
+async def set_username(
+    request: UsernameRequest,
+    current_user: User = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """
+    Set username for the current user.
+    
+    Args:
+        request: Username setting request
+        current_user: Current authenticated user
+        
+    Returns:
+        Username setting result
+    """
+    try:
+        service = UsernameService()
+        result = await service.set_username(current_user.id, request.username)
+        
+        if result.get('success'):
+            return UsernameResponse(
+                success=True,
+                username=result.get('username'),
+                virtual_email=result.get('virtual_email')
+            )
+        else:
+            return UsernameResponse(
+                success=False,
+                error_message=result.get('error', 'Unknown error')
+            )
+            
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error setting username: {str(e)}"
+        )
+
+
+@router.get("/username/validate/{username}", response_model=UsernameValidationResponse)
+async def validate_username(
+    username: str,
+    current_user: User = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """
+    Validate username format and availability.
+    
+    Args:
+        username: Username to validate
+        current_user: Current authenticated user
+        
+    Returns:
+        Username validation result
+    """
+    try:
+        service = UsernameService()
+        
+        # Validate format
+        is_valid = service._validate_username(username)
+        
+        if not is_valid:
+            return UsernameValidationResponse(
+                is_valid=False,
+                is_available=False,
+                error_message="Invalid username format"
+            )
+        
+        # Check availability
+        is_available = not await service._is_username_taken(username, current_user.id)
+        
+        # Generate suggestions if username is taken
+        suggestions = None
+        if not is_available:
+            suggestions = [
+                f"{username}1",
+                f"{username}2", 
+                f"{username}_{current_user.id[:8]}",
+                f"{username}2024"
+            ]
+        
+        return UsernameValidationResponse(
+            is_valid=True,
+            is_available=is_available,
+            suggestions=suggestions
+        )
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error validating username: {str(e)}"
+        )
+
+
+@router.get("/username/generate", response_model=UsernameResponse)
+async def generate_username(
+    current_user: User = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """
+    Generate a username from the user's email.
+    
+    Args:
+        current_user: Current authenticated user
+        
+    Returns:
+        Generated username result
+    """
+    try:
+        service = UsernameService()
+        username = service._generate_username_from_email(current_user.email)
+        
+        if username:
+            # Check if generated username is available
+            is_available = not await service._is_username_taken(username, current_user.id)
+            
+            if is_available:
+                virtual_email = service._generate_virtual_email(username)
+                return UsernameResponse(
+                    success=True,
+                    username=username,
+                    virtual_email=virtual_email
+                )
+            else:
+                # Try with variations
+                for i in range(1, 10):
+                    variation = f"{username}{i}"
+                    if not await service._is_username_taken(variation, current_user.id):
+                        virtual_email = service._generate_virtual_email(variation)
+                        return UsernameResponse(
+                            success=True,
+                            username=variation,
+                            virtual_email=virtual_email
+                        )
+                
+                return UsernameResponse(
+                    success=False,
+                    error_message="Could not generate available username"
+                )
+        else:
+            return UsernameResponse(
+                success=False,
+                error_message="Could not generate username from email"
+            )
+            
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error generating username: {str(e)}"
+        )
+
+
+@router.get("/username/status", response_model=Dict[str, Any])
+async def get_username_status(
+    current_user: User = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """
+    Get current username status for the user.
+    
+    Args:
+        current_user: Current authenticated user
+        
+    Returns:
+        Username status information
+    """
+    try:
+        service = UsernameService()
+        
+        # Check if user has username
+        has_username = bool(current_user.username)
+        
+        # Generate virtual email if username exists
+        virtual_email = None
+        if has_username:
+            virtual_email = service._generate_virtual_email(current_user.username)
+        
+        return {
+            "has_username": has_username,
+            "username": current_user.username,
+            "virtual_email": virtual_email,
+            "email": current_user.email
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error getting username status: {str(e)}"
+        )

@@ -4,11 +4,13 @@ Handles email ingestion, classification, and processing.
 """
 
 from .email_service import EmailProcessingService
-from .gmail_service import GmailService
-from .virtual_email_service import VirtualEmailService
+from .gmail_polling_service import GmailPollingService as GmailService
+from .gmail_polling_service import GmailPollingService
+from .gmail_polling_cron import GmailPollingCronService
 
 __all__ = [
     "EmailProcessingService",
-    "GmailService", 
-    "VirtualEmailService",
+    "GmailService",
+    "GmailPollingService",
+    "GmailPollingCronService",
 ]

@@ -308,7 +308,7 @@ const Dashboard = () => {
     }
   };
 
-  const sendBotToMeeting = async (meeting: Meeting, configuration?: any) => {
+  const sendBotToMeeting = async (meeting: Meeting, configuration?: BotConfiguration) => {
     if (!meeting.meeting_url) return;
     try {
       // Record meeting creation activity
@@ -318,8 +318,8 @@ const Dashboard = () => {
       
       const result = await attendeeService.sendBotToMeeting({
         meeting_url: meeting.meeting_url,
-        bot_name: configuration?.bot_name || meeting.bot_name || 'AI Assistant',
-        bot_chat_message: configuration?.bot_chat_message || meeting.bot_chat_message || 'Hi, I\'m here to transcribe this meeting!'
+        bot_name: configuration?.transcription_settings?.language || meeting.bot_name || 'AI Assistant',
+        bot_chat_message: configuration?.transcription_settings?.enable_speaker_diarization ? 'Hi, I\'m here to transcribe this meeting!' : 'Hi, I\'m here to transcribe this meeting!'
       });
       
       await supabase
@@ -337,10 +337,11 @@ const Dashboard = () => {
         title: "Bot deployed successfully!",
         description: `Bot will join the meeting 2 minutes before it starts.`,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
       toast({
         title: "Failed to deploy bot",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -353,7 +354,7 @@ const Dashboard = () => {
     setConfigModalOpen(true);
   };
 
-  const handleDeployWithConfiguration = async (configuration: any) => {
+  const handleDeployWithConfiguration = async (configuration: BotConfiguration) => {
     if (meetingForConfig) {
       await sendBotToMeeting(meetingForConfig, configuration);
     }

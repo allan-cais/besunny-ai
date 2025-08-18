@@ -17,61 +17,7 @@ import {
   Info,
   CheckCircle
 } from 'lucide-react';
-import { Meeting } from '@/lib/calendar';
-
-interface BotConfiguration {
-  // Basic settings only
-  bot_name: string;
-  bot_chat_message: string;
-  chat_message_recipient: 'everyone' | 'specific_user' | 'everyone_but_host';
-  to_user_uuid?: string;
-  
-  // Basic features
-  auto_join: boolean;
-  recording_enabled: boolean;
-  transcription_language: string;
-  
-  // Advanced features - commented out, will use defaults
-  /*
-  transcription_settings?: {
-    deepgram?: {
-      language?: string;
-      model?: string;
-      smart_format?: boolean;
-    };
-  };
-  
-  recording_settings?: {
-    format?: 'mp4' | 'webm';
-    view?: 'speaker_view' | 'gallery_view';
-    resolution?: '720p' | '1080p' | '1440p';
-  };
-  
-  teams_settings?: {
-    use_login?: boolean;
-  };
-  
-  debug_settings?: {
-    create_debug_recording?: boolean;
-  };
-  
-  automatic_leave_settings?: {
-    leave_after_minutes?: number;
-    leave_when_empty?: boolean;
-  };
-  
-  webhooks?: Array<{
-    url: string;
-    triggers: string[];
-  }>;
-  
-  metadata?: Record<string, any>;
-  
-  deduplication_key?: string;
-  
-  custom_settings?: Record<string, any>;
-  */
-}
+import type { Meeting, BotConfiguration } from '@/types';
 
 interface BotConfigurationModalProps {
   meeting: Meeting | null;
@@ -88,7 +34,25 @@ const DEFAULT_CONFIGURATION: BotConfiguration = {
   auto_join: true,
   recording_enabled: true,
   transcription_language: 'en-US',
-  // Advanced settings commented out - will use Attendee API defaults
+  transcription_settings: {
+    language: 'en-US',
+    enable_speaker_diarization: true,
+    enable_punctuation: true,
+    enable_sentiment_analysis: false
+  },
+  recording_settings: {
+    quality: 'high',
+    format: 'mp4',
+    enable_audio_only: false
+  },
+  teams_settings: {
+    enable_team_chat: false,
+    enable_team_notifications: false
+  },
+  debug_settings: {
+    create_debug_recording: false,
+    log_level: 'info'
+  }
 };
 
 const LANGUAGE_OPTIONS = [

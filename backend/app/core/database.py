@@ -109,39 +109,56 @@ class DatabaseManager:
             return False
 
 
-# Global database manager instance
-db_manager = DatabaseManager()
+# Global database manager instance - lazy loaded
+_db_manager_instance: Optional[DatabaseManager] = None
+
+
+def get_db_manager() -> DatabaseManager:
+    """Get database manager instance."""
+    global _db_manager_instance
+    if _db_manager_instance is None:
+        _db_manager_instance = DatabaseManager()
+    return _db_manager_instance
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """Dependency for getting database session."""
-    async for session in db_manager.get_session():
+    async for session in get_db_manager().get_session():
         yield session
 
 
 async def init_db() -> None:
     """Initialize database on startup."""
-    await db_manager.initialize()
+    await get_db_manager().initialize()
 
 
 async def close_db() -> None:
     """Close database on shutdown."""
-    await db_manager.close()
+    await get_db_manager().close()
 
 
 # Database event listeners for debugging
-if get_settings().debug:
-    @event.listens_for(Base, "before_insert", propagate=True)
-    def before_insert(mapper, connection, target):
-        logger.debug(f"Inserting {target.__class__.__name__}: {target}")
-    
-    @event.listens_for(Base, "before_update", propagate=True)
-    def before_update(mapper, connection, target):
-        logger.debug(f"Updating {target.__class__.__name__}: {target}")
-    
-    @event.listens_for(Base, "before_delete", propagate=True)
-    def before_delete(mapper, connection, target):
-        logger.debug(f"Deleting {target.__class__.__name__}: {target}")
+def setup_debug_listeners():
+    """Setup debug event listeners if debug mode is enabled."""
+    try:
+        if get_settings().debug:
+            @event.listens_for(Base, "before_insert", propagate=True)
+            def before_insert(mapper, connection, target):
+                logger.debug(f"Inserting {target.__class__.__name__}: {target}")
+            
+            @event.listens_for(Base, "before_update", propagate=True)
+            def before_update(mapper, connection, target):
+                logger.debug(f"Updating {target.__class__.__name__}: {target}")
+            
+            @event.listens_for(Base, "before_delete", propagate=True)
+            def before_delete(mapper, connection, target):
+                logger.debug(f"Deleting {target.__class__.__name__}: {target}")
+    except Exception as e:
+        logger.warning(f"Could not setup debug listeners: {e}")
+
+
+# Setup debug listeners when module is imported
+setup_debug_listeners()
 
 
 class SupabaseClient:
