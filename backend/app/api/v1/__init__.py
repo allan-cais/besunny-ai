@@ -5,7 +5,7 @@ Includes all v1 API endpoints and sub-routers.
 
 from fastapi import APIRouter
 
-from . import documents, projects, emails, drive, calendar, classification, attendee, ai, embeddings, meeting_intelligence, microservices, enterprise, webhooks, auth, user, gmail_watch, drive_subscription
+from . import documents, projects, emails, drive, calendar, classification, attendee, ai, embeddings, meeting_intelligence, microservices, enterprise, webhooks, auth, user, gmail_watch, drive_subscription, ai_orchestration, performance_monitoring
 
 # Create main v1 router
 router = APIRouter(prefix="/v1")
@@ -23,6 +23,7 @@ router.include_router(attendee.router, prefix="/attendee", tags=["attendee"])
 router.include_router(ai.router, prefix="/ai", tags=["ai"])
 router.include_router(embeddings.router, prefix="/embeddings", tags=["embeddings"])
 router.include_router(meeting_intelligence.router, prefix="/meeting-intelligence", tags=["meeting-intelligence"])
+router.include_router(ai_orchestration.router, tags=["ai-orchestration"])
 
 # Microservices Architecture Routers
 router.include_router(microservices.router, tags=["microservices"])
@@ -32,6 +33,7 @@ router.include_router(webhooks.router, tags=["webhooks"])
 
 # Enterprise Features - Phase 4
 router.include_router(enterprise.router, tags=["enterprise"])
+router.include_router(performance_monitoring.router, tags=["performance-monitoring"])
 
 # Authentication Router - Phase 5
 router.include_router(auth.router, prefix="/auth", tags=["authentication"])
@@ -59,9 +61,11 @@ async def health_check():
             "/ai",
             "/embeddings",
             "/meeting-intelligence",
+            "/ai-orchestration",
             "/microservices",
             "/webhooks",
             "/enterprise",
+            "/performance",
             "/auth",
             "/user",
             "/gmail-watch",

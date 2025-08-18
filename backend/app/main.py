@@ -14,6 +14,7 @@ import time
 import logging
 import structlog
 import os
+import asyncio
 from pathlib import Path
 
 from .core.config import get_settings, is_development
@@ -97,6 +98,7 @@ async def lifespan(app: FastAPI):
         # Initialize AI services
         try:
             from .services.ai import AIService, EmbeddingService, ClassificationService, MeetingIntelligenceService
+            from .services.ai.ai_orchestration_service import AIOrchestrationService
             
             # Initialize AI services in background (non-blocking)
             logger.info("Initializing AI services...")
@@ -108,6 +110,20 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"AI services initialization failed: {e}")
             logger.info("Application will continue without AI services")
+        
+        # Initialize Performance Monitoring Service
+        try:
+            from .services.enterprise.performance_monitoring_service import PerformanceMonitoringService
+            
+            # Initialize performance monitoring in background
+            logger.info("Initializing Performance Monitoring Service...")
+            performance_monitor = PerformanceMonitoringService()
+            asyncio.create_task(performance_monitor.initialize())
+            logger.info("Performance Monitoring Service configured for background initialization")
+            
+        except Exception as e:
+            logger.warning(f"Performance Monitoring Service initialization failed: {e}")
+            logger.info("Application will continue without performance monitoring")
         
         logger.info("Application startup completed")
         yield
