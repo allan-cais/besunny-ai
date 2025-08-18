@@ -46,6 +46,9 @@ WORKDIR /app/backend
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements-minimal.txt
 
+# Set working directory to backend for the application
+WORKDIR /app/backend
+
 # Create non-root user
 RUN useradd --create-home --shell /bin/bash app && \
     chown -R app:app /app
