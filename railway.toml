@@ -1,0 +1,11 @@
+# Railway Root Configuration
+# This file tells Railway to use our service-specific configurations
+
+# Disable automatic detection
+[build]
+builder = "nixpacks"
+autoDetect = false
+
+# Force Railway to use our specific configs
+[deploy]
+startCommand = "echo 'Please use service-specific configs'"

@@ -1,0 +1,51 @@
+# Railway Backend Service Configuration
+# This file is specifically for the backend service
+
+[deploy]
+startCommand = "cd backend && python start.py"
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 10
+
+# Backend build configuration
+[build]
+builder = "nixpacks"
+buildCommand = "pip install -r requirements.txt"
+watchPatterns = ["**/*.py", "requirements.txt"]
+
+# Source directory for backend
+[build.source]
+path = "."
+exclude = ["src/**", "public/**", "package*.json", "vite.config.ts", "tailwind.config.ts", "tsconfig*.json", "*.md", "Dockerfile*", "railway*.toml", "deploy-*.sh", ".railway/**", "node_modules/**", "dist/**", "**/deno.json", "**/*.deno"]
+
+# Set working directory for the service
+[deploy.workingDirectory]
+path = "backend"
+
+# Force Python detection and exclude Node.js/Deno files
+[build.detection]
+python = true
+node = false
+deno = false
+
+# Environment variables for backend
+[deploy.envs]
+PYTHON_VERSION = "3.11"
+ENVIRONMENT = "production"
+DEBUG = "false"
+HOST = "0.0.0.0"
+PORT = "$PORT"
+WORKERS = "1"
+ENABLE_METRICS = "false"
+LOG_LEVEL = "INFO"
+LOG_FORMAT = "json"
+SECRET_KEY = "railway-staging-secret-key-change-in-production"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = "30"
+CORS_ORIGINS = "*"
+CORS_ALLOW_CREDENTIALS = "false"
+SUPABASE_URL = "https://placeholder.supabase.co"
+SUPABASE_SERVICE_ROLE_KEY = "placeholder-key"
+SUPABASE_ANON_KEY = "placeholder-key"
+REDIS_URL = "redis://localhost:6379/0"
