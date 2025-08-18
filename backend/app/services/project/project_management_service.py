@@ -531,3 +531,4 @@ class ProjectManagementService:
 
 # Note: Pydantic BaseModel import is expected to fail in this environment
 # The classes are defined above and will work when the package is installed
+
