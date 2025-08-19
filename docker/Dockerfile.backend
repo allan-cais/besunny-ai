@@ -1,5 +1,5 @@
 # BeSunny.ai Backend Dockerfile
-# Optimized for reliability and health checks
+# Optimized for reliability and production deployment
 
 FROM python:3.11-alpine
 
@@ -14,9 +14,12 @@ ENV PORT=8000
 # Set work directory
 WORKDIR /app
 
-# Install only essential packages
+# Install system dependencies
 RUN apk add --no-cache \
     curl \
+    gcc \
+    musl-dev \
+    libffi-dev \
     && rm -rf /var/cache/apk/*
 
 # Copy requirements first for better caching
@@ -40,5 +43,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD /healthcheck.sh
 
-# Start the simple health server
-CMD ["python", "simple-health-server.py"]
+# Start the real FastAPI application
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
