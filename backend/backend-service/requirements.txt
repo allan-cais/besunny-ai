@@ -38,7 +38,7 @@ openai>=1.0.0
 numpy>=1.24.0
 
 # Vector database
-pinecone-client>=2.2.0
+pinecone>=2.2.0
 
 # HTTP and networking
 httpx>=0.25.2
