@@ -40,6 +40,9 @@ numpy>=1.24.0
 # Vector database
 pinecone>=2.2.0
 
+# System monitoring
+psutil>=5.9.0
+
 # HTTP and networking
 httpx>=0.25.2
 requests>=2.31.0
