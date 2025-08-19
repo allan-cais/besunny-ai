@@ -1,5 +1,5 @@
 # Backend Dockerfile for Railway deployment
-# This runs from the /backend root directory
+# This runs from the backend/ directory
 
 FROM python:3.11-alpine
 
@@ -37,17 +37,6 @@ COPY . .
 RUN echo '#!/bin/sh\ncurl -f http://localhost:8000/health || exit 1' > /healthcheck.sh && \
     chmod +x /healthcheck.sh
 
-# Create a startup script that tries main app first, falls back to health server
-RUN echo '#!/bin/sh\n\
-echo "🚀 Attempting to start main FastAPI application..."\n\
-if python -c "import app.main" 2>/dev/null; then\n\
-    echo "✅ Main app import successful, starting uvicorn..."\n\
-    exec python -m uvicorn app.main:app --host 0.0.0.0 --port 8000\n\
-else\n\
-    echo "⚠️ Main app import failed, falling back to health check server..."\n\
-    exec python simple-health-server.py\n\
-fi' > /start.sh && chmod +x /start.sh
-
 # Expose port
 EXPOSE 8000
 
@@ -55,5 +44,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD /healthcheck.sh
 
-# Start with fallback option
-CMD ["/start.sh"]
+# Start the FastAPI application directly
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

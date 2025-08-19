@@ -310,3 +310,6 @@ export class PythonBackendAPI {
     return this.baseUrl.length > 0;
   }
 }
+
+// Export a default instance
+export const pythonBackendAPI = new PythonBackendAPI();
