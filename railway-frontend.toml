@@ -1,0 +1,16 @@
+# Railway configuration for BeSunny.ai Frontend Only
+# Use this for frontend deployment
+
+[build]
+builder = "dockerfile"
+dockerfilePath = "docker/Dockerfile.frontend.railway"
+
+# Frontend environment
+[build.environment]
+NODE_ENV = "production"
+
+# Frontend deployment
+[deploy]
+healthcheckPath = "/"
+healthcheckTimeout = 300
+healthcheckInterval = 30

@@ -1,0 +1,17 @@
+# Railway configuration for BeSunny.ai Backend Only
+# Use this for backend deployment
+
+[build]
+builder = "dockerfile"
+dockerfilePath = "docker/Dockerfile.backend"
+
+# Backend environment
+[build.environment]
+ENVIRONMENT = "production"
+DEBUG = "false"
+
+# Backend deployment
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+healthcheckInterval = 30

@@ -1,6 +1,7 @@
 # Railway configuration for BeSunny.ai Full Stack
 # Deploying both frontend and backend services
 
+# Backend service (default)
 [build]
 builder = "dockerfile"
 dockerfilePath = "docker/Dockerfile.backend"
@@ -18,14 +19,14 @@ healthcheckInterval = 30
 
 # Frontend service
 [[services]]
-name = "frontend"
+name = "besunny-frontend"
 builder = "dockerfile"
 dockerfilePath = "docker/Dockerfile.frontend.railway"
 
-[services.frontend.build.environment]
+[services.besunny-frontend.build.environment]
 NODE_ENV = "production"
 
-[services.frontend.deploy]
+[services.besunny-frontend.deploy]
 healthcheckPath = "/"
 healthcheckTimeout = 300
 healthcheckInterval = 30
