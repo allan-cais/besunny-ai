@@ -11,7 +11,7 @@ export const productionConfig = {
 
   // Backend configuration
   backend: {
-    baseUrl: process.env.VITE_PYTHON_BACKEND_URL || 'http://localhost:8000',
+    baseUrl: import.meta.env.VITE_PYTHON_BACKEND_URL || 'http://localhost:8000',
     timeout: 30000,
     retries: 3,
     retryDelay: 1000
@@ -19,30 +19,30 @@ export const productionConfig = {
 
   // Supabase configuration
   supabase: {
-    url: process.env.VITE_SUPABASE_URL || '',
-    anonKey: process.env.VITE_SUPABASE_ANON_KEY || '',
-    serviceRoleKey: process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || ''
+    url: import.meta.env.VITE_SUPABASE_URL || '',
+    anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
+    serviceRoleKey: import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY || ''
   },
 
   // Feature flags
   features: {
-    pythonBackend: process.env.VITE_ENABLE_PYTHON_BACKEND === 'true',
-    analytics: process.env.VITE_ENABLE_ANALYTICS === 'true',
-    errorReporting: process.env.VITE_ENABLE_ERROR_REPORTING === 'true'
+    pythonBackend: import.meta.env.VITE_ENABLE_PYTHON_BACKEND === 'true',
+    analytics: import.meta.env.VITE_ENABLE_ANALYTICS === 'true',
+    errorReporting: import.meta.env.VITE_ENABLE_ERROR_REPORTING === 'true'
   },
 
   // Performance settings
   performance: {
-    pollingInterval: parseInt(process.env.VITE_POLLING_INTERVAL_MS || '30000'),
-    maxRetries: parseInt(process.env.VITE_MAX_RETRIES || '3'),
-    retryDelay: parseInt(process.env.VITE_RETRY_DELAY_MS || '1000')
+    pollingInterval: parseInt(import.meta.env.VITE_POLLING_INTERVAL_MS || '30000'),
+    maxRetries: parseInt(import.meta.env.VITE_MAX_RETRIES || '3'),
+    retryDelay: parseInt(import.meta.env.VITE_RETRY_DELAY_MS || '1000')
   },
 
   // UI limits
   limits: {
-    maxDocumentsPerPage: parseInt(process.env.VITE_MAX_DOCUMENTS_PER_PAGE || '50'),
-    maxMeetingsPerPage: parseInt(process.env.VITE_MAX_MEETINGS_PER_PAGE || '100'),
-    maxChatMessagesPerPage: parseInt(process.env.VITE_MAX_CHAT_MESSAGES_PER_PAGE || '100')
+    maxDocumentsPerPage: parseInt(import.meta.env.VITE_MAX_DOCUMENTS_PER_PAGE || '50'),
+    maxMeetingsPerPage: parseInt(import.meta.env.VITE_MAX_MEETINGS_PER_PAGE || '100'),
+    maxChatMessagesPerPage: parseInt(import.meta.env.VITE_MAX_CHAT_MESSAGES_PER_PAGE || '100')
   }
 };
 

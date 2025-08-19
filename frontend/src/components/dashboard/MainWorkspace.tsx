@@ -5,7 +5,7 @@ import QuickActions from './QuickActions';
 import DataFeed from './DataFeed';
 import FeedItemDetail from './FeedItemDetail';
 import ProjectDashboard from '@/pages/project';
-import PythonBackendIntegrationTest from '@/components/PythonBackendIntegrationTest';
+
 
 const MainWorkspace = ({ 
   activeProjectId, 
@@ -59,7 +59,7 @@ const MainWorkspace = ({
             </p>
           </div>
           <StatsGrid />
-          <PythonBackendIntegrationTest />
+
           {/* <QuickActions /> */}
         </div>
       </div>

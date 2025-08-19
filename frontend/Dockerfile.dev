@@ -1,0 +1,22 @@
+# Development Dockerfile for BeSunny.ai Frontend
+# Optimized for local development with hot reloading
+
+FROM node:18-alpine
+
+# Set work directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci
+
+# Copy source code
+COPY . .
+
+# Expose port
+EXPOSE 3000
+
+# Start development server with hot reloading
+CMD ["npm", "run", "dev"]

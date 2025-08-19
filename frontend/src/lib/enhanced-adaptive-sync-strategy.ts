@@ -567,7 +567,7 @@ class EnhancedAdaptiveSyncStrategy {
 
       const { data: gmailWatch, error: gmailWatchError } = await supabase
         .from('gmail_watches')
-        .select('user_email')
+        .select('id, is_active, expiration, history_id')
         .eq('user_email', user.email)
         .eq('is_active', true)
         .single();

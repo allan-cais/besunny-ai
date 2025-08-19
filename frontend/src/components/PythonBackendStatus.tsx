@@ -24,56 +24,56 @@ interface PythonBackendStatusProps {
 }
 
 export function PythonBackendStatus({ showDetails = false, className = '' }: PythonBackendStatusProps) {
-  const { status, checkConnection, isFeatureEnabled } = usePythonBackend();
+  const { isConnected, isEnabled, error, checkConnection } = usePythonBackend();
 
   const getStatusIcon = () => {
-    if (!status.isEnabled) {
+    if (!isEnabled) {
       return <Settings className="h-4 w-4" />;
     }
-    if (status.isConnected) {
+    if (isConnected) {
       return <CheckCircle className="h-4 w-4" />;
     }
-    if (status.error) {
+    if (error) {
       return <XCircle className="h-4 w-4" />;
     }
     return <AlertCircle className="h-4 w-4" />;
   };
 
   const getStatusColor = () => {
-    if (!status.isEnabled) {
+    if (!isEnabled) {
       return 'bg-gray-100 text-gray-800 hover:bg-gray-100';
     }
-    if (status.isConnected) {
+    if (isConnected) {
       return 'bg-green-100 text-green-800 hover:bg-green-100';
     }
-    if (status.error) {
+    if (error) {
       return 'bg-red-100 text-red-800 hover:bg-red-100';
     }
     return 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100';
   };
 
   const getStatusText = () => {
-    if (!status.isEnabled) {
+    if (!isEnabled) {
       return 'Disabled';
     }
-    if (status.isConnected) {
+    if (isConnected) {
       return 'Connected';
     }
-    if (status.error) {
+    if (error) {
       return 'Error';
     }
     return 'Checking...';
   };
 
   const getStatusDescription = () => {
-    if (!status.isEnabled) {
+    if (!isEnabled) {
       return 'Python backend is disabled in configuration';
     }
-    if (status.isConnected) {
+    if (isConnected) {
       return 'Python backend is available and ready';
     }
-    if (status.error) {
-      return status.error;
+    if (error) {
+      return error;
     }
     return 'Checking Python backend availability...';
   };
@@ -122,7 +122,7 @@ export function PythonBackendStatus({ showDetails = false, className = '' }: Pyt
             variant="outline"
             size="sm"
             onClick={handleRefresh}
-            disabled={!status.isEnabled}
+            disabled={!isEnabled}
           >
             <RefreshCw className="h-3 w-3 mr-1" />
             Refresh
@@ -135,65 +135,65 @@ export function PythonBackendStatus({ showDetails = false, className = '' }: Pyt
         </p>
 
         {/* Feature Status */}
-        {status.isEnabled && (
+        {isEnabled && (
           <div className="space-y-2">
             <h4 className="text-sm font-medium">Service Status</h4>
             <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="flex items-center gap-2">
-                <Wifi className={`h-3 w-3 ${isFeatureEnabled('calendar') ? 'text-green-600' : 'text-gray-400'}`} />
-                <span>Calendar</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Wifi className={`h-3 w-3 ${isFeatureEnabled('documents') ? 'text-green-600' : 'text-gray-400'}`} />
-                <span>Documents</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Wifi className={`h-3 w-3 ${isFeatureEnabled('projects') ? 'text-green-600' : 'text-gray-400'}`} />
-                <span>Projects</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Wifi className={`h-3 w-3 ${isFeatureEnabled('drive') ? 'text-green-600' : 'text-gray-400'}`} />
-                <span>Drive</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Wifi className={`h-3 w-3 ${isFeatureEnabled('emails') ? 'text-green-600' : 'text-gray-400'}`} />
-                <span>Emails</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Wifi className={`h-3 w-3 ${isFeatureEnabled('classification') ? 'text-green-600' : 'text-gray-400'}`} />
-                <span>AI Classification</span>
-              </div>
+                              <div className="flex items-center gap-2">
+                  <Wifi className={`h-3 w-3 ${features.isPythonBackendEnabled() ? 'text-green-600' : 'text-gray-400'}`} />
+                  <span>Calendar</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Wifi className={`h-3 w-3 ${features.isPythonBackendEnabled() ? 'text-green-600' : 'text-gray-400'}`} />
+                  <span>Documents</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Wifi className={`h-3 w-3 ${features.isPythonBackendEnabled() ? 'text-green-600' : 'text-gray-400'}`} />
+                  <span>Projects</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Wifi className={`h-3 w-3 ${features.isPythonBackendEnabled() ? 'text-green-600' : 'text-gray-400'}`} />
+                  <span>Drive</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Wifi className={`h-3 w-3 ${features.isPythonBackendEnabled() ? 'text-green-600' : 'text-gray-400'}`} />
+                  <span>Emails</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Wifi className={`h-3 w-3 ${features.isPythonBackendEnabled() ? 'text-green-600' : 'text-gray-400'}`} />
+                  <span>AI Classification</span>
+                </div>
             </div>
           </div>
         )}
 
         {/* Connection Details */}
-        {status.isEnabled && (
+        {isEnabled && (
           <div className="space-y-2">
             <h4 className="text-sm font-medium">Connection Details</h4>
             <div className="text-xs space-y-1 text-muted-foreground">
               <div className="flex justify-between">
                 <span>Enabled:</span>
-                <span className={status.isEnabled ? 'text-green-600' : 'text-red-600'}>
-                  {status.isEnabled ? 'Yes' : 'No'}
+                <span className={isEnabled ? 'text-green-600' : 'text-red-600'}>
+                  {isEnabled ? 'Yes' : 'No'}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span>Available:</span>
-                <span className={status.isAvailable ? 'text-green-600' : 'text-red-600'}>
-                  {status.isAvailable ? 'Yes' : 'No'}
+                <span className={isConnected ? 'text-green-600' : 'text-red-600'}>
+                  {isConnected ? 'Yes' : 'No'}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span>Connected:</span>
-                <span className={status.isConnected ? 'text-green-600' : 'text-red-600'}>
-                  {status.isConnected ? 'Yes' : 'No'}
+                <span className={isConnected ? 'text-green-600' : 'text-red-600'}>
+                  {isConnected ? 'Yes' : 'No'}
                 </span>
               </div>
-              {status.lastCheck && (
+              {error && (
                 <div className="flex justify-between">
                   <span>Last Check:</span>
-                  <span>{status.lastCheck.toLocaleTimeString()}</span>
+                  <span>{new Date().toLocaleTimeString()}</span>
                 </div>
               )}
             </div>
@@ -201,11 +201,11 @@ export function PythonBackendStatus({ showDetails = false, className = '' }: Pyt
         )}
 
         {/* Error Details */}
-        {status.error && (
+        {error && (
           <div className="space-y-2">
             <h4 className="text-sm font-medium text-red-600">Error Details</h4>
             <p className="text-xs text-red-600 bg-red-50 p-2 rounded">
-              {status.error}
+              {error}
             </p>
           </div>
         )}

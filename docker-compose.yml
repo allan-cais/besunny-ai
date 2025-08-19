@@ -1,0 +1,87 @@
+services:
+  # Backend service
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - HOST=0.0.0.0
+      - PORT=8000
+      - PYTHONPATH=/app
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend:/app
+      - /app/__pycache__
+      - /app/.pytest_cache
+    networks:
+      - besunny-network
+    depends_on:
+      - redis
+    command: ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    extra_hosts:
+      - "deb.debian.org:151.101.2.132"
+      - "deb.debian.org:151.101.66.132"
+      - "deb.debian.org:151.101.130.132"
+      - "deb.debian.org:151.101.194.132"
+
+  # Frontend service
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - VITE_API_BASE_URL=http://localhost:8000
+    env_file:
+      - ./frontend/.env
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - besunny-network
+    depends_on:
+      - backend
+    command: ["npm", "run", "dev"]
+
+  # Redis for local development (if you don't have a remote Redis)
+  redis:
+    image: redis:7.2-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - besunny-network
+    command: redis-server --appendonly yes
+
+  # Optional: PostgreSQL for local development (if you want a local DB option)
+  # postgres:
+  #   image: postgres:15-alpine
+  #   environment:
+  #     POSTGRES_DB: besunny_local
+  #     POSTGRES_USER: besunny
+  #     POSTGRES_PASSWORD: besunny123
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   networks:
+  #     - besunny-network
+
+networks:
+  besunny-network:
+    driver: bridge
+
+volumes:
+  redis_data:
+  # postgres_data:
