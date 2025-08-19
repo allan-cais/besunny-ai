@@ -51,13 +51,21 @@ class ProjectOnboardingAIService:
     def __init__(self):
         self.settings = get_settings()
         self.supabase = get_supabase()
-        self.client = AsyncOpenAI(api_key=self.settings.openai_api_key)
+        self.client = None  # Initialize lazily
         self.model = self.settings.openai_model
         
         # Rate limiting semaphore
         self._rate_limit_semaphore = asyncio.Semaphore(3)
         
         logger.info("Project Onboarding AI Service initialized")
+    
+    def _get_client(self):
+        """Get OpenAI client, initializing if needed."""
+        if self.client is None:
+            if not self.settings.openai_api_key:
+                raise ValueError("OpenAI API key not configured")
+            self.client = AsyncOpenAI(api_key=self.settings.openai_api_key)
+        return self.client
     
     async def process_project_onboarding(self, project_id: str, user_id: str, 
                                       summary: Dict[str, Any]) -> Dict[str, Any]:
@@ -185,7 +193,7 @@ class ProjectOnboardingAIService:
                 user_message = self._build_user_message(summary)
                 
                 # Call OpenAI API
-                response = await self.client.chat.completions.create(
+                response = await self._get_client().chat.completions.create(
                     model=self.model,
                     messages=[
                         {"role": "system", "content": system_prompt},

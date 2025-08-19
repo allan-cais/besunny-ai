@@ -67,18 +67,53 @@ class AIOrchestrationService:
     def __init__(self):
         self.settings = get_settings()
         
-        # Initialize AI services
-        self.ai_service = AIService()
-        self.classification_service = ClassificationService()
-        self.enhanced_classification_service = EnhancedClassificationService()
-        self.meeting_intelligence_service = MeetingIntelligenceService()
-        self.embedding_service = EmbeddingService()
+        # Initialize AI services lazily
+        self._ai_service = None
+        self._classification_service = None
+        self._enhanced_classification_service = None
+        self._meeting_intelligence_service = None
+        self._embedding_service = None
         
         self._initialized = False
         self._service_health = {}
         self._workflow_cache = {}
         
         logger.info("AI Orchestration Service initialized")
+    
+    @property
+    def ai_service(self):
+        """Get AI service, initializing if needed."""
+        if self._ai_service is None:
+            self._ai_service = AIService()
+        return self._ai_service
+    
+    @property
+    def classification_service(self):
+        """Get classification service, initializing if needed."""
+        if self._classification_service is None:
+            self._classification_service = ClassificationService()
+        return self._classification_service
+    
+    @property
+    def enhanced_classification_service(self):
+        """Get enhanced classification service, initializing if needed."""
+        if self._enhanced_classification_service is None:
+            self._enhanced_classification_service = EnhancedClassificationService()
+        return self._enhanced_classification_service
+    
+    @property
+    def meeting_intelligence_service(self):
+        """Get meeting intelligence service, initializing if needed."""
+        if self._meeting_intelligence_service is None:
+            self._meeting_intelligence_service = MeetingIntelligenceService()
+        return self._meeting_intelligence_service
+    
+    @property
+    def embedding_service(self):
+        """Get embedding service, initializing if needed."""
+        if self._embedding_service is None:
+            self._embedding_service = EmbeddingService()
+        return self._embedding_service
     
     async def initialize(self):
         """Initialize the AI orchestration service."""

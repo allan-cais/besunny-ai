@@ -46,7 +46,7 @@ class AIService:
     
     def __init__(self):
         self.settings = get_settings()
-        self.client = AsyncOpenAI(api_key=self.settings.openai_api_key)
+        self.client = None  # Initialize lazily
         self.model = self.settings.openai_model
         self.max_tokens = self.settings.openai_max_tokens
         
@@ -54,6 +54,14 @@ class AIService:
         self._rate_limit_semaphore = asyncio.Semaphore(5)
         
         logger.info(f"AI Service initialized with model: {self.model}")
+    
+    def _get_client(self):
+        """Get OpenAI client, initializing if needed."""
+        if self.client is None:
+            if not self.settings.openai_api_key:
+                raise ValueError("OpenAI API key not configured")
+            self.client = AsyncOpenAI(api_key=self.settings.openai_api_key)
+        return self.client
     
     async def classify_document(
         self, 
@@ -78,7 +86,7 @@ class AIService:
             async with self._rate_limit_semaphore:
                 system_prompt = self._build_classification_prompt(project_context, user_preferences)
                 
-                response = await self.client.chat.completions.create(
+                response = await self._get_client().chat.completions.create(
                     model=self.model,
                     messages=[
                         {"role": "system", "content": system_prompt},
@@ -136,7 +144,7 @@ class AIService:
             async with self._rate_limit_semaphore:
                 system_prompt = self._build_analysis_prompt(analysis_type)
                 
-                response = await self.client.chat.completions.create(
+                response = await self._get_client().chat.completions.create(
                     model=self.model,
                     messages=[
                         {"role": "system", "content": system_prompt},
@@ -201,7 +209,7 @@ class AIService:
                 Return only the summary text, no additional formatting.
                 """
                 
-                response = await self.client.chat.completions.create(
+                response = await self._get_client().chat.completions.create(
                     model=self.model,
                     messages=[
                         {"role": "system", "content": system_prompt},
@@ -273,7 +281,7 @@ class AIService:
                 }}
                 """
                 
-                response = await self.client.chat.completions.create(
+                response = await self._get_client().chat.completions.create(
                     model=self.model,
                     messages=[
                         {"role": "system", "content": system_prompt},
@@ -460,7 +468,7 @@ class AIService:
                 Consider the meeting type, duration, and context when generating the configuration.
                 """
                 
-                response = await self.client.chat.completions.create(
+                response = await self._get_client().chat.completions.create(
                     model=self.model,
                     messages=[
                         {"role": "system", "content": system_prompt},
@@ -562,7 +570,7 @@ class AIService:
                 }
                 """
                 
-                response = await self.client.chat.completions.create(
+                response = await self._get_client().chat.completions.create(
                     model=self.model,
                     messages=[
                         {"role": "system", "content": system_prompt},
