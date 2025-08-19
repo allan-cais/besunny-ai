@@ -10,14 +10,15 @@ WORKDIR /build
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
+    libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements
 COPY backend-service/requirements.txt .
 
-# Install packages and create wheels
+# Install packages and create wheels (including dependencies)
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip wheel --no-cache-dir --no-deps --wheel-dir /wheels -r requirements.txt
+    pip wheel --no-cache-dir --wheel-dir /wheels -r requirements.txt
 
 # Final stage - use Alpine for smaller image
 FROM python:3.11-alpine
@@ -47,6 +48,7 @@ RUN apk add --no-cache \
     musl-dev \
     libffi-dev \
     build-base \
+    postgresql-dev \
     && rm -rf /var/cache/apk/*
 
 # Copy wheels from builder stage
@@ -55,9 +57,9 @@ COPY --from=builder /wheels /wheels
 # Copy requirements
 COPY backend-service/requirements.txt .
 
-# Install packages from wheels
+# Install packages from wheels, fallback to pip for missing ones
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir --no-index --find-links /wheels -r requirements.txt && \
+    pip install --no-cache-dir --find-links /wheels -r requirements.txt && \
     rm -rf /wheels
 
 # Copy backend code
