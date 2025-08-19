@@ -34,6 +34,14 @@ google-api-python-client>=2.100.0
 # OpenAI (critical for AI services)
 openai>=1.0.0
 
+# Scientific computing and ML (critical for AI services)
+numpy>=1.24.0
+scikit-learn>=1.3.0
+scipy>=1.11.0
+
+# Vector database (critical for embeddings)
+pinecone-client>=2.2.0
+
 # HTTP and networking
 httpx>=0.25.2
 requests>=2.31.0
