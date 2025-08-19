@@ -1,6 +1,25 @@
 # Backend Dockerfile for Railway deployment
-# This runs from the backend/ directory
+# Multi-stage build to avoid compilation issues
 
+# Build stage - use full Python image for building packages
+FROM python:3.11-slim as builder
+
+WORKDIR /build
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements
+COPY backend-service/requirements.txt .
+
+# Install packages and create wheels
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip wheel --no-cache-dir --no-deps --wheel-dir /wheels -r requirements.txt
+
+# Final stage - use Alpine for smaller image
 FROM python:3.11-alpine
 
 # Set environment variables
@@ -12,6 +31,11 @@ ENV HOST=0.0.0.0
 ENV PORT=8000
 ENV PYTHONPATH=/app
 
+# Set Python build environment variables
+ENV PYTHONHASHSEED=random
+ENV PIP_NO_CACHE_DIR=1
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1
+
 # Set work directory
 WORKDIR /app
 
@@ -19,16 +43,22 @@ WORKDIR /app
 RUN apk add --no-cache \
     curl \
     gcc \
+    g++ \
     musl-dev \
     libffi-dev \
+    build-base \
     && rm -rf /var/cache/apk/*
 
-# Copy requirements first for better caching
+# Copy wheels from builder stage
+COPY --from=builder /wheels /wheels
+
+# Copy requirements
 COPY backend-service/requirements.txt .
 
-# Install Python dependencies
+# Install packages from wheels
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir --no-index --find-links /wheels -r requirements.txt && \
+    rm -rf /wheels
 
 # Copy backend code
 COPY . .
