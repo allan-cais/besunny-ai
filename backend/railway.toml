@@ -1,0 +1,17 @@
+# Railway configuration for BeSunny.ai Backend Service
+# This service will be deployed with root directory set to /backend
+
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+
+[build.environment]
+ENVIRONMENT = "production"
+DEBUG = "false"
+HOST = "0.0.0.0"
+PORT = "8000"
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+healthcheckInterval = 30
