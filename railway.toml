@@ -1,0 +1,34 @@
+# Railway configuration for BeSunny.ai Monorepo
+
+# Deploying both frontend and backend services from monorepo structure
+
+# Frontend service
+[[services]]
+name = "besunny-frontend"
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+
+[services.besunny-frontend.build.environment]
+NODE_ENV = "production"
+
+[services.besunny-frontend.deploy]
+healthcheckPath = "/"
+healthcheckTimeout = 300
+healthcheckInterval = 30
+
+# Backend service
+[[services]]
+name = "besunny-backend"
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+
+[services.besunny-backend.build.environment]
+ENVIRONMENT = "production"
+DEBUG = "false"
+HOST = "0.0.0.0"
+PORT = "8000"
+
+[services.besunny-backend.deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+healthcheckInterval = 30
