@@ -1,17 +1,17 @@
 # Railway configuration for BeSunny.ai Full Stack
 # Deploying both frontend and backend services
 
-# Backend service (default)
+# Default service (backend)
 [build]
 builder = "dockerfile"
 dockerfilePath = "docker/Dockerfile.backend"
 
-# Backend environment
 [build.environment]
 ENVIRONMENT = "production"
 DEBUG = "false"
+HOST = "0.0.0.0"
+PORT = "8000"
 
-# Backend deployment
 [deploy]
 healthcheckPath = "/health"
 healthcheckTimeout = 300
