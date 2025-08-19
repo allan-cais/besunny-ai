@@ -24,11 +24,11 @@ RUN apk add --no-cache \
     && rm -rf /var/cache/apk/*
 
 # Copy requirements first for better caching
-COPY requirements-simple.txt .
+COPY backend-service/requirements.txt .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements-simple.txt
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy backend code
 COPY . .

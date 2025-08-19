@@ -27,6 +27,12 @@ class Settings(BaseSettings):
     environment: str = Field(default="production", env="ENVIRONMENT")
     debug: bool = Field(default=False, env="DEBUG")
     
+    # Server settings
+    host: str = Field(default="0.0.0.0", env="HOST")
+    port: int = Field(default=8000, env="PORT")
+    workers: int = Field(default=1, env="WORKERS")
+    log_level: str = Field(default="info", env="LOG_LEVEL")
+    
     # Security
     secret_key: str = Field(default="your-secret-key-here", env="SECRET_KEY")
     algorithm: str = Field(default="HS256", env="ALGORITHM")
@@ -41,6 +47,7 @@ class Settings(BaseSettings):
     
     # Redis
     redis: RedisSettings = RedisSettings()
+    redis_url: str = Field(default="redis://localhost:6379", env="REDIS_URL")
     
     # Supabase
     supabase_url: Optional[str] = Field(default=None, env="SUPABASE_URL")
@@ -64,6 +71,10 @@ class Settings(BaseSettings):
     
     # Health check settings
     health_check_timeout: int = Field(default=5, env="HEALTH_CHECK_TIMEOUT")
+    
+    # Rate limiting settings
+    rate_limit_window: int = Field(default=60, env="RATE_LIMIT_WINDOW")
+    rate_limit_requests: int = Field(default=100, env="RATE_LIMIT_REQUESTS")
     
     class Config:
         env_file = ".env"
