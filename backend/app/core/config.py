@@ -65,6 +65,20 @@ class Settings(BaseSettings):
     google_project_id: Optional[str] = Field(default=None, env="GOOGLE_PROJECT_ID")
     google_login_redirect_uri: Optional[str] = Field(default=None, env="GOOGLE_LOGIN_REDIRECT_URI")
     
+    # Pinecone - vector database
+    pinecone_api_key: Optional[str] = Field(default=None, env="PINECONE_API_KEY")
+    pinecone_environment: Optional[str] = Field(default=None, env="PINECONE_ENVIRONMENT")
+    pinecone_index_name: Optional[str] = Field(default=None, env="PINECONE_INDEX_NAME")
+    
+    # Webhook settings
+    webhook_base_url: str = Field(default="http://localhost:8000", env="WEBHOOK_BASE_URL")
+    n8n_classification_webhook_url: Optional[str] = Field(default=None, env="N8N_CLASSIFICATION_WEBHOOK_URL")
+    n8n_drivesync_webhook_url: Optional[str] = Field(default=None, env="N8N_DRIVESYNC_WEBHOOK_URL")
+    
+    # Attendee service settings
+    attendee_api_base_url: Optional[str] = Field(default=None, env="ATTENDEE_API_BASE_URL")
+    master_attendee_api_key: Optional[str] = Field(default=None, env="MASTER_ATTENDEE_API_KEY")
+    
     # Performance settings
     max_concurrent_requests: int = Field(default=100, env="MAX_CONCURRENT_REQUESTS")
     request_timeout: int = Field(default=30, env="REQUEST_TIMEOUT")
@@ -75,6 +89,13 @@ class Settings(BaseSettings):
     # Rate limiting settings
     rate_limit_window: int = Field(default=60, env="RATE_LIMIT_WINDOW")
     rate_limit_requests: int = Field(default=100, env="RATE_LIMIT_REQUESTS")
+    
+    # Enterprise settings
+    audit_log_retention_days: int = Field(default=90, env="AUDIT_LOG_RETENTION_DAYS")
+    bi_cache_ttl: int = Field(default=3600, env="BI_CACHE_TTL")
+    enable_multi_tenancy: bool = Field(default=True, env="ENABLE_MULTI_TENANCY")
+    max_tenants_per_instance: int = Field(default=1000, env="MAX_TENANTS_PER_INSTANCE")
+    workflow_execution_timeout: int = Field(default=300, env="WORKFLOW_EXECUTION_TIMEOUT")
     
     class Config:
         env_file = ".env"
