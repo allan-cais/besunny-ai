@@ -15,7 +15,7 @@ import structlog
 import os
 from pathlib import Path
 
-from core.config import get_settings, is_development
+from app.core.config import get_settings, is_development
 
 # Configure structured logging
 structlog.configure(
@@ -169,7 +169,7 @@ def create_app() -> FastAPI:
         from .api.v1 import router as api_v1_router
     except ImportError:
         # Fallback for direct execution
-        from api.v1 import router as api_v1_router
+        from app.api.v1 import router as api_v1_router
     app.include_router(api_v1_router, prefix="/api/v1")
     
     # Mount static files if they exist
