@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { pythonBackendServices, BackendHealthStatus, BackendMetrics } from '../lib/python-backend-services';
-import { productionConfig } from '../config/production-config';
+import { config } from '../config';
 
 export interface UsePythonBackendOptions {
   autoConnect?: boolean;
@@ -51,16 +51,17 @@ export function usePythonBackend(options: UsePythonBackendOptions = {}): UsePyth
   const [health, setHealth] = useState<BackendHealthStatus | null>(null);
   const [metrics, setMetrics] = useState<BackendMetrics | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isConfigLoaded, setIsConfigLoaded] = useState(false);
 
   // Refs
   const healthCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isInitializedRef = useRef(false);
 
-  // Check if Python backend is enabled
-  const isEnabled = productionConfig.features.pythonBackend;
+  // Check if Python backend is enabled (wait for config to be loaded)
+  const isEnabled = isConfigLoaded && config.features.enablePythonBackend;
 
-  // Get base URL
-  const baseUrl = productionConfig.backend.baseUrl;
+  // Get base URL (wait for config to be loaded)
+  const baseUrl = isConfigLoaded ? config.pythonBackend.url : '';
 
   // Initialize services
   const initializeServices = useCallback(async () => {
@@ -149,6 +150,29 @@ export function usePythonBackend(options: UsePythonBackendOptions = {}): UsePyth
   // Error handling
   const clearError = useCallback(() => {
     setError(null);
+  }, []);
+
+  // Wait for config to be loaded
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    
+    const checkConfig = () => {
+      // Check if the config has been loaded with runtime values
+      if (config.pythonBackend.url && config.pythonBackend.url !== '') {
+        setIsConfigLoaded(true);
+      } else {
+        // Retry after a short delay
+        timeoutId = setTimeout(checkConfig, 100);
+      }
+    };
+    
+    checkConfig();
+    
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
   }, []);
 
   // Auto-connect effect

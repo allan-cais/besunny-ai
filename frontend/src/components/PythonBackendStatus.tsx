@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { usePythonBackend } from '@/hooks/use-python-backend';
-import { features } from '@/config';
+import { features, config } from '@/config';
 import { 
   CheckCircle, 
   XCircle, 
@@ -28,6 +28,10 @@ export function PythonBackendStatus({ showDetails = false, className = '' }: Pyt
 
   const getStatusIcon = () => {
     if (!isEnabled) {
+      // Check if we're still waiting for config to load
+      if (config.pythonBackend.url === '') {
+        return <RefreshCw className="h-4 w-4 animate-spin" />;
+      }
       return <Settings className="h-4 w-4" />;
     }
     if (isConnected) {
@@ -41,6 +45,10 @@ export function PythonBackendStatus({ showDetails = false, className = '' }: Pyt
 
   const getStatusColor = () => {
     if (!isEnabled) {
+      // Check if we're still waiting for config to load
+      if (config.pythonBackend.url === '') {
+        return 'bg-blue-100 text-blue-800 hover:bg-blue-100';
+      }
       return 'bg-gray-100 text-gray-800 hover:bg-gray-100';
     }
     if (isConnected) {
@@ -54,6 +62,10 @@ export function PythonBackendStatus({ showDetails = false, className = '' }: Pyt
 
   const getStatusText = () => {
     if (!isEnabled) {
+      // Check if we're still waiting for config to load
+      if (config.pythonBackend.url === '') {
+        return 'Loading...';
+      }
       return 'Disabled';
     }
     if (isConnected) {
@@ -67,6 +79,10 @@ export function PythonBackendStatus({ showDetails = false, className = '' }: Pyt
 
   const getStatusDescription = () => {
     if (!isEnabled) {
+      // Check if we're still waiting for config to load
+      if (config.pythonBackend.url === '') {
+        return 'Loading Python backend configuration...';
+      }
       return 'Python backend is disabled in configuration';
     }
     if (isConnected) {
