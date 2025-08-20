@@ -13,7 +13,7 @@ const Header = () => {
     <header className="relative h-[61px] border-b border-[#4a5565] dark:border-zinc-700 bg-stone-100 dark:bg-zinc-800 px-6 flex items-center justify-between flex-shrink-0">
               <h2 className="font-mono text-lg font-bold tracking-tight">sunny.ai</h2>
       <div className="flex items-center space-x-4">
-        <PythonBackendStatus />
+        {/* <PythonBackendStatus /> */}
         <UserAccountMenu />
         <ToggleGroup 
           type="single" 
