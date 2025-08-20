@@ -24,7 +24,6 @@ export const RailwayEnvironmentTest: React.FC = () => {
     
     // Test 2: Check environment variables
     const envCheck = checkRailwayEnvironmentVariables();
-    const isRailway = isRailwayEnvironment();
     
     if (isRailway) {
       // In Railway, missing env vars is expected and normal
