@@ -181,11 +181,42 @@ const IntegrationsPage: React.FC = () => {
       MODE: import.meta.env.MODE
     });
     
-    if (!clientId) {
+    // Check if we're in Railway and try to get runtime config
+    let runtimeClientId = clientId;
+    if (!runtimeClientId && typeof window !== 'undefined') {
+      try {
+        // Try to get from runtime config if available
+        const runtimeConfig = (window as any).__RUNTIME_CONFIG__;
+        if (runtimeConfig?.VITE_GOOGLE_CLIENT_ID) {
+          runtimeClientId = runtimeConfig.VITE_GOOGLE_CLIENT_ID;
+          console.log('Found VITE_GOOGLE_CLIENT_ID in runtime config:', runtimeClientId);
+        }
+        
+        // Also try to fetch from runtime-config.json
+        if (!runtimeClientId) {
+          const response = await fetch('/runtime-config.json');
+          if (response.ok) {
+            const config = await response.json();
+            if (config.VITE_GOOGLE_CLIENT_ID) {
+              runtimeClientId = config.VITE_GOOGLE_CLIENT_ID;
+              console.log('Found VITE_GOOGLE_CLIENT_ID in runtime-config.json:', runtimeClientId);
+            }
+          }
+        }
+      } catch (e) {
+        console.log('No runtime config available:', e);
+      }
+    }
+    
+    if (!runtimeClientId) {
       setError('Google OAuth client ID not configured');
       console.error('Missing VITE_GOOGLE_CLIENT_ID environment variable');
+      console.error('This usually means Railway needs to rebuild the frontend with the environment variables');
       return;
     }
+    
+    // Use the runtime client ID if available
+    const finalClientId = runtimeClientId;
 
     // If user is already connected, disconnect first to clear old tokens
     if (googleStatus?.connected) {
@@ -207,7 +238,7 @@ const IntegrationsPage: React.FC = () => {
     ].join(' ');
 
     const params = new URLSearchParams({
-      client_id: clientId,
+      client_id: finalClientId,
       redirect_uri: redirectUri,
       response_type: 'code',
       scope: scopes,

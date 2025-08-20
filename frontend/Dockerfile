@@ -16,7 +16,17 @@ COPY . .
 
 # Build the application (use production mode by default, but can be overridden)
 ARG BUILD_MODE=production
-RUN npm run build:${BUILD_MODE}
+
+# Pass through all VITE_* environment variables to the build process
+# This is crucial for Railway to inject environment variables during build
+ENV VITE_GOOGLE_CLIENT_ID=${VITE_GOOGLE_CLIENT_ID}
+ENV VITE_PYTHON_BACKEND_URL=${VITE_PYTHON_BACKEND_URL}
+ENV VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+ENV VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+ENV VITE_GOOGLE_REDIRECT_URI=${VITE_GOOGLE_REDIRECT_URI}
+
+# Build with explicit production mode
+RUN npm run build:production
 
 # Clean up to save space
 RUN rm -rf node_modules
