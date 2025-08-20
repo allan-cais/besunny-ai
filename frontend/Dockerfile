@@ -17,22 +17,29 @@ COPY . .
 # Build the application (use production mode by default, but can be overridden)
 ARG BUILD_MODE=production
 
-# Pass through all VITE_* environment variables to the build process
-# This is crucial for Railway to inject environment variables during build
-ENV VITE_GOOGLE_CLIENT_ID=${VITE_GOOGLE_CLIENT_ID}
-ENV VITE_PYTHON_BACKEND_URL=${VITE_PYTHON_BACKEND_URL}
-ENV VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
-ENV VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
-ENV VITE_GOOGLE_REDIRECT_URI=${VITE_GOOGLE_REDIRECT_URI}
+# Accept build arguments for VITE_* environment variables
+# Railway passes these during build time
+ARG VITE_GOOGLE_CLIENT_ID
+ARG VITE_PYTHON_BACKEND_URL
+ARG VITE_SUPABASE_URL
+ARG VITE_SUPABASE_ANON_KEY
+ARG VITE_GOOGLE_REDIRECT_URI
 
-# Debug: Show environment variables during build
-RUN echo "=== BUILD ENVIRONMENT VARIABLES ===" && \
+# Set as environment variables for the build process
+ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
+ENV VITE_PYTHON_BACKEND_URL=$VITE_PYTHON_BACKEND_URL
+ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
+ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
+ENV VITE_GOOGLE_REDIRECT_URI=$VITE_GOOGLE_REDIRECT_URI
+
+# Debug: Show build arguments during build
+RUN echo "=== BUILD ARGUMENTS ===" && \
     echo "VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-NOT_SET}" && \
     echo "VITE_PYTHON_BACKEND_URL: ${VITE_PYTHON_BACKEND_URL:-NOT_SET}" && \
     echo "VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-NOT_SET}" && \
     echo "VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-NOT_SET}" && \
     echo "VITE_GOOGLE_REDIRECT_URI: ${VITE_GOOGLE_REDIRECT_URI:-NOT_SET}" && \
-    echo "=================================="
+    echo "================================"
 
 # Build with explicit production mode
 RUN npm run build:production
