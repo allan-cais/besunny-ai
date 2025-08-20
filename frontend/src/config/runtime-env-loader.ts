@@ -34,6 +34,10 @@ interface RuntimeEnvConfig {
     maxMeetingsPerPage: number;
     maxChatMessagesPerPage: number;
   };
+  debug: {
+    enableEnvLogging: boolean;
+    enableConfigLogging: boolean;
+  };
 }
 
 // Default configuration values
@@ -44,7 +48,7 @@ const defaultConfig: RuntimeEnvConfig = {
     serviceRoleKey: '',
   },
   pythonBackend: {
-    url: 'https://besunny-ai.railway.app',
+    url: 'https://besunny-1.railway.app',
     timeout: 30000,
     retries: 3,
     retryDelay: 1000,
@@ -70,6 +74,10 @@ const defaultConfig: RuntimeEnvConfig = {
     maxMeetingsPerPage: 100,
     maxChatMessagesPerPage: 100,
   },
+  debug: {
+    enableEnvLogging: false,
+    enableConfigLogging: false,
+  },
 };
 
 // Function to load environment variables from Railway at runtime
@@ -80,11 +88,15 @@ async function loadRuntimeEnvironmentVariables(): Promise<RuntimeEnvConfig> {
                               window.location.hostname !== '127.0.0.1';
     
     if (!isCloudEnvironment) {
-      console.log('🏠 Running locally, using default config');
+      if (import.meta.env.DEV || import.meta.env.VITE_DEBUG_ENV === 'true' || defaultConfig.debug.enableEnvLogging) {
+        console.log('🏠 Running locally, using default config');
+      }
       return defaultConfig;
     }
     
-    console.log('🌐 Running in cloud environment, attempting to load runtime config');
+    if (import.meta.env.DEV || import.meta.env.VITE_DEBUG_ENV === 'true' || defaultConfig.debug.enableEnvLogging) {
+      console.log('🌐 Running in cloud environment, attempting to load runtime config');
+    }
     
     // Try to load from a runtime config endpoint (if available)
     // This could be a simple JSON file or API endpoint
@@ -92,15 +104,21 @@ async function loadRuntimeEnvironmentVariables(): Promise<RuntimeEnvConfig> {
       const response = await fetch('/runtime-config.json');
       if (response.ok) {
         const runtimeConfig = await response.json();
-        console.log('✅ Loaded runtime configuration');
+        if (import.meta.env.DEV || import.meta.env.VITE_DEBUG_ENV === 'true' || runtimeConfig.debug?.enableEnvLogging) {
+          console.log('✅ Loaded runtime configuration');
+        }
         return { ...defaultConfig, ...runtimeConfig };
       }
     } catch (error) {
-      console.log('⚠️ No runtime config file found, using defaults');
+      if (import.meta.env.DEV || import.meta.env.VITE_DEBUG_ENV === 'true' || defaultConfig.debug.enableEnvLogging) {
+        console.log('⚠️ No runtime config file found, using defaults');
+      }
     }
     
     // For now, use the default config but log that we're in production
-    console.log('🚂 Using Railway production configuration');
+    if (import.meta.env.DEV || import.meta.env.VITE_DEBUG_ENV === 'true' || defaultConfig.debug.enableEnvLogging) {
+      console.log('🚂 Using Railway production configuration');
+    }
     return defaultConfig;
     
   } catch (error) {

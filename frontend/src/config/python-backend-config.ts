@@ -86,8 +86,9 @@ if (!config.baseUrl) {
   const isCloudEnvironment = isRailwayEnvironment();
   
   if (isCloudEnvironment) {
-    console.error('❌ Python backend URL not configured in cloud environment');
-    console.error('Please ensure VITE_PYTHON_BACKEND_URL is set in Railway dashboard');
+    // In cloud environment, use the runtime config default
+    config.baseUrl = 'https://besunny-ai.railway.app';
+    console.log('🚂 Using Railway Python backend URL:', config.baseUrl);
   } else {
     console.warn('Python backend URL not configured. Using fallback URL.');
     config.baseUrl = 'http://localhost:8000';

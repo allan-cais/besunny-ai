@@ -5,7 +5,7 @@
     "serviceRoleKey": ""
   },
   "pythonBackend": {
-    "url": "https://besunny-ai.railway.app",
+    "url": "https://besunny-1.railway.app",
     "timeout": 30000,
     "retries": 3,
     "retryDelay": 1000
@@ -20,6 +20,10 @@
     "enableAnalytics": false,
     "enableErrorReporting": false,
     "enablePythonBackend": true
+  },
+  "debug": {
+    "enableEnvLogging": false,
+    "enableConfigLogging": false
   },
   "polling": {
     "defaultIntervalMs": 30000,

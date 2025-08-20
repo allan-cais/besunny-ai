@@ -37,13 +37,20 @@ interface Config {
     maxMeetingsPerPage: number;
     maxChatMessagesPerPage: number;
   };
+  debug?: {
+    enableEnvLogging: boolean;
+    enableConfigLogging: boolean;
+  };
 }
 
 // Environment variable validation with better error handling
 function getRequiredEnvVar(name: string): string {
   const value = import.meta.env[name];
   if (!value) {
-    console.warn(`⚠️ Missing required environment variable: ${name}`);
+    // Only log warnings in development or when explicitly debugging
+    if (import.meta.env.DEV || import.meta.env.VITE_DEBUG_ENV === 'true') {
+      console.warn(`⚠️ Missing required environment variable: ${name}`);
+    }
     // Don't return placeholder values - let the app fail gracefully
     // This allows Railway's environment variables to be loaded properly
     return '';
@@ -54,7 +61,10 @@ function getRequiredEnvVar(name: string): string {
 function getOptionalEnvVar(name: string, defaultValue: string = ''): string {
   const value = import.meta.env[name];
   if (!value) {
-    console.warn(`⚠️ Missing optional environment variable: ${name}, using default: ${defaultValue}`);
+    // Only log warnings in development or when explicitly debugging
+    if (import.meta.env.DEV || import.meta.env.VITE_DEBUG_ENV === 'true') {
+      console.warn(`⚠️ Missing optional environment variable: ${name}, using default: ${defaultValue}`);
+    }
   }
   return value || defaultValue;
 }
@@ -62,7 +72,10 @@ function getOptionalEnvVar(name: string, defaultValue: string = ''): string {
 function getOptionalNumberEnvVar(name: string, defaultValue: number): number {
   const value = import.meta.env[name];
   if (!value) {
-    console.warn(`⚠️ Missing optional environment variable: ${name}, using default: ${defaultValue}`);
+    // Only log warnings in development or when explicitly debugging
+    if (import.meta.env.DEV || import.meta.env.VITE_DEBUG_ENV === 'true') {
+      console.warn(`⚠️ Missing optional environment variable: ${name}, using default: ${defaultValue}`);
+    }
     return defaultValue;
   }
   const parsed = parseInt(value);
@@ -107,21 +120,27 @@ export const config: Config = {
     maxMeetingsPerPage: getOptionalNumberEnvVar('VITE_MAX_MEETINGS_PER_PAGE', runtimeConfig.limits.maxMeetingsPerPage),
     maxChatMessagesPerPage: getOptionalNumberEnvVar('VITE_MAX_CHAT_MESSAGES_PER_PAGE', runtimeConfig.limits.maxChatMessagesPerPage),
   },
+  debug: {
+    enableEnvLogging: runtimeConfig.debug.enableEnvLogging,
+    enableConfigLogging: runtimeConfig.debug.enableConfigLogging,
+  },
 };
 
 // Debug logging for staging troubleshooting
-console.log('🔧 Configuration loaded:', {
-  mode: import.meta.env.MODE,
-  dev: import.meta.env.DEV,
-  prod: import.meta.env.PROD,
-  appEnv: import.meta.env.VITE_APP_ENV,
-  supabaseUrl: config.supabase.url,
-  pythonBackendUrl: config.pythonBackend.url,
-  enablePythonBackend: config.features.enablePythonBackend,
-  enableDebugMode: config.features.enableDebugMode,
-  // Log all available environment variables for debugging
-  availableEnvVars: Object.keys(import.meta.env).filter(key => key.startsWith('VITE_')),
-});
+if (import.meta.env.DEV || import.meta.env.VITE_DEBUG_ENV === 'true') {
+  console.log('🔧 Configuration loaded:', {
+    mode: import.meta.env.MODE,
+    dev: import.meta.env.DEV,
+    prod: import.meta.env.PROD,
+    appEnv: import.meta.env.VITE_APP_ENV,
+    supabaseUrl: config.supabase.url,
+    pythonBackendUrl: config.pythonBackend.url,
+    enablePythonBackend: config.features.enablePythonBackend,
+    enableDebugMode: config.features.enableDebugMode,
+    // Log all available environment variables for debugging
+    availableEnvVars: Object.keys(import.meta.env).filter(key => key.startsWith('VITE_')),
+  });
+}
 
 // API endpoint builders with safe fallbacks
 export const apiEndpoints = {
@@ -153,8 +172,8 @@ export function validateConfig(): void {
     // Validate required Supabase configuration
     if (!config.supabase.url || !config.supabase.anonKey) {
       if (isCloudEnvironment) {
-        console.error('❌ Missing required Supabase configuration in cloud environment');
-        console.error('Please ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set in Railway dashboard');
+        // In cloud environment, this should not happen with runtime config
+        console.warn('⚠️ Supabase configuration incomplete, but runtime config should handle this');
       } else {
         console.warn('⚠️ Invalid Supabase configuration - using fallbacks');
       }
@@ -167,8 +186,8 @@ export function validateConfig(): void {
         new URL(config.pythonBackend.url);
       } catch {
         if (isCloudEnvironment) {
-          console.error('❌ Invalid Python backend URL in cloud environment');
-          console.error('Please ensure VITE_PYTHON_BACKEND_URL is set correctly in Railway dashboard');
+          // In cloud environment, this should not happen with runtime config
+          console.warn('⚠️ Python backend URL format issue, but runtime config should handle this');
         } else {
           console.warn('⚠️ Invalid Python backend URL format - using fallback');
         }
@@ -195,7 +214,10 @@ export function validateConfig(): void {
       return;
     }
 
-    console.log('✅ Configuration validation passed');
+    // Only log success in development or when debugging
+    if (import.meta.env.DEV || import.meta.env.VITE_DEBUG_ENV === 'true' || config.debug?.enableConfigLogging) {
+      console.log('✅ Configuration validation passed');
+    }
 
   } catch (error) {
     console.error('❌ Configuration validation failed:', error);
@@ -376,8 +398,10 @@ export async function updateConfigFromRuntime(): Promise<void> {
     Object.assign(config.polling, runtimeConfig.polling);
     Object.assign(config.limits, runtimeConfig.limits);
     
-    console.log('✅ Configuration updated from runtime');
-    console.log('🔧 Updated config:', config);
+    if (import.meta.env.DEV || import.meta.env.VITE_DEBUG_ENV === 'true') {
+      console.log('✅ Configuration updated from runtime');
+      console.log('🔧 Updated config:', config);
+    }
     
   } catch (error) {
     console.error('❌ Failed to update configuration from runtime:', error);
