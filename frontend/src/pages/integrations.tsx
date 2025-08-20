@@ -173,8 +173,17 @@ const IntegrationsPage: React.FC = () => {
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
     const redirectUri = `${window.location.origin}/integrations`;
     
+    // Debug logging
+    console.log('Environment variables check:', {
+      VITE_GOOGLE_CLIENT_ID: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+      VITE_PYTHON_BACKEND_URL: import.meta.env.VITE_PYTHON_BACKEND_URL,
+      NODE_ENV: import.meta.env.NODE_ENV,
+      MODE: import.meta.env.MODE
+    });
+    
     if (!clientId) {
       setError('Google OAuth client ID not configured');
+      console.error('Missing VITE_GOOGLE_CLIENT_ID environment variable');
       return;
     }
 
