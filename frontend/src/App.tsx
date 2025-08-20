@@ -98,8 +98,8 @@ const App = () => {
           </BrowserRouter>
           
           {/* Temporary debug component for staging troubleshooting */}
-          <EnvironmentDebug show={true} />
-          <RailwayEnvironmentTest />
+          {/* <EnvironmentDebug show={true} /> */}
+          {/* <RailwayEnvironmentTest /> */}
         </TooltipProvider>
       </ThemeProvider>
     </AuthProvider>
