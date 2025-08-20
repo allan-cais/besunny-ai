@@ -19,7 +19,7 @@ export default defineConfig(({ command, mode }) => ({
       output: {
         manualChunks: {
           vendor: ["react", "react-dom"],
-          ui: ["@radix-ui/react-dashboard-menu", "@radix-ui/react-dropdown-menu", "@radix-ui/react-select"],
+          ui: ["@radix-ui/react-dialog", "@radix-ui/react-dropdown-menu", "@radix-ui/react-select"],
         },
       },
     },
