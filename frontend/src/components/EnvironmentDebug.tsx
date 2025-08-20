@@ -9,19 +9,19 @@ interface EnvironmentDebugProps {
 export const EnvironmentDebug: React.FC<EnvironmentDebugProps> = ({ show = false }) => {
   // Call Railway debugging function when component mounts
   useEffect(() => {
-    debugRailwayEnvironment();
-    
-    // Check Railway environment variables
-    const envCheck = checkRailwayEnvironmentVariables();
-    if (!envCheck.isLoaded) {
-      console.error('❌ Railway environment variables not fully loaded:', {
-        missing: envCheck.missing,
-        loaded: envCheck.loaded
-      });
+    // Only run debug functions if debug is enabled
+    if (import.meta.env.DEV || import.meta.env.VITE_DEBUG_ENV === 'true') {
+      debugRailwayEnvironment();
+      
+      // Check Railway environment variables
+      const envCheck = checkRailwayEnvironmentVariables();
+      if (!envCheck.isLoaded) {
+        console.log('ℹ️ Railway environment variables using runtime config (expected behavior)');
+      }
+      
+      // Test Railway environment variable loading
+      testRailwayEnvironmentVariables();
     }
-    
-    // Test Railway environment variable loading
-    testRailwayEnvironmentVariables();
   }, []);
 
   if (!show && import.meta.env.PROD) {

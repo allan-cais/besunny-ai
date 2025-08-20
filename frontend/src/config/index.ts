@@ -280,27 +280,30 @@ export function debugRailwayEnvironment(): void {
                             window.location.hostname !== '127.0.0.1';
   
   if (isCloudEnvironment) {
-    console.log('🌐 Running in cloud environment:', window.location.hostname);
-    console.log('🔍 Available VITE_ environment variables:', 
-      Object.keys(import.meta.env).filter(key => key.startsWith('VITE_')));
-    
-    // Check specific required variables
-    const requiredVars = ['VITE_SUPABASE_URL', 'VITE_SUPABASE_ANON_KEY'];
-    requiredVars.forEach(varName => {
-      const value = import.meta.env[varName];
-      if (value) {
-        console.log(`✅ ${varName}: ${value.substring(0, 20)}...`);
+    // Only log if debug is enabled
+    if (import.meta.env.DEV || import.meta.env.VITE_DEBUG_ENV === 'true') {
+      console.log('🌐 Running in cloud environment:', window.location.hostname);
+      console.log('🔍 Available VITE_ environment variables:', 
+        Object.keys(import.meta.env).filter(key => key.startsWith('VITE_')));
+      
+      // Check specific required variables
+      const requiredVars = ['VITE_SUPABASE_URL', 'VITE_SUPABASE_ANON_KEY'];
+      requiredVars.forEach(varName => {
+        const value = import.meta.env[varName];
+        if (value) {
+          console.log(`✅ ${varName}: ${value.substring(0, 20)}...`);
+        } else {
+          console.log(`⚠️ ${varName}: Using runtime config (expected in Railway)`);
+        }
+      });
+      
+      // Check Python backend URL
+      const pythonBackendUrl = import.meta.env.VITE_PYTHON_BACKEND_URL;
+      if (pythonBackendUrl) {
+        console.log(`✅ VITE_PYTHON_BACKEND_URL: ${pythonBackendUrl}`);
       } else {
-        console.error(`❌ ${varName}: NOT SET`);
+        console.log(`⚠️ VITE_PYTHON_BACKEND_URL: Using runtime config (expected in Railway)`);
       }
-    });
-    
-    // Check Python backend URL
-    const pythonBackendUrl = import.meta.env.VITE_PYTHON_BACKEND_URL;
-    if (pythonBackendUrl) {
-      console.log(`✅ VITE_PYTHON_BACKEND_URL: ${pythonBackendUrl}`);
-    } else {
-      console.error(`❌ VITE_PYTHON_BACKEND_URL: NOT SET`);
     }
   }
 }
@@ -341,6 +344,7 @@ export function checkRailwayEnvironmentVariables(): {
     }
   });
   
+  // In Railway/production, we expect these to be missing and use runtime config instead
   const isLoaded = requiredVars.every(varName => 
     import.meta.env[varName]
   );
@@ -350,6 +354,12 @@ export function checkRailwayEnvironmentVariables(): {
 
 // Function to test Railway environment variable loading
 export function testRailwayEnvironmentVariables(): void {
+  // Only run tests if debug is enabled
+  if (!import.meta.env.DEV && import.meta.env.VITE_DEBUG_ENV !== 'true') {
+    console.log('🧪 Railway environment testing disabled. Set VITE_DEBUG_ENV=true to enable.');
+    return;
+  }
+  
   console.log('🧪 Testing Railway environment variables...');
   
   const envCheck = checkRailwayEnvironmentVariables();
@@ -377,7 +387,7 @@ export function testRailwayEnvironmentVariables(): void {
       if (value) {
         console.log(`✅ ${varName}: ${value.substring(0, 50)}...`);
       } else {
-        console.error(`❌ ${varName}: NOT SET`);
+        console.log(`⚠️ ${varName}: Using runtime config (expected in Railway)`);
       }
     });
   } else {
