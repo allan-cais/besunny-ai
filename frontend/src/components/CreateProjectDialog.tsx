@@ -388,11 +388,11 @@ const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
       try {
         const aiResult = await processProjectOnboarding(webhookPayload);
         if (!aiResult.success) {
-          console.warn('AI processing failed:', aiResult.error);
+  
         }
       } catch (aiError) {
         // Don't throw error - AI processing is optional for project creation
-        console.warn('AI processing error:', aiError);
+
       }
 
       // Show success toast

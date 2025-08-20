@@ -68,7 +68,7 @@ export const validateStagingConfig = (): boolean => {
 
   for (const value of required) {
     if (!value) {
-      console.error('Missing required staging configuration:', value);
+  
       return false;
     }
   }

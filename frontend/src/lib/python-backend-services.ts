@@ -56,7 +56,7 @@ export class PythonBackendServices {
       // Start periodic health monitoring
       this.startHealthMonitoring();
       
-      console.log('Python Backend Services initialized successfully');
+  
     } catch (error) {
       console.error('Failed to initialize Python Backend Services:', error);
       throw error;
@@ -76,7 +76,7 @@ export class PythonBackendServices {
       responseTime: 0,
     };
     
-    console.log('Python Backend Services destroyed');
+
   }
 
   private startHealthMonitoring(): void {
@@ -85,7 +85,7 @@ export class PythonBackendServices {
       try {
         await this.checkHealth();
       } catch (error) {
-        console.warn('Health check failed:', error);
+
       }
     }, 30000);
   }

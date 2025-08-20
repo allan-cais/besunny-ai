@@ -88,9 +88,9 @@ if (!config.baseUrl) {
   if (isCloudEnvironment) {
     // In cloud environment, use the runtime config default
     config.baseUrl = 'https://besunny-ai.railway.app';
-    console.log('🚂 Using Railway Python backend URL:', config.baseUrl);
+
   } else {
-    console.warn('Python backend URL not configured. Using fallback URL.');
+
     config.baseUrl = 'http://localhost:8000';
   }
 }
@@ -139,7 +139,7 @@ export const validateConfig = (): boolean => {
   }
   
   if (errors.length > 0) {
-    console.error('Configuration validation failed:', errors);
+
     return false;
   }
   
@@ -164,7 +164,7 @@ export const resetConfig = (): void => {
 
 // Log configuration (only in development)
 if (isDevelopment) {
-  console.log('Python Backend Configuration:', {
+  
     ...config,
     environment: environmentInfo,
   });

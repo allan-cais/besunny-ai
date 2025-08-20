@@ -123,7 +123,7 @@ export class DefaultErrorHandler implements ErrorHandler {
     if (logLevel === 'error') {
       console.error(logMessage);
     } else if (logLevel === 'warn') {
-      console.warn(logMessage);
+      
     } else if (logLevel === 'info') {
       // Use console.info for informational messages
       console.info(logMessage);
@@ -134,7 +134,7 @@ export class DefaultErrorHandler implements ErrorHandler {
     // Operational errors are expected and can be handled gracefully
     // They don't indicate a bug in the code
     if (features.isDebugMode()) {
-      console.log('Operational error handled:', error.message);
+      
     }
   }
 

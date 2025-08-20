@@ -109,7 +109,7 @@ export const apiKeyService = {
     
     // Note: Bot updates are now handled through the attendee service
     // This functionality may need to be implemented in the Python backend
-    console.warn('Bot updates are not yet implemented in the Python backend. Please use the attendee service directly.');
+    
     
     // For now, return a placeholder response
     return {
@@ -125,7 +125,7 @@ export const apiKeyService = {
     
     // Note: Bot deletion is now handled through the attendee service
     // This functionality may need to be implemented in the Python backend
-    console.warn('Bot deletion is not yet implemented in the Python backend. Please use the attendee service directly.');
+    
     
     // For now, return a placeholder response
     return {
@@ -226,7 +226,7 @@ export const apiKeyService = {
     
     // Note: Speech output is not yet implemented in the Python backend
     // This functionality may need to be implemented or integrated with external services
-    console.warn('Speech output is not yet implemented in the Python backend.');
+    
     
     // For now, return a placeholder response
     return {
@@ -242,7 +242,7 @@ export const apiKeyService = {
     
     // Note: Audio output is not yet implemented in the Python backend
     // This functionality may need to be implemented or integrated with external services
-    console.warn('Audio output is not yet implemented in the Python backend.');
+    
     
     // For now, return a placeholder response
     return {
@@ -258,7 +258,7 @@ export const apiKeyService = {
     
     // Note: Image output is not yet implemented in the Python backend
     // This functionality may need to be implemented or integrated with external services
-    console.warn('Image output is not yet implemented in the Python backend.');
+    
     
     // For now, return a placeholder response
     return {
@@ -274,7 +274,7 @@ export const apiKeyService = {
     
     // Note: Video output is not yet implemented in the Python backend
     // This functionality may need to be implemented or integrated with external services
-    console.warn('Video output is not yet implemented in the Python backend.');
+    
     
     // For now, return a placeholder response
     return {
@@ -365,7 +365,7 @@ export const apiKeyService = {
     if (!session) throw new Error('Not authenticated');
     // Note: Recording URL retrieval is not yet implemented in the Python backend
     // This functionality may need to be implemented or integrated with external services
-    console.warn('Recording URL retrieval is not yet implemented in the Python backend.');
+    
     
     // For now, return a placeholder response
     return {
@@ -380,7 +380,7 @@ export const apiKeyService = {
     if (!session) throw new Error('Not authenticated');
     // Note: Leave meeting functionality is not yet implemented in the Python backend
     // This functionality may need to be implemented or integrated with external services
-    console.warn('Leave meeting functionality is not yet implemented in the Python backend.');
+    
     
     // For now, return a placeholder response
     return {
@@ -395,7 +395,7 @@ export const apiKeyService = {
     if (!session) throw new Error('Not authenticated');
     // Note: Bot data deletion is not yet implemented in the Python backend
     // This functionality may need to be implemented or integrated with external services
-    console.warn('Bot data deletion is not yet implemented in the Python backend.');
+    
     
     // For now, return a placeholder response
     return {
@@ -410,7 +410,7 @@ export const apiKeyService = {
     if (!session) throw new Error('Not authenticated');
     // Note: API key testing is not yet implemented in the Python backend
     // This functionality may need to be implemented or integrated with external services
-    console.warn('API key testing is not yet implemented in the Python backend.');
+    
     
     // For now, return a placeholder response
     return false;

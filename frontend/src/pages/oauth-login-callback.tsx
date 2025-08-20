@@ -101,7 +101,7 @@ const OAuthLoginCallback: React.FC = () => {
               }
             }
           } catch (serviceError) {
-            console.warn('Service setup failed:', serviceError);
+    
             setMessage('Authentication successful! Some services may need manual setup. Redirecting...');
           }
 

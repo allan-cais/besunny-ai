@@ -32,15 +32,6 @@ ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
 ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
 ENV VITE_GOOGLE_REDIRECT_URI=$VITE_GOOGLE_REDIRECT_URI
 
-# Debug: Show build arguments during build
-RUN echo "=== BUILD ARGUMENTS ===" && \
-    echo "VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-NOT_SET}" && \
-    echo "VITE_PYTHON_BACKEND_URL: ${VITE_PYTHON_BACKEND_URL:-NOT_SET}" && \
-    echo "VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-NOT_SET}" && \
-    echo "VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-NOT_SET}" && \
-    echo "VITE_GOOGLE_REDIRECT_URI: ${VITE_GOOGLE_REDIRECT_URI:-NOT_SET}" && \
-    echo "================================"
-
 # Build with explicit production mode
 RUN npm run build:production
 

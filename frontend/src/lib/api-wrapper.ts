@@ -200,7 +200,6 @@ export class SupabaseApiWrapper extends ApiWrapper {
     data?: any,
     options?: Omit<ApiCallOptions, 'method' | 'body'>
   ): Promise<ApiResponse<T>> {
-    console.warn(`Supabase Edge Function ${functionName} has been migrated to Python backend. Please update your code to use the appropriate Python backend endpoint.`);
     throw new Error(`Supabase Edge Function ${functionName} has been migrated to Python backend. Please update your code to use the appropriate Python backend endpoint.`);
   }
 
@@ -211,7 +210,6 @@ export class SupabaseApiWrapper extends ApiWrapper {
     data?: any,
     options?: Omit<ApiCallOptions, 'method' | 'body' | 'headers'>
   ): Promise<ApiResponse<T>> {
-    console.warn(`Supabase Edge Function ${functionName} has been migrated to Python backend. Please update your code to use the appropriate Python backend endpoint.`);
     throw new Error(`Supabase Edge Function ${functionName} has been migrated to Python backend. Please update your code to use the appropriate Python backend endpoint.`);
   }
 }

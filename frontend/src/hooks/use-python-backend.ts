@@ -95,7 +95,7 @@ export function usePythonBackend(options: UsePythonBackendOptions = {}): UsePyth
       setError(healthStatus.error || null);
       
       if (healthStatus.isConnected && healthStatus.isHealthy) {
-        console.log('Python backend connected successfully');
+
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Connection failed';
@@ -120,7 +120,7 @@ export function usePythonBackend(options: UsePythonBackendOptions = {}): UsePyth
       healthCheckIntervalRef.current = null;
     }
     
-    console.log('Python backend disconnected');
+    
   }, []);
 
   const checkConnection = useCallback(async () => {

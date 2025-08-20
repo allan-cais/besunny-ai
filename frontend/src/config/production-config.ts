@@ -55,7 +55,7 @@ export const validateConfig = (): boolean => {
 
   for (const value of required) {
     if (!value) {
-      console.error('Missing required configuration:', value);
+  
       return false;
     }
   }

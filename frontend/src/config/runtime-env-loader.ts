@@ -89,13 +89,13 @@ async function loadRuntimeEnvironmentVariables(): Promise<RuntimeEnvConfig> {
     
     if (!isCloudEnvironment) {
       if (import.meta.env.DEV || import.meta.env.VITE_DEBUG_ENV === 'true' || defaultConfig.debug.enableEnvLogging) {
-        console.log('🏠 Running locally, using default config');
+    
       }
       return defaultConfig;
     }
     
     if (import.meta.env.DEV || import.meta.env.VITE_DEBUG_ENV === 'true' || defaultConfig.debug.enableEnvLogging) {
-      console.log('🌐 Running in cloud environment, attempting to load runtime config');
+  
     }
     
     // Try to load from a runtime config endpoint (if available)
@@ -105,25 +105,24 @@ async function loadRuntimeEnvironmentVariables(): Promise<RuntimeEnvConfig> {
       if (response.ok) {
         const runtimeConfig = await response.json();
         if (import.meta.env.DEV || import.meta.env.VITE_DEBUG_ENV === 'true' || runtimeConfig.debug?.enableEnvLogging) {
-          console.log('✅ Loaded runtime configuration');
+  
         }
         return { ...defaultConfig, ...runtimeConfig };
       }
     } catch (error) {
       if (import.meta.env.DEV || import.meta.env.VITE_DEBUG_ENV === 'true' || defaultConfig.debug.enableEnvLogging) {
-        console.log('⚠️ No runtime config file found, using defaults');
+
       }
     }
     
     // For now, use the default config but log that we're in production
     if (import.meta.env.DEV || import.meta.env.VITE_DEBUG_ENV === 'true' || defaultConfig.debug.enableEnvLogging) {
-      console.log('🚂 Using Railway production configuration');
+      
     }
     return defaultConfig;
     
   } catch (error) {
-    console.error('❌ Error loading runtime environment variables:', error);
-    console.log('🔄 Falling back to default configuration');
+    
     return defaultConfig;
   }
 }

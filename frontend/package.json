@@ -23,8 +23,7 @@
     "prod:logs": "cd backend && docker-compose --profile production logs -f",
     "prod:stop": "cd backend && docker-compose --profile production down",
     "prod:scale": "cd backend && docker-compose --profile production up --scale backend=3 --scale celery=2 -d",
-    "test:full": "cd backend && docker-compose --profile production up --build -d && sleep 30 && curl -f http://localhost:8000/health && echo '✅ All services healthy' && docker-compose --profile production down",
-    "debug:env": "node -e \"console.log('Environment variables:'); Object.keys(process.env).filter(k => k.startsWith('VITE_')).forEach(k => console.log(k + ':', process.env[k] ? 'SET' : 'NOT SET'));\""
+
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",

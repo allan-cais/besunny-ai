@@ -49,7 +49,7 @@ function getRequiredEnvVar(name: string): string {
   if (!value) {
     // Only log warnings in development or when explicitly debugging
     if (import.meta.env.DEV || import.meta.env.VITE_DEBUG_ENV === 'true') {
-      console.warn(`⚠️ Missing required environment variable: ${name}`);
+  
     }
     // Don't return placeholder values - let the app fail gracefully
     // This allows Railway's environment variables to be loaded properly
@@ -60,27 +60,16 @@ function getRequiredEnvVar(name: string): string {
 
 function getOptionalEnvVar(name: string, defaultValue: string = ''): string {
   const value = import.meta.env[name];
-  if (!value) {
-    // Only log warnings in development or when explicitly debugging
-    if (import.meta.env.DEV || import.meta.env.VITE_DEBUG_ENV === 'true') {
-      console.warn(`⚠️ Missing optional environment variable: ${name}, using default: ${defaultValue}`);
-    }
-  }
   return value || defaultValue;
 }
 
 function getOptionalNumberEnvVar(name: string, defaultValue: number): number {
   const value = import.meta.env[name];
   if (!value) {
-    // Only log warnings in development or when explicitly debugging
-    if (import.meta.env.DEV || import.meta.env.VITE_DEBUG_ENV === 'true') {
-      console.warn(`⚠️ Missing optional environment variable: ${name}, using default: ${defaultValue}`);
-    }
     return defaultValue;
   }
   const parsed = parseInt(value);
   if (isNaN(parsed)) {
-    console.warn(`⚠️ Invalid number for environment variable: ${name}, using default: ${defaultValue}`);
     return defaultValue;
   }
   return parsed;
@@ -120,27 +109,10 @@ export const config: Config = {
     maxMeetingsPerPage: getOptionalNumberEnvVar('VITE_MAX_MEETINGS_PER_PAGE', runtimeConfig.limits.maxMeetingsPerPage),
     maxChatMessagesPerPage: getOptionalNumberEnvVar('VITE_MAX_CHAT_MESSAGES_PER_PAGE', runtimeConfig.limits.maxChatMessagesPerPage),
   },
-  debug: {
-    enableEnvLogging: runtimeConfig.debug.enableEnvLogging,
-    enableConfigLogging: runtimeConfig.debug.enableConfigLogging,
-  },
+
 };
 
-// Debug logging for staging troubleshooting
-if (import.meta.env.DEV || import.meta.env.VITE_DEBUG_ENV === 'true') {
-  console.log('🔧 Configuration loaded:', {
-    mode: import.meta.env.MODE,
-    dev: import.meta.env.DEV,
-    prod: import.meta.env.PROD,
-    appEnv: import.meta.env.VITE_APP_ENV,
-    supabaseUrl: config.supabase.url,
-    pythonBackendUrl: config.pythonBackend.url,
-    enablePythonBackend: config.features.enablePythonBackend,
-    enableDebugMode: config.features.enableDebugMode,
-    // Log all available environment variables for debugging
-    availableEnvVars: Object.keys(import.meta.env).filter(key => key.startsWith('VITE_')),
-  });
-}
+
 
 // API endpoint builders with safe fallbacks
 export const apiEndpoints = {
@@ -172,12 +144,7 @@ export function validateConfig(): void {
     
     // Validate required Supabase configuration
     if (!config.supabase.url || !config.supabase.anonKey) {
-      if (isCloudEnvironment) {
-        // In cloud environment, this should not happen with runtime config
-        console.warn('⚠️ Supabase configuration incomplete, but runtime config should handle this');
-      } else {
-        console.warn('⚠️ Invalid Supabase configuration - using fallbacks');
-      }
+
       return;
     }
 
@@ -186,12 +153,7 @@ export function validateConfig(): void {
       try {
         new URL(config.pythonBackend.url);
       } catch {
-        if (isCloudEnvironment) {
-          // In cloud environment, this should not happen with runtime config
-          console.warn('⚠️ Python backend URL format issue, but runtime config should handle this');
-        } else {
-          console.warn('⚠️ Invalid Python backend URL format - using fallback');
-        }
+
         return;
       }
     }
@@ -200,28 +162,25 @@ export function validateConfig(): void {
     try {
       new URL(config.supabase.url);
     } catch {
-      console.warn('⚠️ Invalid Supabase URL format - using fallback');
+
       return;
     }
     
     // Validate numeric configurations
     if (config.polling.defaultIntervalMs <= 0) {
-      console.warn('⚠️ Invalid polling interval - using fallback');
+
       return;
     }
     
     if (config.limits.maxDocumentsPerPage <= 0) {
-      console.warn('⚠️ Invalid documents per page limit - using fallback');
+
       return;
     }
 
-    // Only log success in development or when debugging
-    if (import.meta.env.DEV || import.meta.env.VITE_DEBUG_ENV === 'true' || config.debug?.enableConfigLogging) {
-      console.log('✅ Configuration validation passed');
-    }
+
 
   } catch (error) {
-    console.error('❌ Configuration validation failed:', error);
+
     // Don't throw, just log the error
   }
 }
@@ -237,7 +196,7 @@ export const features = {
     try {
       return config.features[feature] || false;
     } catch (error) {
-      console.warn(`⚠️ Error accessing feature flag: ${feature}`, error);
+
       return false;
     }
   },
@@ -245,7 +204,7 @@ export const features = {
     try {
       return config.features.enableDebugMode || false;
     } catch (error) {
-      console.warn('⚠️ Error accessing debug mode', error);
+
       return false;
     }
   },
@@ -253,7 +212,7 @@ export const features = {
     try {
       return config.features.enableAnalytics || false;
     } catch (error) {
-      console.warn('⚠️ Error accessing analytics flag', error);
+
       return false;
     }
   },
@@ -261,7 +220,7 @@ export const features = {
     try {
       return config.features.enableErrorReporting || false;
     } catch (error) {
-      console.warn('⚠️ Error accessing error reporting flag', error);
+
       return false;
     }
   },
@@ -269,45 +228,13 @@ export const features = {
     try {
       return config.features.enablePythonBackend || false;
     } catch (error) {
-      console.warn('⚠️ Error accessing Python backend flag', error);
+
       return false;
     }
   },
 } as const;
 
-// Railway environment debugging helper
-export function debugRailwayEnvironment(): void {
-  const isCloudEnvironment = window.location.hostname !== 'localhost' && 
-                            window.location.hostname !== '127.0.0.1';
-  
-  if (isCloudEnvironment) {
-    // Only log if debug is enabled
-    if (import.meta.env.DEV || import.meta.env.VITE_DEBUG_ENV === 'true') {
-      console.log('🌐 Running in cloud environment:', window.location.hostname);
-      console.log('🔍 Available VITE_ environment variables:', 
-        Object.keys(import.meta.env).filter(key => key.startsWith('VITE_')));
-      
-      // Check specific required variables
-      const requiredVars = ['VITE_SUPABASE_URL', 'VITE_SUPABASE_ANON_KEY'];
-      requiredVars.forEach(varName => {
-        const value = import.meta.env[varName];
-        if (value) {
-          console.log(`✅ ${varName}: ${value.substring(0, 20)}...`);
-        } else {
-          console.log(`⚠️ ${varName}: Using runtime config (expected in Railway)`);
-        }
-      });
-      
-      // Check Python backend URL
-      const pythonBackendUrl = import.meta.env.VITE_PYTHON_BACKEND_URL;
-      if (pythonBackendUrl) {
-        console.log(`✅ VITE_PYTHON_BACKEND_URL: ${pythonBackendUrl}`);
-      } else {
-        console.log(`⚠️ VITE_PYTHON_BACKEND_URL: Using runtime config (expected in Railway)`);
-      }
-    }
-  }
-}
+
 
 // Utility function to check if running in Railway/cloud environment
 export function isRailwayEnvironment(): boolean {
@@ -353,48 +280,7 @@ export function checkRailwayEnvironmentVariables(): {
   return { isLoaded, missing, loaded };
 }
 
-// Function to test Railway environment variable loading
-export function testRailwayEnvironmentVariables(): void {
-  // Only run tests if debug is enabled
-  if (!import.meta.env.DEV && import.meta.env.VITE_DEBUG_ENV !== 'true') {
-    console.log('🧪 Railway environment testing disabled. Set VITE_DEBUG_ENV=true to enable.');
-    return;
-  }
-  
-  console.log('🧪 Testing Railway environment variables...');
-  
-  const envCheck = checkRailwayEnvironmentVariables();
-  console.log('Environment check result:', envCheck);
-  
-  if (isRailwayEnvironment()) {
-    console.log('🌐 Running in Railway/cloud environment');
-    
-    // Log all available environment variables
-    const allEnvVars = Object.keys(import.meta.env);
-    const viteEnvVars = allEnvVars.filter(key => key.startsWith('VITE_'));
-    
-    console.log('All environment variables:', allEnvVars);
-    console.log('VITE_ environment variables:', viteEnvVars);
-    
-    // Test specific variables
-    const testVars = [
-      'VITE_SUPABASE_URL',
-      'VITE_SUPABASE_ANON_KEY',
-      'VITE_PYTHON_BACKEND_URL'
-    ];
-    
-    testVars.forEach(varName => {
-      const value = import.meta.env[varName];
-      if (value) {
-        console.log(`✅ ${varName}: ${value.substring(0, 50)}...`);
-      } else {
-        console.log(`⚠️ ${varName}: Using runtime config (expected in Railway)`);
-      }
-    });
-  } else {
-    console.log('🏠 Running in local environment');
-  }
-}
+
 
 // Function to dynamically update configuration at runtime
 export async function updateConfigFromRuntime(): Promise<void> {
@@ -409,13 +295,10 @@ export async function updateConfigFromRuntime(): Promise<void> {
     Object.assign(config.polling, runtimeConfig.polling);
     Object.assign(config.limits, runtimeConfig.limits);
     
-    if (import.meta.env.DEV || import.meta.env.VITE_DEBUG_ENV === 'true') {
-      console.log('✅ Configuration updated from runtime');
-      console.log('🔧 Updated config:', config);
-    }
+
     
   } catch (error) {
-    console.error('❌ Failed to update configuration from runtime:', error);
+
   }
 }
 
