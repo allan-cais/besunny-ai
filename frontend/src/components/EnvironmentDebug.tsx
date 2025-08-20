@@ -1,5 +1,5 @@
-import React from 'react';
-import { config, features } from '@/config';
+import React, { useEffect } from 'react';
+import { config, features, debugRailwayEnvironment, checkRailwayEnvironmentVariables, testRailwayEnvironmentVariables } from '@/config';
 import { pythonBackendConfig } from '@/config/python-backend-config';
 
 interface EnvironmentDebugProps {
@@ -7,6 +7,23 @@ interface EnvironmentDebugProps {
 }
 
 export const EnvironmentDebug: React.FC<EnvironmentDebugProps> = ({ show = false }) => {
+  // Call Railway debugging function when component mounts
+  useEffect(() => {
+    debugRailwayEnvironment();
+    
+    // Check Railway environment variables
+    const envCheck = checkRailwayEnvironmentVariables();
+    if (!envCheck.isLoaded) {
+      console.error('❌ Railway environment variables not fully loaded:', {
+        missing: envCheck.missing,
+        loaded: envCheck.loaded
+      });
+    }
+    
+    // Test Railway environment variable loading
+    testRailwayEnvironmentVariables();
+  }, []);
+
   if (!show && import.meta.env.PROD) {
     return null;
   }
@@ -50,6 +67,36 @@ export const EnvironmentDebug: React.FC<EnvironmentDebugProps> = ({ show = false
           <div className="ml-2">
             Debug Mode: {features.isDebugMode() ? '✅' : '❌'}
           </div>
+        </div>
+
+        <div className="mt-2">
+          <strong>Railway Environment Variables:</strong>
+          {(() => {
+            const envCheck = checkRailwayEnvironmentVariables();
+            return (
+              <>
+                <div className="ml-2">
+                  Status: {envCheck.isLoaded ? '✅ Loaded' : '❌ Missing Required'}
+                </div>
+                {envCheck.loaded.length > 0 && (
+                  <div className="ml-2">
+                    Loaded: {envCheck.loaded.join(', ')}
+                  </div>
+                )}
+                {envCheck.missing.length > 0 && (
+                  <div className="ml-2 text-red-400">
+                    Missing: {envCheck.missing.join(', ')}
+                  </div>
+                )}
+                <button 
+                  onClick={() => testRailwayEnvironmentVariables()}
+                  className="ml-2 mt-1 px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                >
+                  Test Environment
+                </button>
+              </>
+            );
+          })()}
         </div>
 
         <div className="mt-2">

@@ -14,8 +14,9 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Build the application
-RUN npm run build:production
+# Build the application (use production mode by default, but can be overridden)
+ARG BUILD_MODE=production
+RUN npm run build:${BUILD_MODE}
 
 # Clean up to save space
 RUN rm -rf node_modules

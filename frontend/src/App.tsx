@@ -17,6 +17,7 @@ import ProtectedRoute from "./components/auth/ProtectedRoute";
 import ProjectDashboard from "./pages/project";
 import SettingsPage from "./pages/settings";
 import EnvironmentDebug from "./components/EnvironmentDebug";
+import RailwayEnvironmentTest from "./components/RailwayEnvironmentTest";
 
 const queryClient = new QueryClient();
 
@@ -90,6 +91,7 @@ const App = () => (
           
           {/* Temporary debug component for staging troubleshooting */}
           <EnvironmentDebug show={true} />
+          <RailwayEnvironmentTest />
         </TooltipProvider>
       </ThemeProvider>
     </AuthProvider>

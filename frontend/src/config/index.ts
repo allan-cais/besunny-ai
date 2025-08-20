@@ -1,6 +1,8 @@
 // Configuration Management
 // Centralizes all environment variables and configuration settings
 
+import { stagingConfig } from './staging-config';
+
 interface Config {
   supabase: {
     url: string;
@@ -41,13 +43,8 @@ function getRequiredEnvVar(name: string): string {
   const value = import.meta.env[name];
   if (!value) {
     console.warn(`⚠️ Missing required environment variable: ${name}`);
-    // Return a safe default for staging/production builds
-    if (name === 'VITE_SUPABASE_URL') {
-      return 'https://placeholder.supabase.co';
-    }
-    if (name === 'VITE_SUPABASE_ANON_KEY') {
-      return 'placeholder-key';
-    }
+    // Don't return placeholder values - let the app fail gracefully
+    // This allows Railway's environment variables to be loaded properly
     return '';
   }
   return value;
@@ -121,6 +118,8 @@ console.log('🔧 Configuration loaded:', {
   pythonBackendUrl: config.pythonBackend.url,
   enablePythonBackend: config.features.enablePythonBackend,
   enableDebugMode: config.features.enableDebugMode,
+  // Log all available environment variables for debugging
+  availableEnvVars: Object.keys(import.meta.env).filter(key => key.startsWith('VITE_')),
 });
 
 // API endpoint builders with safe fallbacks
@@ -147,10 +146,18 @@ export const apiEndpoints = {
 // Configuration validation with better error handling
 export function validateConfig(): void {
   try {
+    // Check if we're running in Railway or similar cloud environment
+    const isCloudEnvironment = isRailwayEnvironment();
+    
     // Validate required Supabase configuration
     if (!config.supabase.url || !config.supabase.anonKey) {
-      console.warn('⚠️ Invalid Supabase configuration - using fallbacks');
-      return; // Don't throw, just warn
+      if (isCloudEnvironment) {
+        console.error('❌ Missing required Supabase configuration in cloud environment');
+        console.error('Please ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set in Railway dashboard');
+      } else {
+        console.warn('⚠️ Invalid Supabase configuration - using fallbacks');
+      }
+      return;
     }
 
     // Validate Python backend configuration
@@ -158,7 +165,12 @@ export function validateConfig(): void {
       try {
         new URL(config.pythonBackend.url);
       } catch {
-        console.warn('⚠️ Invalid Python backend URL format - using fallback');
+        if (isCloudEnvironment) {
+          console.error('❌ Invalid Python backend URL in cloud environment');
+          console.error('Please ensure VITE_PYTHON_BACKEND_URL is set correctly in Railway dashboard');
+        } else {
+          console.warn('⚠️ Invalid Python backend URL format - using fallback');
+        }
         return;
       }
     }
@@ -238,6 +250,119 @@ export const features = {
     }
   },
 } as const;
+
+// Railway environment debugging helper
+export function debugRailwayEnvironment(): void {
+  const isCloudEnvironment = window.location.hostname !== 'localhost' && 
+                            window.location.hostname !== '127.0.0.1';
+  
+  if (isCloudEnvironment) {
+    console.log('🌐 Running in cloud environment:', window.location.hostname);
+    console.log('🔍 Available VITE_ environment variables:', 
+      Object.keys(import.meta.env).filter(key => key.startsWith('VITE_')));
+    
+    // Check specific required variables
+    const requiredVars = ['VITE_SUPABASE_URL', 'VITE_SUPABASE_ANON_KEY'];
+    requiredVars.forEach(varName => {
+      const value = import.meta.env[varName];
+      if (value) {
+        console.log(`✅ ${varName}: ${value.substring(0, 20)}...`);
+      } else {
+        console.error(`❌ ${varName}: NOT SET`);
+      }
+    });
+    
+    // Check Python backend URL
+    const pythonBackendUrl = import.meta.env.VITE_PYTHON_BACKEND_URL;
+    if (pythonBackendUrl) {
+      console.log(`✅ VITE_PYTHON_BACKEND_URL: ${pythonBackendUrl}`);
+    } else {
+      console.error(`❌ VITE_PYTHON_BACKEND_URL: NOT SET`);
+    }
+  }
+}
+
+// Utility function to check if running in Railway/cloud environment
+export function isRailwayEnvironment(): boolean {
+  return typeof window !== 'undefined' && 
+         window.location.hostname !== 'localhost' && 
+         window.location.hostname !== '127.0.0.1';
+}
+
+// Function to check if all required Railway environment variables are loaded
+export function checkRailwayEnvironmentVariables(): {
+  isLoaded: boolean;
+  missing: string[];
+  loaded: string[];
+} {
+  const requiredVars = [
+    'VITE_SUPABASE_URL',
+    'VITE_SUPABASE_ANON_KEY'
+  ];
+  
+  const optionalVars = [
+    'VITE_PYTHON_BACKEND_URL',
+    'VITE_SUPABASE_SERVICE_ROLE_KEY',
+    'VITE_OPENAI_API_KEY',
+    'VITE_ANTHROPIC_API_KEY'
+  ];
+  
+  const allVars = [...requiredVars, ...optionalVars];
+  const missing: string[] = [];
+  const loaded: string[] = [];
+  
+  allVars.forEach(varName => {
+    const value = import.meta.env[varName];
+    if (value) {
+      loaded.push(varName);
+    } else {
+      missing.push(varName);
+    }
+  });
+  
+  const isLoaded = requiredVars.every(varName => 
+    import.meta.env[varName]
+  );
+  
+  return { isLoaded, missing, loaded };
+}
+
+// Function to test Railway environment variable loading
+export function testRailwayEnvironmentVariables(): void {
+  console.log('🧪 Testing Railway environment variables...');
+  
+  const envCheck = checkRailwayEnvironmentVariables();
+  console.log('Environment check result:', envCheck);
+  
+  if (isRailwayEnvironment()) {
+    console.log('🌐 Running in Railway/cloud environment');
+    
+    // Log all available environment variables
+    const allEnvVars = Object.keys(import.meta.env);
+    const viteEnvVars = allEnvVars.filter(key => key.startsWith('VITE_'));
+    
+    console.log('All environment variables:', allEnvVars);
+    console.log('VITE_ environment variables:', viteEnvVars);
+    
+    // Test specific variables
+    const testVars = [
+      'VITE_SUPABASE_URL',
+      'VITE_SUPABASE_ANON_KEY',
+      'VITE_PYTHON_BACKEND_URL'
+    ];
+    
+    testVars.forEach(varName => {
+      const value = import.meta.env[varName];
+      if (value) {
+        console.log(`✅ ${varName}: ${value.substring(0, 50)}...`);
+      } else {
+        console.error(`❌ ${varName}: NOT SET`);
+      }
+    });
+  } else {
+    console.log('🏠 Running in local environment');
+  }
+}
 
 // Export configuration for use in components
 export default config;

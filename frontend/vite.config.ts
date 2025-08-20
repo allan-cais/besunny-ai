@@ -19,7 +19,7 @@ export default defineConfig(({ command, mode }) => ({
       output: {
         manualChunks: {
           vendor: ["react", "react-dom"],
-          ui: ["@radix-ui/react-dialog", "@radix-ui/react-dropdown-menu", "@radix-ui/react-select"],
+          ui: ["@radix-ui/react-dashboard-menu", "@radix-ui/react-dropdown-menu", "@radix-ui/react-select"],
         },
       },
     },
@@ -39,4 +39,8 @@ export default defineConfig(({ command, mode }) => ({
     __IS_STAGING__: mode === "staging",
     __IS_PROD__: mode === "production",
   },
+  // Ensure environment variables are properly loaded
+  envPrefix: 'VITE_',
+  // Load environment variables from Railway
+  envDir: '.',
 }));

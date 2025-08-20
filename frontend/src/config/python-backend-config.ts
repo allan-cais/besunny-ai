@@ -3,6 +3,8 @@
  * Environment-specific configuration for Python backend services
  */
 
+import { isRailwayEnvironment } from './index';
+
 export interface PythonBackendConfig {
   baseUrl: string;
   timeout: number;
@@ -46,7 +48,7 @@ const developmentConfig: PythonBackendConfig = {
 // Staging configuration
 const stagingConfig: PythonBackendConfig = {
   ...baseConfig,
-  baseUrl: getEnvVar('VITE_PYTHON_BACKEND_URL', 'https://besunny-ai.railway.app'),
+  baseUrl: getEnvVar('VITE_PYTHON_BACKEND_URL', ''),
   timeout: 30000,
   retryAttempts: 3,
   healthCheckInterval: 60000,
@@ -57,7 +59,7 @@ const stagingConfig: PythonBackendConfig = {
 // Production configuration
 const productionConfig: PythonBackendConfig = {
   ...baseConfig,
-  baseUrl: getEnvVar('VITE_PYTHON_BACKEND_URL', 'https://besunny-ai.railway.app'),
+  baseUrl: getEnvVar('VITE_PYTHON_BACKEND_URL', ''),
   timeout: 30000,
   retryAttempts: 3,
   healthCheckInterval: 120000, // Less frequent health checks in production
@@ -81,8 +83,15 @@ if (isDevelopment) {
 
 // Validate configuration
 if (!config.baseUrl) {
-  console.warn('Python backend URL not configured. Using fallback URL.');
-  config.baseUrl = 'http://localhost:8000';
+  const isCloudEnvironment = isRailwayEnvironment();
+  
+  if (isCloudEnvironment) {
+    console.error('❌ Python backend URL not configured in cloud environment');
+    console.error('Please ensure VITE_PYTHON_BACKEND_URL is set in Railway dashboard');
+  } else {
+    console.warn('Python backend URL not configured. Using fallback URL.');
+    config.baseUrl = 'http://localhost:8000';
+  }
 }
 
 // Export configuration
