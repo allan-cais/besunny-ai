@@ -3,7 +3,8 @@ import {
   checkRailwayEnvironmentVariables, 
   testRailwayEnvironmentVariables,
   isRailwayEnvironment,
-  config 
+  config,
+  updateConfigFromRuntime
 } from '@/config';
 
 export const RailwayEnvironmentTest: React.FC = () => {
@@ -86,6 +87,13 @@ export const RailwayEnvironmentTest: React.FC = () => {
           className="w-full px-3 py-2 bg-green-600 text-white text-xs rounded hover:bg-green-700"
         >
           Run Console Test
+        </button>
+        
+        <button 
+          onClick={() => updateConfigFromRuntime()}
+          className="w-full px-3 py-2 bg-purple-600 text-white text-xs rounded hover:bg-purple-700"
+        >
+          Update Runtime Config
         </button>
         
         {testResults.length > 0 && (

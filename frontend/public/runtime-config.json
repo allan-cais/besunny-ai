@@ -1,0 +1,34 @@
+{
+  "supabase": {
+    "url": "https://gkkmaeobxwvramtsjabu.supabase.co",
+    "anonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdra21hZW9ieHd2cmFtdHNqYWJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA4ODYxMzMsImV4cCI6MjA2NjQ2MjEzM30.S-bzk-Tq1Onm0cVoH-1Vt_UFFx_eGREcq5xyQtEkgXo",
+    "serviceRoleKey": ""
+  },
+  "pythonBackend": {
+    "url": "https://besunny-ai.railway.app",
+    "timeout": 30000,
+    "retries": 3,
+    "retryDelay": 1000
+  },
+  "api": {
+    "n8nWebhookUrl": "https://n8n.customaistudio.io/webhook/kirit-rag-webhook",
+    "openaiApiKey": "",
+    "anthropicApiKey": ""
+  },
+  "features": {
+    "enableDebugMode": false,
+    "enableAnalytics": false,
+    "enableErrorReporting": false,
+    "enablePythonBackend": true
+  },
+  "polling": {
+    "defaultIntervalMs": 30000,
+    "maxRetries": 3,
+    "retryDelayMs": 1000
+  },
+  "limits": {
+    "maxDocumentsPerPage": 50,
+    "maxMeetingsPerPage": 100,
+    "maxChatMessagesPerPage": 100
+  }
+}

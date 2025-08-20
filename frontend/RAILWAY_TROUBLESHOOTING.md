@@ -7,11 +7,31 @@ The staging site is showing missing environment variables in the console, partic
 - `VITE_PYTHON_BACKEND_URL`
 
 ## Root Cause
-The issue is likely that Railway's environment variables are not being properly loaded during the build process or at runtime.
+The issue is that Vite replaces `import.meta.env.VITE_*` variables at build time, so if they're not available during the build, they won't be available in the final bundle. Railway's environment variables are only available at runtime, not during the build process.
+
+## Solution Implemented
+I've implemented a runtime environment variable loader that:
+1. Provides default configuration values for Railway production
+2. Loads configuration from a runtime config file (`/runtime-config.json`)
+3. Falls back to hardcoded production values when environment variables are missing
+4. Allows dynamic configuration updates at runtime
 
 ## Solutions
 
-### 1. Verify Environment Variables in Railway Dashboard
+### 1. Runtime Configuration (Recommended Solution)
+The app now includes a runtime configuration system that works with Railway:
+
+1. **Default Production Values**: The app includes hardcoded production values for Railway
+2. **Runtime Config File**: `/runtime-config.json` can be updated by Railway deployment scripts
+3. **Automatic Fallbacks**: When environment variables are missing, the app uses production defaults
+
+**Current Production Defaults:**
+- Supabase URL: `https://gkkmaeobxwvramtsjabu.supabase.co`
+- Python Backend: `https://besunny-ai.railway.app`
+- All other settings have sensible production defaults
+
+### 2. Alternative: Verify Environment Variables in Railway Dashboard
+If you prefer to use Railway environment variables:
 1. Go to your Railway project dashboard
 2. Navigate to the frontend service
 3. Check the "Variables" tab
@@ -48,8 +68,16 @@ npm run debug:env
 ### 5. Runtime Debugging
 The app now includes enhanced debugging:
 - Environment debug component (bottom-right corner)
+- Railway environment test component (bottom-left corner)
 - Console logging for Railway environment detection
 - Detailed error messages for missing variables
+- Runtime configuration testing and updates
+
+**New Debug Features:**
+- **Environment Debug**: Shows current configuration status
+- **Railway Environment Test**: Comprehensive testing of environment variables
+- **Runtime Config Update**: Button to reload configuration from runtime
+- **Console Tests**: Detailed logging of environment variable status
 
 ### 6. Railway Configuration
 Ensure your `railway.toml` has the correct service configuration:

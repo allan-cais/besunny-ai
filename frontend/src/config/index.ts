@@ -2,6 +2,7 @@
 // Centralizes all environment variables and configuration settings
 
 import { stagingConfig } from './staging-config';
+import { getRuntimeConfig, runtimeConfig, isRailwayEnvironment as isRailwayRuntime } from './runtime-env-loader';
 
 interface Config {
   supabase: {
@@ -75,36 +76,36 @@ function getOptionalNumberEnvVar(name: string, defaultValue: number): number {
 // Build configuration object with safe defaults
 export const config: Config = {
   supabase: {
-    url: getRequiredEnvVar('VITE_SUPABASE_URL'),
-    anonKey: getRequiredEnvVar('VITE_SUPABASE_ANON_KEY'),
-    serviceRoleKey: getOptionalEnvVar('VITE_SUPABASE_SERVICE_ROLE_KEY'),
+    url: getRequiredEnvVar('VITE_SUPABASE_URL') || runtimeConfig.supabase.url,
+    anonKey: getRequiredEnvVar('VITE_SUPABASE_ANON_KEY') || runtimeConfig.supabase.anonKey,
+    serviceRoleKey: getOptionalEnvVar('VITE_SUPABASE_SERVICE_ROLE_KEY') || runtimeConfig.supabase.serviceRoleKey,
   },
   pythonBackend: {
-    url: getOptionalEnvVar('VITE_PYTHON_BACKEND_URL', 'http://localhost:8000'),
-    timeout: getOptionalNumberEnvVar('VITE_PYTHON_BACKEND_TIMEOUT', 30000),
-    retries: getOptionalNumberEnvVar('VITE_PYTHON_BACKEND_RETRIES', 3),
-    retryDelay: getOptionalNumberEnvVar('VITE_PYTHON_BACKEND_RETRY_DELAY', 1000),
+    url: getOptionalEnvVar('VITE_PYTHON_BACKEND_URL', runtimeConfig.pythonBackend.url),
+    timeout: getOptionalNumberEnvVar('VITE_PYTHON_BACKEND_TIMEOUT', runtimeConfig.pythonBackend.timeout),
+    retries: getOptionalNumberEnvVar('VITE_PYTHON_BACKEND_RETRIES', runtimeConfig.pythonBackend.retries),
+    retryDelay: getOptionalNumberEnvVar('VITE_PYTHON_BACKEND_RETRY_DELAY', runtimeConfig.pythonBackend.retryDelay),
   },
   api: {
-    n8nWebhookUrl: getOptionalEnvVar('VITE_N8N_WEBHOOK_URL', 'https://n8n.customaistudio.io/webhook/kirit-rag-webhook'),
-    openaiApiKey: getOptionalEnvVar('VITE_OPENAI_API_KEY'),
-    anthropicApiKey: getOptionalEnvVar('VITE_ANTHROPIC_API_KEY'),
+    n8nWebhookUrl: getOptionalEnvVar('VITE_N8N_WEBHOOK_URL', runtimeConfig.api.n8nWebhookUrl),
+    openaiApiKey: getOptionalEnvVar('VITE_OPENAI_API_KEY') || runtimeConfig.api.openaiApiKey,
+    anthropicApiKey: getOptionalEnvVar('VITE_ANTHROPIC_API_KEY') || runtimeConfig.api.anthropicApiKey,
   },
   features: {
-    enableDebugMode: import.meta.env.DEV || false,
-    enableAnalytics: getOptionalEnvVar('VITE_ENABLE_ANALYTICS', 'false') === 'true',
-    enableErrorReporting: getOptionalEnvVar('VITE_ENABLE_ERROR_REPORTING', 'false') === 'true',
-    enablePythonBackend: getOptionalEnvVar('VITE_ENABLE_PYTHON_BACKEND', 'true') === 'true',
+    enableDebugMode: import.meta.env.DEV || runtimeConfig.features.enableDebugMode,
+    enableAnalytics: getOptionalEnvVar('VITE_ENABLE_ANALYTICS', runtimeConfig.features.enableAnalytics.toString()) === 'true',
+    enableErrorReporting: getOptionalEnvVar('VITE_ENABLE_ERROR_REPORTING', runtimeConfig.features.enableErrorReporting.toString()) === 'true',
+    enablePythonBackend: getOptionalEnvVar('VITE_ENABLE_PYTHON_BACKEND', runtimeConfig.features.enablePythonBackend.toString()) === 'true',
   },
   polling: {
-    defaultIntervalMs: getOptionalNumberEnvVar('VITE_POLLING_INTERVAL_MS', 30000),
-    maxRetries: getOptionalNumberEnvVar('VITE_MAX_RETRIES', 3),
-    retryDelayMs: getOptionalNumberEnvVar('VITE_RETRY_DELAY_MS', 1000),
+    defaultIntervalMs: getOptionalNumberEnvVar('VITE_POLLING_INTERVAL_MS', runtimeConfig.polling.defaultIntervalMs),
+    maxRetries: getOptionalNumberEnvVar('VITE_MAX_RETRIES', runtimeConfig.polling.maxRetries),
+    retryDelayMs: getOptionalNumberEnvVar('VITE_RETRY_DELAY_MS', runtimeConfig.polling.retryDelayMs),
   },
   limits: {
-    maxDocumentsPerPage: getOptionalNumberEnvVar('VITE_MAX_DOCUMENTS_PER_PAGE', 50),
-    maxMeetingsPerPage: getOptionalNumberEnvVar('VITE_MAX_MEETINGS_PER_PAGE', 100),
-    maxChatMessagesPerPage: getOptionalNumberEnvVar('VITE_MAX_CHAT_MESSAGES_PER_PAGE', 100),
+    maxDocumentsPerPage: getOptionalNumberEnvVar('VITE_MAX_DOCUMENTS_PER_PAGE', runtimeConfig.limits.maxDocumentsPerPage),
+    maxMeetingsPerPage: getOptionalNumberEnvVar('VITE_MAX_MEETINGS_PER_PAGE', runtimeConfig.limits.maxMeetingsPerPage),
+    maxChatMessagesPerPage: getOptionalNumberEnvVar('VITE_MAX_CHAT_MESSAGES_PER_PAGE', runtimeConfig.limits.maxChatMessagesPerPage),
   },
 };
 
@@ -284,9 +285,7 @@ export function debugRailwayEnvironment(): void {
 
 // Utility function to check if running in Railway/cloud environment
 export function isRailwayEnvironment(): boolean {
-  return typeof window !== 'undefined' && 
-         window.location.hostname !== 'localhost' && 
-         window.location.hostname !== '127.0.0.1';
+  return isRailwayRuntime();
 }
 
 // Function to check if all required Railway environment variables are loaded
@@ -361,6 +360,27 @@ export function testRailwayEnvironmentVariables(): void {
     });
   } else {
     console.log('🏠 Running in local environment');
+  }
+}
+
+// Function to dynamically update configuration at runtime
+export async function updateConfigFromRuntime(): Promise<void> {
+  try {
+    const runtimeConfig = await getRuntimeConfig();
+    
+    // Update the config object with runtime values
+    Object.assign(config.supabase, runtimeConfig.supabase);
+    Object.assign(config.pythonBackend, runtimeConfig.pythonBackend);
+    Object.assign(config.api, runtimeConfig.api);
+    Object.assign(config.features, runtimeConfig.features);
+    Object.assign(config.polling, runtimeConfig.polling);
+    Object.assign(config.limits, runtimeConfig.limits);
+    
+    console.log('✅ Configuration updated from runtime');
+    console.log('🔧 Updated config:', config);
+    
+  } catch (error) {
+    console.error('❌ Failed to update configuration from runtime:', error);
   }
 }
 

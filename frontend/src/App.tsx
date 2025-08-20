@@ -1,3 +1,4 @@
+import React from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -18,11 +19,18 @@ import ProjectDashboard from "./pages/project";
 import SettingsPage from "./pages/settings";
 import EnvironmentDebug from "./components/EnvironmentDebug";
 import RailwayEnvironmentTest from "./components/RailwayEnvironmentTest";
+import { updateConfigFromRuntime } from "./config";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
+const App = () => {
+  // Update configuration from runtime when app starts
+  React.useEffect(() => {
+    updateConfigFromRuntime();
+  }, []);
+
+  return (
+    <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <ThemeProvider>
         <TooltipProvider>
@@ -96,6 +104,7 @@ const App = () => (
       </ThemeProvider>
     </AuthProvider>
   </QueryClientProvider>
-);
+  );
+};
 
 export default App;
