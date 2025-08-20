@@ -1,5 +1,5 @@
 // Hybrid Calendar Service
-// Provides seamless integration between Supabase edge functions and Python backend
+// Provides seamless integration with Python backend (Supabase Edge Functions migrated)
 // Automatically falls back to Supabase if Python backend is unavailable
 
 import { features } from '../config';

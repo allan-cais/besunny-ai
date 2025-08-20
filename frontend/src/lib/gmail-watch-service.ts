@@ -24,13 +24,13 @@ export const gmailWatchService = {
       const session = (await supabase.auth.getSession()).data.session;
       if (!session) throw new Error('Not authenticated');
 
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/setup-gmail-watch`, {
+      const response = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/gmail-watch/setup`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ userEmail }),
+        body: JSON.stringify({ user_email: userEmail }),
       });
 
       const result = await response.json();

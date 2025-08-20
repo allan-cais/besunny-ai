@@ -86,7 +86,7 @@ export const apiKeyService = {
   async getBotDetails(botId: string): Promise<Record<string, unknown>> {
     const session = (await supabase.auth.getSession()).data.session;
     if (!session) throw new Error('Not authenticated');
-    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/attendee-proxy/bot-details?bot_id=${botId}`, {
+    const response = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/attendee/bot-status/${botId}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -95,58 +95,43 @@ export const apiKeyService = {
     });
     const result = await response.json();
     
-    if (!result.ok) {
-      throw new Error(result.error || 'Failed to get bot details');
+    if (!result.success) {
+      throw new Error(result.message || 'Failed to get bot details');
     }
     
-    return result.data;
+    return result;
   },
 
   // Update a scheduled bot (e.g., change join time)
   async updateScheduledBot(botId: string, updates: Record<string, unknown>): Promise<Record<string, unknown>> {
     const session = (await supabase.auth.getSession()).data.session;
     if (!session) throw new Error('Not authenticated');
-    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/attendee-proxy/update-bot`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({
-        bot_id: botId,
-        updates
-      })
-    });
-    const result = await response.json();
     
-    if (!result.ok) {
-      throw new Error(result.error || 'Failed to update bot');
-    }
+    // Note: Bot updates are now handled through the attendee service
+    // This functionality may need to be implemented in the Python backend
+    console.warn('Bot updates are not yet implemented in the Python backend. Please use the attendee service directly.');
     
-    return result.data;
+    // For now, return a placeholder response
+    return {
+      success: false,
+      message: 'Bot updates are not yet implemented in the Python backend. Please use the attendee service directly.'
+    };
   },
 
   // Delete a scheduled bot
   async deleteScheduledBot(botId: string): Promise<Record<string, unknown>> {
     const session = (await supabase.auth.getSession()).data.session;
     if (!session) throw new Error('Not authenticated');
-    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/attendee-proxy/delete-bot`, {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({
-        bot_id: botId
-      })
-    });
-    const result = await response.json();
     
-    if (!result.ok) {
-      throw new Error(result.error || 'Failed to delete bot');
-    }
+    // Note: Bot deletion is now handled through the attendee service
+    // This functionality may need to be implemented in the Python backend
+    console.warn('Bot deletion is not yet implemented in the Python backend. Please use the attendee service directly.');
     
-    return result.data;
+    // For now, return a placeholder response
+    return {
+      success: false,
+      message: 'Bot deletion is not yet implemented in the Python backend. Please use the attendee service directly.'
+    };
   },
 
   // Get meeting transcript
@@ -154,9 +139,9 @@ export const apiKeyService = {
     const session = (await supabase.auth.getSession()).data.session;
     if (!session) throw new Error('Not authenticated');
     
-    let url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/attendee-proxy/transcript?bot_id=${botId}`;
+    let url = `${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/attendee/transcript/${botId}`;
     if (updatedAfter) {
-      url += `&updated_after=${encodeURIComponent(updatedAfter)}`;
+      url += `?updated_after=${encodeURIComponent(updatedAfter)}`;
     }
     
     const response = await fetch(url, {
@@ -168,11 +153,11 @@ export const apiKeyService = {
     });
     const result = await response.json();
     
-    if (!result.ok) {
-      throw new Error(result.error || 'Failed to get transcript');
+    if (!result.success) {
+      throw new Error(result.message || 'Failed to get transcript');
     }
     
-    return result.data;
+    return result;
   },
 
   // Get chat messages
@@ -180,9 +165,17 @@ export const apiKeyService = {
     const session = (await supabase.auth.getSession()).data.session;
     if (!session) throw new Error('Not authenticated');
     
-    let url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/attendee-proxy/chat-messages?bot_id=${botId}`;
-    if (cursor) url += `&cursor=${encodeURIComponent(cursor)}`;
-    if (updatedAfter) url += `&updated_after=${encodeURIComponent(updatedAfter)}`;
+    let url = `${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/attendee/chat-messages/${botId}`;
+    const params = new URLSearchParams();
+    if (cursor) {
+      params.append('cursor', cursor);
+    }
+    if (updatedAfter) {
+      params.append('updated_after', updatedAfter);
+    }
+    if (params.toString()) {
+      url += `?${params.toString()}`;
+    }
     
     const response = await fetch(url, {
       method: 'GET',
@@ -193,18 +186,18 @@ export const apiKeyService = {
     });
     const result = await response.json();
     
-    if (!result.ok) {
-      throw new Error(result.error || 'Failed to get chat messages');
+    if (!result.success) {
+      throw new Error(result.message || 'Failed to get chat messages');
     }
     
-    return result.data;
+    return result;
   },
 
   // Send a chat message
   async sendChatMessage(botId: string, message: string, to: string = 'everyone', toUserUuid?: string): Promise<any> {
     const session = (await supabase.auth.getSession()).data.session;
     if (!session) throw new Error('Not authenticated');
-    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/attendee-proxy/send-chat`, {
+    const response = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/attendee/send-chat`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -219,110 +212,75 @@ export const apiKeyService = {
     });
     const result = await response.json();
     
-    if (!result.ok) {
-      throw new Error(result.error || 'Failed to send chat message');
+    if (!result.success) {
+      throw new Error(result.message || 'Failed to send chat message');
     }
     
-    return result.data;
+    return result;
   },
 
   // Output speech
   async outputSpeech(botId: string, text: string, voiceSettings: any): Promise<any> {
     const session = (await supabase.auth.getSession()).data.session;
     if (!session) throw new Error('Not authenticated');
-    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/attendee-proxy/speech`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({
-        bot_id: botId,
-        text,
-        text_to_speech_settings: voiceSettings
-      })
-    });
-    const result = await response.json();
     
-    if (!result.ok) {
-      throw new Error(result.error || 'Failed to output speech');
-    }
+    // Note: Speech output is not yet implemented in the Python backend
+    // This functionality may need to be implemented or integrated with external services
+    console.warn('Speech output is not yet implemented in the Python backend.');
     
-    return result.data;
+    // For now, return a placeholder response
+    return {
+      success: false,
+      message: 'Speech output is not yet implemented in the Python backend.'
+    };
   },
 
   // Output audio
   async outputAudio(botId: string, audioData: string, type: string = 'audio/mp3'): Promise<any> {
     const session = (await supabase.auth.getSession()).data.session;
     if (!session) throw new Error('Not authenticated');
-    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/attendee-proxy/output-audio`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({
-        bot_id: botId,
-        type,
-        data: audioData
-      })
-    });
-    const result = await response.json();
     
-    if (!result.ok) {
-      throw new Error(result.error || 'Failed to output audio');
-    }
+    // Note: Audio output is not yet implemented in the Python backend
+    // This functionality may need to be implemented or integrated with external services
+    console.warn('Audio output is not yet implemented in the Python backend.');
     
-    return result.data;
+    // For now, return a placeholder response
+    return {
+      success: false,
+      message: 'Audio output is not yet implemented in the Python backend.'
+    };
   },
 
   // Output image
   async outputImage(botId: string, imageData: string, type: string = 'image/png'): Promise<any> {
     const session = (await supabase.auth.getSession()).data.session;
     if (!session) throw new Error('Not authenticated');
-    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/attendee-proxy/output-image`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({
-        bot_id: botId,
-        type,
-        data: imageData
-      })
-    });
-    const result = await response.json();
     
-    if (!result.ok) {
-      throw new Error(result.error || 'Failed to output image');
-    }
+    // Note: Image output is not yet implemented in the Python backend
+    // This functionality may need to be implemented or integrated with external services
+    console.warn('Image output is not yet implemented in the Python backend.');
     
-    return result.data;
+    // For now, return a placeholder response
+    return {
+      success: false,
+      message: 'Image output is not yet implemented in the Python backend.'
+    };
   },
 
   // Output video
   async outputVideo(botId: string, videoUrl: string): Promise<any> {
     const session = (await supabase.auth.getSession()).data.session;
     if (!session) throw new Error('Not authenticated');
-    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/attendee-proxy/output-video`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({
-        bot_id: botId,
-        url: videoUrl
-      })
-    });
-    const result = await response.json();
     
-    if (!result.ok) {
-      throw new Error(result.error || 'Failed to output video');
-    }
+    // Note: Video output is not yet implemented in the Python backend
+    // This functionality may need to be implemented or integrated with external services
+    console.warn('Video output is not yet implemented in the Python backend.');
     
-    return result.data;
+    // For now, return a placeholder response
+    return {
+      success: false,
+      message: 'Video output is not yet implemented in the Python backend.'
+    };
   },
 
   // Get participant events
@@ -330,10 +288,20 @@ export const apiKeyService = {
     const session = (await supabase.auth.getSession()).data.session;
     if (!session) throw new Error('Not authenticated');
     
-    let url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/attendee-proxy/participant-events?bot_id=${botId}`;
-    if (after) url += `&after=${encodeURIComponent(after)}`;
-    if (before) url += `&before=${encodeURIComponent(before)}`;
-    if (cursor) url += `&cursor=${encodeURIComponent(cursor)}`;
+    let url = `${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/attendee/participant-events/${botId}`;
+    const params = new URLSearchParams();
+    if (after) {
+      params.append('after', after);
+    }
+    if (before) {
+      params.append('before', before);
+    }
+    if (cursor) {
+      params.append('cursor', cursor);
+    }
+    if (params.toString()) {
+      url += `?${params.toString()}`;
+    }
     
     const response = await fetch(url, {
       method: 'GET',
@@ -344,65 +312,19 @@ export const apiKeyService = {
     });
     const result = await response.json();
     
-    if (!result.ok) {
-      throw new Error(result.error || 'Failed to get participant events');
+    if (!result.success) {
+      throw new Error(result.message || 'Failed to get participant events');
     }
     
-    return result.data;
+    return result;
   },
 
   // Pause recording
   async pauseRecording(botId: string): Promise<any> {
     const session = (await supabase.auth.getSession()).data.session;
     if (!session) throw new Error('Not authenticated');
-    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/attendee-proxy/pause-recording`, {
+    const response = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/attendee/pause-recording/${botId}`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({
-        bot_id: botId
-      })
-    });
-    const result = await response.json();
-    
-    if (!result.ok) {
-      throw new Error(result.error || 'Failed to pause recording');
-    }
-    
-    return result.data;
-  },
-
-  // Resume recording
-  async resumeRecording(botId: string): Promise<any> {
-    const session = (await supabase.auth.getSession()).data.session;
-    if (!session) throw new Error('Not authenticated');
-    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/attendee-proxy/resume-recording`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({
-        bot_id: botId
-      })
-    });
-    const result = await response.json();
-    
-    if (!result.ok) {
-      throw new Error(result.error || 'Failed to resume recording');
-    }
-    
-    return result.data;
-  },
-
-  // Get recording URL
-  async getRecordingUrl(botId: string): Promise<any> {
-    const session = (await supabase.auth.getSession()).data.session;
-    if (!session) throw new Error('Not authenticated');
-    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/attendee-proxy/recording?bot_id=${botId}`, {
-      method: 'GET',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${session.access_token}`,
@@ -410,72 +332,87 @@ export const apiKeyService = {
     });
     const result = await response.json();
     
-    if (!result.ok) {
-      throw new Error(result.error || 'Failed to get recording URL');
+    if (!result.success) {
+      throw new Error(result.message || 'Failed to pause recording');
     }
     
-    return result.data;
+    return result;
+  },
+
+  // Resume recording
+  async resumeRecording(botId: string): Promise<any> {
+    const session = (await supabase.auth.getSession()).data.session;
+    if (!session) throw new Error('Not authenticated');
+    const response = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/attendee/resume-recording/${botId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+      }
+    });
+    const result = await response.json();
+    
+    if (!result.success) {
+      throw new Error(result.message || 'Failed to resume recording');
+    }
+    
+    return result;
+  },
+
+  // Get recording URL
+  async getRecordingUrl(botId: string): Promise<any> {
+    const session = (await supabase.auth.getSession()).data.session;
+    if (!session) throw new Error('Not authenticated');
+    // Note: Recording URL retrieval is not yet implemented in the Python backend
+    // This functionality may need to be implemented or integrated with external services
+    console.warn('Recording URL retrieval is not yet implemented in the Python backend.');
+    
+    // For now, return a placeholder response
+    return {
+      success: false,
+      message: 'Recording URL retrieval is not yet implemented in the Python backend.'
+    };
   },
 
   // Leave meeting
   async leaveMeeting(botId: string): Promise<any> {
     const session = (await supabase.auth.getSession()).data.session;
     if (!session) throw new Error('Not authenticated');
-    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/attendee-proxy/leave-meeting`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({
-        bot_id: botId
-      })
-    });
-    const result = await response.json();
+    // Note: Leave meeting functionality is not yet implemented in the Python backend
+    // This functionality may need to be implemented or integrated with external services
+    console.warn('Leave meeting functionality is not yet implemented in the Python backend.');
     
-    if (!result.ok) {
-      throw new Error(result.error || 'Failed to leave meeting');
-    }
-    
-    return result.data;
+    // For now, return a placeholder response
+    return {
+      success: false,
+      message: 'Leave meeting functionality is not yet implemented in the Python backend.'
+    };
   },
 
   // Delete bot data
   async deleteBotData(botId: string): Promise<any> {
     const session = (await supabase.auth.getSession()).data.session;
     if (!session) throw new Error('Not authenticated');
-    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/attendee-proxy/delete-data`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({
-        bot_id: botId
-      })
-    });
-    const result = await response.json();
+    // Note: Bot data deletion is not yet implemented in the Python backend
+    // This functionality may need to be implemented or integrated with external services
+    console.warn('Bot data deletion is not yet implemented in the Python backend.');
     
-    if (!result.ok) {
-      throw new Error(result.error || 'Failed to delete bot data');
-    }
-    
-    return result.data;
+    // For now, return a placeholder response
+    return {
+      success: false,
+      message: 'Bot data deletion is not yet implemented in the Python backend.'
+    };
   },
 
   // Test API key (existing function)
   async testApiKey(service: string, apiKey: string): Promise<boolean> {
     const session = (await supabase.auth.getSession()).data.session;
     if (!session) throw new Error('Not authenticated');
-    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/attendee-proxy/test-key`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({ apiKey })
-    });
-    const result = await response.json();
-    return result.ok;
+    // Note: API key testing is not yet implemented in the Python backend
+    // This functionality may need to be implemented or integrated with external services
+    console.warn('API key testing is not yet implemented in the Python backend.');
+    
+    // For now, return a placeholder response
+    return false;
   }
 }; 

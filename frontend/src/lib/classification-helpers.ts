@@ -2,7 +2,7 @@
  * Classification Helpers
  * 
  * Shared utilities for email and drive notification classification
- * Used by process-inbound-emails and drive-webhook-handler edge functions
+ * Used by process-inbound-emails and drive-webhook-handler (now handled by Python backend)
  */
 
 export interface Project {

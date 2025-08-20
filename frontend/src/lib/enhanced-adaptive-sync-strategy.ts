@@ -500,7 +500,7 @@ class EnhancedAdaptiveSyncStrategy {
         };
       }
 
-      // For now, just mark as processed since the actual polling is handled by edge functions
+              // For now, just mark as processed since the actual polling is handled by Python backend services
       return {
         success: true,
         type: 'drive',

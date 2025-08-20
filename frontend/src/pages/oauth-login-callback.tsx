@@ -32,8 +32,8 @@ const OAuthLoginCallback: React.FC = () => {
         setStatus('loading');
         setMessage('Authenticating with Google...');
 
-        // Call the Google OAuth login edge function
-        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-oauth-login`, {
+        // Call the Python backend for Google OAuth login
+        const response = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/auth/google/oauth/callback`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -99,25 +99,24 @@ const OAuthLoginCallback: React.FC = () => {
                 // Gmail watch setup failed
                 setMessage('Calendar sync configured! Gmail watch can be set up later. Redirecting...');
               }
-            } else {
-              setMessage('Calendar sync configured! Gmail watch can be set up later. Redirecting...');
             }
-          } catch (syncError) {
-            // Google services setup failed
-            // Continue anyway - services can be set up later
-            setMessage('Authentication successful! Services can be configured later. Redirecting...');
+          } catch (serviceError) {
+            console.warn('Service setup failed:', serviceError);
+            setMessage('Authentication successful! Some services may need manual setup. Redirecting...');
           }
-          
-          // Redirect to dashboard after a short delay
-          setTimeout(() => navigate('/dashboard'), 2000);
+
+          // Redirect to dashboard after successful authentication
+          setTimeout(() => {
+            navigate('/dashboard');
+          }, 2000);
         } else {
-          throw new Error(result.message || 'Authentication failed');
+          throw new Error('Invalid response from authentication service');
         }
       } catch (error) {
-        // OAuth login error
+        console.error('OAuth callback error:', error);
         setStatus('error');
-        setMessage(error.message || 'Authentication failed');
-        setTimeout(() => navigate('/auth'), 3000);
+        setMessage(`Authentication failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        setTimeout(() => navigate('/auth'), 5000);
       }
     };
 
@@ -135,7 +134,7 @@ const OAuthLoginCallback: React.FC = () => {
       case 'temporarily_unavailable':
         return 'Google service temporarily unavailable. Please try again later.';
       default:
-        return 'An unexpected error occurred during authentication.';
+        return 'An unexpected error occurred during OAuth.';
     }
   };
 
@@ -145,24 +144,29 @@ const OAuthLoginCallback: React.FC = () => {
         <div className="bg-white dark:bg-zinc-900 border border-[#4a5565] dark:border-zinc-700 rounded-lg p-6">
           <div className="text-center space-y-4">
             {status === 'loading' && (
-              <Loader2 className="w-8 h-8 animate-spin mx-auto text-blue-600 dark:text-blue-400" />
+              <>
+                <Loader2 className="w-8 h-8 animate-spin mx-auto text-blue-600 dark:text-blue-400" />
+                <h2 className="text-lg font-bold">Processing Authentication...</h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{message}</p>
+              </>
             )}
+            
             {status === 'success' && (
-              <CheckCircle className="w-8 h-8 mx-auto text-green-600 dark:text-green-400" />
+              <>
+                <CheckCircle className="w-8 h-8 mx-auto text-green-600 dark:text-green-400" />
+                <h2 className="text-lg font-bold text-green-600 dark:text-green-400">Authentication Successful!</h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{message}</p>
+              </>
             )}
+            
             {status === 'error' && (
-              <XCircle className="w-8 h-8 mx-auto text-red-600 dark:text-red-400" />
+              <>
+                <XCircle className="w-8 h-8 mx-auto text-red-600 dark:text-red-400" />
+                <h2 className="text-lg font-bold text-red-600 dark:text-red-400">Authentication Failed</h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{message}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-500">Redirecting to login page...</p>
+              </>
             )}
-            
-            <h2 className="text-lg font-bold">
-              {status === 'loading' && 'Processing Authentication...'}
-              {status === 'success' && 'Authentication Successful!'}
-              {status === 'error' && 'Authentication Failed'}
-            </h2>
-            
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              {message}
-            </p>
           </div>
         </div>
       </div>

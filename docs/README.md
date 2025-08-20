@@ -39,7 +39,7 @@ Welcome to the comprehensive documentation for the BeSunny.ai intelligent worksp
 - **[Virtual Email Implementation](./VIRTUAL_EMAIL_IMPLEMENTATION.md)** - Virtual email system details
 - **[Google Drive Integration](./GOOGLE_DRIVE_FILE_WATCH_SYSTEM.md)** - Google Drive file monitoring
 - **[Meeting Bot System](./ATTENDEE_INTEGRATION.md)** - Meeting bot and transcription system
-- **[OAuth Implementation](./GOOGLE_OAUTH_LOGIN_IMPLEMENTATION.md)** - Google OAuth setup and usage
+- **[Google OAuth Master](./GOOGLE_OAUTH_MASTER.md)** - Comprehensive Google OAuth implementation guide
 
 ## 🎯 Quick Navigation
 
@@ -81,7 +81,7 @@ Welcome to the comprehensive documentation for the BeSunny.ai intelligent worksp
 - **Document Management**: Document Classification, Virtual Email
 - **Meeting Management**: Meeting Intelligence, Meeting Bot System
 - **Project Management**: Project Overview, Component Architecture
-- **Integrations**: Google Drive, OAuth, Webhooks
+- **Integrations**: Google Drive, [Google OAuth Master](./GOOGLE_OAUTH_MASTER.md), Webhooks
 
 ### By Use Case
 - **Building Features**: Component Architecture, Development Workflow

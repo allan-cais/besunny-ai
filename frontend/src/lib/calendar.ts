@@ -178,23 +178,25 @@ export const calendarService = {
     const session = (await supabase.auth.getSession()).data.session;
     if (!session) throw new Error('Not authenticated');
     
-    const url = new URL(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-calendar/events`);
-    if (projectId) {
-      url.searchParams.set('project_id', projectId);
-    }
-    // Initial sync: 0 days past (today only), 60 days future
-    url.searchParams.set('days_past', '0');
-    url.searchParams.set('days_future', '60');
+    const url = new URL(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/calendar/sync`);
     
     const response = await fetch(url.toString(), {
-      method: 'GET',
+      method: 'POST',
       headers: {
         'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
       },
+      body: JSON.stringify({
+        user_id: session.user.id,
+        calendar_id: 'primary',
+        sync_range_days: 60,
+        project_id: projectId,
+        sync_type: 'initial'
+      }),
     });
     
     const result = await response.json();
-    if (!result.ok) throw new Error(result.error || 'Failed to sync calendar events');
+    if (!result.success) throw new Error(result.message || 'Failed to sync calendar events');
     return result;
   },
 
@@ -216,22 +218,25 @@ export const calendarService = {
     const session = (await supabase.auth.getSession()).data.session;
     if (!session) throw new Error('Not authenticated');
     
-    const url = new URL(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-calendar/events`);
-    if (projectId) {
-      url.searchParams.set('project_id', projectId);
-    }
-    url.searchParams.set('days_past', daysPast.toString());
-    url.searchParams.set('days_future', daysFuture.toString());
+    const url = new URL(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/calendar/sync`);
     
     const response = await fetch(url.toString(), {
-      method: 'GET',
+      method: 'POST',
       headers: {
         'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
       },
+      body: JSON.stringify({
+        user_id: session.user.id,
+        calendar_id: 'primary',
+        sync_range_days: daysPast + daysFuture,
+        project_id: projectId,
+        sync_type: 'full'
+      }),
     });
     
     const result = await response.json();
-    if (!result.ok) throw new Error(result.error || 'Failed to sync calendar events');
+    if (!result.success) throw new Error(result.message || 'Failed to sync calendar events');
     return result;
   },
 
@@ -246,7 +251,7 @@ export const calendarService = {
     const session = (await supabase.auth.getSession()).data.session;
     if (!session) throw new Error('Not authenticated');
     
-    const url = new URL(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-calendar-webhook/setup`);
+    const url = new URL(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/calendar/webhook`);
     
     const response = await fetch(url.toString(), {
       method: 'POST',
@@ -254,11 +259,20 @@ export const calendarService = {
         'Authorization': `Bearer ${session.access_token}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ userId: session.user.id }),
+      body: JSON.stringify({ 
+        user_id: session.user.id,
+        calendar_id: 'primary'
+      }),
     });
     
     const result = await response.json();
-    return result;
+    return {
+      ok: result.success,
+      webhook_id: result.webhook_id,
+      resource_id: result.webhook_id,
+      expiration: result.expiration,
+      error: result.message
+    };
   },
 
   // Get current and upcoming meetings (for UI display)
@@ -372,7 +386,7 @@ export const calendarService = {
     const session = (await supabase.auth.getSession()).data.session;
     if (!session) throw new Error('Not authenticated');
     
-    const url = new URL(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/renew-calendar-webhooks/renew`);
+    const url = new URL(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/calendar/webhook/renew`);
     
     const response = await fetch(url.toString(), {
       method: 'POST',
@@ -380,11 +394,17 @@ export const calendarService = {
         'Authorization': `Bearer ${session.access_token}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ userId: session.user.id }),
+      body: JSON.stringify({ user_id: session.user.id }),
     });
     
     const result = await response.json();
-    return result;
+    return {
+      ok: result.success,
+      webhook_id: result.webhook_id,
+      resource_id: result.webhook_id,
+      expiration: result.expiration,
+      error: result.message
+    };
   },
 
   // Get meetings for a specific project
@@ -392,8 +412,9 @@ export const calendarService = {
     const session = (await supabase.auth.getSession()).data.session;
     if (!session) throw new Error('Not authenticated');
     
-    const url = new URL(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-calendar/meetings`);
+    const url = new URL(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/calendar/meetings`);
     url.searchParams.set('project_id', projectId);
+    url.searchParams.set('user_id', session.user.id);
     
     const response = await fetch(url.toString(), {
       method: 'GET',
@@ -403,7 +424,7 @@ export const calendarService = {
     });
     
     const result = await response.json();
-    if (!result.ok) throw new Error(result.error || 'Failed to get project meetings');
+    if (!result.success) throw new Error(result.message || 'Failed to get project meetings');
     return result.meetings || [];
   },
 
@@ -553,7 +574,7 @@ export const calendarService = {
     const session = (await supabase.auth.getSession()).data.session;
     if (!session) throw new Error('Not authenticated');
     
-    const url = new URL(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-calendar-webhook/notify`);
+    const url = new URL(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/calendar/sync`);
     
     const response = await fetch(url.toString(), {
       method: 'POST',
@@ -562,14 +583,22 @@ export const calendarService = {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        state: 'sync',
-        userId: session.user.id,
-        resourceId: 'manual-trigger',
+        user_id: session.user.id,
+        calendar_id: 'primary',
+        sync_type: 'manual',
+        force_sync: true
       }),
     });
     
     const result = await response.json();
-    return result;
+    return {
+      ok: result.success,
+      processed: result.processed,
+      created: result.created,
+      updated: result.updated,
+      errors: result.errors,
+      error: result.message
+    };
   },
 
   // Get raw calendar events from Google
@@ -581,7 +610,8 @@ export const calendarService = {
     const session = (await supabase.auth.getSession()).data.session;
     if (!session) throw new Error('Not authenticated');
     
-    const url = new URL(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-calendar/raw-events`);
+    const url = new URL(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/calendar/events/raw`);
+    url.searchParams.set('user_id', session.user.id);
     url.searchParams.set('days_past', daysPast.toString());
     url.searchParams.set('days_future', daysFuture.toString());
     
@@ -593,7 +623,11 @@ export const calendarService = {
     });
     
     const result = await response.json();
-    return result;
+    return {
+      ok: result.success,
+      events: result.events,
+      error: result.message
+    };
   },
 
   // Simulate a webhook notification (for testing real-time sync)
@@ -608,8 +642,7 @@ export const calendarService = {
     const session = (await supabase.auth.getSession()).data.session;
     if (!session) throw new Error('Not authenticated');
     
-    const url = new URL(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-calendar-webhook/notify`);
-    url.searchParams.set('userId', session.user.id);
+    const url = new URL(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/calendar/sync`);
     
     const response = await fetch(url.toString(), {
       method: 'POST',
@@ -618,13 +651,22 @@ export const calendarService = {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        // Simulate a real webhook notification (no state: 'sync')
+        user_id: session.user.id,
+        calendar_id: 'primary',
+        sync_type: 'simulate',
         timestamp: new Date().toISOString(),
       }),
     });
     
     const result = await response.json();
-    return result;
+    return {
+      ok: result.success,
+      processed: result.processed,
+      created: result.created,
+      updated: result.updated,
+      errors: result.errors,
+      error: result.message
+    };
   },
 
   // Test webhook notification function removed for production
@@ -971,7 +1013,7 @@ export const calendarService = {
         return { success: false, error: 'No Google credentials found' };
       }
 
-      const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-calendar-webhook/notify?userId=${userId}`;
+      const webhookUrl = `${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/calendar/webhook/notify?userId=${userId}`;
       const channelId = `calendar-watch-${userId}-${Date.now()}`;
       const expiration = Date.now() + (7 * 24 * 60 * 60 * 1000); // 7 days
 
@@ -1761,7 +1803,7 @@ export const calendarService = {
 
       return {
         webhook_active: webhook.is_active,
-        webhook_url: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-calendar-webhook/notify?userId=${userId}`,
+        webhook_url: `${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/calendar/webhook/notify?userId=${userId}`,
         last_sync: webhook.updated_at,
         sync_logs: syncLogs || [],
         recent_errors: recentErrors || [],
@@ -1821,7 +1863,7 @@ export const calendarService = {
 
       if (stopResponse.ok) {
         // Webhook exists, now recreate it
-        const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-calendar-webhook/notify?userId=${userId}`;
+        const webhookUrl = `${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/calendar/webhook/notify?userId=${userId}`;
         const channelId = `calendar-watch-${userId}-${Date.now()}`;
         const expiration = Date.now() + (7 * 24 * 60 * 60 * 1000); // 7 days
 

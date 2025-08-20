@@ -104,13 +104,13 @@ class AttendeeServiceImpl implements AttendeeService {
 
   async pollAllMeetings() {
     // This endpoint doesn't require auth (for cron jobs)
-    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/attendee-service/poll-all`, {
+    const response = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/attendee/poll-all`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
     });
 
     const result = await response.json();
-    if (!result.success) throw new Error(result.error || 'Polling failed');
+    if (!result.success) throw new Error(result.message || 'Polling failed');
     
     return result.result;
   }

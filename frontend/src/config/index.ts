@@ -145,7 +145,8 @@ if (import.meta.env.DEV || import.meta.env.VITE_DEBUG_ENV === 'true') {
 // API endpoint builders with safe fallbacks
 export const apiEndpoints = {
   supabase: {
-    functions: (functionName: string) => `${config.supabase.url}/functions/v1/${functionName}`,
+    // Supabase Edge Functions have been migrated to Python backend
+    // functions: (functionName: string) => `${config.supabase.url}/functions/v1/${functionName}`,
     auth: `${config.supabase.url}/auth/v1`,
     rest: `${config.supabase.url}/rest/v1`,
     realtime: `${config.supabase.url}/realtime/v1`,

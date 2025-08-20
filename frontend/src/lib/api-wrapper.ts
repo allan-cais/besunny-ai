@@ -185,36 +185,34 @@ export class ApiWrapper {
   }
 }
 
-// Supabase API wrapper
+// Supabase API wrapper (Legacy - Edge Functions migrated to Python backend)
 export class SupabaseApiWrapper extends ApiWrapper {
   constructor() {
     super(config.supabase.url);
   }
 
-  // Call Supabase Edge Function
+  // Note: Supabase Edge Functions have been migrated to Python backend
+  // Use the Python backend API endpoints instead
+  
+  // Legacy method - now redirects to Python backend
   async callFunction<T = any>(
     functionName: string,
     data?: any,
     options?: Omit<ApiCallOptions, 'method' | 'body'>
   ): Promise<ApiResponse<T>> {
-    const endpoint = apiEndpoints.supabase.functions(functionName);
-    return this.post<T>(endpoint, data, options);
+    console.warn(`Supabase Edge Function ${functionName} has been migrated to Python backend. Please update your code to use the appropriate Python backend endpoint.`);
+    throw new Error(`Supabase Edge Function ${functionName} has been migrated to Python backend. Please update your code to use the appropriate Python backend endpoint.`);
   }
 
-  // Call Supabase Edge Function with authentication
+  // Legacy method - now redirects to Python backend
   async callFunctionWithAuth<T = any>(
     functionName: string,
     accessToken: string,
     data?: any,
     options?: Omit<ApiCallOptions, 'method' | 'body' | 'headers'>
   ): Promise<ApiResponse<T>> {
-    return this.callFunction<T>(functionName, data, {
-      ...options,
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        ...options?.headers,
-      },
-    });
+    console.warn(`Supabase Edge Function ${functionName} has been migrated to Python backend. Please update your code to use the appropriate Python backend endpoint.`);
+    throw new Error(`Supabase Edge Function ${functionName} has been migrated to Python backend. Please update your code to use the appropriate Python backend endpoint.`);
   }
 }
 

@@ -236,7 +236,7 @@ export class CalendarService {
     const session = (await supabase.auth.getSession()).data.session;
     if (!session) throw new Error('Not authenticated');
     
-    const url = new URL(`${config.supabase.url}/functions/v1/google-calendar-webhook/setup`);
+    const url = new URL(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/calendar/webhook`);
     
     const response = await fetch(url.toString(), {
       method: 'POST',
@@ -244,11 +244,20 @@ export class CalendarService {
         'Authorization': `Bearer ${session.access_token}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ userId: session.user.id }),
+      body: JSON.stringify({ 
+        user_id: session.user.id,
+        calendar_id: 'primary'
+      }),
     });
     
     const result = await response.json();
-    return result;
+    return {
+      ok: result.success,
+      webhook_id: result.webhook_id,
+      resource_id: result.webhook_id,
+      expiration: result.expiration,
+      error: result.message
+    };
   }
 
   // Initial sync
@@ -256,23 +265,25 @@ export class CalendarService {
     const session = (await supabase.auth.getSession()).data.session;
     if (!session) throw new Error('Not authenticated');
     
-    const url = new URL(`${config.supabase.url}/functions/v1/google-calendar/events`);
-    if (projectId) {
-      url.searchParams.set('project_id', projectId);
-    }
-    // Initial sync: 0 days past (today only), 60 days future
-    url.searchParams.set('days_past', '0');
-    url.searchParams.set('days_future', '60');
+    const url = new URL(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/calendar/sync`);
     
     const response = await fetch(url.toString(), {
-      method: 'GET',
+      method: 'POST',
       headers: {
         'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
       },
+      body: JSON.stringify({
+        user_id: session.user.id,
+        calendar_id: 'primary',
+        sync_range_days: 60,
+        project_id: projectId,
+        sync_type: 'initial'
+      }),
     });
     
     const result = await response.json();
-    if (!result.ok) throw new Error(result.error || 'Failed to sync calendar events');
+    if (!result.success) throw new Error(result.message || 'Failed to sync calendar events');
     return result;
   }
 
@@ -281,22 +292,25 @@ export class CalendarService {
     const session = (await supabase.auth.getSession()).data.session;
     if (!session) throw new Error('Not authenticated');
     
-    const url = new URL(`${config.supabase.url}/functions/v1/google-calendar/events`);
-    if (projectId) {
-      url.searchParams.set('project_id', projectId);
-    }
-    url.searchParams.set('days_past', daysPast.toString());
-    url.searchParams.set('days_future', daysFuture.toString());
+    const url = new URL(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/calendar/sync`);
     
     const response = await fetch(url.toString(), {
-      method: 'GET',
+      method: 'POST',
       headers: {
         'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
       },
+      body: JSON.stringify({
+        user_id: session.user.id,
+        calendar_id: 'primary',
+        sync_range_days: daysPast + daysFuture,
+        project_id: projectId,
+        sync_type: 'full'
+      }),
     });
     
     const result = await response.json();
-    if (!result.ok) throw new Error(result.error || 'Failed to sync calendar events');
+    if (!result.success) throw new Error(result.message || 'Failed to sync calendar events');
     return result;
   }
 
@@ -309,7 +323,8 @@ export class CalendarService {
     const session = (await supabase.auth.getSession()).data.session;
     if (!session) throw new Error('Not authenticated');
     
-    const url = new URL(`${config.supabase.url}/functions/v1/google-calendar/raw-events`);
+    const url = new URL(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/calendar/events/raw`);
+    url.searchParams.set('user_id', session.user.id);
     url.searchParams.set('days_past', daysPast.toString());
     url.searchParams.set('days_future', daysFuture.toString());
     
@@ -321,7 +336,11 @@ export class CalendarService {
     });
     
     const result = await response.json();
-    return result;
+    return {
+      ok: result.success,
+      events: result.events,
+      error: result.message
+    };
   }
 
   // Send bot to meeting
@@ -333,7 +352,7 @@ export class CalendarService {
     const session = (await supabase.auth.getSession()).data.session;
     if (!session) throw new Error('Not authenticated');
     
-    const url = new URL(`${config.supabase.url}/functions/v1/google-calendar/meetings`);
+    const url = new URL(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/attendee/send-bot`);
     
     const response = await fetch(url.toString(), {
       method: 'POST',
@@ -342,14 +361,18 @@ export class CalendarService {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        meetingId,
-        configuration,
-        userId: session.user.id,
+        meeting_url: meetingId,
+        bot_config: configuration,
+        user_id: session.user.id,
       }),
     });
     
     const result = await response.json();
-    return result;
+    return {
+      ok: result.success,
+      bot_id: result.bot_id,
+      error: result.message
+    };
   }
 
   // Update meeting
