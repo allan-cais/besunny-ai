@@ -217,8 +217,8 @@ const IntegrationsPage: React.FC = () => {
         throw new Error('No valid session found');
       }
 
-      // POST the code to the Python backend
-      const response = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/auth/google/oauth/callback`, {
+      // POST the code to the Python backend for workspace integration
+      const response = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/auth/google/workspace/oauth/callback`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

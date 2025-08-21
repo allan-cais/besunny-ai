@@ -255,6 +255,51 @@ async def exchange_google_token(
         )
 
 
+@router.post("/google/workspace/oauth/callback", response_model=Dict[str, Any])
+async def handle_google_workspace_oauth_callback(
+    request: Request,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    Handle Google Workspace OAuth callback for extended scopes.
+    
+    This endpoint handles OAuth callbacks for workspace integration with:
+    - Gmail access (gmail.modify)
+    - Drive access (drive)
+    - Calendar access (calendar)
+    """
+    try:
+        # Get the authorization code from the request body
+        body = await request.json()
+        code = body.get('code')
+        
+        if not code:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Authorization code is required"
+            )
+        
+        # Process the workspace OAuth callback
+        result = await oauth_service.handle_workspace_oauth_callback(code, current_user['id'])
+        
+        if not result.get('success'):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result.get('error', 'Workspace OAuth callback failed')
+            )
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Google Workspace OAuth callback error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Workspace OAuth processing failed"
+        )
+
+
 @router.post("/google/token/refresh", response_model=Dict[str, Any])
 async def refresh_google_token(
     user_id: str,

@@ -182,13 +182,24 @@ class GmailWatchSetupService:
     async def _get_active_users_with_gmail(self) -> List[Dict[str, Any]]:
         """Get all active users with Gmail integration."""
         try:
+            # Get users with workspace credentials that have Gmail API access
             result = self.supabase.table("google_credentials") \
-                .select("user_id, google_email") \
+                .select("user_id, google_email, scope") \
+                .eq("login_provider", False) \
                 .not_.is_("access_token", None) \
                 .execute()
             
             if result.data:
-                return result.data
+                # Filter for users with Gmail API scope
+                gmail_users = []
+                for cred in result.data:
+                    if 'gmail.modify' in cred.get('scope', ''):
+                        gmail_users.append({
+                            'user_id': cred['user_id'],
+                            'google_email': cred['google_email']
+                        })
+                return gmail_users
+            
             return []
             
         except Exception as e:
@@ -232,16 +243,36 @@ class GmailWatchSetupService:
         return expiration > datetime.now() + timedelta(hours=1)
     
     async def _get_user_credentials(self, user_id: str) -> Optional[Dict[str, Any]]:
-        """Get user's Google credentials."""
+        """Get user's Google credentials with Gmail API access."""
         try:
+            # First try to get workspace credentials (with Gmail API access)
             result = self.supabase.table("google_credentials") \
                 .select("*") \
                 .eq("user_id", user_id) \
+                .eq("login_provider", False) \
+                .execute()
+            
+            if result.data:
+                # Check if credentials have Gmail API scope
+                for cred in result.data:
+                    if 'gmail.modify' in cred.get('scope', ''):
+                        return cred
+                
+                # If no Gmail scope found, try login credentials as fallback
+                logger.warning(f"User {user_id} has workspace credentials but no Gmail API access")
+            
+            # Fallback to login credentials if no workspace credentials found
+            result = self.supabase.table("google_credentials") \
+                .select("*") \
+                .eq("user_id", user_id) \
+                .eq("login_provider", True) \
                 .single() \
                 .execute()
             
             if result.data:
+                logger.warning(f"User {user_id} using login credentials for Gmail watch (limited functionality)")
                 return result.data
+            
             return None
             
         except Exception as e:

@@ -68,6 +68,13 @@ class GoogleOAuthService:
             if not user_id:
                 return {'success': False, 'error': 'User creation failed'}
             
+            # Store Google credentials in database
+            credentials_stored = await self._store_google_credentials(
+                user_id, tokens, user_info
+            )
+            if not credentials_stored:
+                logger.warning(f"Failed to store credentials for user {user_id}")
+            
             return {
                 'success': True,
                 'user_id': user_id,
@@ -79,6 +86,39 @@ class GoogleOAuthService:
         except Exception as e:
             logger.error(f"OAuth callback error: {e}")
             return {'success': False, 'error': 'OAuth processing failed'}
+    
+    async def handle_workspace_oauth_callback(self, code: str, user_id: str) -> Dict[str, Any]:
+        """Handle Google Workspace OAuth callback for extended scopes."""
+        try:
+            # Exchange code for tokens with workspace scopes
+            tokens = await self._exchange_code_for_tokens(code)
+            if not tokens:
+                return {'success': False, 'error': 'Token exchange failed'}
+            
+            # Get user info to verify the account
+            user_info = await self._get_user_info(tokens.access_token)
+            if not user_info:
+                return {'success': False, 'error': 'Failed to get user info'}
+            
+            # Store workspace credentials in database (separate from login credentials)
+            credentials_stored = await self._store_workspace_credentials(
+                user_id, tokens, user_info
+            )
+            if not credentials_stored:
+                return {'success': False, 'error': 'Failed to store workspace credentials'}
+            
+            return {
+                'success': True,
+                'user_id': user_id,
+                'email': user_info.email,
+                'name': user_info.name,
+                'picture': user_info.picture,
+                'message': 'Google Workspace connected successfully'
+            }
+            
+        except Exception as e:
+            logger.error(f"Workspace OAuth callback error: {e}")
+            return {'success': False, 'error': 'Workspace OAuth processing failed'}
     
     async def _exchange_code_for_tokens(self, code: str) -> Optional[OAuthTokens]:
         """Exchange authorization code for tokens."""
@@ -169,6 +209,90 @@ class GoogleOAuthService:
         except Exception as e:
             logger.error(f"User upsert failed: {e}")
             return None
+    
+    async def _store_google_credentials(self, user_id: str, tokens: OAuthTokens, user_info: UserInfo) -> bool:
+        """Store Google OAuth credentials in database."""
+        try:
+            # Calculate expiration time
+            expires_at = datetime.now() + timedelta(seconds=tokens.expires_in)
+            
+            # Prepare credentials data
+            credentials_data = {
+                'user_id': user_id,
+                'access_token': tokens.access_token,
+                'refresh_token': tokens.refresh_token,
+                'token_type': 'Bearer',
+                'expires_at': expires_at.isoformat(),
+                'scope': 'https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile',
+                'google_email': user_info.email,
+                'google_user_id': user_info.id,
+                'google_name': user_info.name,
+                'google_picture': user_info.picture,
+                'login_provider': True,  # This is a login provider
+                'login_created_at': datetime.now().isoformat(),
+                'created_at': datetime.now().isoformat(),
+                'updated_at': datetime.now().isoformat()
+            }
+            
+            # Check if credentials already exist
+            existing = self.supabase.table("google_credentials").select("id").eq("user_id", user_id).execute()
+            
+            if existing.data:
+                # Update existing credentials
+                self.supabase.table("google_credentials").update(credentials_data).eq("user_id", user_id).execute()
+                logger.info(f"Updated Google credentials for user {user_id}")
+            else:
+                # Insert new credentials
+                self.supabase.table("google_credentials").insert(credentials_data).execute()
+                logger.info(f"Stored new Google credentials for user {user_id}")
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to store Google credentials for user {user_id}: {e}")
+            return False
+    
+    async def _store_workspace_credentials(self, user_id: str, tokens: OAuthTokens, user_info: UserInfo) -> bool:
+        """Store Google Workspace OAuth credentials in database."""
+        try:
+            # Calculate expiration time
+            expires_at = datetime.now() + timedelta(seconds=tokens.expires_in)
+            
+            # Prepare workspace credentials data
+            credentials_data = {
+                'user_id': user_id,
+                'access_token': tokens.access_token,
+                'refresh_token': tokens.refresh_token,
+                'token_type': 'Bearer',
+                'expires_at': expires_at.isoformat(),
+                'scope': 'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/calendar',
+                'google_email': user_info.email,
+                'google_user_id': user_info.id,
+                'google_name': user_info.name,
+                'google_picture': user_info.picture,
+                'login_provider': False,  # This is NOT a login provider, it's workspace integration
+                'login_created_at': None,
+                'created_at': datetime.now().isoformat(),
+                'updated_at': datetime.now().isoformat()
+            }
+            
+            # Check if workspace credentials already exist
+            existing = self.supabase.table("google_credentials").select("id").eq("user_id", user_id).eq("login_provider", False).execute()
+            
+            if existing.data:
+                # Update existing workspace credentials
+                self.supabase.table("google_credentials").update(credentials_data).eq("user_id", user_id).eq("login_provider", False).execute()
+                logger.info(f"Updated Google workspace credentials for user {user_id}")
+            else:
+                # Insert new workspace credentials
+                self.supabase.table("google_credentials").insert(credentials_data).execute()
+                logger.info(f"Stored new Google workspace credentials for user {user_id}")
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to store Google workspace credentials for user {user_id}: {e}")
+            return False
     
     async def close(self):
         """Clean up HTTP client."""
