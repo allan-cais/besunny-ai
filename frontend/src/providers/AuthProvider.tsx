@@ -5,7 +5,6 @@ import { supabase } from '@/lib/supabase';
 interface AuthContextType {
   user: User | null;
   session: Session | null;
-  loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signUp: (email: string, password: string, name: string) => Promise<{ error: AuthError | null }>;
   signInWithGoogle: () => Promise<{ error: AuthError | null }>;
@@ -30,7 +29,6 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
   const [initialized, setInitialized] = useState(false);
 
   // Initialize session on mount
@@ -42,7 +40,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (error) {
         setSession(null);
         setUser(null);
-        setLoading(false);
         setInitialized(true);
         return;
       }
@@ -55,12 +52,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setUser(null);
       }
       
-      setLoading(false);
       setInitialized(true);
     } catch (error) {
       setSession(null);
       setUser(null);
-      setLoading(false);
       setInitialized(true);
     }
   }, []);
@@ -69,7 +64,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const handleAuthStateChange = useCallback(async (event: string, newSession: Session | null) => {
     setSession(newSession);
     setUser(newSession?.user ?? null);
-    setLoading(false);
   }, []);
 
   // Initialize on mount
@@ -181,7 +175,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const value = {
     user,
     session,
-    loading,
     signIn,
     signUp,
     signInWithGoogle,
