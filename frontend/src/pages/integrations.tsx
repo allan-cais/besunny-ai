@@ -35,7 +35,7 @@ interface GoogleIntegrationStatus {
 }
 
 const IntegrationsPage: React.FC = () => {
-  const { user, loading: authLoading } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [googleStatus, setGoogleStatus] = useState<GoogleIntegrationStatus | null>(null);
@@ -67,14 +67,14 @@ const IntegrationsPage: React.FC = () => {
 
   // Load Google integration status when user changes
   useEffect(() => {
-    if (!authLoading && user?.id) {
-      loadGoogleStatus();
-      setPageLoading(false);
-    } else if (!authLoading && !user?.id) {
+    if (!user?.id) {
       setPageLoading(false);
       setError('User session not found. Please log in again.');
+    } else {
+      loadGoogleStatus();
+      setPageLoading(false);
     }
-  }, [authLoading, user?.id]);
+  }, [user?.id]);
 
   const getErrorMessage = (errorCode: string): string => {
     switch (errorCode) {
@@ -173,21 +173,9 @@ const IntegrationsPage: React.FC = () => {
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
     const redirectUri = `${window.location.origin}/integrations`;
     
-          if (!clientId) {
-        setError('Google OAuth client ID not configured');
-        return;
-      }
-
-    // If user is already connected, disconnect first to clear old tokens
-    if (googleStatus?.connected) {
-      try {
-        setConnecting(true);
-        await handleGoogleDisconnect();
-      } catch (error) {
-        // Continue anyway - the prompt=consent should handle scope updates
-      } finally {
-        setConnecting(false);
-      }
+    if (!clientId) {
+      setError('Google OAuth client ID not configured');
+      return;
     }
 
     const scopes = [
@@ -197,15 +185,15 @@ const IntegrationsPage: React.FC = () => {
       'https://www.googleapis.com/auth/calendar'
     ].join(' ');
 
-          const params = new URLSearchParams({
-        client_id: clientId,
-        redirect_uri: redirectUri,
-        response_type: 'code',
-        scope: scopes,
-        access_type: 'offline',
-        prompt: 'consent',
-        state: user.id
-      });
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      response_type: 'code',
+      scope: scopes,
+      access_type: 'offline',
+      prompt: 'consent',
+      state: user.id
+    });
 
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
     window.location.href = authUrl;
@@ -242,54 +230,28 @@ const IntegrationsPage: React.FC = () => {
       const result = await response.json();
 
       if (!response.ok) {
-        setError(result.error || 'Failed to exchange token');
+        setError(result.error || 'Failed to connect Google account');
         setSuccess(null);
-        throw new Error(result.error || 'Failed to exchange token');
+        return;
       }
 
       if (result.success) {
-        const successMessage = result.name && result.picture 
-          ? `Successfully connected to Google account: ${result.email}. Your profile has been updated with your Google information!`
-          : `Successfully connected to Google account: ${result.email}`;
-        
+        const successMessage = `Successfully connected to Google account: ${result.email}`;
         setSuccess(successMessage);
         setError(null);
+        
+        // Load updated Google status
         await loadGoogleStatus();
         
-        // Refresh user session to get updated profile information
-        try {
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session) {
-            // Trigger a session refresh to get updated user metadata
-            await supabase.auth.refreshSession();
-          }
-        } catch (refreshError) {
-        }
-        
-        // Automatically set up calendar sync
-        try {
-          const { calendarService } = await import('@/lib/calendar');
-          const syncResult = await calendarService.initializeCalendarSync(user.id);
-          
-          if (syncResult.success) {
-          } else {
-            // Calendar sync setup failed
-          }
-        } catch (syncError) {
-          // Calendar sync setup failed
-          // Continue anyway - sync can be set up later
-        }
         // Remove code/state from URL to prevent re-triggering
         navigate('/integrations', { replace: true });
       } else {
-        setError(result.message || 'Failed to connect Google account');
+        setError(result.error || 'Failed to connect Google account');
         setSuccess(null);
-        throw new Error(result.message || 'Failed to connect Google account');
       }
     } catch (error) {
-      setError(error.message || 'Failed to complete OAuth process');
+      setError('Failed to complete OAuth process');
       setSuccess(null);
-              // OAuth callback error
     } finally {
       setConnecting(false);
     }
@@ -376,11 +338,23 @@ const IntegrationsPage: React.FC = () => {
     return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
   };
 
-  if (authLoading || pageLoading) {
+  if (!user?.id) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="w-8 h-8 animate-spin mr-2" />
-        <span>Loading...</span>
+        <div className="text-center">
+          <h2 className="text-xl font-semibold mb-2">Authentication Required</h2>
+          <p className="text-gray-600">Please log in to access integrations.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (pageLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <span>Loading...</span>
+        </div>
       </div>
     );
   }

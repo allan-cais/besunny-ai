@@ -26,18 +26,15 @@ token_service = GoogleTokenService()
 settings = get_settings()
 
 
+@router.get("/health")
+async def auth_health_check():
+    """Health check for auth service."""
+    return {"status": "healthy", "service": "auth"}
+
+
 @router.post("/google/oauth/callback", response_model=Dict[str, Any])
 async def handle_google_oauth_callback(request: Request):
-    """
-    Handle Google OAuth callback with authorization code.
-    
-    This endpoint processes the OAuth callback from Google and:
-    1. Exchanges the authorization code for tokens
-    2. Gets user information from Google
-    3. Creates or updates the user in our system
-    4. Creates a user session
-    5. Returns authentication tokens and user info
-    """
+    """Handle Google OAuth callback efficiently."""
     try:
         # Get the authorization code from the request body
         body = await request.json()
@@ -49,8 +46,6 @@ async def handle_google_oauth_callback(request: Request):
                 detail="Authorization code is required"
             )
         
-        logger.info("Processing Google OAuth callback")
-        
         # Process the OAuth callback
         result = await oauth_service.handle_oauth_callback(code)
         
@@ -60,8 +55,16 @@ async def handle_google_oauth_callback(request: Request):
                 detail=result.get('error', 'OAuth callback failed')
             )
         
-        logger.info("Google OAuth callback completed successfully")
-        return result
+        # Return success response with proper headers
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            content=result,
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0"
+            }
+        )
         
     except HTTPException:
         raise
@@ -69,7 +72,7 @@ async def handle_google_oauth_callback(request: Request):
         logger.error(f"Google OAuth callback error: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error during OAuth callback"
+            detail="OAuth processing failed"
         )
 
 
@@ -485,26 +488,4 @@ async def logout(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error during logout"
-        )
-
-
-@router.get("/health")
-async def auth_health_check():
-    """
-    Health check for authentication services.
-    
-    This endpoint checks the health of authentication-related services.
-    """
-    try:
-        # Basic health check
-        return {
-            'status': 'healthy',
-            'service': 'authentication',
-            'timestamp': '2024-01-01T00:00:00Z'
-        }
-    except Exception as e:
-        logger.error(f"Auth health check error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Authentication service unhealthy"
         )
