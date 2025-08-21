@@ -22,8 +22,7 @@
     "prod:deploy": "cd backend && docker-compose --profile production up --build -d",
     "prod:logs": "cd backend && docker-compose --profile production logs -f",
     "prod:stop": "cd backend && docker-compose --profile production down",
-    "prod:scale": "cd backend && docker-compose --profile production up --scale backend=3 --scale celery=2 -d",
-
+    "prod:scale": "cd backend && docker-compose --profile production up --scale backend=3 --scale celery=2 -d"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
