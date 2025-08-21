@@ -193,11 +193,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   return (
     <AuthContext.Provider value={value}>
-      {loading ? (
-        <div style={{ padding: 40, textAlign: 'center' }}>
-          <span>Loading session...</span>
-        </div>
-      ) : children}
+      {children}
     </AuthContext.Provider>
   );
 }; 
