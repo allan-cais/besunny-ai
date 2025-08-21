@@ -121,7 +121,7 @@ async def update_document(
 ):
     """Update a specific document."""
     try:
-        supabase = get_supabase()
+        supabase = get_supabase_client()
         
         # Check if document exists and belongs to user
         existing_result = await supabase.table('documents').select('id').eq('id', document_id).eq('created_by', current_user.id).single().execute()
@@ -153,7 +153,7 @@ async def delete_document(
 ):
     """Delete a specific document."""
     try:
-        supabase = get_supabase()
+        supabase = get_supabase_client()
         
         # Check if document exists and belongs to user
         existing_result = await supabase.table('documents').select('id').eq('id', document_id).eq('created_by', current_user.id).single().execute()
@@ -181,7 +181,7 @@ async def get_project_documents(
 ):
     """Get all documents for a specific project."""
     try:
-        supabase = get_supabase()
+        supabase = get_supabase_client()
         
         # Get documents for project - ALWAYS filter by user first for security
         query = supabase.table('documents').select('*').eq('created_by', current_user.id).eq('project_id', project_id)
@@ -210,7 +210,7 @@ async def get_unclassified_documents(
 ):
     """Get unclassified documents (no project assigned)."""
     try:
-        supabase = get_supabase()
+        supabase = get_supabase_client()
         
         # Get unclassified documents - ALWAYS filter by user first for security
         query = supabase.table('documents').select('*').eq('created_by', current_user.id).is_('project_id', None)
@@ -239,7 +239,7 @@ async def assign_document_to_project(
 ):
     """Assign a document to a project."""
     try:
-        supabase = get_supabase()
+        supabase = get_supabase_client()
         
         # Check if document exists and belongs to user
         existing_result = await supabase.table('documents').select('id').eq('id', document_id).eq('created_by', current_user.id).single().execute()
@@ -277,7 +277,7 @@ async def remove_document_from_project(
 ):
     """Remove a document from its assigned project."""
     try:
-        supabase = get_supabase()
+        supabase = get_supabase_client()
         
         # Check if document exists and belongs to user
         existing_result = await supabase.table('documents').select('id').eq('id', document_id).eq('created_by', current_user.id).single().execute()
@@ -308,7 +308,7 @@ async def get_document_stats(
 ):
     """Get document statistics for the current user."""
     try:
-        supabase = get_supabase()
+        supabase = get_supabase_client()
         
         # Get total document count
         total_result = await supabase.table('documents').select('id', count='exact').eq('created_by', current_user.id).execute()
