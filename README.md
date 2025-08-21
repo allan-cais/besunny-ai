@@ -197,7 +197,3 @@ This project is part of the BeSunny.ai platform.
 - **Documentation**: Check the `/docs` folder
 - **Issues**: Create GitHub issues for bugs or feature requests
 - **Discussions**: Use GitHub Discussions for questions
-
----
-
-**Built with ❤️ by the BeSunny.ai team**
