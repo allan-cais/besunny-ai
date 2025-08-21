@@ -4,6 +4,7 @@ Clean, minimal, and production-ready implementation.
 """
 
 import logging
+import uuid
 from typing import Dict, Any, Optional
 from datetime import datetime, timedelta
 import httpx
@@ -36,7 +37,15 @@ class GoogleOAuthService:
     
     def __init__(self):
         self.settings = get_settings()
-        self.supabase = get_supabase()
+        # Use service role client to bypass RLS for OAuth operations
+        from ...core.supabase_config import get_supabase_service_client
+        self.supabase = get_supabase_service_client()
+        if not self.supabase:
+            # Fallback to regular client if service role not available
+            from ...core.supabase_config import get_supabase_client
+            self.supabase = get_supabase_client()
+            logger.warning("Using regular Supabase client - OAuth operations may fail due to RLS")
+        
         self.client_id = self.settings.google_client_id
         self.client_secret = self.settings.google_client_secret
         self.redirect_uri = self.settings.google_login_redirect_uri
@@ -207,19 +216,16 @@ class GoogleOAuthService:
                 user_id = result.data[0]['id']
                 self.supabase.table("users").update({
                     'name': user_info.name,
-                    'picture': user_info.picture,
-                    'updated_at': datetime.now().isoformat()
+                    'created_at': datetime.now().isoformat()
                 }).eq("id", user_id).execute()
                 return user_id
             else:
                 # Create new user
                 result = self.supabase.table("users").insert({
+                    'id': str(uuid.uuid4()),  # Generate UUID for id
                     'email': user_info.email,
                     'name': user_info.name,
-                    'picture': user_info.picture,
-                    'google_id': user_info.id,
-                    'created_at': datetime.now().isoformat(),
-                    'updated_at': datetime.now().isoformat()
+                    'created_at': datetime.now().isoformat()
                 }).execute()
                 
                 if result.data:

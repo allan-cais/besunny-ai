@@ -74,6 +74,35 @@ class SupabaseConfig:
             logger.error(f"Failed to initialize Supabase client: {e}")
             return False
     
+    def get_service_role_client(self) -> Optional[Client]:
+        """Get Supabase client with service role key (bypasses RLS)."""
+        try:
+            if not self.supabase_url or not self.supabase_service_role_key:
+                logger.error("Cannot create service role client: missing URL or service role key")
+                return None
+            
+            # Create client options
+            options = ClientOptions(
+                schema='public',
+                headers={
+                    'X-Client-Info': 'besunny-ai-python-backend-service-role'
+                }
+            )
+            
+            # Create Supabase client with service role key
+            service_client = create_client(
+                self.supabase_url,
+                self.supabase_service_role_key,
+                options=options
+            )
+            
+            logger.info("Service role Supabase client created successfully")
+            return service_client
+            
+        except Exception as e:
+            logger.error(f"Failed to create service role client: {e}")
+            return None
+    
     def _test_connection(self):
         """Test Supabase connection."""
         try:
@@ -122,6 +151,12 @@ def get_supabase_client() -> Optional[Client]:
     """Get initialized Supabase client."""
     config = get_supabase_config()
     return config.get_client()
+
+
+def get_supabase_service_client() -> Optional[Client]:
+    """Get Supabase client with service role key (bypasses RLS)."""
+    config = get_supabase_config()
+    return config.get_service_role_client()
 
 
 def is_supabase_available() -> bool:
