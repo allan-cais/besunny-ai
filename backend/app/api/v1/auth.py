@@ -269,9 +269,10 @@ async def handle_google_workspace_oauth_callback(
     - Calendar access (calendar)
     """
     try:
-        # Get the authorization code from the request body
+        # Get the authorization code and redirect URI from the request body
         body = await request.json()
         code = body.get('code')
+        redirect_uri = body.get('redirect_uri')
         
         if not code:
             raise HTTPException(
@@ -279,8 +280,14 @@ async def handle_google_workspace_oauth_callback(
                 detail="Authorization code is required"
             )
         
+        if not redirect_uri:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Redirect URI is required"
+            )
+        
         # Process the workspace OAuth callback
-        result = await oauth_service.handle_workspace_oauth_callback(code, current_user['id'])
+        result = await oauth_service.handle_workspace_oauth_callback(code, current_user['id'], redirect_uri)
         
         if not result.get('success'):
             raise HTTPException(

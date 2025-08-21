@@ -87,11 +87,11 @@ class GoogleOAuthService:
             logger.error(f"OAuth callback error: {e}")
             return {'success': False, 'error': 'OAuth processing failed'}
     
-    async def handle_workspace_oauth_callback(self, code: str, user_id: str) -> Dict[str, Any]:
+    async def handle_workspace_oauth_callback(self, code: str, user_id: str, redirect_uri: str) -> Dict[str, Any]:
         """Handle Google Workspace OAuth callback for extended scopes."""
         try:
-            # Exchange code for tokens with workspace scopes
-            tokens = await self._exchange_code_for_tokens(code)
+            # Exchange code for tokens with workspace scopes using the correct redirect URI
+            tokens = await self._exchange_code_for_tokens(code, redirect_uri)
             if not tokens:
                 return {'success': False, 'error': 'Token exchange failed'}
             
@@ -120,23 +120,40 @@ class GoogleOAuthService:
             logger.error(f"Workspace OAuth callback error: {e}")
             return {'success': False, 'error': 'Workspace OAuth processing failed'}
     
-    async def _exchange_code_for_tokens(self, code: str) -> Optional[OAuthTokens]:
+    async def _exchange_code_for_tokens(self, code: str, redirect_uri: Optional[str] = None) -> Optional[OAuthTokens]:
         """Exchange authorization code for tokens."""
         try:
+            # Use provided redirect_uri or fall back to default
+            final_redirect_uri = redirect_uri or self.redirect_uri
+            
+            if not final_redirect_uri:
+                logger.error("No redirect URI provided for token exchange")
+                return None
+            
+            logger.info(f"Exchanging OAuth code for tokens with redirect_uri: {final_redirect_uri}")
+            
             response = await self.http_client.post(
                 'https://oauth2.googleapis.com/token',
                 data={
                     'code': code,
                     'client_id': self.client_id,
                     'client_secret': self.client_secret,
-                    'redirect_uri': self.redirect_uri,
+                    'redirect_uri': final_redirect_uri,
                     'grant_type': 'authorization_code'
                 },
                 timeout=8.0
             )
+            
+            if not response.is_success:
+                error_text = response.text
+                logger.error(f"Google OAuth token exchange failed with status {response.status_code}: {error_text}")
+                return None
+                
             response.raise_for_status()
             
             data = response.json()
+            logger.info(f"Successfully exchanged OAuth code for tokens. Scopes: {data.get('scope', 'N/A')}")
+            
             return OAuthTokens(
                 access_token=data['access_token'],
                 refresh_token=data.get('refresh_token', ''),
@@ -145,6 +162,9 @@ class GoogleOAuthService:
             
         except httpx.TimeoutException:
             logger.error("Token exchange timeout")
+            return None
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error during token exchange: {e.response.status_code} - {e.response.text}")
             return None
         except Exception as e:
             logger.error(f"Token exchange failed: {e}")
