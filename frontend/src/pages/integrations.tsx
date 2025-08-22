@@ -200,16 +200,23 @@ const IntegrationsPage: React.FC = () => {
   };
 
   const handleOAuthCallback = async (code: string, state: string) => {
+    console.log('🔍 OAuth Debug - handleOAuthCallback called with:', { code: code?.substring(0, 20) + '...', state, userId: user?.id });
+    
     if (!user?.id || state !== user.id) {
+      console.log('🔍 OAuth Debug - Invalid callback:', { hasUser: !!user?.id, stateMatches: state === user?.id });
       setError('Invalid OAuth callback');
       setSuccess(null);
       return;
     }
 
     try {
+      console.log('🔍 OAuth Debug - Starting OAuth process...');
       setConnecting(true);
       setError(null);
       setSuccess(null);
+      
+      // DEBUG MODE: Prevent any redirects and show detailed logging
+      console.log('🔍 OAuth Debug - DEBUG MODE: Will prevent redirects to see what happens');
 
         // For existing users, use workspace OAuth to connect Google account
         const supabaseSession = await supabase.auth.getSession();
@@ -261,22 +268,37 @@ const IntegrationsPage: React.FC = () => {
         if (workspaceResult.success) {
           // Google account connected successfully
           const successMessage = `Google account connected successfully: ${workspaceResult.email}`;
+          console.log('🔍 OAuth Debug - Success!', {
+            message: successMessage,
+            result: workspaceResult
+          });
+          
           setSuccess(successMessage);
           setError(null);
           
           // Load updated Google status
+          console.log('🔍 OAuth Debug - Loading updated Google status...');
           await loadGoogleStatus();
           
           // Remove code/state from URL to prevent re-triggering
-          navigate('/integrations', { replace: true });
+          console.log('🔍 OAuth Debug - Navigating to integrations page...');
+          
+          // DEBUG MODE: Comment out navigation to see what happens
+          // navigate('/integrations', { replace: true });
+          console.log('🔍 OAuth Debug - DEBUG MODE: Navigation commented out to prevent redirect');
+          
+          console.log('🔍 OAuth Debug - Navigation completed');
         } else {
+          console.log('🔍 OAuth Debug - OAuth failed:', workspaceResult);
           setError(workspaceResult.error || 'Failed to connect Google account');
           setSuccess(null);
         }
     } catch (error) {
+      console.log('🔍 OAuth Debug - Error in OAuth process:', error);
       setError('Failed to complete OAuth process');
       setSuccess(null);
     } finally {
+      console.log('🔍 OAuth Debug - OAuth process completed, setting connecting to false');
       setConnecting(false);
     }
   };
