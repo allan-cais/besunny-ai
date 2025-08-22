@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/providers/AuthProvider';
 import { useSupabase } from '@/hooks/use-supabase';
-import { ChatSession, supabaseService } from '@/lib/supabase';
+import { supabaseService } from '@/lib/supabase';
 import CreateProjectDialog from '@/components/CreateProjectDialog';
 import AIAssistant from '@/components/AIAssistant';
 import ProjectChat from '@/components/ProjectChat';
 import { v4 as uuidv4 } from 'uuid';
+import type { Project, ChatSession } from '@/types';
 import {
   Header,
   NavigationSidebar,
@@ -31,6 +32,25 @@ const DashboardLayout = () => {
   const [activeFeedItemId, setActiveFeedItemId] = useState<string | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
+
+  // Debug logging
+  console.log('🔍 DashboardLayout Debug:', {
+    pathname: location.pathname,
+    search: location.search,
+    hasUser: !!user,
+    userId: user?.id,
+    hasSession: !!session,
+    timestamp: new Date().toISOString()
+  });
+
+  // Track location changes for debugging
+  useEffect(() => {
+    console.log('🔍 DashboardLayout Debug: Location changed:', {
+      pathname: location.pathname,
+      search: location.search,
+      timestamp: new Date().toISOString()
+    });
+  }, [location.pathname, location.search]);
 
   // Load projects for the current user
   useEffect(() => {

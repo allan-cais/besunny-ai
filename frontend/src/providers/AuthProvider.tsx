@@ -33,11 +33,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Initialize session on mount
   const initializeSession = useCallback(async () => {
+    console.log('🔍 AuthProvider Debug: Starting session initialization');
     try {
       // Get current session
       const { data: { session: currentSession }, error } = await supabase.auth.getSession();
       
+      console.log('🔍 AuthProvider Debug: Session check result:', {
+        hasSession: !!currentSession,
+        hasError: !!error,
+        errorMessage: error?.message,
+        userId: currentSession?.user?.id,
+        timestamp: new Date().toISOString()
+      });
+      
       if (error) {
+        console.log('🔍 AuthProvider Debug: Session error, clearing state');
         setSession(null);
         setUser(null);
         setInitialized(true);
@@ -45,15 +55,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
       
       if (currentSession) {
+        console.log('🔍 AuthProvider Debug: Setting session and user');
         setSession(currentSession);
         setUser(currentSession.user);
       } else {
+        console.log('🔍 AuthProvider Debug: No session found, clearing state');
         setSession(null);
         setUser(null);
       }
       
+      console.log('🔍 AuthProvider Debug: Session initialization complete');
       setInitialized(true);
     } catch (error) {
+      console.error('🔍 AuthProvider Debug: Session initialization error:', error);
       setSession(null);
       setUser(null);
       setInitialized(true);
@@ -62,24 +76,44 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Handle auth state changes
   const handleAuthStateChange = useCallback(async (event: string, newSession: Session | null) => {
+    console.log('🔍 AuthProvider Debug: Auth state change:', {
+      event,
+      hasNewSession: !!newSession,
+      userId: newSession?.user?.id,
+      timestamp: new Date().toISOString()
+    });
+    
     setSession(newSession);
     setUser(newSession?.user ?? null);
   }, []);
 
   // Initialize on mount
   useEffect(() => {
+    console.log('🔍 AuthProvider Debug: Initialization effect triggered:', {
+      initialized,
+      timestamp: new Date().toISOString()
+    });
+    
     if (!initialized) {
+      console.log('🔍 AuthProvider Debug: Starting initialization');
       initializeSession();
     }
   }, [initialized, initializeSession]);
 
   // Set up auth state listener
   useEffect(() => {
+    console.log('🔍 AuthProvider Debug: Auth state listener effect triggered:', {
+      initialized,
+      timestamp: new Date().toISOString()
+    });
+    
     if (!initialized) return;
     
+    console.log('🔍 AuthProvider Debug: Setting up auth state listener');
     const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthStateChange);
 
     return () => {
+      console.log('🔍 AuthProvider Debug: Cleaning up auth state listener');
       subscription.unsubscribe();
     };
   }, [initialized, handleAuthStateChange]);

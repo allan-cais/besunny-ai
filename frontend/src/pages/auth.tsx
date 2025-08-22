@@ -11,13 +11,24 @@ const AuthPage: React.FC = () => {
   const [mode, setMode] = useState<AuthMode>('login');
   const { user, loading } = useAuth();
 
+  // Debug logging
+  console.log('🔍 AuthPage Debug:', {
+    hasUser: !!user,
+    userId: user?.id,
+    loading,
+    pathname: window.location.pathname,
+    timestamp: new Date().toISOString()
+  });
+
   // If user is already authenticated, redirect to dashboard
   if (!loading && user) {
+    console.log('🔍 AuthPage Debug: User authenticated, redirecting to dashboard');
     return <Navigate to="/dashboard" replace />;
   }
 
   // Show loading spinner while checking authentication
   if (loading) {
+    console.log('🔍 AuthPage Debug: Showing loading state');
     return (
       <div className="min-h-screen bg-white text-black font-mono flex items-center justify-center">
         <div className="text-center space-y-4">
@@ -27,6 +38,8 @@ const AuthPage: React.FC = () => {
       </div>
     );
   }
+
+  console.log('🔍 AuthPage Debug: Rendering auth form');
 
   const renderForm = () => {
     switch (mode) {

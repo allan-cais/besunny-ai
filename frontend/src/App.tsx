@@ -17,8 +17,6 @@ import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import ProjectDashboard from "./pages/project";
 import SettingsPage from "./pages/settings";
-import EnvironmentDebug from "./components/EnvironmentDebug";
-import RailwayEnvironmentTest from "./components/RailwayEnvironmentTest";
 import { updateConfigFromRuntime } from "./config";
 
 const queryClient = new QueryClient();
@@ -40,8 +38,10 @@ const App = () => {
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<AuthPage />} />
+              
+              {/* Protected routes that use DashboardLayout */}
               <Route 
-                path="/dashboard" 
+                path="/" 
                 element={
                   <ProtectedRoute>
                     <DashboardLayout />
@@ -49,57 +49,27 @@ const App = () => {
                 } 
               >
                 <Route index element={<Dashboard />} />
+                <Route path="dashboard" element={<Dashboard />} />
+                <Route path="integrations" element={<IntegrationsPage />} />
+                <Route path="settings" element={<SettingsPage />} />
+                <Route path="project/:projectId" element={<ProjectDashboard />} />
+                <Route path="debug" element={<div className="p-8">Debug Route - Current path: {window.location.pathname}</div>} />
               </Route>
-              <Route 
-                path="/integrations" 
-                element={
-                  <ProtectedRoute>
-                    <DashboardLayout />
-                  </ProtectedRoute>
-                } 
-              >
-                <Route index element={<IntegrationsPage />} />
-              </Route>
+              
+              {/* OAuth callback routes - these don't use DashboardLayout */}
               <Route 
                 path="/oauth/callback" 
-                element={
-                  <OAuthCallback />
-                } 
+                element={<OAuthCallback />} 
               />
               <Route 
                 path="/oauth-login-callback" 
-                element={
-                  <OAuthLoginCallback />
-                } 
+                element={<OAuthLoginCallback />} 
               />
-              <Route 
-                path="/project/:projectId" 
-                element={
-                  <ProtectedRoute>
-                    <DashboardLayout />
-                  </ProtectedRoute>
-                } 
-              >
-                <Route index element={<ProjectDashboard />} />
-              </Route>
-              <Route 
-                path="/settings" 
-                element={
-                  <ProtectedRoute>
-                    <DashboardLayout />
-                  </ProtectedRoute>
-                } 
-              >
-                <Route index element={<SettingsPage />} />
-              </Route>
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              
+              {/* Catch-all route */}
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
-          
-          {/* Temporary debug component for staging troubleshooting */}
-          {/* <EnvironmentDebug show={true} /> */}
-          {/* <RailwayEnvironmentTest /> */}
         </TooltipProvider>
       </ThemeProvider>
     </AuthProvider>
