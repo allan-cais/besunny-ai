@@ -74,6 +74,10 @@ const IntegrationsPage: React.FC = () => {
       allParams: Object.fromEntries(searchParams.entries())
     });
     
+    // Also log the raw location search to see what's actually in the URL
+    console.log('🔍 OAuth Debug - Raw location.search:', window.location.search);
+    console.log('🔍 OAuth Debug - Raw URLSearchParams:', Object.fromEntries(new URLSearchParams(window.location.search)));
+    
     const errorParam = searchParams.get('error');
     const codeParam = searchParams.get('code');
     const stateParam = searchParams.get('state');
@@ -90,6 +94,13 @@ const IntegrationsPage: React.FC = () => {
       handleOAuthCallback(codeParam, stateParam);
     } else {
       console.log('🔍 OAuth Debug - No OAuth parameters or already handled');
+      console.log('🔍 OAuth Debug - Debug info:', {
+        hasCode: !!codeParam,
+        hasState: !!stateParam,
+        codeLength: codeParam?.length || 0,
+        stateLength: stateParam?.length || 0,
+        alreadyHandled: hasHandledCallback.current
+      });
     }
   }, [searchParams]);
 
@@ -203,7 +214,7 @@ const IntegrationsPage: React.FC = () => {
     }
 
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-    const redirectUri = `${window.location.origin}/integrations`;
+    const redirectUri = `${window.location.origin}/oauth/callback`;
     
     console.log('🔍 OAuth Debug - handleGoogleConnect called:', {
       userId: user.id,
@@ -678,6 +689,8 @@ const IntegrationsPage: React.FC = () => {
           )}
         </CardContent>
       </Card>
+
+
 
       {/* Attendee Integration Card - Hidden for now, using master API key */}
       {/* <AttendeeIntegration onStatusChange={setAttendeeStatus} /> */}
