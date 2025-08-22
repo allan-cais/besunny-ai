@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
-import { config } from '../config';
+import type { User, Session } from '@supabase/supabase-js';
+import config from '../config/environment';
 import type { 
   Project, 
   Meeting, 
@@ -19,12 +20,20 @@ const supabaseUrl = config.supabase.url;
 const supabaseAnonKey = config.supabase.anonKey;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  // Supabase environment variables not configured
+  console.error('Supabase environment variables not configured');
 }
 
 export const supabase = createClient(
   supabaseUrl || '',
-  supabaseAnonKey || ''
+  supabaseAnonKey || '',
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      flowType: 'pkce'
+    }
+  }
 );
 
 // Database types are now imported from types/index.ts

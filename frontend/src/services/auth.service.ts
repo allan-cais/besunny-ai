@@ -47,6 +47,14 @@ export class AuthenticationService {
       // Get initial session without showing loading state
       const { data: { session }, error } = await supabase.auth.getSession();
       
+      if (config.features.enableDebugMode) {
+        console.log('Auth Service: Initial session check', { 
+          hasSession: !!session, 
+          hasUser: !!session?.user, 
+          error: error?.message 
+        });
+      }
+      
       if (error) {
         this.updateState({ error: error.message, loading: false });
         return;
@@ -58,8 +66,19 @@ export class AuthenticationService {
           session, 
           loading: false 
         });
+        
+        if (config.features.enableDebugMode) {
+          console.log('Auth Service: Session restored successfully', { 
+            userId: session.user.id, 
+            email: session.user.email 
+          });
+        }
       } else {
         this.updateState({ loading: false });
+        
+        if (config.features.enableDebugMode) {
+          console.log('Auth Service: No session found, user not authenticated');
+        }
       }
 
       // Listen for auth changes
@@ -283,7 +302,8 @@ export class AuthenticationService {
   }
 
   public isAuthenticated(): boolean {
-    return !!this.authState.user && !!this.authState.session;
+    // Ensure both user and session are available and valid
+    return !!(this.authState.user && this.authState.session);
   }
 
   public isInitializing(): boolean {
@@ -294,6 +314,15 @@ export class AuthenticationService {
   public isOperationLoading(): boolean {
     // Show operation loading only during actual operations (sign in, sign up, etc.)
     return this.authState.loading && (!!this.authState.user || !!this.authState.session);
+  }
+
+  public isAuthStateStable(): boolean {
+    // Check if authentication state is stable and ready for navigation decisions
+    // This prevents premature redirects during state transitions
+    return !this.authState.loading && (
+      (!!this.authState.user && !!this.authState.session) || 
+      (!this.authState.user && !this.authState.session)
+    );
   }
 
   public getCurrentUser(): User | null {

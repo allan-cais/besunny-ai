@@ -21,6 +21,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isInitializing: boolean;
   isOperationLoading: boolean;
+  isAuthStateStable: boolean;
   clearError: () => void;
 }
 
@@ -96,6 +97,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isAuthenticated: authService.isAuthenticated(),
     isInitializing: authService.isInitializing(),
     isOperationLoading: authService.isOperationLoading(),
+    isAuthStateStable: authService.isAuthStateStable(),
     clearError,
   };
 

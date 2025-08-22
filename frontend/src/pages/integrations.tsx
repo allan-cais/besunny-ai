@@ -30,13 +30,13 @@ import { oauthService, type GoogleIntegrationStatus } from '@/services/oauth.ser
 import PageHeader from '@/components/dashboard/PageHeader';
 
 const IntegrationsPage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, session, loading } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const location = useLocation();
   
   const [googleStatus, setGoogleStatus] = useState<GoogleIntegrationStatus | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [statusLoading, setStatusLoading] = useState(false);
   const [oauthState, setOauthState] = useState(oauthService.getState());
 
   // Subscribe to OAuth state changes
@@ -91,14 +91,14 @@ const IntegrationsPage: React.FC = () => {
     if (!user?.id) return;
     
     try {
-      setLoading(true);
+      setStatusLoading(true);
       const status = await oauthService.checkIntegrationStatus();
       setGoogleStatus(status);
     } catch (error) {
       console.error('Failed to load Google status:', error);
       setGoogleStatus({ connected: false });
     } finally {
-      setLoading(false);
+      setStatusLoading(false);
     }
   };
 
@@ -160,6 +160,17 @@ const IntegrationsPage: React.FC = () => {
         title="INTEGRATIONS"
         path="Connect your Google Workspace for seamless data integration"
       />
+
+      {/* Debug Info - Remove this after testing */}
+      {import.meta.env.DEV && (
+        <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded text-xs">
+          <strong>Debug Info:</strong><br />
+          User: {user?.id ? '✅' : '❌'}<br />
+          Session: {session?.access_token ? '✅' : '❌'}<br />
+          Path: {location.pathname}<br />
+          Loading: {loading ? '✅' : '❌'}
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto scrollbar-hide space-y-6">
         {/* Error Alert */}
@@ -236,7 +247,7 @@ const IntegrationsPage: React.FC = () => {
           </CardHeader>
 
           <CardContent>
-            {loading ? (
+            {statusLoading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="w-6 h-6 animate-spin mr-2" />
                 <span className="text-sm">Loading status...</span>
