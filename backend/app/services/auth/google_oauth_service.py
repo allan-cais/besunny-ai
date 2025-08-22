@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 import httpx
 from pydantic import BaseModel
 
-from ...core.database import get_supabase
+from ...core.supabase_config import get_supabase_client, get_supabase_service_client
 from ...core.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -37,14 +37,22 @@ class GoogleOAuthService:
     
     def __init__(self):
         self.settings = get_settings()
+        
+        # Log configuration values for debugging
+        logger.info(f"🔍 OAuth Debug - Service Init: Supabase URL: {self.settings.supabase_url}")
+        logger.info(f"🔍 OAuth Debug - Service Init: Has anon key: {bool(self.settings.supabase_anon_key)}")
+        logger.info(f"🔍 OAuth Debug - Service Init: Has service role key: {bool(self.settings.supabase_service_role_key)}")
+        logger.info(f"🔍 OAuth Debug - Service Init: Google client ID: {bool(self.settings.google_client_id)}")
+        logger.info(f"🔍 OAuth Debug - Service Init: Google client secret: {bool(self.settings.google_client_secret)}")
+        
         # Use service role client to bypass RLS for OAuth operations
-        from ...core.supabase_config import get_supabase_service_client
         self.supabase = get_supabase_service_client()
         if not self.supabase:
             # Fallback to regular client if service role not available
-            from ...core.supabase_config import get_supabase_client
             self.supabase = get_supabase_client()
             logger.warning("Using regular Supabase client - OAuth operations may fail due to RLS")
+        
+        logger.info(f"🔍 OAuth Debug - Service Init: Supabase client type: {type(self.supabase)}")
         
         self.client_id = self.settings.google_client_id
         self.client_secret = self.settings.google_client_secret
@@ -103,6 +111,26 @@ class GoogleOAuthService:
         try:
             logger.info(f"🔍 OAuth Debug - OAuth Service: Starting workspace OAuth for user {user_id}")
             logger.info(f"🔍 OAuth Debug - OAuth Service: Code length: {len(code) if code else 0}, Redirect URI: {redirect_uri}")
+            logger.info(f"🔍 OAuth Debug - OAuth Service: Supabase token length: {len(supabase_access_token) if supabase_access_token else 0}")
+            
+            # Validate input parameters
+            if not code:
+                logger.error("🔍 OAuth Debug - OAuth Service: Missing authorization code")
+                return {'success': False, 'error': 'Authorization code is required'}
+            
+            if not user_id:
+                logger.error("🔍 OAuth Debug - OAuth Service: Missing user ID")
+                return {'success': False, 'error': 'User ID is required'}
+            
+            if not redirect_uri:
+                logger.error("🔍 OAuth Debug - OAuth Service: Missing redirect URI")
+                return {'success': False, 'error': 'Redirect URI is required'}
+            
+            if not supabase_access_token:
+                logger.error("🔍 OAuth Debug - OAuth Service: Missing Supabase access token")
+                return {'success': False, 'error': 'Supabase access token is required'}
+            
+            logger.info("🔍 OAuth Debug - OAuth Service: All input parameters validated successfully")
             
             # Exchange code for tokens with workspace scopes using the correct redirect URI
             logger.info("🔍 OAuth Debug - OAuth Service: Exchanging code for tokens...")
@@ -394,7 +422,7 @@ class GoogleOAuthService:
             from supabase import create_client, Client
             from supabase.lib.client_options import ClientOptions
             
-            # Create client options
+            # Create client options with the user's access token in Authorization header
             options = ClientOptions(
                 schema='public',
                 headers={
@@ -405,11 +433,11 @@ class GoogleOAuthService:
             
             logger.info(f"🔍 OAuth Debug - Client Creation: Options created - schema: {options.schema}, headers: {options.headers}")
             
-            # Create Supabase client with user's access token
+            # Create Supabase client with anon key but pass user's access token in headers
             # This client will respect RLS policies based on the user's authentication
             authenticated_client = create_client(
                 self.settings.supabase_url,
-                access_token,  # Use the access token as the key
+                self.settings.supabase_anon_key,  # Use anon key, not access token
                 options=options
             )
             

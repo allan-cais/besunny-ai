@@ -133,6 +133,109 @@ async def get_current_user(
         )
 
 
+async def get_current_user_from_supabase_token(
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+) -> dict:
+    """Dependency to get current authenticated user from Supabase token."""
+    try:
+        token = credentials.credentials
+        
+        # Validate the Supabase token by making a request to Supabase
+        from .supabase_config import get_supabase
+        supabase = get_supabase()
+        
+        # Use the token to get user info from Supabase
+        response = supabase.auth.get_user(token)
+        
+        if response.error or not response.user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid Supabase token",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        user = response.user
+        
+        return {
+            "id": user.id,
+            "email": user.email,
+            "username": user.user_metadata.get("username"),
+            "permissions": user.user_metadata.get("permissions", []),
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Supabase authentication error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Supabase authentication failed",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+
+async def get_current_user_hybrid(
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+) -> dict:
+    """Dependency to get current authenticated user from either JWT or Supabase token."""
+    try:
+        token = credentials.credentials
+        
+        # First try to validate as JWT token
+        try:
+            payload = security_manager.verify_token(token)
+            if payload and payload.get("sub"):
+                return {
+                    "id": payload.get("sub"),
+                    "email": payload.get("email"),
+                    "username": payload.get("username"),
+                    "permissions": payload.get("permissions", []),
+                }
+        except Exception:
+            pass
+        
+        # If JWT validation fails, try Supabase token
+        try:
+            from .supabase_config import get_supabase
+            supabase = get_supabase()
+            
+            response = supabase.auth.get_user(token)
+            
+            if response.error or not response.user:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid token",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+            
+            user = response.user
+            
+            return {
+                "id": user.id,
+                "email": user.email,
+                "username": user.user_metadata.get("username"),
+                "permissions": user.user_metadata.get("permissions", []),
+            }
+            
+        except Exception as e:
+            logger.error(f"Supabase token validation failed: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Hybrid authentication error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication failed",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+
 async def get_current_active_user(
     current_user: dict = Depends(get_current_user)
 ) -> dict:

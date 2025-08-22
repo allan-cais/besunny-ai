@@ -181,3 +181,8 @@ def get_supabase_service_role_key() -> Optional[str]:
     """Get Supabase service role key."""
     config = get_supabase_config()
     return config.supabase_service_role_key
+
+
+def get_supabase() -> Optional[Client]:
+    """Get initialized Supabase client (alias for get_supabase_client)."""
+    return get_supabase_client()

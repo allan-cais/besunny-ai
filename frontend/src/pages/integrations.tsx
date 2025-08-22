@@ -55,7 +55,8 @@ const IntegrationsPage: React.FC = () => {
       pathname: location.pathname,
       search: location.search,
       hash: location.hash,
-      fullUrl: window.location.href
+      fullUrl: window.location.href,
+      timestamp: new Date().toISOString()
     });
     
     // Also log the raw URL search params to see what Google is sending back
@@ -71,7 +72,8 @@ const IntegrationsPage: React.FC = () => {
       error: searchParams.get('error'),
       code: searchParams.get('code')?.substring(0, 20) + '...',
       state: searchParams.get('state'),
-      allParams: Object.fromEntries(searchParams.entries())
+      allParams: Object.fromEntries(searchParams.entries()),
+      timestamp: new Date().toISOString()
     });
     
     // Also log the raw location search to see what's actually in the URL
@@ -83,6 +85,18 @@ const IntegrationsPage: React.FC = () => {
     const errorParam = urlParams.get('error');
     const codeParam = urlParams.get('code');
     const stateParam = urlParams.get('state');
+
+    console.log('🔍 OAuth Debug - Parsed URL params:', {
+      error: errorParam,
+      code: codeParam?.substring(0, 20) + '...',
+      state: stateParam,
+      codeLength: codeParam?.length || 0,
+      stateLength: stateParam?.length || 0,
+      hasError: !!errorParam,
+      hasCode: !!codeParam,
+      hasState: !!stateParam,
+      timestamp: new Date().toISOString()
+    });
 
     if (errorParam) {
       console.log('🔍 OAuth Debug - Error parameter found:', errorParam);
@@ -101,14 +115,84 @@ const IntegrationsPage: React.FC = () => {
         hasState: !!stateParam,
         codeLength: codeParam?.length || 0,
         stateLength: stateParam?.length || 0,
-        alreadyHandled: hasHandledCallback.current
+        alreadyHandled: hasHandledCallback.current,
+        timestamp: new Date().toISOString()
       });
     }
-  }, [searchParams]);
+  }, [searchParams, location.search]); // Add location.search as dependency
+
+  // Additional effect to check for OAuth parameters on component mount
+  useEffect(() => {
+    console.log('🔍 OAuth Debug - Component mount effect - checking URL for OAuth params');
+    console.log('🔍 OAuth Debug - Mount effect timestamp:', new Date().toISOString());
+    
+    // Check if we have OAuth parameters in the URL on mount
+    const urlParams = new URLSearchParams(window.location.search);
+    const errorParam = urlParams.get('error');
+    const codeParam = urlParams.get('code');
+    const stateParam = urlParams.get('state');
+
+    console.log('🔍 OAuth Debug - Mount check - URL params:', {
+      error: errorParam,
+      code: codeParam?.substring(0, 20) + '...',
+      state: stateParam,
+      hasParams: !!(errorParam || codeParam || stateParam),
+      fullUrl: window.location.href,
+      search: window.location.search
+    });
+
+    // If we have OAuth parameters and haven't handled them yet, process them
+    if ((errorParam || (codeParam && stateParam)) && !hasHandledCallback.current) {
+      console.log('🔍 OAuth Debug - Mount check - Found OAuth params, processing...');
+      
+      if (errorParam) {
+        console.log('🔍 OAuth Debug - Mount check - Processing error parameter');
+        setError(getErrorMessage(errorParam));
+        setSuccess(null);
+        hasHandledCallback.current = true;
+      } else if (codeParam && stateParam) {
+        console.log('🔍 OAuth Debug - Mount check - Processing code and state parameters');
+        hasHandledCallback.current = true;
+        setError(null);
+        setSuccess(null);
+        handleOAuthCallback(codeParam, stateParam);
+      }
+    } else {
+      console.log('🔍 OAuth Debug - Mount check - No OAuth params or already handled');
+    }
+  }, []); // Only run on mount
+
+  // Debug effect to show environment variables
+  useEffect(() => {
+    console.log('🔍 OAuth Debug - Environment effect triggered:', {
+      timestamp: new Date().toISOString()
+    });
+    
+    console.log('🔍 OAuth Debug - Environment variables:', {
+      VITE_GOOGLE_CLIENT_ID: import.meta.env.VITE_GOOGLE_CLIENT_ID ? 'Set' : 'Not set',
+      VITE_PYTHON_BACKEND_URL: import.meta.env.VITE_PYTHON_BACKEND_URL || 'Not set',
+      NODE_ENV: import.meta.env.NODE_ENV,
+      MODE: import.meta.env.MODE,
+      DEV: import.meta.env.DEV,
+      PROD: import.meta.env.PROD
+    });
+    
+    console.log('🔍 OAuth Debug - Current location:', {
+      origin: window.location.origin,
+      pathname: window.location.pathname,
+      search: window.location.search,
+      href: window.location.href
+    });
+  }, []);
 
   // Load Google integration status when user changes
   useEffect(() => {
-    console.log('🔍 OAuth Debug - User effect triggered:', { userId: user?.id, hasUser: !!user?.id });
+    console.log('🔍 OAuth Debug - User effect triggered:', { 
+      userId: user?.id, 
+      hasUser: !!user?.id,
+      userEmail: user?.email,
+      timestamp: new Date().toISOString()
+    });
     
     if (!user?.id) {
       console.log('🔍 OAuth Debug - No user, setting error');
@@ -266,10 +350,22 @@ const IntegrationsPage: React.FC = () => {
   };
 
   const handleOAuthCallback = async (code: string, state: string) => {
-    console.log('🔍 OAuth Debug - handleOAuthCallback called with:', { code: code?.substring(0, 20) + '...', state, userId: user?.id });
+    console.log('🔍 OAuth Debug - handleOAuthCallback called with:', { 
+      code: code?.substring(0, 20) + '...', 
+      state, 
+      userId: user?.id,
+      hasUser: !!user?.id,
+      userEmail: user?.email,
+      timestamp: new Date().toISOString()
+    });
     
     if (!user?.id || state !== user.id) {
-      console.log('🔍 OAuth Debug - Invalid callback:', { hasUser: !!user?.id, stateMatches: state === user?.id });
+      console.log('🔍 OAuth Debug - Invalid callback:', { 
+        hasUser: !!user?.id, 
+        stateMatches: state === user?.id,
+        providedState: state,
+        expectedState: user?.id
+      });
       setError('Invalid OAuth callback');
       setSuccess(null);
       return;
@@ -297,6 +393,16 @@ const IntegrationsPage: React.FC = () => {
           redirectUri: `${window.location.origin}/integrations`
         });
         
+        // Additional debugging for session details
+        if (supabaseSession.data.session) {
+          console.log('🔍 OAuth Debug - Session details:', {
+            userId: supabaseSession.data.session.user.id,
+            email: supabaseSession.data.session.user.email,
+            expiresAt: supabaseSession.data.session.expires_at,
+            tokenType: supabaseSession.data.session.token_type
+          });
+        }
+        
         if (!supabaseAccessToken) {
           setError('Supabase session not found');
           return;
@@ -309,9 +415,44 @@ const IntegrationsPage: React.FC = () => {
         };
         
         console.log('🔍 OAuth Debug - Request Body:', requestBody);
-        console.log('🔍 OAuth Debug - Backend URL:', `${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/auth/google/workspace/oauth/callback`);
         
-        const workspaceResponse = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/auth/google/workspace/oauth/callback`, {
+        // Get the Python backend URL with fallback
+        const pythonBackendUrl = import.meta.env.VITE_PYTHON_BACKEND_URL || 'https://besunny-1.railway.app';
+        const backendUrl = `${pythonBackendUrl}/api/v1/auth/google/workspace/oauth/callback`;
+        
+        console.log('🔍 OAuth Debug - Backend URL:', backendUrl);
+        console.log('🔍 OAuth Debug - Environment variable VITE_PYTHON_BACKEND_URL:', import.meta.env.VITE_PYTHON_BACKEND_URL);
+        
+        // Log the complete request details
+        console.log('🔍 OAuth Debug - Complete request details:', {
+          method: 'POST',
+          url: backendUrl,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseAccessToken?.substring(0, 20)}...`,
+          },
+          body: requestBody
+        });
+        
+        // First check if the backend is accessible
+        try {
+          console.log('🔍 OAuth Debug - Checking backend health...');
+          const healthResponse = await fetch(`${pythonBackendUrl}/health`);
+          console.log('🔍 OAuth Debug - Backend health check status:', healthResponse.status);
+          
+          if (!healthResponse.ok) {
+            throw new Error(`Backend health check failed: ${healthResponse.status}`);
+          }
+          
+          const healthData = await healthResponse.json();
+          console.log('🔍 OAuth Debug - Backend health response:', healthData);
+        } catch (healthError) {
+          console.error('🔍 OAuth Debug - Backend health check failed:', healthError);
+          setError(`Backend is not accessible: ${healthError.message}`);
+          return;
+        }
+        
+        const workspaceResponse = await fetch(backendUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -321,11 +462,33 @@ const IntegrationsPage: React.FC = () => {
         });
         
         console.log('🔍 OAuth Debug - Response Status:', workspaceResponse.status);
+        console.log('🔍 OAuth Debug - Response Status Text:', workspaceResponse.statusText);
         console.log('🔍 OAuth Debug - Response Headers:', Object.fromEntries(workspaceResponse.headers.entries()));
+        console.log('🔍 OAuth Debug - Response OK:', workspaceResponse.ok);
+        console.log('🔍 OAuth Debug - Response Type:', workspaceResponse.type);
 
-        const workspaceResult = await workspaceResponse.json();
+        // Log the raw response text for debugging
+        const responseText = await workspaceResponse.text();
+        console.log('🔍 OAuth Debug - Raw response text:', responseText);
+        console.log('🔍 OAuth Debug - Response text length:', responseText.length);
+        
+        let workspaceResult;
+        try {
+          workspaceResult = JSON.parse(responseText);
+          console.log('🔍 OAuth Debug - Parsed response:', workspaceResult);
+        } catch (parseError) {
+          console.error('🔍 OAuth Debug - Failed to parse response as JSON:', parseError);
+          console.error('🔍 OAuth Debug - Response text that failed to parse:', responseText);
+          setError('Invalid response from backend');
+          return;
+        }
 
         if (!workspaceResponse.ok) {
+          console.error('🔍 OAuth Debug - Response not OK:', {
+            status: workspaceResponse.status,
+            statusText: workspaceResponse.statusText,
+            result: workspaceResult
+          });
           setError(workspaceResult.error || 'Failed to connect Google account');
           setSuccess(null);
           return;
@@ -336,7 +499,9 @@ const IntegrationsPage: React.FC = () => {
           const successMessage = `Google account connected successfully: ${workspaceResult.email}`;
           console.log('🔍 OAuth Debug - Success!', {
             message: successMessage,
-            result: workspaceResult
+            result: workspaceResult,
+            responseStatus: workspaceResponse.status,
+            responseHeaders: Object.fromEntries(workspaceResponse.headers.entries())
           });
           
           setSuccess(successMessage);
@@ -355,12 +520,22 @@ const IntegrationsPage: React.FC = () => {
           
           console.log('🔍 OAuth Debug - Navigation completed');
         } else {
-          console.log('🔍 OAuth Debug - OAuth failed:', workspaceResult);
+          console.log('🔍 OAuth Debug - OAuth failed:', {
+            result: workspaceResult,
+            responseStatus: workspaceResponse.status,
+            responseHeaders: Object.fromEntries(workspaceResponse.headers.entries())
+          });
           setError(workspaceResult.error || 'Failed to connect Google account');
           setSuccess(null);
         }
     } catch (error) {
       console.log('🔍 OAuth Debug - Error in OAuth process:', error);
+      console.error('🔍 OAuth Debug - Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+        cause: error.cause
+      });
       setError('Failed to complete OAuth process');
       setSuccess(null);
     } finally {
@@ -505,7 +680,109 @@ const IntegrationsPage: React.FC = () => {
         </Alert>
       )}
 
-      {/* Google Integration Card */}
+      {/* Debug Panel - Only show in development or when debugging */}
+      {(import.meta.env.DEV || import.meta.env.VITE_DEBUG_ENV === 'true') && (
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-6">
+          <h3 className="text-sm font-semibold text-yellow-800 dark:text-yellow-200 mb-2">
+            🔍 OAuth Debug Panel
+          </h3>
+          <div className="text-xs text-yellow-700 dark:text-yellow-300 space-y-1">
+            <div>User ID: {user?.id || 'Not set'}</div>
+            <div>Google Client ID: {import.meta.env.VITE_GOOGLE_CLIENT_ID ? 'Set' : 'Not set'}</div>
+            <div>Python Backend URL: {import.meta.env.VITE_PYTHON_BACKEND_URL || 'Not set'}</div>
+            <div>Current URL: {window.location.href}</div>
+            <div>OAuth State: {hasHandledCallback.current ? 'Already handled' : 'Ready to handle'}</div>
+            <div>URL Parameters: {window.location.search || 'None'}</div>
+            <div>Code Param: {new URLSearchParams(window.location.search).get('code') ? 'Present' : 'None'}</div>
+            <div>State Param: {new URLSearchParams(window.location.search).get('state') ? 'Present' : 'None'}</div>
+            {error && <div className="text-red-600">Error: {error}</div>}
+            {success && <div className="text-green-600">Success: {success}</div>}
+          </div>
+          <div className="mt-3 space-x-2">
+            <button
+              onClick={() => {
+                console.log('🔍 OAuth Debug - Manual OAuth trigger clicked');
+                hasHandledCallback.current = false;
+                handleGoogleConnect();
+              }}
+              className="px-3 py-1 text-xs bg-yellow-600 text-white rounded hover:bg-yellow-700"
+            >
+              Manual OAuth Trigger
+            </button>
+            <button
+              onClick={() => {
+                console.log('🔍 OAuth Debug - Reset OAuth state clicked');
+                hasHandledCallback.current = false;
+                setError(null);
+                setSuccess(null);
+              }}
+              className="px-3 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700"
+            >
+              Reset OAuth State
+            </button>
+            <button
+              onClick={async () => {
+                console.log('🔍 OAuth Debug - Backend health check clicked');
+                try {
+                  const pythonBackendUrl = import.meta.env.VITE_PYTHON_BACKEND_URL || 'https://besunny-1.railway.app';
+                  const response = await fetch(`${pythonBackendUrl}/health`);
+                  const data = await response.json();
+                  console.log('🔍 OAuth Debug - Backend health check result:', data);
+                  setSuccess(`Backend health check: ${data.status}`);
+                } catch (error) {
+                  console.error('🔍 OAuth Debug - Backend health check failed:', error);
+                  setError(`Backend health check failed: ${error.message}`);
+                }
+              }}
+              className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              Test Backend
+            </button>
+            <button
+              onClick={() => {
+                console.log('🔍 OAuth Debug - Simulate OAuth callback clicked');
+                // Simulate OAuth callback parameters
+                const mockCode = 'mock_oauth_code_' + Date.now();
+                const mockState = user?.id || 'mock_state';
+                
+                // Set URL parameters to simulate OAuth callback
+                const url = new URL(window.location.href);
+                url.searchParams.set('code', mockCode);
+                url.searchParams.set('state', mockState);
+                window.history.replaceState({}, '', url.toString());
+                
+                // Trigger the OAuth processing
+                hasHandledCallback.current = false;
+                handleOAuthCallback(mockCode, mockState);
+              }}
+              className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
+            >
+              Simulate OAuth Callback
+            </button>
+            <button
+              onClick={() => {
+                console.log('🔍 OAuth Debug - Clear URL parameters clicked');
+                // Clear URL parameters
+                const url = new URL(window.location.href);
+                url.searchParams.delete('code');
+                url.searchParams.delete('state');
+                url.searchParams.delete('error');
+                window.history.replaceState({}, '', url.toString());
+                
+                // Reset OAuth state
+                hasHandledCallback.current = false;
+                setError(null);
+                setSuccess(null);
+              }}
+              className="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
+            >
+              Clear URL Params
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Google Integration Section */}
       <Card className="bg-white dark:bg-zinc-900 border border-[#4a5565] dark:border-zinc-700 mb-8">
         <CardHeader>
           <div className="flex items-center justify-between">

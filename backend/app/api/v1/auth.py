@@ -8,7 +8,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Dict, Any, Optional
 import logging
 
-from ...core.security import get_current_user, security_manager
+from ...core.security import get_current_user, security_manager, get_current_user_hybrid
 from ...services.auth.google_oauth_service import GoogleOAuthService
 from ...services.auth.google_token_service import GoogleTokenService
 from ...models.schemas.user import UserResponse, Token, TokenData
@@ -258,7 +258,7 @@ async def exchange_google_token(
 @router.post("/google/workspace/oauth/callback", response_model=Dict[str, Any])
 async def handle_google_workspace_oauth_callback(
     request: Request,
-    current_user: Dict[str, Any] = Depends(get_current_user)
+    current_user: Dict[str, Any] = Depends(get_current_user_hybrid)
 ):
     """
     Handle Google Workspace OAuth callback for extended scopes.
@@ -270,6 +270,8 @@ async def handle_google_workspace_oauth_callback(
     """
     try:
         logger.info(f"🔍 OAuth Debug - API Endpoint Called for user: {current_user.get('id')}")
+        logger.info(f"🔍 OAuth Debug - Request method: {request.method}")
+        logger.info(f"🔍 OAuth Debug - Request headers: {dict(request.headers)}")
         
         # Get the authorization code, redirect URI, and Supabase access token from the request body
         body = await request.json()
@@ -280,6 +282,8 @@ async def handle_google_workspace_oauth_callback(
         supabase_access_token = body.get('supabase_access_token')
         
         logger.info(f"🔍 OAuth Debug - Extracted Values: code={bool(code)}, redirect_uri={redirect_uri}, has_token={bool(supabase_access_token)}")
+        logger.info(f"🔍 OAuth Debug - Code length: {len(code) if code else 0}")
+        logger.info(f"🔍 OAuth Debug - Token length: {len(supabase_access_token) if supabase_access_token else 0}")
         
         if not code:
             logger.error("🔍 OAuth Debug - Missing authorization code")
