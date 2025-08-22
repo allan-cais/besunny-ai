@@ -5,7 +5,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/providers/AuthProvider';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { 
   ArrowLeft, 
   Mail, 
@@ -38,6 +38,7 @@ const IntegrationsPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const [googleStatus, setGoogleStatus] = useState<GoogleIntegrationStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [connecting, setConnecting] = useState(false);
@@ -47,30 +48,55 @@ const IntegrationsPage: React.FC = () => {
   const [pageLoading, setPageLoading] = useState(true);
   // const [attendeeStatus, setAttendeeStatus] = useState<ApiKeyStatus | null>(null);
   const hasHandledCallback = useRef(false);
+  
+  // Track location changes to see where redirects are coming from
+  useEffect(() => {
+    console.log('🔍 OAuth Debug - Location changed:', {
+      pathname: location.pathname,
+      search: location.search,
+      hash: location.hash,
+      fullUrl: window.location.href
+    });
+  }, [location]);
 
   // Check for OAuth callback parameters
   useEffect(() => {
+    console.log('🔍 OAuth Debug - useEffect triggered with searchParams:', {
+      error: searchParams.get('error'),
+      code: searchParams.get('code')?.substring(0, 20) + '...',
+      state: searchParams.get('state'),
+      allParams: Object.fromEntries(searchParams.entries())
+    });
+    
     const errorParam = searchParams.get('error');
     const codeParam = searchParams.get('code');
     const stateParam = searchParams.get('state');
 
     if (errorParam) {
+      console.log('🔍 OAuth Debug - Error parameter found:', errorParam);
       setError(getErrorMessage(errorParam));
       setSuccess(null);
     } else if (codeParam && stateParam && !hasHandledCallback.current) {
+      console.log('🔍 OAuth Debug - Code and state found, calling handleOAuthCallback');
       hasHandledCallback.current = true;
       setError(null);
       setSuccess(null);
       handleOAuthCallback(codeParam, stateParam);
+    } else {
+      console.log('🔍 OAuth Debug - No OAuth parameters or already handled');
     }
   }, [searchParams]);
 
   // Load Google integration status when user changes
   useEffect(() => {
+    console.log('🔍 OAuth Debug - User effect triggered:', { userId: user?.id, hasUser: !!user?.id });
+    
     if (!user?.id) {
+      console.log('🔍 OAuth Debug - No user, setting error');
       setPageLoading(false);
       setError('User session not found. Please log in again.');
     } else {
+      console.log('🔍 OAuth Debug - User found, loading Google status');
       loadGoogleStatus();
       setPageLoading(false);
     }
