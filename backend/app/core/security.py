@@ -180,35 +180,74 @@ async def get_current_user_hybrid(
     """Dependency to get current authenticated user from either JWT or Supabase token."""
     try:
         token = credentials.credentials
+        logger.info(f"🔍 Auth Debug - Validating token of length: {len(token) if token else 0}")
         
         # First try to validate as JWT token
         try:
             payload = security_manager.verify_token(token)
             if payload and payload.get("sub"):
+                logger.info(f"🔍 Auth Debug - JWT validation successful for user: {payload.get('sub')}")
                 return {
                     "id": payload.get("sub"),
                     "email": payload.get("email"),
                     "username": payload.get("username"),
                     "permissions": payload.get("permissions", []),
                 }
-        except Exception:
+        except Exception as jwt_error:
+            logger.info(f"🔍 Auth Debug - JWT validation failed: {jwt_error}")
             pass
         
         # If JWT validation fails, try Supabase token
         try:
-            from .supabase_config import get_supabase
+            from .supabase_config import get_supabase, get_supabase_config
+            logger.info(f"🔍 Auth Debug - Attempting Supabase token validation")
+            
+            # Check Supabase configuration first
+            supabase_config = get_supabase_config()
+            config_info = supabase_config.get_config_info()
+            logger.info(f"🔍 Auth Debug - Supabase config: {config_info}")
+            
+            if not supabase_config.is_initialized():
+                logger.warning("🔍 Auth Debug - Supabase not initialized, attempting to initialize")
+                if not supabase_config.initialize():
+                    logger.error("🔍 Auth Debug - Failed to initialize Supabase")
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail="Supabase service unavailable",
+                        headers={"WWW-Authenticate": "Bearer"},
+                    )
+            
             supabase = get_supabase()
+            if not supabase:
+                logger.error("🔍 Auth Debug - Supabase client not available")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Supabase client unavailable",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
             
+            logger.info(f"🔍 Auth Debug - Calling supabase.auth.get_user with token")
             response = supabase.auth.get_user(token)
+            logger.info(f"🔍 Auth Debug - Supabase response: error={response.error}, has_user={bool(response.user)}")
             
-            if response.error or not response.user:
+            if response.error:
+                logger.error(f"🔍 Auth Debug - Supabase auth error: {response.error}")
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid token",
+                    detail=f"Supabase authentication error: {response.error.message}",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+            
+            if not response.user:
+                logger.error("🔍 Auth Debug - No user returned from Supabase")
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="No user found for token",
                     headers={"WWW-Authenticate": "Bearer"},
                 )
             
             user = response.user
+            logger.info(f"🔍 Auth Debug - Supabase validation successful for user: {user.id}")
             
             return {
                 "id": user.id,
@@ -217,18 +256,25 @@ async def get_current_user_hybrid(
                 "permissions": user.user_metadata.get("permissions", []),
             }
             
+        except HTTPException:
+            raise
         except Exception as e:
-            logger.error(f"Supabase token validation failed: {e}")
+            logger.error(f"🔍 Auth Debug - Supabase token validation failed: {e}")
+            logger.error(f"🔍 Auth Debug - Exception type: {type(e)}")
+            import traceback
+            logger.error(f"🔍 Auth Debug - Traceback: {traceback.format_exc()}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token",
+                detail=f"Token validation failed: {str(e)}",
                 headers={"WWW-Authenticate": "Bearer"},
             )
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Hybrid authentication error: {e}")
+        logger.error(f"🔍 Auth Debug - Hybrid authentication error: {e}")
+        import traceback
+        logger.error(f"🔍 Auth Debug - Full traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication failed",

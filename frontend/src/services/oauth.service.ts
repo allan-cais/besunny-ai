@@ -101,7 +101,7 @@ export class OAuthService {
 
       const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
       
-      // Redirect to Google OAuth
+      // Redirect to Google OAuth immediately - no loading state needed
       window.location.href = authUrl;
       
       return { success: true };

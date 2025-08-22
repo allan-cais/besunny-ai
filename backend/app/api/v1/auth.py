@@ -32,6 +32,36 @@ async def auth_health_check():
     return {"status": "healthy", "service": "auth"}
 
 
+@router.get("/test-supabase")
+async def test_supabase_config():
+    """Test endpoint to verify Supabase configuration."""
+    try:
+        from ...core.supabase_config import get_supabase_config, get_supabase
+        
+        config = get_supabase_config()
+        config_info = config.get_config_info()
+        
+        # Try to get Supabase client
+        supabase = get_supabase()
+        client_available = bool(supabase)
+        
+        return {
+            "status": "success",
+            "config": config_info,
+            "client_available": client_available,
+            "message": "Supabase configuration test completed"
+        }
+    except Exception as e:
+        logger.error(f"Supabase config test failed: {e}")
+        import traceback
+        return {
+            "status": "error",
+            "error": str(e),
+            "traceback": traceback.format_exc(),
+            "message": "Supabase configuration test failed"
+        }
+
+
 @router.post("/google/oauth/callback", response_model=Dict[str, Any])
 async def handle_google_oauth_callback(request: Request):
     """Handle Google OAuth callback efficiently."""
@@ -272,6 +302,7 @@ async def handle_google_workspace_oauth_callback(
         logger.info(f"🔍 OAuth Debug - API Endpoint Called for user: {current_user.get('id')}")
         logger.info(f"🔍 OAuth Debug - Request method: {request.method}")
         logger.info(f"🔍 OAuth Debug - Request headers: {dict(request.headers)}")
+        logger.info(f"🔍 OAuth Debug - Authorization header: {request.headers.get('authorization', 'NOT_FOUND')}")
         
         # Get the authorization code, redirect URI, and Supabase access token from the request body
         body = await request.json()
@@ -329,6 +360,8 @@ async def handle_google_workspace_oauth_callback(
         raise
     except Exception as e:
         logger.error(f"🔍 OAuth Debug - Unexpected error: {e}")
+        import traceback
+        logger.error(f"🔍 OAuth Debug - Full traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Workspace OAuth processing failed"

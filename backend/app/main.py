@@ -50,6 +50,20 @@ async def lifespan(app: FastAPI):
     logger.info("Starting BeSunny.ai Python Backend")
     
     try:
+        # Initialize Supabase client
+        try:
+            from app.core.supabase_config import get_supabase_config
+            supabase_config = get_supabase_config()
+            if supabase_config.initialize():
+                logger.info("Supabase client initialized successfully")
+                _health_status["services"]["supabase"] = "initialized"
+            else:
+                logger.warning("Supabase client initialization failed")
+                _health_status["services"]["supabase"] = "failed"
+        except Exception as e:
+            logger.error(f"Supabase initialization error: {e}")
+            _health_status["services"]["supabase"] = "error"
+        
         # Mark startup as successful
         _health_status["startup_time"] = time.time()
         _health_status["last_check"] = time.time()

@@ -44,11 +44,11 @@ export class AuthenticationService {
 
   private async initialize(): Promise<void> {
     try {
-      // Get initial session
+      // Get initial session without showing loading state
       const { data: { session }, error } = await supabase.auth.getSession();
       
       if (error) {
-        this.updateState({ error: error.message });
+        this.updateState({ error: error.message, loading: false });
         return;
       }
 
@@ -284,6 +284,16 @@ export class AuthenticationService {
 
   public isAuthenticated(): boolean {
     return !!this.authState.user && !!this.authState.session;
+  }
+
+  public isInitializing(): boolean {
+    // Only show initializing if we have no user and no session yet
+    return !this.authState.user && !this.authState.session && this.authState.loading;
+  }
+
+  public isOperationLoading(): boolean {
+    // Show operation loading only during actual operations (sign in, sign up, etc.)
+    return this.authState.loading && (!!this.authState.user || !!this.authState.session);
   }
 
   public getCurrentUser(): User | null {

@@ -38,7 +38,6 @@ const IntegrationsPage: React.FC = () => {
   const [googleStatus, setGoogleStatus] = useState<GoogleIntegrationStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [oauthState, setOauthState] = useState(oauthService.getState());
-  const [pageLoading, setPageLoading] = useState(true);
 
   // Subscribe to OAuth state changes
   useEffect(() => {
@@ -69,13 +68,8 @@ const IntegrationsPage: React.FC = () => {
 
   // Load Google integration status when user changes
   useEffect(() => {
-    if (!user?.id) {
-      setPageLoading(false);
-      return;
-    }
-
+    if (!user?.id) return;
     loadGoogleStatus();
-    setPageLoading(false);
   }, [user?.id]);
 
   const getErrorMessage = (errorCode: string): string => {
@@ -159,24 +153,6 @@ const IntegrationsPage: React.FC = () => {
   const clearMessages = () => {
     oauthService.clearMessages();
   };
-
-  if (pageLoading) {
-    return (
-      <div className="min-h-screen bg-stone-100 dark:bg-zinc-800 text-[#4a5565] dark:text-zinc-50 font-mono flex items-center justify-center">
-        <div className="max-w-md w-full mx-auto p-6">
-          <div className="bg-white dark:bg-zinc-900 border border-[#4a5565] dark:border-zinc-700 rounded-lg p-6">
-            <div className="text-center space-y-4">
-              <Loader2 className="w-8 h-8 animate-spin mx-auto text-blue-600 dark:text-blue-400" />
-              <h2 className="text-lg font-bold">Loading...</h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Loading integration status...
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="px-4 pt-12 pb-8 font-mono h-full flex flex-col">

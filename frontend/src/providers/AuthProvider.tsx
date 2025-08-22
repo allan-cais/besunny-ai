@@ -19,6 +19,8 @@ interface AuthContextType {
   resetPassword: (email: string) => Promise<{ success: boolean; error?: string }>;
   refreshSession: () => Promise<{ success: boolean; error?: string }>;
   isAuthenticated: boolean;
+  isInitializing: boolean;
+  isOperationLoading: boolean;
   clearError: () => void;
 }
 
@@ -32,7 +34,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
     session: null,
-    loading: true,
+    loading: false, // Start with loading false for natural page loads
     error: null,
   });
 
@@ -92,6 +94,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     resetPassword,
     refreshSession,
     isAuthenticated: authService.isAuthenticated(),
+    isInitializing: authService.isInitializing(),
+    isOperationLoading: authService.isOperationLoading(),
     clearError,
   };
 
