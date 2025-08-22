@@ -58,10 +58,9 @@ const OAuthLoginCallback: React.FC = () => {
           setStatus('success');
           setMessage('Successfully authenticated! Setting up Google services...');
           
-          // Set up automatic calendar sync and Gmail watch
+          // Set up automatic calendar sync (Gmail watch disabled for OAuth debugging)
           try {
             const { calendarService } = await import('@/lib/calendar');
-            const { gmailWatchService } = await import('@/lib/gmail-watch-service');
             
             // Set up calendar sync
             const syncResult = await calendarService.initializeCalendarSync(result.session.user.id);
@@ -74,34 +73,18 @@ const OAuthLoginCallback: React.FC = () => {
                 const manualResult = await calendarService.manualSyncWithoutCleanup(result.session.user.id);
                 
                 if (manualResult.success) {
-                  setMessage('Calendar sync completed! Setting up Gmail watch...');
+                  setMessage('Calendar sync completed! Redirecting to dashboard...');
                 } else {
-                  setMessage('Calendar sync partially completed. Setting up Gmail watch...');
+                  setMessage('Calendar sync partially completed. Redirecting...');
                 }
               } else {
-                setMessage('Calendar sync configured! Setting up Gmail watch...');
+                setMessage('Calendar sync configured! Redirecting to dashboard...');
               }
             } else {
               // Calendar sync failed
-              setMessage('Calendar sync failed, but authentication successful. Setting up Gmail watch...');
-            }
-            
-            // Set up Gmail watch for virtual email detection
-            if (result.session.user.email) {
-              try {
-                const gmailResult = await gmailWatchService.setupGmailWatch(result.session.user.email);
-                if (gmailResult.success) {
-                  setMessage('Gmail watch configured! Redirecting to dashboard...');
-                } else {
-                  setMessage('Calendar sync configured! Gmail watch can be set up later. Redirecting...');
-                }
-              } catch (gmailError) {
-                // Gmail watch setup failed
-                setMessage('Calendar sync configured! Gmail watch can be set up later. Redirecting...');
-              }
+              setMessage('Calendar sync failed, but authentication successful. Redirecting...');
             }
           } catch (serviceError) {
-    
             setMessage('Authentication successful! Some services may need manual setup. Redirecting...');
           }
 

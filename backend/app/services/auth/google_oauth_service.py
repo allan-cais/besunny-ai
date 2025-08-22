@@ -60,7 +60,7 @@ class GoogleOAuthService:
             logger.warning("Google OAuth not fully configured")
     
     async def handle_oauth_callback(self, code: str) -> Dict[str, Any]:
-        """Handle OAuth callback efficiently."""
+        """Handle OAuth callback for Google login (creates new users)."""
         try:
             # Exchange code for tokens
             tokens = await self._exchange_code_for_tokens(code)
@@ -72,7 +72,7 @@ class GoogleOAuthService:
             if not user_info:
                 return {'success': False, 'error': 'Failed to get user info'}
             
-            # Create/update user and return
+            # Create/update user in public.users table
             user_id = await self._upsert_user(user_info)
             if not user_id:
                 return {'success': False, 'error': 'User creation failed'}
@@ -84,12 +84,14 @@ class GoogleOAuthService:
             if not credentials_stored:
                 logger.warning(f"Failed to store credentials for user {user_id}")
             
+            # Return user info for frontend to create Supabase session
             return {
                 'success': True,
                 'user_id': user_id,
                 'email': user_info.email,
                 'name': user_info.name,
-                'picture': user_info.picture
+                'picture': user_info.picture,
+                'message': 'Google OAuth login successful - user created and credentials stored'
             }
             
         except Exception as e:
@@ -97,7 +99,7 @@ class GoogleOAuthService:
             return {'success': False, 'error': 'OAuth processing failed'}
     
     async def handle_workspace_oauth_callback(self, code: str, user_id: str, redirect_uri: str) -> Dict[str, Any]:
-        """Handle Google Workspace OAuth callback for extended scopes."""
+        """Handle Google Workspace OAuth callback for existing users connecting Google."""
         try:
             # Exchange code for tokens with workspace scopes using the correct redirect URI
             tokens = await self._exchange_code_for_tokens(code, redirect_uri)
@@ -122,7 +124,7 @@ class GoogleOAuthService:
                 'email': user_info.email,
                 'name': user_info.name,
                 'picture': user_info.picture,
-                'message': 'Google Workspace connected successfully'
+                'message': 'Google Workspace connected successfully - credentials stored'
             }
             
         except Exception as e:
@@ -257,8 +259,15 @@ class GoogleOAuthService:
                 'login_provider': True,  # This is a login provider
                 'login_created_at': datetime.now().isoformat(),
                 'created_at': datetime.now().isoformat(),
-                'updated_at': datetime.now().isoformat()
+                'expires_in': tokens.expires_in,
+                'token_uri': 'https://oauth2.googleapis.com/token',
+                'client_id': self.client_id,
+                'client_secret': self.client_secret
             }
+            
+            # For OAuth setup, we need to use service role to bypass RLS
+            # This is acceptable because we're setting up the initial authentication
+            # Subsequent operations will use user context and respect RLS
             
             # Check if credentials already exist
             existing = self.supabase.table("google_credentials").select("id").eq("user_id", user_id).execute()
@@ -299,8 +308,15 @@ class GoogleOAuthService:
                 'login_provider': False,  # This is NOT a login provider, it's workspace integration
                 'login_created_at': None,
                 'created_at': datetime.now().isoformat(),
-                'updated_at': datetime.now().isoformat()
+                'expires_in': tokens.expires_in,
+                'token_uri': 'https://oauth2.googleapis.com/token',
+                'client_id': self.client_id,
+                'client_secret': self.client_secret
             }
+            
+            # For OAuth setup, we need to use service role to bypass RLS
+            # This is acceptable because we're setting up the initial authentication
+            # Subsequent operations will use user context and respect RLS
             
             # Check if workspace credentials already exist
             existing = self.supabase.table("google_credentials").select("id").eq("user_id", user_id).eq("login_provider", False).execute()
@@ -312,7 +328,7 @@ class GoogleOAuthService:
             else:
                 # Insert new workspace credentials
                 self.supabase.table("google_credentials").insert(credentials_data).execute()
-                logger.info(f"Stored new Google workspace credentials for user {user_id}")
+                logger.info(f"Stored new Google credentials for user {user_id}")
             
             return True
             

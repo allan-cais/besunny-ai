@@ -211,42 +211,42 @@ const IntegrationsPage: React.FC = () => {
       setError(null);
       setSuccess(null);
 
-              // First, try to create/authenticate the user with login OAuth
-        const loginResponse = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/auth/google/oauth/callback`, {
+        // For existing users, use workspace OAuth to connect Google account
+        const workspaceResponse = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/auth/google/workspace/oauth/callback`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token || ''}`,
           },
-          body: JSON.stringify({ code }),
+          body: JSON.stringify({ 
+            code,
+            redirect_uri: `${window.location.origin}/integrations`
+          }),
         });
 
-        const loginResult = await loginResponse.json();
+        const workspaceResult = await workspaceResponse.json();
 
-        if (!loginResponse.ok) {
-          setError(loginResult.error || 'Failed to authenticate with Google');
+        if (!workspaceResponse.ok) {
+          setError(workspaceResult.error || 'Failed to connect Google account');
           setSuccess(null);
           return;
         }
 
-        if (loginResult.success) {
-          // User was created/authenticated successfully
-          // For now, just show success - the user has basic access
-          const successMessage = `Google account connected successfully: ${loginResult.email}`;
+        if (workspaceResult.success) {
+          // Google account connected successfully
+          const successMessage = `Google account connected successfully: ${workspaceResult.email}`;
           setSuccess(successMessage);
           setError(null);
           
-          // Note: Extended scopes (Gmail, Drive, Calendar) will be added later
-          // when we implement the proper workspace OAuth flow
-        
-        // Load updated Google status
-        await loadGoogleStatus();
-        
-        // Remove code/state from URL to prevent re-triggering
-        navigate('/integrations', { replace: true });
-      } else {
-        setError(loginResult.error || 'Failed to connect Google account');
-        setSuccess(null);
-      }
+          // Load updated Google status
+          await loadGoogleStatus();
+          
+          // Remove code/state from URL to prevent re-triggering
+          navigate('/integrations', { replace: true });
+        } else {
+          setError(workspaceResult.error || 'Failed to connect Google account');
+          setSuccess(null);
+        }
     } catch (error) {
       setError('Failed to complete OAuth process');
       setSuccess(null);

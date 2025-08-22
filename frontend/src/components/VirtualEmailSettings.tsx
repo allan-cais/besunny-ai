@@ -9,7 +9,7 @@ import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import UsernameSetupDialog from './UsernameSetupDialog';
 import AutoScheduleInstructions from '@/components/dashboard/AutoScheduleInstructions';
-import { gmailWatchService, GmailWatchStatus, VirtualEmailDetection } from '@/lib/gmail-watch-service';
+// Gmail watch functionality disabled for OAuth debugging
 
 interface UserData {
   username?: string;
@@ -22,10 +22,7 @@ const VirtualEmailSettings: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [showUsernameDialog, setShowUsernameDialog] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [gmailWatchStatus, setGmailWatchStatus] = useState<GmailWatchStatus>({ isActive: false });
-  const [virtualEmailDetections, setVirtualEmailDetections] = useState<VirtualEmailDetection[]>([]);
-  const [isSettingUpWatch, setIsSettingUpWatch] = useState(false);
-  const [isTestingDetection, setIsTestingDetection] = useState(false);
+  // Gmail watch functionality disabled for OAuth debugging
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -33,10 +30,7 @@ const VirtualEmailSettings: React.FC = () => {
 
   useEffect(() => {
     loadUserData();
-    if (userData?.email) {
-      loadGmailWatchStatus();
-      loadVirtualEmailDetections();
-    }
+    // Gmail watch functionality disabled for OAuth debugging
   }, [user, userData?.email]);
 
   const loadUserData = async () => {
@@ -90,88 +84,13 @@ const VirtualEmailSettings: React.FC = () => {
     }
   };
 
-  const loadGmailWatchStatus = async () => {
-    if (!userData?.email) return;
-    
-    try {
-      const status = await gmailWatchService.getGmailWatchStatus(userData.email);
-      setGmailWatchStatus(status);
-    } catch (error) {
-      // Error loading Gmail watch status
-      // Set a default status to prevent UI errors
-      setGmailWatchStatus({ isActive: false });
-    }
-  };
+  // Gmail watch functionality disabled for OAuth debugging
 
-  const loadVirtualEmailDetections = async () => {
-    try {
-      const detections = await gmailWatchService.getVirtualEmailDetections(10);
-      setVirtualEmailDetections(detections);
-    } catch (error) {
-      // Error loading virtual email detections
-    }
-  };
 
-  const handleSetupGmailWatch = async () => {
-    if (!userData?.email) return;
-    
-    setIsSettingUpWatch(true);
-    try {
-      const result = await gmailWatchService.setupGmailWatch(userData.email);
-      
-      if (result.success) {
-        toast({
-          title: 'Gmail Watch Setup',
-          description: 'Successfully set up Gmail monitoring for virtual email detection',
-        });
-        await loadGmailWatchStatus();
-      } else {
-        toast({
-          title: 'Setup Failed',
-          description: result.error || 'Failed to setup Gmail watch',
-          variant: 'destructive',
-        });
-      }
-    } catch (error) {
-      // Error setting up Gmail watch
-      toast({
-        title: 'Setup Failed',
-        description: 'Failed to setup Gmail watch',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsSettingUpWatch(false);
-    }
-  };
 
-  const handleTestDetection = async () => {
-    setIsTestingDetection(true);
-    try {
-      const result = await gmailWatchService.testVirtualEmailDetection();
-      
-      if (result.success) {
-        toast({
-          title: 'Test Sent',
-          description: 'Test email sent to your virtual email address',
-        });
-      } else {
-        toast({
-          title: 'Test Failed',
-          description: result.error || 'Failed to send test email',
-          variant: 'destructive',
-        });
-      }
-    } catch (error) {
-      // Error testing detection
-      toast({
-        title: 'Test Failed',
-        description: 'Failed to send test email',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsTestingDetection(false);
-    }
-  };
+  // Gmail watch functionality disabled for OAuth debugging
+
+  // Gmail watch functionality disabled for OAuth debugging
 
   const handleUsernameSet = () => {
     setShowUsernameDialog(false);
@@ -247,53 +166,7 @@ const VirtualEmailSettings: React.FC = () => {
                 <Badge className="border border-green-500 rounded px-2 py-0.5 text-[10px] text-green-500 bg-green-50 dark:bg-green-950 hover:bg-green-50 dark:hover:bg-green-950 uppercase font-mono">
                   Active
                 </Badge>
-                {gmailWatchStatus.isActive && (
-                  <Badge className="border border-blue-500 rounded px-2 py-0.5 text-[10px] text-blue-500 bg-blue-50 dark:bg-blue-950 hover:bg-blue-50 dark:hover:bg-blue-950 uppercase font-mono">
-                    Gmail Watch Active
-                  </Badge>
-                )}
-              </div>
-              
-              {/* Gmail Watch Controls */}
-              <div className="flex items-center gap-2">
-                {!gmailWatchStatus.isActive ? (
-                  <Button
-                    onClick={handleSetupGmailWatch}
-                    disabled={isSettingUpWatch}
-                    className="bg-blue-600 hover:bg-blue-700 text-white font-mono"
-                  >
-                    {isSettingUpWatch ? (
-                      <>
-                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                        Setting Up...
-                      </>
-                    ) : (
-                      <>
-                        <Activity className="h-4 w-4 mr-2" />
-                        Setup Gmail Watch
-                      </>
-                    )}
-                  </Button>
-                ) : (
-                  <Button
-                    onClick={handleTestDetection}
-                    disabled={isTestingDetection}
-                    variant="outline"
-                    className="border-blue-500 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 font-mono"
-                  >
-                    {isTestingDetection ? (
-                      <>
-                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                        Testing...
-                      </>
-                    ) : (
-                      <>
-                        <Mail className="h-4 w-4 mr-2" />
-                        Test Detection
-                      </>
-                    )}
-                  </Button>
-                )}
+                {/* Gmail Watch functionality disabled for OAuth debugging */}
               </div>
             </CardContent>
           </Card>
@@ -356,54 +229,7 @@ const VirtualEmailSettings: React.FC = () => {
           {/* Auto-Schedule Instructions */}
           <AutoScheduleInstructions />
           
-          {/* Recent Virtual Email Detections */}
-          {virtualEmailDetections.length > 0 && (
-            <Card className="border-[#4a5565] dark:border-zinc-700 bg-white dark:bg-zinc-900">
-              <CardHeader>
-                <CardTitle className="text-[#4a5565] dark:text-zinc-200 font-mono">
-                  Recent Virtual Email Detections
-                </CardTitle>
-                <CardDescription className="text-gray-600 dark:text-gray-400 font-mono">
-                  Recent emails that used your virtual email address
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {virtualEmailDetections.map((detection) => (
-                    <div
-                      key={detection.id}
-                      className="flex items-center justify-between p-3 bg-stone-50 dark:bg-zinc-800 rounded-lg border border-[#4a5565] dark:border-zinc-700"
-                    >
-                      <div className="flex items-center gap-3">
-                        <Badge
-                          variant={detection.email_type === 'to' ? 'default' : 'secondary'}
-                          className="text-xs font-mono"
-                        >
-                          {detection.email_type.toUpperCase()}
-                        </Badge>
-                        <div>
-                          <p className="text-sm font-medium text-[#4a5565] dark:text-zinc-200 font-mono">
-                            {detection.virtual_email}
-                          </p>
-                          <p className="text-xs text-gray-600 dark:text-gray-400 font-mono">
-                            {new Date(detection.detected_at).toLocaleString()}
-                          </p>
-                        </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => window.open(`https://mail.google.com/mail/u/0/#inbox/${detection.gmail_message_id}`, '_blank')}
-                        className="text-[#4a5565] dark:text-zinc-200 hover:bg-stone-100 dark:hover:bg-zinc-700"
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          {/* Gmail Watch functionality disabled for OAuth debugging */}
         </>
       )}
 

@@ -529,123 +529,21 @@ class EnhancedAdaptiveSyncStrategy {
   }
 
   /**
-   * Check if Gmail watches table is accessible
-   */
-  private async checkGmailWatchesAccess(): Promise<boolean> {
-    try {
-      const { error } = await supabase
-        .from('gmail_watches')
-        .select('id')
-        .limit(1);
-      
-      return !error || error.code !== '406';
-    } catch (error) {
-      return false;
-    }
-  }
-
-  /**
-   * Enhanced Gmail sync with virtual email detection
+   * Gmail sync disabled - removed for OAuth debugging
    */
   private async syncGmail(userId: string): Promise<EnhancedSyncResult> {
-    try {
-      // Get user's Gmail watch status - filter by user's email to match RLS policy
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user?.email) {
-        return {
-          success: true,
-          type: 'gmail',
-          processed: 0,
-          created: 0,
-          updated: 0,
-          deleted: 0,
-          skipped: true,
-          virtualEmailsDetected: 0,
-          autoScheduledMeetings: 0,
-        };
-      }
-
-      const { data: gmailWatch, error: gmailWatchError } = await supabase
-        .from('gmail_watches')
-        .select('id, is_active, expiration, history_id')
-        .eq('user_email', user.email)
-        .eq('is_active', true)
-        .single();
-
-      // Handle RLS access issues gracefully
-      if (gmailWatchError) {
-        if (gmailWatchError.code === '406' || gmailWatchError.message?.includes('Not Acceptable')) {
-          return {
-            success: true,
-            type: 'gmail',
-            processed: 0,
-            created: 0,
-            updated: 0,
-            deleted: 0,
-            skipped: true,
-            virtualEmailsDetected: 0,
-            autoScheduledMeetings: 0,
-          };
-        }
-        throw gmailWatchError;
-      }
-
-      if (!gmailWatch) {
-        return {
-          success: true,
-          type: 'gmail',
-          processed: 0,
-          created: 0,
-          updated: 0,
-          deleted: 0,
-          skipped: true,
-          virtualEmailsDetected: 0,
-          autoScheduledMeetings: 0,
-        };
-      }
-
-      // Get recent virtual email detections
-      const { data: recentDetections } = await supabase
-        .from('virtual_email_detections')
-        .select('id, detected_at')
-        .eq('user_id', userId)
-        .gte('detected_at', new Date(Date.now() - 60 * 60 * 1000).toISOString()); // Last hour
-
-      // Get pending email processing logs
-      const { data: pendingEmails } = await supabase
-        .from('email_processing_logs')
-        .select('id, status')
-        .eq('user_id', userId)
-        .eq('status', 'pending');
-
-      const virtualEmailsDetected = recentDetections?.length || 0;
-      const processed = pendingEmails?.length || 0;
-
-      return {
-        success: true,
-        type: 'gmail',
-        processed,
-        created: processed,
-        updated: 0,
-        deleted: 0,
-        skipped: false,
-        virtualEmailsDetected,
-        autoScheduledMeetings: 0,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        type: 'gmail',
-        processed: 0,
-        created: 0,
-        updated: 0,
-        deleted: 0,
-        skipped: false,
-        virtualEmailsDetected: 0,
-        autoScheduledMeetings: 0,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      };
-    }
+    // Gmail functionality temporarily disabled
+    return {
+      success: true,
+      type: 'gmail',
+      processed: 0,
+      created: 0,
+      updated: 0,
+      deleted: 0,
+      skipped: true,
+      virtualEmailsDetected: 0,
+      autoScheduledMeetings: 0,
+    };
   }
 
   /**
