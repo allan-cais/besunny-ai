@@ -269,47 +269,62 @@ async def handle_google_workspace_oauth_callback(
     - Calendar access (calendar)
     """
     try:
+        logger.info(f"🔍 OAuth Debug - API Endpoint Called for user: {current_user.get('id')}")
+        
         # Get the authorization code, redirect URI, and Supabase access token from the request body
         body = await request.json()
+        logger.info(f"🔍 OAuth Debug - Request Body: {body}")
+        
         code = body.get('code')
         redirect_uri = body.get('redirect_uri')
         supabase_access_token = body.get('supabase_access_token')
         
+        logger.info(f"🔍 OAuth Debug - Extracted Values: code={bool(code)}, redirect_uri={redirect_uri}, has_token={bool(supabase_access_token)}")
+        
         if not code:
+            logger.error("🔍 OAuth Debug - Missing authorization code")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Authorization code is required"
             )
         
         if not redirect_uri:
+            logger.error("🔍 OAuth Debug - Missing redirect URI")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Redirect URI is required"
             )
         
         if not supabase_access_token:
+            logger.error("🔍 OAuth Debug - Missing Supabase access token")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Supabase access token is required for workspace OAuth"
             )
+        
+        logger.info(f"🔍 OAuth Debug - Calling OAuth service with: user_id={current_user['id']}, redirect_uri={redirect_uri}")
         
         # Process the workspace OAuth callback with authenticated Supabase client
         result = await oauth_service.handle_workspace_oauth_callback(
             code, current_user['id'], redirect_uri, supabase_access_token
         )
         
+        logger.info(f"🔍 OAuth Debug - OAuth service result: {result}")
+        
         if not result.get('success'):
+            logger.error(f"🔍 OAuth Debug - OAuth service failed: {result.get('error')}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=result.get('error', 'Workspace OAuth callback failed')
             )
         
+        logger.info(f"🔍 OAuth Debug - OAuth service succeeded for user: {current_user['id']}")
         return result
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Google Workspace OAuth callback error: {e}")
+        logger.error(f"🔍 OAuth Debug - Unexpected error: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Workspace OAuth processing failed"

@@ -101,28 +101,50 @@ class GoogleOAuthService:
     async def handle_workspace_oauth_callback(self, code: str, user_id: str, redirect_uri: str, supabase_access_token: str) -> Dict[str, Any]:
         """Handle Google Workspace OAuth callback for existing users connecting Google."""
         try:
+            logger.info(f"🔍 OAuth Debug - OAuth Service: Starting workspace OAuth for user {user_id}")
+            logger.info(f"🔍 OAuth Debug - OAuth Service: Code length: {len(code) if code else 0}, Redirect URI: {redirect_uri}")
+            
             # Exchange code for tokens with workspace scopes using the correct redirect URI
+            logger.info("🔍 OAuth Debug - OAuth Service: Exchanging code for tokens...")
             tokens = await self._exchange_code_for_tokens(code, redirect_uri)
             if not tokens:
+                logger.error("🔍 OAuth Debug - OAuth Service: Token exchange failed")
                 return {'success': False, 'error': 'Token exchange failed'}
             
+            logger.info(f"🔍 OAuth Debug - OAuth Service: Tokens received - access_token_length: {len(tokens.access_token) if tokens.access_token else 0}, expires_in: {tokens.expires_in}")
+            
             # Get user info to verify the account
+            logger.info("🔍 OAuth Debug - OAuth Service: Getting user info from Google...")
             user_info = await self._get_user_info(tokens.access_token)
             if not user_info:
+                logger.error("🔍 OAuth Debug - OAuth Service: Failed to get user info from Google")
                 return {'success': False, 'error': 'Failed to get user info'}
+            
+            logger.info(f"🔍 OAuth Debug - OAuth Service: User info received - email: {user_info.email}, name: {user_info.name}")
             
             # Create authenticated Supabase client using the user's access token
             # This ensures RLS policies are respected for credential storage
+            logger.info("🔍 OAuth Debug - OAuth Service: Creating authenticated Supabase client...")
             authenticated_supabase_client = self._create_authenticated_supabase_client(supabase_access_token)
+            
+            if not authenticated_supabase_client:
+                logger.error("🔍 OAuth Debug - OAuth Service: Failed to create authenticated Supabase client")
+                return {'success': False, 'error': 'Failed to create authenticated Supabase client'}
+            
+            logger.info(f"🔍 OAuth Debug - OAuth Service: Authenticated client created - type: {type(authenticated_supabase_client)}")
             
             # Store workspace credentials in database (separate from login credentials)
             # For existing users, use authenticated context to respect RLS
+            logger.info("🔍 OAuth Debug - OAuth Service: Storing workspace credentials...")
             credentials_stored = await self._store_workspace_credentials(
                 user_id, tokens, user_info, authenticated_supabase_client
             )
             
             if not credentials_stored:
+                logger.error("🔍 OAuth Debug - OAuth Service: Failed to store workspace credentials")
                 return {'success': False, 'error': 'Failed to store workspace credentials'}
+            
+            logger.info("🔍 OAuth Debug - OAuth Service: Credentials stored successfully!")
             
             return {
                 'success': True,
@@ -134,7 +156,9 @@ class GoogleOAuthService:
             }
             
         except Exception as e:
-            logger.error(f"Workspace OAuth callback error: {e}")
+            logger.error(f"🔍 OAuth Debug - OAuth Service: Unexpected error: {e}")
+            import traceback
+            logger.error(f"🔍 OAuth Debug - OAuth Service: Traceback: {traceback.format_exc()}")
             return {'success': False, 'error': 'Workspace OAuth processing failed'}
     
     async def _exchange_code_for_tokens(self, code: str, redirect_uri: Optional[str] = None) -> Optional[OAuthTokens]:
@@ -296,6 +320,9 @@ class GoogleOAuthService:
     async def _store_workspace_credentials(self, user_id: str, tokens: OAuthTokens, user_info: UserInfo, authenticated_supabase_client=None) -> bool:
         """Store Google Workspace OAuth credentials in database."""
         try:
+            logger.info(f"🔍 OAuth Debug - Credential Storage: Starting for user {user_id}")
+            logger.info(f"🔍 OAuth Debug - Credential Storage: Using client type: {type(authenticated_supabase_client)}")
+            
             # Calculate expiration time
             expires_at = datetime.now() + timedelta(seconds=tokens.expires_in)
             
@@ -320,31 +347,50 @@ class GoogleOAuthService:
                 'client_secret': self.client_secret
             }
             
+            logger.info(f"🔍 OAuth Debug - Credential Storage: Prepared data - user_id: {credentials_data['user_id']}, email: {credentials_data['google_email']}, scope: {credentials_data['scope']}")
+            
             # For existing users connecting Google, use authenticated context to respect RLS
             # This ensures the user can only insert/update their own credentials
             supabase_client = authenticated_supabase_client or self.supabase
+            logger.info(f"🔍 OAuth Debug - Credential Storage: Using Supabase client type: {type(supabase_client)}")
             
             # Check if workspace credentials already exist
+            logger.info("🔍 OAuth Debug - Credential Storage: Checking for existing credentials...")
             existing = supabase_client.table("google_credentials").select("user_id").eq("user_id", user_id).eq("login_provider", False).execute()
+            
+            logger.info(f"🔍 OAuth Debug - Credential Storage: Existing credentials found: {len(existing.data) if existing.data else 0}")
             
             if existing.data:
                 # Update existing workspace credentials
-                supabase_client.table("google_credentials").update(credentials_data).eq("user_id", user_id).eq("login_provider", False).execute()
+                logger.info("🔍 OAuth Debug - Credential Storage: Updating existing credentials...")
+                update_result = supabase_client.table("google_credentials").update(credentials_data).eq("user_id", user_id).eq("login_provider", False).execute()
+                logger.info(f"🔍 OAuth Debug - Credential Storage: Update result: {update_result}")
                 logger.info(f"Updated Google workspace credentials for user {user_id}")
             else:
                 # Insert new workspace credentials
-                supabase_client.table("google_credentials").insert(credentials_data).execute()
+                logger.info("🔍 OAuth Debug - Credential Storage: Inserting new credentials...")
+                insert_result = supabase_client.table("google_credentials").insert(credentials_data).execute()
+                logger.info(f"🔍 OAuth Debug - Credential Storage: Insert result: {insert_result}")
                 logger.info(f"Stored new Google workspace credentials for user {user_id}")
+            
+            # Verify the credentials were actually stored
+            logger.info("🔍 OAuth Debug - Credential Storage: Verifying storage...")
+            verification = supabase_client.table("google_credentials").select("user_id, google_email, scope").eq("user_id", user_id).eq("login_provider", False).execute()
+            logger.info(f"🔍 OAuth Debug - Credential Storage: Verification result: {verification}")
             
             return True
             
         except Exception as e:
-            logger.error(f"Failed to store Google workspace credentials for user {user_id}: {e}")
+            logger.error(f"🔍 OAuth Debug - Credential Storage: Failed to store credentials for user {user_id}: {e}")
+            import traceback
+            logger.error(f"🔍 OAuth Debug - Credential Storage: Traceback: {traceback.format_exc()}")
             return False
     
     def _create_authenticated_supabase_client(self, access_token: str):
         """Create a Supabase client using the user's access token for authenticated operations."""
         try:
+            logger.info(f"🔍 OAuth Debug - Client Creation: Starting with token length: {len(access_token) if access_token else 0}")
+            
             from supabase import create_client, Client
             from supabase.lib.client_options import ClientOptions
             
@@ -357,6 +403,8 @@ class GoogleOAuthService:
                 }
             )
             
+            logger.info(f"🔍 OAuth Debug - Client Creation: Options created - schema: {options.schema}, headers: {options.headers}")
+            
             # Create Supabase client with user's access token
             # This client will respect RLS policies based on the user's authentication
             authenticated_client = create_client(
@@ -365,12 +413,16 @@ class GoogleOAuthService:
                 options=options
             )
             
+            logger.info(f"🔍 OAuth Debug - Client Creation: Authenticated client created - type: {type(authenticated_client)}")
             logger.info("Authenticated Supabase client created successfully")
             return authenticated_client
             
         except Exception as e:
-            logger.error(f"Failed to create authenticated Supabase client: {e}")
+            logger.error(f"🔍 OAuth Debug - Client Creation: Failed to create authenticated Supabase client: {e}")
+            import traceback
+            logger.error(f"🔍 OAuth Debug - Client Creation: Traceback: {traceback.format_exc()}")
             # Fallback to service role client if authentication fails
+            logger.info("🔍 OAuth Debug - Client Creation: Falling back to service role client")
             return self.supabase
     
     async def close(self):

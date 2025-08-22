@@ -215,10 +215,28 @@ const IntegrationsPage: React.FC = () => {
         const supabaseSession = await supabase.auth.getSession();
         const supabaseAccessToken = supabaseSession.data.session?.access_token;
         
+        console.log('🔍 OAuth Debug - Frontend:', {
+          userId: user?.id,
+          hasSupabaseSession: !!supabaseSession.data.session,
+          hasAccessToken: !!supabaseAccessToken,
+          accessTokenLength: supabaseAccessToken?.length || 0,
+          code: code,
+          redirectUri: `${window.location.origin}/integrations`
+        });
+        
         if (!supabaseAccessToken) {
           setError('Supabase session not found');
           return;
         }
+        
+        const requestBody = { 
+          code,
+          redirect_uri: `${window.location.origin}/integrations`,
+          supabase_access_token: supabaseAccessToken
+        };
+        
+        console.log('🔍 OAuth Debug - Request Body:', requestBody);
+        console.log('🔍 OAuth Debug - Backend URL:', `${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/auth/google/workspace/oauth/callback`);
         
         const workspaceResponse = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/auth/google/workspace/oauth/callback`, {
           method: 'POST',
@@ -226,12 +244,11 @@ const IntegrationsPage: React.FC = () => {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${supabaseAccessToken}`,
           },
-          body: JSON.stringify({ 
-            code,
-            redirect_uri: `${window.location.origin}/integrations`,
-            supabase_access_token: supabaseAccessToken
-          }),
+          body: JSON.stringify(requestBody),
         });
+        
+        console.log('🔍 OAuth Debug - Response Status:', workspaceResponse.status);
+        console.log('🔍 OAuth Debug - Response Headers:', Object.fromEntries(workspaceResponse.headers.entries()));
 
         const workspaceResult = await workspaceResponse.json();
 
