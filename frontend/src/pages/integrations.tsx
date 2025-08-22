@@ -214,7 +214,7 @@ const IntegrationsPage: React.FC = () => {
     }
 
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-    const redirectUri = `${window.location.origin}/integrations`;
+    const redirectUri = `${window.location.origin}/integrations`; // Using existing Google Cloud Console config
     
     console.log('🔍 OAuth Debug - handleGoogleConnect called:', {
       userId: user.id,
