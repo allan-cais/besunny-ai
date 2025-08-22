@@ -15,6 +15,7 @@ import {
   Settings,
   MessageSquare
 } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 const IntegrationsPage: React.FC = () => {
   const { user, session, loading } = useAuth();
@@ -22,9 +23,34 @@ const IntegrationsPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const location = useLocation();
 
-  // Simple state for Google integration
+  // State for Google integration
   const [googleConnected, setGoogleConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [isProcessingCallback, setIsProcessingCallback] = useState(false);
+
+  // Check if user has Google credentials on component mount
+  useEffect(() => {
+    const checkGoogleConnection = async () => {
+      if (user?.id) {
+        try {
+          const { data, error } = await supabase
+            .from('google_credentials')
+            .select('user_id')
+            .eq('user_id', user.id)
+            .eq('login_provider', false)
+            .maybeSingle();
+          
+          if (!error && data) {
+            setGoogleConnected(true);
+          }
+        } catch (error) {
+          console.error('Error checking Google connection:', error);
+        }
+      }
+    };
+
+    checkGoogleConnection();
+  }, [user?.id]);
 
   // Handle OAuth callback parameters
   useEffect(() => {
@@ -37,19 +63,61 @@ const IntegrationsPage: React.FC = () => {
       console.error('OAuth error:', errorParam);
       // Clean up URL
       navigate('/integrations', { replace: true });
-    } else if (codeParam && stateParam && user?.id) {
-      // Handle OAuth callback - for now just mark as connected
-      setGoogleConnected(true);
+    } else if (codeParam && stateParam && user?.id && session?.access_token) {
+      // Handle OAuth callback - exchange code for tokens
+      handleOAuthCallback(codeParam, stateParam);
+    }
+  }, [searchParams, location.search, user?.id, session?.access_token, navigate]);
+
+  const handleOAuthCallback = async (code: string, state: string) => {
+    if (!user?.id || !session?.access_token) return;
+    
+    setIsProcessingCallback(true);
+    
+    try {
+      // Call the backend to exchange the authorization code for tokens
+      const response = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/auth/google/workspace/oauth/callback`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          code,
+          redirect_uri: `${window.location.origin}/integrations`,
+          supabase_access_token: session.access_token,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to connect Google account');
+      }
+
+      const result = await response.json();
+      
+      if (result.success) {
+        setGoogleConnected(true);
+        console.log('Google account connected successfully');
+      } else {
+        throw new Error(result.error || 'Failed to connect Google account');
+      }
+    } catch (error) {
+      console.error('Error connecting Google account:', error);
+      alert(`Failed to connect Google account: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsProcessingCallback(false);
+      // Clean up URL
       navigate('/integrations', { replace: true });
     }
-  }, [searchParams, location.search, user?.id, navigate]);
+  };
 
   const handleGoogleConnect = async () => {
     if (!user) return;
     
     setIsConnecting(true);
     
-    // Simple Google OAuth redirect
+    // Google OAuth redirect for workspace integration
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
     const redirectUri = `${window.location.origin}/integrations`;
     
@@ -79,7 +147,27 @@ const IntegrationsPage: React.FC = () => {
   };
 
   const handleGoogleDisconnect = async () => {
-    setGoogleConnected(false);
+    if (!user?.id) return;
+    
+    try {
+      // Call backend to disconnect Google account
+      const response = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/auth/google/disconnect`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+      });
+
+      if (response.ok) {
+        setGoogleConnected(false);
+        console.log('Google account disconnected successfully');
+      } else {
+        throw new Error('Failed to disconnect Google account');
+      }
+    } catch (error) {
+      console.error('Error disconnecting Google account:', error);
+      alert('Failed to disconnect Google account');
+    }
   };
 
   return (
@@ -139,10 +227,12 @@ const IntegrationsPage: React.FC = () => {
           </CardHeader>
 
           <CardContent>
-            {isConnecting ? (
+            {isConnecting || isProcessingCallback ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="w-6 h-6 animate-spin mr-2" />
-                <span className="text-sm">Connecting to Google...</span>
+                <span className="text-sm">
+                  {isConnecting ? 'Connecting to Google...' : 'Processing Google callback...'}
+                </span>
               </div>
             ) : googleConnected ? (
               <div className="space-y-4">

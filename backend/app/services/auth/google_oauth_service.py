@@ -70,29 +70,47 @@ class GoogleOAuthService:
     async def handle_oauth_callback(self, code: str) -> Dict[str, Any]:
         """Handle OAuth callback for Google login (creates new users)."""
         try:
+            logger.info(f"🔍 OAuth Debug - Starting OAuth callback for code length: {len(code) if code else 0}")
+            
             # Exchange code for tokens
+            logger.info("🔍 OAuth Debug - Exchanging code for tokens...")
             tokens = await self._exchange_code_for_tokens(code)
             if not tokens:
+                logger.error("🔍 OAuth Debug - Token exchange failed")
                 return {'success': False, 'error': 'Token exchange failed'}
             
+            logger.info(f"🔍 OAuth Debug - Tokens received successfully - access_token_length: {len(tokens.access_token) if tokens.access_token else 0}")
+            
             # Get user info
+            logger.info("🔍 OAuth Debug - Getting user info from Google...")
             user_info = await self._get_user_info(tokens.access_token)
             if not user_info:
+                logger.error("🔍 OAuth Debug - Failed to get user info")
                 return {'success': False, 'error': 'Failed to get user info'}
             
+            logger.info(f"🔍 OAuth Debug - User info received - email: {user_info.email}, name: {user_info.name}")
+            
             # Create/update user in public.users table
+            logger.info("🔍 OAuth Debug - Creating/updating user in database...")
             user_id = await self._upsert_user(user_info)
             if not user_id:
+                logger.error("🔍 OAuth Debug - User creation failed")
                 return {'success': False, 'error': 'User creation failed'}
             
+            logger.info(f"🔍 OAuth Debug - User upsert successful - user_id: {user_id}")
+            
             # Store Google credentials in database
+            logger.info("🔍 OAuth Debug - Storing Google credentials...")
             credentials_stored = await self._store_google_credentials(
                 user_id, tokens, user_info
             )
             if not credentials_stored:
-                logger.warning(f"Failed to store credentials for user {user_id}")
+                logger.warning(f"🔍 OAuth Debug - Failed to store credentials for user {user_id}")
+            else:
+                logger.info(f"🔍 OAuth Debug - Credentials stored successfully for user {user_id}")
             
             # Return user info for frontend to create Supabase session
+            logger.info(f"🔍 OAuth Debug - OAuth callback completed successfully for user {user_id}")
             return {
                 'success': True,
                 'user_id': user_id,
@@ -103,7 +121,9 @@ class GoogleOAuthService:
             }
             
         except Exception as e:
-            logger.error(f"OAuth callback error: {e}")
+            logger.error(f"🔍 OAuth Debug - OAuth callback error: {e}")
+            import traceback
+            logger.error(f"🔍 OAuth Debug - Traceback: {traceback.format_exc()}")
             return {'success': False, 'error': 'OAuth processing failed'}
     
     async def handle_workspace_oauth_callback(self, code: str, user_id: str, redirect_uri: str, supabase_access_token: str) -> Dict[str, Any]:
@@ -268,37 +288,59 @@ class GoogleOAuthService:
     async def _upsert_user(self, user_info: UserInfo) -> Optional[str]:
         """Create or update user efficiently."""
         try:
+            logger.info(f"🔍 OAuth Debug - Upserting user with email: {user_info.email}")
+            
             # Check if user exists
             result = self.supabase.table("users").select("id").eq("email", user_info.email).execute()
+            logger.info(f"🔍 OAuth Debug - User lookup result: {result}")
             
             if result.data:
                 # Update existing user
                 user_id = result.data[0]['id']
-                self.supabase.table("users").update({
+                logger.info(f"🔍 OAuth Debug - Updating existing user: {user_id}")
+                update_result = self.supabase.table("users").update({
                     'name': user_info.name,
-                    'created_at': datetime.now().isoformat()
+                    'updated_at': datetime.now().isoformat()
                 }).eq("id", user_id).execute()
+                logger.info(f"🔍 OAuth Debug - User update result: {update_result}")
                 return user_id
             else:
                 # Create new user
-                result = self.supabase.table("users").insert({
+                logger.info(f"🔍 OAuth Debug - Creating new user")
+                new_user_data = {
                     'id': str(uuid.uuid4()),  # Generate UUID for id
                     'email': user_info.email,
                     'name': user_info.name,
-                    'created_at': datetime.now().isoformat()
-                }).execute()
+                    'created_at': datetime.now().isoformat(),
+                    'updated_at': datetime.now().isoformat()
+                }
+                logger.info(f"🔍 OAuth Debug - New user data: {new_user_data}")
+                
+                result = self.supabase.table("users").insert(new_user_data).execute()
+                logger.info(f"🔍 OAuth Debug - User creation result: {result}")
                 
                 if result.data:
-                    return result.data[0]['id']
-                return None
+                    user_id = result.data[0]['id']
+                    logger.info(f"🔍 OAuth Debug - New user created with ID: {user_id}")
+                    return user_id
+                else:
+                    logger.error(f"🔍 OAuth Debug - User creation failed - no data returned")
+                    return None
                 
         except Exception as e:
-            logger.error(f"User upsert failed: {e}")
+            logger.error(f"🔍 OAuth Debug - User upsert failed: {e}")
+            import traceback
+            logger.error(f"🔍 OAuth Debug - Traceback: {traceback.format_exc()}")
             return None
     
     async def _store_google_credentials(self, user_id: str, tokens: OAuthTokens, user_info: UserInfo) -> bool:
         """Store Google OAuth credentials in database."""
         try:
+            logger.info(f"🔍 OAuth Debug - Storing credentials for user {user_id}")
+            logger.info(f"🔍 OAuth Debug - Access token length: {len(tokens.access_token) if tokens.access_token else 0}")
+            logger.info(f"🔍 OAuth Debug - Refresh token length: {len(tokens.refresh_token) if tokens.refresh_token else 0}")
+            logger.info(f"🔍 OAuth Debug - Expires in: {tokens.expires_in}")
+            
             # Calculate expiration time
             expires_at = datetime.now() + timedelta(seconds=tokens.expires_in)
             
@@ -323,26 +365,47 @@ class GoogleOAuthService:
                 'client_secret': self.client_secret
             }
             
+            logger.info(f"🔍 OAuth Debug - Prepared credentials data: {list(credentials_data.keys())}")
+            logger.info(f"🔍 OAuth Debug - Using Supabase client type: {type(self.supabase)}")
+            
             # For OAuth setup, we need to use service role to bypass RLS
             # This is acceptable because we're setting up the initial authentication
             # Subsequent operations will use user context and respect RLS
             
             # Check if credentials already exist
+            logger.info("🔍 OAuth Debug - Checking for existing credentials...")
             existing = self.supabase.table("google_credentials").select("user_id").eq("user_id", user_id).execute()
+            logger.info(f"🔍 OAuth Debug - Existing credentials check result: {existing}")
             
             if existing.data:
                 # Update existing credentials
-                self.supabase.table("google_credentials").update(credentials_data).eq("user_id", user_id).execute()
+                logger.info("🔍 OAuth Debug - Updating existing credentials...")
+                update_result = self.supabase.table("google_credentials").update(credentials_data).eq("user_id", user_id).execute()
+                logger.info(f"🔍 OAuth Debug - Update result: {update_result}")
                 logger.info(f"Updated Google credentials for user {user_id}")
             else:
                 # Insert new credentials
-                self.supabase.table("google_credentials").insert(credentials_data).execute()
+                logger.info("🔍 OAuth Debug - Inserting new credentials...")
+                insert_result = self.supabase.table("google_credentials").insert(credentials_data).execute()
+                logger.info(f"🔍 OAuth Debug - Insert result: {insert_result}")
                 logger.info(f"Stored new Google credentials for user {user_id}")
+            
+            # Verify the credentials were actually stored
+            logger.info("🔍 OAuth Debug - Verifying storage...")
+            verification = self.supabase.table("google_credentials").select("user_id, access_token, google_email").eq("user_id", user_id).execute()
+            logger.info(f"🔍 OAuth Debug - Verification result: {verification}")
+            
+            if verification.data:
+                logger.info(f"🔍 OAuth Debug - Credentials verified successfully for user {user_id}")
+            else:
+                logger.warning(f"🔍 OAuth Debug - Credentials verification failed for user {user_id}")
             
             return True
             
         except Exception as e:
-            logger.error(f"Failed to store Google credentials for user {user_id}: {e}")
+            logger.error(f"🔍 OAuth Debug - Failed to store Google credentials for user {user_id}: {e}")
+            import traceback
+            logger.error(f"🔍 OAuth Debug - Traceback: {traceback.format_exc()}")
             return False
     
     async def _store_workspace_credentials(self, user_id: str, tokens: OAuthTokens, user_info: UserInfo, authenticated_supabase_client=None) -> bool:
