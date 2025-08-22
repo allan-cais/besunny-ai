@@ -489,6 +489,12 @@ const Dashboard = () => {
 
 
 
+  // Simple test render to see if component works at all
+  // Show loading state while data is being fetched
+  if (meetingsLoading || dataLoading) {
+    return null; // Return null for seamless loading
+  }
+
   return (
     <div className="px-4 pt-12 pb-8 font-sans h-full flex flex-col">
       {/* Scrollable Content */}

@@ -50,7 +50,7 @@ const SignUpForm: React.FC<SignUpFormProps> = ({ onSwitchToLogin }) => {
       return;
     }
 
-    const { error } = await signUp(email, password, name);
+    const { error } = await signUp({ email, password, name });
     
     if (error) {
       setError(error.message);

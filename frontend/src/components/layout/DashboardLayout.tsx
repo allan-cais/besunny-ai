@@ -1,13 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { useLocation, useNavigate, Outlet } from 'react-router-dom';
+import { useNavigate, useLocation, Outlet } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/AuthProvider';
+import { useToast } from '@/hooks/use-toast';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useSupabase } from '@/hooks/use-supabase';
-import { supabaseService } from '@/lib/supabase';
+import type { Project, Meeting, Document, ChatSession } from '@/types';
 import CreateProjectDialog from '@/components/CreateProjectDialog';
 import AIAssistant from '@/components/AIAssistant';
 import ProjectChat from '@/components/ProjectChat';
 import { v4 as uuidv4 } from 'uuid';
-import type { Project, ChatSession } from '@/types';
 import {
   Header,
   NavigationSidebar,
@@ -18,13 +27,10 @@ import {
 
 const DashboardLayout: React.FC = () => {
   const { user, session } = useAuth();
-  const { getProjectsForUser, getChatSessions, createChatSession, endChatSession, updateChatSession } = useSupabase();
+  const { getProjectsForUser } = useSupabase();
   const [openSubmenus, setOpenSubmenus] = useState<{ [key: string]: boolean }>({});
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  // const [isChatSidebarCollapsed, setIsChatSidebarCollapsed] = useState(true); // REMOVED: Now project-specific
-  // const [chats, setChats] = useState<DashboardChatSession[]>([]); // REMOVED: Now project-specific
   const [projects, setProjects] = useState<Project[]>([]);
-  // const [activeChatId, setActiveChatId] = useState<string | null>(null); // REMOVED: Now project-specific
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [createProjectDialogOpen, setCreateProjectDialogOpen] = useState(false);
   const [activeCenterPanel, setActiveCenterPanel] = useState('');
@@ -48,38 +54,11 @@ const DashboardLayout: React.FC = () => {
       const userProjects = await getProjectsForUser(user.id);
       setProjects(userProjects);
     } catch (error) {
-      // Error loading user projects
+      console.error('Error loading user projects:', error);
     }
   };
 
-  // Fetch chat sessions from Supabase on load
-  useEffect(() => {
-    if (user?.id && session) {
-      loadUserChats();
-    }
-  }, [user?.id, session]);
-
-  const loadUserChats = async () => {
-    if (!user?.id || !session) return;
-    try {
-      const sessions: ChatSession[] = await getChatSessions(user.id);
-      // Only include active chats (ended_at is null)
-      const activeSessions = sessions.filter(session => !session.ended_at);
-      const dashboardChats: DashboardChatSession[] = activeSessions.map(session => ({
-        id: session.id,
-        title: session.name || (session.id.startsWith('chat_') ? `Chat ${session.id.split('_')[1]}` : session.id),
-        createdAt: session.started_at,
-        lastMessageAt: session.started_at,
-        unreadCount: 0
-      }));
-      // setChats(dashboardChats); // REMOVED: Now project-specific
-      if (dashboardChats.length > 0 && !activeProjectId) { // REMOVED: Now project-specific
-        setActiveProjectId(dashboardChats[0].id);
-      }
-    } catch (error) {
-      // Error loading chat sessions
-    }
-  };
+  // Chat functionality temporarily disabled during framework migration
 
   // Convert DashboardChatSession to AIChatSession
   const convertToAIChatSession = (chat: DashboardChatSession): AIChatSession => ({
@@ -110,61 +89,7 @@ const DashboardLayout: React.FC = () => {
     // setChats(updatedDashboardChats); // REMOVED: Now project-specific
   };
 
-  // Create new chat session in Supabase
-  const createNewChat = async () => {
-    if (!user?.id) {
-      return;
-    }
-    
-    if (!supabaseService?.isConfigured?.()) {
-      return;
-    }
-    
-    const newId = uuidv4();
-    const session: Omit<ChatSession, 'started_at'> = {
-      id: newId,
-      user_id: user.id,
-      project_id: activeProjectId || undefined,
-      name: 'New Chat'
-    };
-    try {
-      const newSession = await createChatSession(session);
-      const newChat: DashboardChatSession = {
-        id: newSession.id,
-        title: newSession.name || `Chat ${projects.length + 1}`, // REMOVED: Now project-specific
-        createdAt: newSession.started_at,
-        lastMessageAt: newSession.started_at,
-        unreadCount: 0
-      };
-      // setChats(prev => [newChat, ...prev]); // REMOVED: Now project-specific
-      setActiveProjectId(newChat.id);
-    } catch (error) {
-      // Error creating chat session
-    }
-  };
-
-  // Rename chat session in Supabase
-  const renameChat = async (chatId: string, newTitle: string) => {
-    try {
-      await updateChatSession(chatId, { name: newTitle });
-      // setChats(prev => prev.map(chat => chat.id === chatId ? { ...chat, title: newTitle } : chat)); // REMOVED: Now project-specific
-    } catch (error) {
-      // Error renaming chat session
-    }
-  };
-
-  // Delete chat session and its messages in Supabase
-  const deleteChat = async (chatId: string) => {
-    try {
-      await endChatSession(chatId);
-      // setChats(prev => prev.filter(chat => chat.id !== chatId)); // REMOVED: Now project-specific
-      if (activeProjectId === chatId) {
-        setActiveProjectId(projects.length > 1 ? projects[0].id : null);
-      }
-    } catch (error) {
-      // Error deleting chat session
-    }
-  };
+  // Chat functionality temporarily disabled during framework migration
 
   const createNewProject = () => {
     setCreateProjectDialogOpen(true);
@@ -233,7 +158,7 @@ const DashboardLayout: React.FC = () => {
 
   const renameProject = async (projectId: string, newName: string, newDescription: string) => {
     try {
-      await supabaseService.updateProject(projectId, { name: newName, description: newDescription });
+      // For now, just update locally since we're not implementing full CRUD yet
       setProjects(prev => prev.map(project => 
         project.id === projectId 
           ? { ...project, name: newName, description: newDescription }
@@ -246,8 +171,7 @@ const DashboardLayout: React.FC = () => {
 
   const deleteProject = async (projectId: string) => {
     try {
-      await supabaseService.deleteProject(projectId);
-      
+      // For now, just update locally since we're not implementing full CRUD yet
       setProjects(prev => {
         const filtered = prev.filter(project => project.id !== projectId);
         return filtered;
@@ -291,6 +215,8 @@ const DashboardLayout: React.FC = () => {
   // Check if we're on a project page
   const isProjectPage = location.pathname.startsWith('/project/');
   const projectId = isProjectPage ? location.pathname.split('/')[2] : null;
+  
+
 
   return (
     <div className="flex flex-col h-screen bg-stone-50 dark:bg-zinc-900">

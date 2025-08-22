@@ -1,374 +1,273 @@
-// Utility Functions
-// Provides common utilities for data transformation, formatting, and other operations
-
-import { DocumentType, Meeting, Document, VirtualEmailActivity, RawTranscript } from '../types';
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
-// Utility function for combining class names with Tailwind CSS
+/**
+ * Utility function to merge Tailwind CSS classes
+ * Combines clsx and tailwind-merge for optimal class handling
+ */
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-// Date and Time Utilities
-export const dateUtils = {
-  // Format date for display
-  formatDate(dateString: string, options: Intl.DateTimeFormatOptions = {}): string {
+/**
+ * Format date to readable string
+ */
+export function formatDate(date: Date | string): string {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  return d.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+}
+
+/**
+ * Format date and time to readable string
+ */
+export function formatDateTime(date: Date | string): string {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  return d.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+/**
+ * Format relative time (e.g., "2 hours ago")
+ */
+export function formatRelativeTime(date: Date | string): string {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  const now = new Date();
+  const diffInSeconds = Math.floor((now.getTime() - d.getTime()) / 1000);
+
+  if (diffInSeconds < 60) return 'just now';
+  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`;
+  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
+  if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 86400)} days ago`;
+  if (diffInSeconds < 31536000) return `${Math.floor(diffInSeconds / 2592000)} months ago`;
+  
+  return `${Math.floor(diffInSeconds / 31536000)} years ago`;
+}
+
+/**
+ * Truncate text to specified length
+ */
+export function truncateText(text: string, maxLength: number): string {
+  if (text.length <= maxLength) return text;
+  return text.slice(0, maxLength) + '...';
+}
+
+/**
+ * Generate random ID
+ */
+export function generateId(length: number = 8): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
+/**
+ * Debounce function
+ */
+export function debounce<T extends (...args: any[]) => any>(
+  func: T,
+  wait: number
+): (...args: Parameters<T>) => void {
+  let timeout: NodeJS.Timeout;
+  return (...args: Parameters<T>) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), wait);
+  };
+}
+
+/**
+ * Throttle function
+ */
+export function throttle<T extends (...args: any[]) => any>(
+  func: T,
+  limit: number
+): (...args: Parameters<T>) => void {
+  let inThrottle: boolean;
+  return (...args: Parameters<T>) => {
+    if (!inThrottle) {
+      func(...args);
+      inThrottle = true;
+      setTimeout(() => (inThrottle = false), limit);
+    }
+  };
+}
+
+/**
+ * Deep clone object
+ */
+export function deepClone<T>(obj: T): T {
+  if (obj === null || typeof obj !== 'object') return obj;
+  if (obj instanceof Date) return new Date(obj.getTime()) as unknown as T;
+  if (obj instanceof Array) return obj.map(item => deepClone(item)) as unknown as T;
+  if (typeof obj === 'object') {
+    const clonedObj = {} as T;
+    for (const key in obj) {
+      if (obj.hasOwnProperty(key)) {
+        clonedObj[key] = deepClone(obj[key]);
+      }
+    }
+    return clonedObj;
+  }
+  return obj;
+}
+
+/**
+ * Check if value is empty
+ */
+export function isEmpty(value: any): boolean {
+  if (value === null || value === undefined) return true;
+  if (typeof value === 'string') return value.trim().length === 0;
+  if (Array.isArray(value)) return value.length === 0;
+  if (typeof value === 'object') return Object.keys(value).length === 0;
+  return false;
+}
+
+/**
+ * Capitalize first letter
+ */
+export function capitalize(str: string): string {
+  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+}
+
+/**
+ * Convert string to slug
+ */
+export function toSlug(str: string): string {
+  return str
+    .toLowerCase()
+    .replace(/[^a-z0-9 -]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .trim();
+}
+
+/**
+ * Format file size
+ */
+export function formatFileSize(bytes: number): string {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+/**
+ * Sleep function for async operations
+ */
+export function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Retry function with exponential backoff
+ */
+export async function retry<T>(
+  fn: () => Promise<T>,
+  maxAttempts: number = 3,
+  baseDelay: number = 1000
+): Promise<T> {
+  let lastError: Error;
+  
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) {
-        return 'Invalid date';
+      return await fn();
+    } catch (error) {
+      lastError = error as Error;
+      
+      if (attempt === maxAttempts) {
+        throw lastError;
       }
       
-      const defaultOptions: Intl.DateTimeFormatOptions = {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        ...options,
-      };
-      
-      return date.toLocaleDateString('en-US', defaultOptions);
-    } catch {
-      return 'Invalid date';
+      const delay = baseDelay * Math.pow(2, attempt - 1);
+      await sleep(delay);
     }
-  },
+  }
+  
+  throw lastError!;
+}
 
-  // Format time for display
-  formatTime(dateString: string, options: Intl.DateTimeFormatOptions = {}): string {
-    try {
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) {
-        return 'Invalid time';
-      }
+/**
+ * Validate email format
+ */
+export function isValidEmail(email: string): boolean {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+}
+
+/**
+ * Validate URL format
+ */
+export function isValidUrl(url: string): boolean {
+  try {
+    new URL(url);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Get initials from name
+ */
+export function getInitials(name: string): string {
+  return name
+    .split(' ')
+    .map(word => word.charAt(0))
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+}
+
+/**
+ * Group array by key
+ */
+export function groupBy<T>(array: T[], key: keyof T): Record<string, T[]> {
+  return array.reduce((groups, item) => {
+    const group = String(item[key]);
+    groups[group] = groups[group] || [];
+    groups[group].push(item);
+    return groups;
+  }, {} as Record<string, T[]>);
+}
+
+/**
+ * Sort array by multiple keys
+ */
+export function sortBy<T>(
+  array: T[],
+  ...keys: Array<keyof T | { key: keyof T; direction: 'asc' | 'desc' }>
+): T[] {
+  return [...array].sort((a, b) => {
+    for (const keyConfig of keys) {
+      let key: keyof T;
+      let direction: 'asc' | 'desc' = 'asc';
       
-      const defaultOptions: Intl.DateTimeFormatOptions = {
-        hour: '2-digit',
-        minute: '2-digit',
-        ...options,
-      };
-      
-      return date.toLocaleTimeString('en-US', defaultOptions);
-    } catch {
-      return 'Invalid time';
-    }
-  },
-
-  // Format date and time together
-  formatDateTime(dateString: string): string {
-    return `${this.formatDate(dateString)} • ${this.formatTime(dateString)}`;
-  },
-
-  // Get relative time (e.g., "2 hours ago")
-  getRelativeTime(dateString: string): string {
-    try {
-      const date = new Date(dateString);
-      const now = new Date();
-      const diffInMs = now.getTime() - date.getTime();
-      const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
-      const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
-      const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
-
-      if (diffInMinutes < 1) {
-        return 'Just now';
-      } else if (diffInMinutes < 60) {
-        return `${diffInMinutes} minute${diffInMinutes === 1 ? '' : 's'} ago`;
-      } else if (diffInHours < 24) {
-        return `${diffInHours} hour${diffInHours === 1 ? '' : 's'} ago`;
-      } else if (diffInDays < 7) {
-        return `${diffInDays} day${diffInDays === 1 ? '' : 's'} ago`;
+      if (typeof keyConfig === 'object') {
+        key = keyConfig.key;
+        direction = keyConfig.direction;
       } else {
-        return this.formatDate(dateString);
-      }
-    } catch {
-      return 'Invalid date';
-    }
-  },
-
-  // Check if date is today
-  isToday(dateString: string): boolean {
-    try {
-      const date = new Date(dateString);
-      const today = new Date();
-      return date.toDateString() === today.toDateString();
-    } catch {
-      return false;
-    }
-  },
-
-  // Check if date is this week
-  isThisWeek(dateString: string): boolean {
-    try {
-      const date = new Date(dateString);
-      const today = new Date();
-      const startOfWeek = new Date(today);
-      startOfWeek.setDate(today.getDate() - today.getDay());
-      startOfWeek.setHours(0, 0, 0, 0);
-      
-      const endOfWeek = new Date(startOfWeek);
-      endOfWeek.setDate(startOfWeek.getDate() + 6);
-      endOfWeek.setHours(23, 59, 59, 999);
-      
-      return date >= startOfWeek && date <= endOfWeek;
-    } catch {
-      return false;
-    }
-  },
-};
-
-// String Utilities
-export const stringUtils = {
-  // Truncate text with ellipsis
-  truncate(text: string, maxLength: number, suffix: string = '...'): string {
-    if (!text || text.length <= maxLength) {
-      return text;
-    }
-    return text.substring(0, maxLength - suffix.length) + suffix;
-  },
-
-  // Capitalize first letter
-  capitalize(text: string): string {
-    if (!text) return text;
-    return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
-  },
-
-  // Convert to title case
-  toTitleCase(text: string): string {
-    if (!text) return text;
-    return text
-      .split(' ')
-      .map(word => this.capitalize(word))
-      .join(' ');
-  },
-
-  // Generate initials from name
-  getInitials(name: string): string {
-    if (!name) return '';
-    return name
-      .split(' ')
-      .map(word => word.charAt(0).toUpperCase())
-      .join('')
-      .substring(0, 2);
-  },
-
-  // Clean HTML tags
-  stripHtml(html: string): string {
-    if (!html) return '';
-    return html.replace(/<[^>]*>/g, '').trim();
-  },
-
-  // Generate slug from text
-  toSlug(text: string): string {
-    if (!text) return '';
-    return text
-      .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, '')
-      .replace(/\s+/g, '-')
-      .replace(/-+/g, '-')
-      .trim();
-  },
-};
-
-// Data Transformation Utilities
-export const dataUtils = {
-  // Transform document to virtual email activity
-  documentToVirtualEmailActivity(document: Document): VirtualEmailActivity {
-    return {
-      id: document.id,
-      type: document.type,
-      title: document.title || 'Untitled Document',
-      summary: document.summary ? stringUtils.truncate(document.summary, 150) : 'No content available',
-      source: document.source || 'unknown',
-      sender: document.author,
-      file_size: document.file_size,
-      created_at: document.created_at,
-      processed: true,
-      project_id: document.project_id,
-      transcript_duration_seconds: document.transcript_duration_seconds,
-      transcript_metadata: document.transcript_metadata,
-      rawTranscript: document.type === 'meeting_transcript' ? {
-        id: document.meeting_id || document.id,
-        title: document.title,
-        transcript: document.summary || '',
-        transcript_summary: document.summary || '',
-        transcript_metadata: document.transcript_metadata,
-        transcript_duration_seconds: document.transcript_duration_seconds || 0,
-        transcript_retrieved_at: document.received_at || document.created_at,
-        final_transcript_ready: true,
-      } : undefined,
-    };
-  },
-
-  // Transform documents array to virtual email activities
-  documentsToVirtualEmailActivities(documents: Document[]): VirtualEmailActivity[] {
-    return documents.map(this.documentToVirtualEmailActivity);
-  },
-
-  // Get document type from source
-  getDocumentType(source: string, document?: Partial<Document>): DocumentType {
-    if (document?.type && document.type !== 'unknown') {
-      return document.type;
-    }
-
-    const sourceLower = source.toLowerCase();
-    
-    if (sourceLower.includes('gmail') || sourceLower.includes('email')) {
-      return 'email';
-    }
-    
-    if (sourceLower.includes('meeting') || sourceLower.includes('transcript')) {
-      return 'meeting_transcript';
-    }
-    
-    if (sourceLower.includes('drive') || sourceLower.includes('google')) {
-      return 'drive_file';
-    }
-    
-    if (sourceLower.includes('document') || sourceLower.includes('file')) {
-      return 'document';
-    }
-    
-    return 'unknown';
-  },
-
-  // Sort meetings by start time
-  sortMeetingsByStartTime(meetings: Meeting[]): Meeting[] {
-    return [...meetings].sort((a, b) => 
-      new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
-    );
-  },
-
-  // Sort documents by creation date
-  sortDocumentsByDate(documents: Document[]): Document[] {
-    return [...documents].sort((a, b) => 
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    );
-  },
-
-  // Filter meetings by status
-  filterMeetingsByStatus(meetings: Meeting[], status: string | string[]): Meeting[] {
-    const statuses = Array.isArray(status) ? status : [status];
-    return meetings.filter(meeting => statuses.includes(meeting.bot_status));
-  },
-
-  // Filter documents by type
-  filterDocumentsByType(documents: Document[], type: DocumentType | DocumentType[]): Document[] {
-    const types = Array.isArray(type) ? type : [type];
-    return documents.filter(document => types.includes(document.type));
-  },
-};
-
-// Validation Utilities
-export const validationUtils = {
-  // Validate email format
-  isValidEmail(email: string): boolean {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  },
-
-  // Validate URL format
-  isValidUrl(url: string): boolean {
-    try {
-      new URL(url);
-      return true;
-    } catch {
-      return false;
-    }
-  },
-
-  // Validate required fields
-  hasRequiredFields<T extends Record<string, unknown>>(
-    obj: T, 
-    requiredFields: (keyof T)[]
-  ): { isValid: boolean; missingFields: (keyof T)[] } {
-    const missingFields = requiredFields.filter(field => 
-      !obj[field] || (typeof obj[field] === 'string' && obj[field].trim() === '')
-    );
-    
-    return {
-      isValid: missingFields.length === 0,
-      missingFields,
-    };
-  },
-
-  // Validate object structure
-  validateObjectStructure<T extends Record<string, unknown>>(
-    obj: T,
-    schema: Record<keyof T, 'string' | 'number' | 'boolean' | 'object' | 'array'>
-  ): { isValid: boolean; errors: string[] } {
-    const errors: string[] = [];
-    
-    for (const [key, expectedType] of Object.entries(schema)) {
-      if (!(key in obj)) {
-        errors.push(`Missing required field: ${key}`);
-        continue;
+        key = keyConfig;
       }
       
-      const value = obj[key];
-      const actualType = Array.isArray(value) ? 'array' : typeof value;
+      const aVal = a[key];
+      const bVal = b[key];
       
-      if (actualType !== expectedType) {
-        errors.push(`Field ${key} should be ${expectedType}, got ${actualType}`);
-      }
+      if (aVal < bVal) return direction === 'asc' ? -1 : 1;
+      if (aVal > bVal) return direction === 'asc' ? 1 : -1;
     }
     
-    return {
-      isValid: errors.length === 0,
-      errors,
-    };
-  },
-};
-
-// Array Utilities
-export const arrayUtils = {
-  // Remove duplicates from array
-  unique<T>(array: T[], key?: keyof T): T[] {
-    if (!key) {
-      return [...new Set(array)];
-    }
-    
-    const seen = new Set();
-    return array.filter(item => {
-      const value = item[key];
-      if (seen.has(value)) {
-        return false;
-      }
-      seen.add(value);
-      return true;
-    });
-  },
-
-  // Group array by key
-  groupBy<T>(array: T[], key: keyof T): Record<string, T[]> {
-    return array.reduce((groups, item) => {
-      const groupKey = String(item[key]);
-      if (!groups[groupKey]) {
-        groups[groupKey] = [];
-      }
-      groups[groupKey].push(item);
-      return groups;
-    }, {} as Record<string, T[]>);
-  },
-
-  // Chunk array into smaller arrays
-  chunk<T>(array: T[], size: number): T[][] {
-    const chunks: T[][] = [];
-    for (let i = 0; i < array.length; i += size) {
-      chunks.push(array.slice(i, i + size));
-    }
-    return chunks;
-  },
-
-  // Flatten nested arrays
-  flatten<T>(array: T[][]): T[] {
-    return array.reduce((flat, item) => flat.concat(item), [] as T[]);
-  },
-};
-
-// Export all utilities
-export default {
-  date: dateUtils,
-  string: stringUtils,
-  data: dataUtils,
-  validation: validationUtils,
-  array: arrayUtils,
-};
+    return 0;
+  });
+}

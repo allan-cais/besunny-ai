@@ -34,7 +34,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToSignUp, onForgotPasswor
       return;
     }
 
-    const { error } = await signIn(email, password);
+    const { error } = await signIn({ email, password });
     
     if (error) {
       setError(error.message);

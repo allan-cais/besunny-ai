@@ -1,19 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { 
-  supabaseService, 
-  ChatMessage, 
-  ChatSession, 
-  User, 
-  Project, 
-  Document,
-  KnowledgeSpace,
-  DocumentChunk,
-  Tag,
-  Summary,
-  Receipt,
-  AgentLog
-} from '../lib/supabase';
+import { supabase } from '../lib/supabase';
+import type { User, Project, Document } from '../types';
 
+// Simple hook for basic Supabase operations
 export const useSupabase = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -24,16 +13,18 @@ export const useSupabase = () => {
 
   // User operations
   const createUser = useCallback(async (user: Omit<User, 'created_at'>) => {
-    if (!supabaseService.isConfigured()) {
-      return null;
-    }
-
     setIsLoading(true);
     setError(null);
     
     try {
-      const newUser = await supabaseService.createUser(user);
-      return newUser;
+      const { data, error: apiError } = await supabase
+        .from('users')
+        .insert(user)
+        .select()
+        .single();
+      
+      if (apiError) throw apiError;
+      return data;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create user');
       throw err;
@@ -43,16 +34,18 @@ export const useSupabase = () => {
   }, []);
 
   const getUser = useCallback(async (id: string) => {
-    if (!supabaseService.isConfigured()) {
-      return null;
-    }
-
     setIsLoading(true);
     setError(null);
     
     try {
-      const user = await supabaseService.getUser(id);
-      return user;
+      const { data, error: apiError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', id)
+        .single();
+      
+      if (apiError) throw apiError;
+      return data;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch user');
       return null;
@@ -63,16 +56,18 @@ export const useSupabase = () => {
 
   // Project operations
   const createProject = useCallback(async (project: Omit<Project, 'created_at'>) => {
-    if (!supabaseService.isConfigured()) {
-      return null;
-    }
-
     setIsLoading(true);
     setError(null);
     
     try {
-      const newProject = await supabaseService.createProject(project);
-      return newProject;
+      const { data, error: apiError } = await supabase
+        .from('projects')
+        .insert(project)
+        .select()
+        .single();
+      
+      if (apiError) throw apiError;
+      return data;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create project');
       throw err;
@@ -82,16 +77,17 @@ export const useSupabase = () => {
   }, []);
 
   const getProjects = useCallback(async () => {
-    if (!supabaseService.isConfigured()) {
-      return [];
-    }
-
     setIsLoading(true);
     setError(null);
     
     try {
-      const projects = await supabaseService.getProjects();
-      return projects;
+      const { data, error: apiError } = await supabase
+        .from('projects')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (apiError) throw apiError;
+      return data || [];
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch projects');
       return [];
@@ -101,16 +97,18 @@ export const useSupabase = () => {
   }, []);
 
   const getProjectsForUser = useCallback(async (userId: string) => {
-    if (!supabaseService.isConfigured()) {
-      return [];
-    }
-
     setIsLoading(true);
     setError(null);
     
     try {
-      const projects = await supabaseService.getProjectsForUser(userId);
-      return projects;
+      const { data, error: apiError } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('created_by', userId)
+        .order('created_at', { ascending: false });
+      
+      if (apiError) throw apiError;
+      return data || [];
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch user projects');
       return [];
@@ -119,134 +117,42 @@ export const useSupabase = () => {
     }
   }, []);
 
-  // Chat session operations
-  const createChatSession = useCallback(async (session: Omit<ChatSession, 'started_at'>) => {
-    if (!supabaseService.isConfigured()) {
-      return null;
-    }
-
+  const updateProject = useCallback(async (projectId: string, updates: Partial<Project>) => {
     setIsLoading(true);
     setError(null);
     
     try {
-      const newSession = await supabaseService.createChatSession(session);
-      return newSession;
+      const { data, error: apiError } = await supabase
+        .from('projects')
+        .update(updates)
+        .eq('id', projectId)
+        .select()
+        .single();
+      
+      if (apiError) throw apiError;
+      return data;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create chat session');
+      setError(err instanceof Error ? err.message : 'Failed to update project');
       throw err;
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  const updateChatSession = useCallback(async (sessionId: string, updates: Partial<ChatSession>) => {
-    if (!supabaseService.isConfigured()) {
-      return null;
-    }
+  const deleteProject = useCallback(async (projectId: string) => {
     setIsLoading(true);
     setError(null);
+    
     try {
-      const updatedSession = await supabaseService.updateChatSession(sessionId, updates);
-      return updatedSession;
+      const { error: apiError } = await supabase
+        .from('projects')
+        .delete()
+        .eq('id', projectId);
+      
+      if (apiError) throw apiError;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update chat session');
+      setError(err instanceof Error ? err.message : 'Failed to delete project');
       throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  const getChatSessions = useCallback(async (userId?: string, projectId?: string) => {
-    if (!supabaseService.isConfigured()) {
-      return [];
-    }
-
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      const sessions = await supabaseService.getChatSessions(userId, projectId);
-      return sessions;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch chat sessions');
-      return [];
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  const getMostRecentProjectChat = useCallback(async (userId: string, projectId: string) => {
-    if (!supabaseService.isConfigured()) {
-      return null;
-    }
-
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      const sessions = await supabaseService.getChatSessions(userId, projectId);
-      // Return the most recent active chat session (not ended)
-      const activeSessions = sessions.filter(session => !session.ended_at);
-      return activeSessions.length > 0 ? activeSessions[0] : null;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch project chat session');
-      return null;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  const endChatSession = useCallback(async (sessionId: string) => {
-    if (!supabaseService.isConfigured()) {
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      await supabaseService.endChatSession(sessionId);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to end chat session');
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  // Chat message operations
-  const saveMessages = useCallback(async (messages: Omit<ChatMessage, 'created_at'>[]) => {
-    if (!supabaseService.isConfigured()) {
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      await supabaseService.saveMessages(messages);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save messages');
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  const getMessagesBySession = useCallback(async (sessionId: string, limit: number = 50) => {
-    if (!supabaseService.isConfigured()) {
-      return [];
-    }
-
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      const messages = await supabaseService.getMessagesBySession(sessionId, limit);
-      return messages;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch messages');
-      return [];
     } finally {
       setIsLoading(false);
     }
@@ -254,16 +160,18 @@ export const useSupabase = () => {
 
   // Document operations
   const createDocument = useCallback(async (document: Omit<Document, 'created_at'>) => {
-    if (!supabaseService.isConfigured()) {
-      return null;
-    }
-
     setIsLoading(true);
     setError(null);
     
     try {
-      const newDocument = await supabaseService.createDocument(document);
-      return newDocument;
+      const { data, error: apiError } = await supabase
+        .from('documents')
+        .insert(document)
+        .select()
+        .single();
+      
+      if (apiError) throw apiError;
+      return data;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create document');
       throw err;
@@ -273,19 +181,62 @@ export const useSupabase = () => {
   }, []);
 
   const getDocuments = useCallback(async (projectId: string) => {
-    if (!supabaseService.isConfigured()) {
-      return [];
-    }
-
     setIsLoading(true);
     setError(null);
     
     try {
-      const documents = await supabaseService.getDocuments(projectId);
-      return documents;
+      const { data, error: apiError } = await supabase
+        .from('documents')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: false });
+      
+      if (apiError) throw apiError;
+      return data || [];
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch documents');
       return [];
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const updateDocument = useCallback(async (documentId: string, updates: Partial<Document>) => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const { data, error: apiError } = await supabase
+        .from('documents')
+        .update(updates)
+        .eq('id', documentId)
+        .select()
+        .single();
+      
+      if (apiError) throw apiError;
+      return data;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update document');
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const deleteDocument = useCallback(async (documentId: string) => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const { error: apiError } = await supabase
+        .from('documents')
+        .delete()
+        .eq('id', documentId);
+      
+      if (apiError) throw apiError;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete document');
+      throw err;
     } finally {
       setIsLoading(false);
     }
@@ -304,52 +255,34 @@ export const useSupabase = () => {
     createProject,
     getProjects,
     getProjectsForUser,
-    
-    // Chat session operations
-    createChatSession,
-    updateChatSession,
-    getChatSessions,
-    getMostRecentProjectChat,
-    endChatSession,
-    
-    // Chat message operations
-    saveMessages,
-    getMessagesBySession,
+    updateProject,
+    deleteProject,
     
     // Document operations
     createDocument,
     getDocuments,
+    updateDocument,
+    deleteDocument,
     
-    isConfigured: supabaseService.isConfigured(),
+    // Configuration check
+    isConfigured: true, // Supabase client is always configured if imported
   };
 };
 
-// Hook for real-time subscriptions to messages
-export const useSupabaseSubscription = (sessionId: string, callback: (payload: Record<string, unknown>) => void) => {
+// Simple subscription hook
+export const useSupabaseSubscription = (table: string, callback: (payload: any) => void) => {
   useEffect(() => {
-    if (!supabaseService.isConfigured() || !sessionId) {
-      return;
-    }
-
-    const subscription = supabaseService.subscribeToMessages(sessionId, callback);
+    const subscription = supabase
+      .channel(`table-db-changes:${table}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table },
+        callback
+      )
+      .subscribe();
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [sessionId, callback]);
-};
-
-// Hook for real-time subscriptions to sessions
-export const useSupabaseSessionSubscription = (userId: string, callback: (payload: Record<string, unknown>) => void) => {
-  useEffect(() => {
-    if (!supabaseService.isConfigured() || !userId) {
-      return;
-    }
-
-    const subscription = supabaseService.subscribeToSessions(userId, callback);
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [userId, callback]);
+  }, [table, callback]);
 }; 

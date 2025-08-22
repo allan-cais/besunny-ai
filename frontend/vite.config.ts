@@ -26,7 +26,14 @@ export default defineConfig(({ command, mode }) => ({
   },
   server: {
     port: 3000,
-    host: true,
+    host: '0.0.0.0', // Allow external connections
+    hmr: {
+      host: 'localhost', // HMR host for Docker
+      port: 3000,
+    },
+    watch: {
+      usePolling: true, // Use polling for Docker volume mounts
+    },
   },
   preview: {
     port: 3000,

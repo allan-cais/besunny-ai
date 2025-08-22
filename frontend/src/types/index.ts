@@ -1,449 +1,402 @@
-// Core Types
-export interface User {
-  id: string;
-  email: string;
-  username?: string;
-  created_at: string;
-  updated_at: string;
+// Core application types
+export interface AppConfig {
+  environment: 'development' | 'staging' | 'production';
+  apiUrl: string;
+  supabaseUrl: string;
+  supabaseAnonKey: string;
+  googleClientId: string;
+  openaiApiKey?: string;
 }
 
+// User and authentication types
+export interface User {
+  id: string;
+  email?: string;
+  name?: string;
+  avatar_url?: string;
+  created_at?: string;
+  updated_at?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface Session {
+  access_token: string;
+  refresh_token: string;
+  expires_at?: number;
+  user: User;
+}
+
+export interface AuthState {
+  user: User | null;
+  session: Session | null;
+  loading: boolean;
+  error: string | null;
+  isAuthenticated: boolean;
+}
+
+// Project types
 export interface Project {
   id: string;
   name: string;
   description?: string;
-  user_id: string;
+  status: 'active' | 'archived' | 'completed' | 'in_progress';
   created_at: string;
   updated_at: string;
-  entity_patterns?: EntityPatterns;
-  classification_signals?: ClassificationSignals;
-  pinecone_document_count?: number;
-  last_classification_at?: string | null;
-  classification_feedback?: ClassificationFeedback;
+  created_by: string;
+  members?: ProjectMember[];
+  settings?: ProjectSettings;
 }
 
+export interface ProjectMember {
+  id: string;
+  user_id: string;
+  project_id: string;
+  role: 'owner' | 'admin' | 'member' | 'viewer';
+  joined_at: string;
+  user: User;
+}
+
+export interface ProjectSettings {
+  ai_enabled: boolean;
+  auto_classification: boolean;
+  notification_preferences: NotificationPreferences;
+}
+
+export interface NotificationPreferences {
+  email: boolean;
+  push: boolean;
+  slack: boolean;
+}
+
+// Document types
+export interface Document {
+  id: string;
+  name: string;
+  type: 'pdf' | 'docx' | 'txt' | 'email' | 'meeting';
+  content?: string;
+  metadata: DocumentMetadata;
+  project_id: string;
+  created_at: string;
+  updated_at: string;
+  status: 'processing' | 'completed' | 'error';
+  classification?: DocumentClassification;
+}
+
+export interface DocumentMetadata {
+  size: number;
+  mime_type: string;
+  source: 'upload' | 'gmail' | 'drive' | 'calendar';
+  source_id?: string;
+  tags: string[];
+  extracted_text?: string;
+}
+
+export interface DocumentClassification {
+  category: string;
+  confidence: number;
+  tags: string[];
+  summary?: string;
+  entities: Entity[];
+}
+
+export interface Entity {
+  name: string;
+  type: 'person' | 'organization' | 'location' | 'date' | 'amount';
+  value: string;
+  confidence: number;
+}
+
+// Meeting types
 export interface Meeting {
   id: string;
   title: string;
   description?: string;
   start_time: string;
   end_time: string;
-  meeting_url: string;
-  user_id: string;
+  attendees: MeetingAttendee[];
   project_id?: string;
-  bot_status: BotStatus;
-  attendee_bot_id?: string;
-  google_calendar_event_id?: string;
-  transcript?: string;
-  transcript_retrieved_at?: string;
-  transcript_duration_seconds?: number;
-  transcript_metadata?: TranscriptMetadata;
-  bot_configuration?: BotConfiguration;
+  transcript?: MeetingTranscript;
   created_at: string;
   updated_at: string;
-  event_status: 'accepted' | 'declined' | 'tentative' | 'needsAction';
-  bot_deployment_method?: 'manual' | 'automatic' | 'scheduled';
-  auto_scheduled_via_email?: boolean;
-  virtual_email_attendee?: string;
-  auto_bot_notification_sent?: boolean;
-  bot_name?: string;
-  bot_chat_message?: string;
 }
 
-export interface Document {
+export interface MeetingAttendee {
   id: string;
-  title: string;
+  user_id: string;
+  meeting_id: string;
+  status: 'accepted' | 'declined' | 'pending';
+  user: User;
+}
+
+export interface MeetingTranscript {
+  id: string;
+  meeting_id: string;
+  content: string;
+  segments: TranscriptSegment[];
   summary?: string;
-  source: string;
-  type: DocumentType;
-  author?: string;
-  file_size?: number;
-  project_id?: string;
-  meeting_id?: string;
-  transcript_duration_seconds?: number;
-  transcript_metadata?: TranscriptMetadata;
+  action_items: ActionItem[];
   created_at: string;
-  updated_at: string;
-  received_at?: string;
-  last_synced_at?: string;
-  file_id?: string;
-  file_url?: string;
-  status?: 'active' | 'updated' | 'deleted' | 'error';
-  watch_active?: boolean;
-}
-
-export interface ChatSession {
-  id: string;
-  user_id: string;
-  project_id?: string;
-  name?: string;
-  started_at: string;
-  ended_at?: string;
-}
-
-export interface ChatMessage {
-  id: string;
-  session_id: string;
-  message: string;
-  role: 'user' | 'assistant' | 'system';
-  created_at: string;
-  used_chunks?: string[];
-}
-
-// Enums
-export type BotStatus = 'pending' | 'bot_scheduled' | 'bot_joined' | 'transcribing' | 'completed' | 'failed';
-
-export type DocumentType = 'email' | 'meeting_transcript' | 'document' | 'drive_file' | 'spreadsheet' | 'presentation' | 'image' | 'folder' | 'unknown';
-
-export type SyncStatus = 'idle' | 'syncing' | 'completed' | 'failed';
-
-export type WebhookStatusType = 'active' | 'expired' | 'failed' | 'pending';
-
-// Complex Types
-export interface EntityPatterns {
-  domains?: string[];
-  people?: Record<string, PersonData>;
-  organizations?: string[];
-  locations?: string[];
-  technologies?: string[];
-}
-
-export interface PersonData {
-  role: 'internal_lead' | 'agency_lead' | 'client_lead' | 'team_member' | 'stakeholder';
-  email?: string;
-  department?: string;
-  seniority?: 'junior' | 'mid' | 'senior' | 'executive';
-}
-
-export interface ClassificationSignals {
-  confidence: number;
-  categories: string[];
-  keywords: string[];
-  sentiment?: 'positive' | 'negative' | 'neutral';
-  urgency?: 'low' | 'medium' | 'high' | 'critical';
-}
-
-export interface ClassificationFeedback {
-  user_rating?: number;
-  user_notes?: string;
-  corrected_categories?: string[];
-  feedback_date?: string;
-}
-
-export interface TranscriptMetadata {
-  participants?: Participant[];
-  speakers?: Speaker[];
-  segments?: TranscriptSegment[];
-  audio_url?: string;
-  recording_url?: string;
-  processing_status?: 'pending' | 'processing' | 'completed' | 'failed' | 'not_available';
-  quality_score?: number;
-  language?: string;
-  confidence_score?: number;
-  word_count?: number;
-  bot_id?: string;
-  [key: string]: unknown; // Allow additional properties
-}
-
-export interface Participant {
-  id: string;
-  name: string;
-  email?: string;
-  role?: string;
-  join_time?: string;
-  leave_time?: string;
-}
-
-export interface Speaker {
-  id: string;
-  name: string;
-  total_speaking_time: number;
-  segments_count: number;
 }
 
 export interface TranscriptSegment {
   id: string;
   speaker_id: string;
-  start_time: number;
-  end_time: number;
   text: string;
+  timestamp: number;
   confidence: number;
 }
 
-export interface BotConfiguration {
-  transcription_settings?: TranscriptionSettings;
-  recording_settings?: RecordingSettings;
-  teams_settings?: TeamsSettings;
-  debug_settings?: DebugSettings;
-  // Additional properties for the modal
-  bot_name?: string;
-  bot_chat_message?: string;
-  chat_message_recipient?: 'everyone' | 'specific_user' | 'everyone_but_host';
-  to_user_uuid?: string;
-  auto_join?: boolean;
-  recording_enabled?: boolean;
-  transcription_language?: string;
-}
-
-export interface TranscriptionSettings {
-  language: string;
-  enable_speaker_diarization: boolean;
-  enable_punctuation: boolean;
-  enable_sentiment_analysis: boolean;
-}
-
-export interface RecordingSettings {
-  quality: 'low' | 'medium' | 'high';
-  format: 'mp4' | 'webm' | 'avi';
-  enable_audio_only: boolean;
-}
-
-export interface TeamsSettings {
-  enable_team_chat: boolean;
-  enable_team_notifications: boolean;
-  team_members?: string[];
-}
-
-export interface DebugSettings {
-  create_debug_recording: boolean;
-  log_level: 'debug' | 'info' | 'warn' | 'error';
-}
-
-// API Response Types
-export interface ApiResponse<T = unknown> {
-  success: boolean;
-  data?: T;
-  error?: string;
-  message?: string;
-}
-
-export interface CalendarSyncResult {
-  success: boolean;
-  type: 'calendar' | 'gmail' | 'drive' | 'attendee';
-  processed: number;
-  created: number;
-  updated: number;
-  deleted: number;
-  skipped: boolean;
-  virtualEmailsDetected: number;
-  autoScheduledMeetings: number;
-  error?: string;
-}
-
-export interface WebhookStatus {
-  webhook_active: boolean;
-  webhook_url?: string;
-  last_sync?: string;
-  sync_logs: SyncLog[];
-  recent_errors: ErrorLog[];
-  webhook_expires_at?: string;
-  connectivity_test?: boolean;
-}
-
-export interface SyncLog {
+export interface ActionItem {
   id: string;
-  user_id: string;
-  type: string;
-  status: 'completed' | 'failed' | 'in_progress';
-  processed_count: number;
-  created_count: number;
-  updated_count: number;
-  deleted_count: number;
-  error_message?: string;
+  description: string;
+  assignee_id?: string;
+  due_date?: string;
+  status: 'pending' | 'in_progress' | 'completed';
+  priority: 'low' | 'medium' | 'high';
+}
+
+// Email types
+export interface Email {
+  id: string;
+  subject: string;
+  sender: string;
+  recipients: string[];
+  content: string;
+  html_content?: string;
+  attachments: EmailAttachment[];
+  project_id?: string;
+  classification?: EmailClassification;
+  created_at: string;
+  read: boolean;
+}
+
+export interface EmailAttachment {
+  id: string;
+  name: string;
+  size: number;
+  mime_type: string;
+  url?: string;
+}
+
+export interface EmailClassification {
+  category: 'project_related' | 'personal' | 'spam' | 'newsletter';
+  confidence: number;
+  priority: 'low' | 'medium' | 'high';
+  suggested_actions: string[];
+}
+
+// AI and classification types
+export interface AIClassification {
+  id: string;
+  document_id: string;
+  model: string;
+  category: string;
+  confidence: number;
+  tags: string[];
+  summary: string;
+  entities: Entity[];
+  metadata: Record<string, any>;
   created_at: string;
 }
 
-export interface ErrorLog {
+export interface AIOrchestration {
+  id: string;
+  type: 'document_processing' | 'meeting_analysis' | 'email_classification';
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  input_data: Record<string, any>;
+  output_data?: Record<string, any>;
+  error?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Integration types
+export interface GoogleIntegration {
   id: string;
   user_id: string;
-  error_type: string;
-  error_message: string;
-  stack_trace?: string;
-  created_at: string;
-}
-
-// Enhanced API Response Types
-export interface PaginatedApiResponse<T> extends ApiResponse<T[]> {
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
-}
-
-export interface ErrorApiResponse extends ApiResponse<never> {
-  success: false;
-  error: string;
-  errorCode?: string;
-  details?: Record<string, unknown>;
-}
-
-// Google Integration Types
-export interface GoogleCredentials {
-  user_id: string;
+  service: 'calendar' | 'drive' | 'gmail';
   access_token: string;
   refresh_token: string;
-  token_type: string;
-  expires_at: string;
-  scope: string;
-  google_email: string;
-  service: 'calendar' | 'gmail' | 'drive';
-  created_at: string;
-}
-
-export interface GoogleCalendarEvent {
-  id: string;
-  summary?: string;
-  description?: string;
-  start: {
-    dateTime?: string;
-    date?: string;
-  };
-  end: {
-    dateTime?: string;
-    date?: string;
-  };
-  attendees?: GoogleCalendarAttendee[];
-  creator?: {
-    email: string;
-  };
-  entryPoints?: GoogleCalendarEntryPoint[];
-  conferenceData?: {
-    entryPoints?: GoogleCalendarEntryPoint[];
-  };
-}
-
-export interface GoogleCalendarAttendee {
-  email: string;
-  displayName?: string;
-  responseStatus?: 'needsAction' | 'declined' | 'tentative' | 'accepted';
-  self?: boolean;
-}
-
-export interface GoogleCalendarEntryPoint {
-  entryPointType: 'video' | 'phone' | 'sip' | 'more';
-  uri: string;
-  label?: string;
-}
-
-// Virtual Email Types
-export interface VirtualEmailActivity {
-  id: string;
-  type: DocumentType;
-  title: string;
-  summary: string;
-  source: string;
-  sender?: string;
-  file_size?: number;
-  created_at: string;
-  processed: boolean;
-  project_id?: string;
-  transcript_duration_seconds?: number;
-  transcript_metadata?: TranscriptMetadata;
-  rawTranscript?: RawTranscript;
-}
-
-export interface RawTranscript {
-  id: string;
-  title: string;
-  transcript: string;
-  transcript_summary: string;
-  transcript_metadata?: TranscriptMetadata;
-  transcript_duration_seconds?: number;
-  transcript_retrieved_at: string;
-  final_transcript_ready: boolean;
-}
-
-// Utility Types
-export type DeepPartial<T> = {
-  [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];
-};
-
-export type Nullable<T> = T | null;
-
-export type Optional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
-
-// Component Props Types
-export interface DashboardChatSession {
-  id: string;
-  title: string;
-  createdAt: string;
-  lastMessageAt: string;
-  unreadCount: number;
-}
-
-export interface Bot {
-  id: string;
-  user_id: string;
-  name: string;
-  description?: string;
-  avatar_url?: string;
-  provider: string;
-  provider_bot_id?: string;
-  settings?: Record<string, unknown>;
+  expires_at: number;
+  scopes: string[];
   is_active: boolean;
   created_at: string;
   updated_at: string;
 }
 
-export interface AuthSession {
-  access_token: string;
-  user: {
-    id: string;
-    email?: string;
-  };
-}
-
-export interface AIChatSession {
+export interface DriveFile {
   id: string;
-  user_id?: string;
+  name: string;
+  mime_type: string;
+  size: number;
+  web_view_link: string;
+  created_at: string;
+  modified_at: string;
   project_id?: string;
-  started_at: string;
-  ended_at?: string;
+  watch_status: 'watching' | 'expired' | 'error';
 }
 
-// Project Onboarding Types
-export interface ProjectOnboardingRequest {
-  projectId: string;
-  userId: string;
-  metadata: {
-    name: string;
-    description: string;
-    references: string;
+// Chat and conversation types
+export interface ChatMessage {
+  id: string;
+  content: string;
+  role: 'user' | 'assistant' | 'system';
+  timestamp: string;
+  metadata?: Record<string, any>;
+}
+
+export interface ChatSession {
+  id: string;
+  project_id?: string;
+  title: string;
+  messages: ChatMessage[];
+  created_at: string;
+  updated_at: string;
+}
+
+// Notification types
+export interface Notification {
+  id: string;
+  user_id: string;
+  type: 'info' | 'success' | 'warning' | 'error';
+  title: string;
+  message: string;
+  read: boolean;
+  action_url?: string;
+  created_at: string;
+}
+
+// API response types
+export interface ApiResponse<T = any> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  message?: string;
+  timestamp: string;
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    total_pages: number;
   };
 }
 
-export interface ProjectOnboardingResponse {
-  success: boolean;
+// Form types
+export interface LoginFormData {
+  email: string;
+  password: string;
+}
+
+export interface SignUpFormData {
+  email: string;
+  password: string;
+  confirmPassword: string;
+  name: string;
+}
+
+export interface ProjectFormData {
+  name: string;
+  description?: string;
+  settings?: Partial<ProjectSettings>;
+}
+
+// Component prop types
+export interface BaseComponentProps {
+  className?: string;
+  children?: React.ReactNode;
+}
+
+export interface LoadingState {
+  loading: boolean;
+  error: string | null;
+}
+
+export interface ModalProps extends BaseComponentProps {
+  isOpen: boolean;
+  onClose: () => void;
+  title?: string;
+}
+
+// Utility types
+export type Status = 'idle' | 'loading' | 'success' | 'error';
+
+export type SortDirection = 'asc' | 'desc';
+
+export interface SortConfig {
+  field: string;
+  direction: SortDirection;
+}
+
+export interface FilterConfig {
+  field: string;
+  value: string | number | boolean;
+  operator: 'eq' | 'ne' | 'gt' | 'lt' | 'gte' | 'lte' | 'contains' | 'in';
+}
+
+// Theme types
+export type Theme = 'light' | 'dark' | 'system';
+
+export interface ThemeConfig {
+  theme: Theme;
+  setTheme: (theme: Theme) => void;
+}
+
+// Navigation types
+export interface NavigationItem {
+  name: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  current?: boolean;
+  children?: NavigationItem[];
+}
+
+// Dashboard types
+export interface DashboardStats {
+  totalProjects: number;
+  activeProjects: number;
+  totalDocuments: number;
+  pendingClassifications: number;
+  upcomingMeetings: number;
+  unreadEmails: number;
+}
+
+export interface ActivityItem {
+  id: string;
+  type: 'document_upload' | 'meeting_scheduled' | 'email_received' | 'classification_completed';
+  title: string;
+  description: string;
+  timestamp: string;
+  project_id?: string;
+  metadata?: Record<string, any>;
+}
+
+// Error types
+export interface AppError {
+  code: string;
   message: string;
-  recommendations?: string[];
+  details?: Record<string, any>;
+  timestamp: string;
 }
 
-// Enhanced Project Types
-export interface ExtendedProject extends Project {
-  normalized_tags?: string[];
-  categories?: string[];
-  reference_keywords?: string[];
-  notes?: string;
-  status?: 'active' | 'archived' | 'draft';
-  priority?: 'low' | 'medium' | 'high' | 'critical';
-  tags?: string[];
-  created_by?: string;
-  last_activity_at?: string;
+export interface ValidationError {
+  field: string;
+  message: string;
+  value?: any;
 }
 
-// Bot Configuration Types
-export interface BotConfigurationRequest {
-  meetingId: string;
-  userId: string;
-  configuration: BotConfiguration;
+// WebSocket types
+export interface WebSocketMessage {
+  type: string;
+  payload: any;
+  timestamp: string;
 }
 
-export interface BotDeploymentResult {
-  success: boolean;
-  botId?: string;
-  meetingId: string;
-  status: BotStatus;
-  error?: string;
-  deploymentUrl?: string;
+export interface WebSocketConnection {
+  isConnected: boolean;
+  send: (message: WebSocketMessage) => void;
+  subscribe: (type: string, callback: (payload: any) => void) => () => void;
 }

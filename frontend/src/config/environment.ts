@@ -1,150 +1,114 @@
-/**
- * Environment Configuration
- * Clean, type-safe environment variable management
- */
+import { AppConfig } from '@/types';
 
-export interface EnvironmentConfig {
-  // App Configuration
-  mode: 'development' | 'staging' | 'production';
-  isDevelopment: boolean;
-  isStaging: boolean;
-  isProduction: boolean;
-  
-  // Supabase Configuration
-  supabase: {
-    url: string;
-    anonKey: string;
-  };
-  
-  // Python Backend Configuration
-  pythonBackend: {
-    url: string;
-    timeout: number;
-    retryAttempts: number;
-    healthCheckInterval: number;
-  };
-  
-  // Google OAuth Configuration
-  google: {
-    clientId: string;
-    redirectUri: string;
-  };
-  
-  // Feature Flags
-  features: {
-    enablePythonBackend: boolean;
-    enableDebugMode: boolean;
-    enableMetrics: boolean;
-  };
-}
+// Environment detection
+const isDevelopment = import.meta.env.DEV;
+const isProduction = import.meta.env.PROD;
+const isStaging = import.meta.env.MODE === 'staging';
 
-// Environment variable getter with validation
-function getRequiredEnvVar(key: string): string {
-  const value = import.meta.env[key];
-  if (!value) {
-    throw new Error(`Required environment variable ${key} is not set`);
-  }
-  return value;
-}
-
-function getOptionalEnvVar(key: string, defaultValue: string = ''): string {
-  return import.meta.env[key] || defaultValue;
-}
-
-// Base configuration
-const baseConfig: Omit<EnvironmentConfig, 'mode' | 'isDevelopment' | 'isStaging' | 'isProduction'> = {
-  supabase: {
-    url: getRequiredEnvVar('VITE_SUPABASE_URL'),
-    anonKey: getRequiredEnvVar('VITE_SUPABASE_ANON_KEY'),
-  },
-  pythonBackend: {
-    url: getOptionalEnvVar('VITE_PYTHON_BACKEND_URL', 'https://besunny-1.railway.app'),
-    timeout: 30000,
-    retryAttempts: 3,
-    healthCheckInterval: 60000,
-  },
-  google: {
-    clientId: getRequiredEnvVar('VITE_GOOGLE_CLIENT_ID'),
-    redirectUri: getOptionalEnvVar('VITE_GOOGLE_REDIRECT_URI', `${window.location.origin}/integrations`),
-  },
-  features: {
-    enablePythonBackend: getOptionalEnvVar('VITE_ENABLE_PYTHON_BACKEND', 'true') === 'true',
-    enableDebugMode: import.meta.env.DEV,
-    enableMetrics: true,
-  },
+// Get environment
+const getEnvironment = (): AppConfig['environment'] => {
+  if (isStaging) return 'staging';
+  if (isProduction) return 'production';
+  return 'development';
 };
 
-// Environment-specific overrides
-const environmentOverrides = {
+// Environment-specific configurations
+const configs = {
   development: {
-    pythonBackend: {
-      url: 'http://localhost:8000',
-      timeout: 60000,
-      retryAttempts: 5,
-      healthCheckInterval: 30000,
-    },
-    features: {
-      enablePythonBackend: true,
-      enableDebugMode: true,
-      enableMetrics: true,
-    },
+    apiUrl: import.meta.env.VITE_API_URL || 'http://localhost:8000',
+    supabaseUrl: import.meta.env.VITE_SUPABASE_URL || 'http://localhost:54321',
+    supabaseAnonKey: import.meta.env.VITE_SUPABASE_ANON_KEY || 'development-key',
+    googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID || 'development-client-id',
+    openaiApiKey: import.meta.env.VITE_OPENAI_API_KEY,
   },
   staging: {
-    pythonBackend: {
-      url: getOptionalEnvVar('VITE_PYTHON_BACKEND_URL', 'https://besunny-1.railway.app'),
-      timeout: 30000,
-      retryAttempts: 3,
-      healthCheckInterval: 60000,
-    },
-    features: {
-      enablePythonBackend: true,
-      enableDebugMode: false,
-      enableMetrics: true,
-    },
+    apiUrl: import.meta.env.VITE_API_URL || 'https://staging-api.besunny.ai',
+    supabaseUrl: import.meta.env.VITE_SUPABASE_URL || 'https://staging.supabase.co',
+    supabaseAnonKey: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
+    googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID || '',
+    openaiApiKey: import.meta.env.VITE_OPENAI_API_KEY,
   },
   production: {
-    pythonBackend: {
-      url: getOptionalEnvVar('VITE_PYTHON_BACKEND_URL', 'https://besunny-1.railway.app'),
-      timeout: 30000,
-      retryAttempts: 3,
-      healthCheckInterval: 120000,
-    },
-    features: {
-      enablePythonBackend: true,
-      enableDebugMode: false,
-      enableMetrics: true,
-    },
+    apiUrl: import.meta.env.VITE_API_URL || 'https://api.besunny.ai',
+    supabaseUrl: import.meta.env.VITE_SUPABASE_URL || 'https://production.supabase.co',
+    supabaseAnonKey: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
+    googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID || '',
+    openaiApiKey: import.meta.env.VITE_OPENAI_API_KEY,
   },
 };
 
-// Determine current environment
-const currentMode = import.meta.env.MODE as EnvironmentConfig['mode'] || 'development';
-
-// Merge configurations
-const config: EnvironmentConfig = {
-  mode: currentMode,
-  isDevelopment: currentMode === 'development',
-  isStaging: currentMode === 'staging',
-  isProduction: currentMode === 'production',
-  ...baseConfig,
-  ...environmentOverrides[currentMode],
+// Get current configuration
+const getConfig = (): AppConfig => {
+  const environment = getEnvironment();
+  const baseConfig = configs[environment];
+  
+  return {
+    environment,
+    ...baseConfig,
+  };
 };
 
-// Configuration validation
-function validateConfig(config: EnvironmentConfig): void {
-  const errors: string[] = [];
+// Validate configuration
+const validateConfig = (config: AppConfig): void => {
+  const requiredFields = [
+    'supabaseUrl',
+    'supabaseAnonKey',
+    'googleClientId',
+  ];
+
+  const missingFields = requiredFields.filter(field => !config[field as keyof AppConfig]);
   
-  if (!config.supabase.url) errors.push('Supabase URL is required');
-  if (!config.supabase.anonKey) errors.push('Supabase anon key is required');
-  if (!config.google.clientId) errors.push('Google client ID is required');
-  if (!config.pythonBackend.url) errors.push('Python backend URL is required');
-  
-  if (errors.length > 0) {
-    throw new Error(`Configuration validation failed: ${errors.join(', ')}`);
+  if (missingFields.length > 0) {
+    console.error('Missing required environment variables:', missingFields);
+    
+    if (isProduction) {
+      throw new Error(`Missing required environment variables: ${missingFields.join(', ')}`);
+    }
   }
+};
+
+// Export configuration
+const config = getConfig();
+
+// Validate in non-development environments
+if (!isDevelopment) {
+  validateConfig(config);
 }
 
-// Validate configuration on import
-validateConfig(config);
-
 export default config;
+
+// Export individual values for convenience
+export const {
+  environment,
+  apiUrl,
+  supabaseUrl,
+  supabaseAnonKey,
+  googleClientId,
+  openaiApiKey,
+} = config;
+
+// Export utility functions
+export const isDev = isDevelopment;
+export const isProd = isProduction;
+export const isStagingEnv = isStaging;
+
+// Export environment checks
+export const isLocalhost = () => {
+  if (typeof window === 'undefined') return false;
+  return window.location.hostname === 'localhost' || 
+         window.location.hostname === '127.0.0.1';
+};
+
+export const isSecureContext = () => {
+  if (typeof window === 'undefined') return false;
+  return window.isSecureContext;
+};
+
+// Export feature flags
+export const featureFlags = {
+  aiClassification: isDevelopment || isStaging || import.meta.env.VITE_ENABLE_AI_CLASSIFICATION === 'true',
+  realTimeUpdates: isDevelopment || isStaging || import.meta.env.VITE_ENABLE_REALTIME === 'true',
+  advancedAnalytics: isDevelopment || isStaging || import.meta.env.VITE_ENABLE_ANALYTICS === 'true',
+  webhookTesting: isDevelopment || isStaging,
+  debugMode: isDevelopment,
+};
