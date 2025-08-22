@@ -214,7 +214,7 @@ const IntegrationsPage: React.FC = () => {
     }
 
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-    const redirectUri = `${window.location.origin}/oauth/callback`;
+    const redirectUri = `${window.location.origin}/integrations`;
     
     console.log('🔍 OAuth Debug - handleGoogleConnect called:', {
       userId: user.id,
