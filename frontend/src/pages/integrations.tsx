@@ -78,9 +78,11 @@ const IntegrationsPage: React.FC = () => {
     console.log('🔍 OAuth Debug - Raw location.search:', window.location.search);
     console.log('🔍 OAuth Debug - Raw URLSearchParams:', Object.fromEntries(new URLSearchParams(window.location.search)));
     
-    const errorParam = searchParams.get('error');
-    const codeParam = searchParams.get('code');
-    const stateParam = searchParams.get('state');
+    // Use window.location.search directly to get OAuth parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const errorParam = urlParams.get('error');
+    const codeParam = urlParams.get('code');
+    const stateParam = urlParams.get('state');
 
     if (errorParam) {
       console.log('🔍 OAuth Debug - Error parameter found:', errorParam);
