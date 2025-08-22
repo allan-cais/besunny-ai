@@ -98,7 +98,7 @@ class GoogleOAuthService:
             logger.error(f"OAuth callback error: {e}")
             return {'success': False, 'error': 'OAuth processing failed'}
     
-    async def handle_workspace_oauth_callback(self, code: str, user_id: str, redirect_uri: str) -> Dict[str, Any]:
+    async def handle_workspace_oauth_callback(self, code: str, user_id: str, redirect_uri: str, supabase_access_token: str) -> Dict[str, Any]:
         """Handle Google Workspace OAuth callback for existing users connecting Google."""
         try:
             # Exchange code for tokens with workspace scopes using the correct redirect URI
@@ -111,10 +111,16 @@ class GoogleOAuthService:
             if not user_info:
                 return {'success': False, 'error': 'Failed to get user info'}
             
+            # Create authenticated Supabase client using the user's access token
+            # This ensures RLS policies are respected for credential storage
+            authenticated_supabase_client = self._create_authenticated_supabase_client(supabase_access_token)
+            
             # Store workspace credentials in database (separate from login credentials)
+            # For existing users, use authenticated context to respect RLS
             credentials_stored = await self._store_workspace_credentials(
-                user_id, tokens, user_info
+                user_id, tokens, user_info, authenticated_supabase_client
             )
+            
             if not credentials_stored:
                 return {'success': False, 'error': 'Failed to store workspace credentials'}
             
@@ -270,7 +276,7 @@ class GoogleOAuthService:
             # Subsequent operations will use user context and respect RLS
             
             # Check if credentials already exist
-            existing = self.supabase.table("google_credentials").select("id").eq("user_id", user_id).execute()
+            existing = self.supabase.table("google_credentials").select("user_id").eq("user_id", user_id).execute()
             
             if existing.data:
                 # Update existing credentials
@@ -287,7 +293,7 @@ class GoogleOAuthService:
             logger.error(f"Failed to store Google credentials for user {user_id}: {e}")
             return False
     
-    async def _store_workspace_credentials(self, user_id: str, tokens: OAuthTokens, user_info: UserInfo) -> bool:
+    async def _store_workspace_credentials(self, user_id: str, tokens: OAuthTokens, user_info: UserInfo, authenticated_supabase_client=None) -> bool:
         """Store Google Workspace OAuth credentials in database."""
         try:
             # Calculate expiration time
@@ -314,27 +320,58 @@ class GoogleOAuthService:
                 'client_secret': self.client_secret
             }
             
-            # For OAuth setup, we need to use service role to bypass RLS
-            # This is acceptable because we're setting up the initial authentication
-            # Subsequent operations will use user context and respect RLS
+            # For existing users connecting Google, use authenticated context to respect RLS
+            # This ensures the user can only insert/update their own credentials
+            supabase_client = authenticated_supabase_client or self.supabase
             
             # Check if workspace credentials already exist
-            existing = self.supabase.table("google_credentials").select("id").eq("user_id", user_id).eq("login_provider", False).execute()
+            existing = supabase_client.table("google_credentials").select("user_id").eq("user_id", user_id).eq("login_provider", False).execute()
             
             if existing.data:
                 # Update existing workspace credentials
-                self.supabase.table("google_credentials").update(credentials_data).eq("user_id", user_id).eq("login_provider", False).execute()
+                supabase_client.table("google_credentials").update(credentials_data).eq("user_id", user_id).eq("login_provider", False).execute()
                 logger.info(f"Updated Google workspace credentials for user {user_id}")
             else:
                 # Insert new workspace credentials
-                self.supabase.table("google_credentials").insert(credentials_data).execute()
-                logger.info(f"Stored new Google credentials for user {user_id}")
+                supabase_client.table("google_credentials").insert(credentials_data).execute()
+                logger.info(f"Stored new Google workspace credentials for user {user_id}")
             
             return True
             
         except Exception as e:
             logger.error(f"Failed to store Google workspace credentials for user {user_id}: {e}")
             return False
+    
+    def _create_authenticated_supabase_client(self, access_token: str):
+        """Create a Supabase client using the user's access token for authenticated operations."""
+        try:
+            from supabase import create_client, Client
+            from supabase.lib.client_options import ClientOptions
+            
+            # Create client options
+            options = ClientOptions(
+                schema='public',
+                headers={
+                    'X-Client-Info': 'besunny-ai-python-backend-authenticated',
+                    'Authorization': f'Bearer {access_token}'
+                }
+            )
+            
+            # Create Supabase client with user's access token
+            # This client will respect RLS policies based on the user's authentication
+            authenticated_client = create_client(
+                self.settings.supabase_url,
+                access_token,  # Use the access token as the key
+                options=options
+            )
+            
+            logger.info("Authenticated Supabase client created successfully")
+            return authenticated_client
+            
+        except Exception as e:
+            logger.error(f"Failed to create authenticated Supabase client: {e}")
+            # Fallback to service role client if authentication fails
+            return self.supabase
     
     async def close(self):
         """Clean up HTTP client."""

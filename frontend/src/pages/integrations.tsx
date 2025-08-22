@@ -212,15 +212,24 @@ const IntegrationsPage: React.FC = () => {
       setSuccess(null);
 
         // For existing users, use workspace OAuth to connect Google account
+        const supabaseSession = await supabase.auth.getSession();
+        const supabaseAccessToken = supabaseSession.data.session?.access_token;
+        
+        if (!supabaseAccessToken) {
+          setError('Supabase session not found');
+          return;
+        }
+        
         const workspaceResponse = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/auth/google/workspace/oauth/callback`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token || ''}`,
+            'Authorization': `Bearer ${supabaseAccessToken}`,
           },
           body: JSON.stringify({ 
             code,
-            redirect_uri: `${window.location.origin}/integrations`
+            redirect_uri: `${window.location.origin}/integrations`,
+            supabase_access_token: supabaseAccessToken
           }),
         });
 

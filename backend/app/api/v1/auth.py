@@ -269,10 +269,11 @@ async def handle_google_workspace_oauth_callback(
     - Calendar access (calendar)
     """
     try:
-        # Get the authorization code and redirect URI from the request body
+        # Get the authorization code, redirect URI, and Supabase access token from the request body
         body = await request.json()
         code = body.get('code')
         redirect_uri = body.get('redirect_uri')
+        supabase_access_token = body.get('supabase_access_token')
         
         if not code:
             raise HTTPException(
@@ -286,8 +287,16 @@ async def handle_google_workspace_oauth_callback(
                 detail="Redirect URI is required"
             )
         
-        # Process the workspace OAuth callback
-        result = await oauth_service.handle_workspace_oauth_callback(code, current_user['id'], redirect_uri)
+        if not supabase_access_token:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Supabase access token is required for workspace OAuth"
+            )
+        
+        # Process the workspace OAuth callback with authenticated Supabase client
+        result = await oauth_service.handle_workspace_oauth_callback(
+            code, current_user['id'], redirect_uri, supabase_access_token
+        )
         
         if not result.get('success'):
             raise HTTPException(
