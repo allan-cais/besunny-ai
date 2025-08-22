@@ -57,6 +57,12 @@ const IntegrationsPage: React.FC = () => {
       hash: location.hash,
       fullUrl: window.location.href
     });
+    
+    // Also log the raw URL search params to see what Google is sending back
+    if (location.search) {
+      console.log('🔍 OAuth Debug - Raw search params:', location.search);
+      console.log('🔍 OAuth Debug - Parsed search params:', Object.fromEntries(new URLSearchParams(location.search)));
+    }
   }, [location]);
 
   // Check for OAuth callback parameters
@@ -199,6 +205,13 @@ const IntegrationsPage: React.FC = () => {
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
     const redirectUri = `${window.location.origin}/integrations`;
     
+    console.log('🔍 OAuth Debug - handleGoogleConnect called:', {
+      userId: user.id,
+      clientId: clientId?.substring(0, 20) + '...',
+      redirectUri,
+      origin: window.location.origin
+    });
+    
     if (!clientId) {
       setError('Google OAuth client ID not configured');
       return;
@@ -222,6 +235,20 @@ const IntegrationsPage: React.FC = () => {
     });
 
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+    
+    console.log('🔍 OAuth Debug - OAuth URL parameters:', {
+      client_id: clientId?.substring(0, 20) + '...',
+      redirect_uri: redirectUri,
+      response_type: 'code',
+      scope: scopes,
+      access_type: 'offline',
+      prompt: 'consent',
+      state: user.id
+    });
+    
+    console.log('🔍 OAuth Debug - Full OAuth URL:', authUrl);
+    console.log('🔍 OAuth Debug - Redirecting to Google OAuth...');
+    
     window.location.href = authUrl;
   };
 
