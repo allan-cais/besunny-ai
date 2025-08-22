@@ -1,12 +1,13 @@
 /**
- * AuthProvider
- * Clean, type-safe authentication provider with proper session management
+ * AuthProvider - Simple & Clean
+ * Just exposes the authentication service to React components
  */
 
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { authService, type AuthState } from '@/services/auth.service';
+import React, { createContext, useContext, ReactNode } from 'react';
+import { authService } from '@/services/auth.service';
 import type { User, Session } from '@supabase/supabase-js';
 
+// Simple context interface
 interface AuthContextType {
   user: User | null;
   session: Session | null;
@@ -17,97 +18,53 @@ interface AuthContextType {
   signInWithGoogle: () => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<{ success: boolean; error?: string }>;
   resetPassword: (email: string) => Promise<{ success: boolean; error?: string }>;
-  refreshSession: () => Promise<{ success: boolean; error?: string }>;
   isAuthenticated: boolean;
-  isInitializing: boolean;
-  isOperationLoading: boolean;
-  isAuthStateStable: boolean;
   clearError: () => void;
 }
 
+// Create context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Provider component
 interface AuthProviderProps {
   children: ReactNode;
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const [authState, setAuthState] = useState<AuthState>({
-    user: null,
-    session: null,
-    loading: false, // Start with loading false for natural page loads
-    error: null,
-  });
+  // Subscribe to auth service state
+  const [authState, setAuthState] = React.useState(() => authService.getState());
 
-  useEffect(() => {
-    // Subscribe to authentication state changes
+  React.useEffect(() => {
     const unsubscribe = authService.subscribe((state) => {
       setAuthState(state);
     });
 
-    // Cleanup subscription on unmount
     return unsubscribe;
   }, []);
 
-  const signIn = async (email: string, password: string) => {
-    const result = await authService.signIn(email, password);
-    return { success: result.success, error: result.error };
-  };
-
-  const signUp = async (email: string, password: string, name?: string) => {
-    const result = await authService.signUp(email, password, name);
-    return { success: result.success, error: result.error };
-  };
-
-  const signInWithGoogle = async () => {
-    const result = await authService.signInWithGoogle();
-    return { success: result.success, error: result.error };
-  };
-
-  const signOut = async () => {
-    const result = await authService.signOut();
-    return { success: result.success, error: result.error };
-  };
-
-  const resetPassword = async (email: string) => {
-    const result = await authService.resetPassword(email);
-    return { success: result.success, error: result.error };
-  };
-
-  const refreshSession = async () => {
-    const result = await authService.refreshSession();
-    return { success: result.success, error: result.error };
-  };
-
-  const clearError = () => {
-    setAuthState(prev => ({ ...prev, error: null }));
-  };
-
-  const contextValue: AuthContextType = {
+  // Simple context value
+  const value: AuthContextType = {
     user: authState.user,
     session: authState.session,
-    loading: authState.loading,
+    loading: authState.isLoading,
     error: authState.error,
-    signIn,
-    signUp,
-    signInWithGoogle,
-    signOut,
-    resetPassword,
-    refreshSession,
+    signIn: authService.signIn.bind(authService),
+    signUp: authService.signUp.bind(authService),
+    signInWithGoogle: authService.signInWithGoogle.bind(authService),
+    signOut: authService.signOut.bind(authService),
+    resetPassword: authService.resetPassword.bind(authService),
     isAuthenticated: authService.isAuthenticated(),
-    isInitializing: authService.isInitializing(),
-    isOperationLoading: authService.isOperationLoading(),
-    isAuthStateStable: authService.isAuthStateStable(),
-    clearError,
+    clearError: authService.clearError.bind(authService),
   };
 
   return (
-    <AuthContext.Provider value={contextValue}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
 };
 
+// Hook to use auth context
 export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
   if (context === undefined) {

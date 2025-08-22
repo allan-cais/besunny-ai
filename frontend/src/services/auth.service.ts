@@ -1,150 +1,133 @@
 /**
- * Authentication Service
- * Clean, type-safe authentication management
+ * Authentication Service - Simple & Reliable
+ * Handles user authentication, session management, and page refresh
  */
 
-import { supabase } from '@/lib/supabase';
+import { createClient, type User, type Session, type AuthError } from '@supabase/supabase-js';
 import config from '@/config/environment';
-import type { User, Session, AuthError } from '@supabase/supabase-js';
 
-export interface AuthState {
+// Create Supabase client with proper configuration
+const supabase = createClient(
+  config.supabase.url,
+  config.supabase.anonKey,
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      flowType: 'pkce'
+    }
+  }
+);
+
+// Simple authentication state
+interface AuthState {
   user: User | null;
   session: Session | null;
-  loading: boolean;
+  isLoading: boolean;
   error: string | null;
 }
 
-export interface AuthResult {
-  success: boolean;
-  user?: User;
-  session?: Session;
-  error?: string;
-}
+// Event listeners for state changes
+type AuthListener = (state: AuthState) => void;
 
-export class AuthenticationService {
-  private static instance: AuthenticationService;
-  private authState: AuthState = {
+class AuthenticationService {
+  private state: AuthState = {
     user: null,
     session: null,
-    loading: true,
-    error: null,
+    isLoading: false,
+    error: null
   };
-  private listeners: Set<(state: AuthState) => void> = new Set();
 
-  private constructor() {
+  private listeners: Set<AuthListener> = new Set();
+  private isInitialized = false;
+
+  constructor() {
     this.initialize();
   }
 
-  public static getInstance(): AuthenticationService {
-    if (!AuthenticationService.instance) {
-      AuthenticationService.instance = new AuthenticationService();
-    }
-    return AuthenticationService.instance;
-  }
-
   private async initialize(): Promise<void> {
+    if (this.isInitialized) return;
+    
     try {
-      // Get initial session without showing loading state
+      // Get current session
       const { data: { session }, error } = await supabase.auth.getSession();
       
-      if (config.features.enableDebugMode) {
-        console.log('Auth Service: Initial session check', { 
-          hasSession: !!session, 
-          hasUser: !!session?.user, 
-          error: error?.message 
-        });
-      }
-      
       if (error) {
-        this.updateState({ error: error.message, loading: false });
+        this.updateState({ error: error.message });
         return;
       }
 
-      if (session) {
-        this.updateState({ 
-          user: session.user, 
-          session, 
-          loading: false 
-        });
-        
-        if (config.features.enableDebugMode) {
-          console.log('Auth Service: Session restored successfully', { 
-            userId: session.user.id, 
-            email: session.user.email 
-          });
-        }
-      } else {
-        this.updateState({ loading: false });
-        
-        if (config.features.enableDebugMode) {
-          console.log('Auth Service: No session found, user not authenticated');
-        }
-      }
+      // Set initial state
+      this.updateState({
+        user: session?.user || null,
+        session: session || null,
+        isLoading: false
+      });
 
       // Listen for auth changes
-      supabase.auth.onAuthStateChange(async (event, session) => {
-        if (config.features.enableDebugMode) {
-          console.log('Auth state change:', event, session?.user?.email);
-        }
-
+      supabase.auth.onAuthStateChange((event, session) => {
         switch (event) {
           case 'SIGNED_IN':
-            this.updateState({ 
-              user: session?.user || null, 
-              session, 
-              loading: false,
-              error: null 
+            this.updateState({
+              user: session?.user || null,
+              session: session || null,
+              isLoading: false,
+              error: null
             });
             break;
           
           case 'SIGNED_OUT':
-            this.updateState({ 
-              user: null, 
-              session: null, 
-              loading: false,
-              error: null 
+            this.updateState({
+              user: null,
+              session: null,
+              isLoading: false,
+              error: null
             });
             break;
           
           case 'TOKEN_REFRESHED':
-            this.updateState({ 
-              session, 
-              loading: false,
-              error: null 
+            this.updateState({
+              session: session || null,
+              isLoading: false,
+              error: null
             });
             break;
           
           case 'USER_UPDATED':
-            this.updateState({ 
-              user: session?.user || null, 
-              session, 
-              loading: false,
-              error: null 
+            this.updateState({
+              user: session?.user || null,
+              session: session || null,
+              isLoading: false,
+              error: null
             });
             break;
         }
       });
 
+      this.isInitialized = true;
     } catch (error) {
       this.updateState({ 
-        error: error instanceof Error ? error.message : 'Authentication initialization failed',
-        loading: false 
+        error: error instanceof Error ? error.message : 'Failed to initialize',
+        isLoading: false 
       });
     }
   }
 
   private updateState(updates: Partial<AuthState>): void {
-    this.authState = { ...this.authState, ...updates };
+    this.state = { ...this.state, ...updates };
     this.notifyListeners();
   }
 
   private notifyListeners(): void {
-    this.listeners.forEach(listener => listener(this.authState));
+    this.listeners.forEach(listener => listener(this.state));
   }
 
-  public subscribe(listener: (state: AuthState) => void): () => void {
+  // Public methods
+  public subscribe(listener: AuthListener): () => void {
     this.listeners.add(listener);
-    listener(this.authState); // Initial call
+    // Call immediately with current state
+    listener(this.state);
     
     return () => {
       this.listeners.delete(listener);
@@ -152,12 +135,12 @@ export class AuthenticationService {
   }
 
   public getState(): AuthState {
-    return { ...this.authState };
+    return { ...this.state };
   }
 
-  public async signIn(email: string, password: string): Promise<AuthResult> {
+  public async signIn(email: string, password: string): Promise<{ success: boolean; error?: string }> {
     try {
-      this.updateState({ loading: true, error: null });
+      this.updateState({ isLoading: true, error: null });
       
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -165,66 +148,58 @@ export class AuthenticationService {
       });
 
       if (error) {
-        this.updateState({ error: error.message, loading: false });
+        this.updateState({ error: error.message, isLoading: false });
         return { success: false, error: error.message };
       }
 
-      return { 
-        success: true, 
-        user: data.user || undefined,
-        session: data.session || undefined 
-      };
+      return { success: true };
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Sign in failed';
-      this.updateState({ error: errorMessage, loading: false });
+      this.updateState({ error: errorMessage, isLoading: false });
       return { success: false, error: errorMessage };
     }
   }
 
-  public async signUp(email: string, password: string, name?: string): Promise<AuthResult> {
+  public async signUp(email: string, password: string, name?: string): Promise<{ success: boolean; error?: string }> {
     try {
-      this.updateState({ loading: true, error: null });
+      this.updateState({ isLoading: true, error: null });
       
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: name ? { name } : undefined,
-        },
+          data: { name }
+        }
       });
 
       if (error) {
-        this.updateState({ error: error.message, loading: false });
+        this.updateState({ error: error.message, isLoading: false });
         return { success: false, error: error.message };
       }
 
-      return { 
-        success: true, 
-        user: data.user || undefined,
-        session: data.session || undefined 
-      };
+      return { success: true };
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Sign up failed';
-      this.updateState({ error: errorMessage, loading: false });
+      this.updateState({ error: errorMessage, isLoading: false });
       return { success: false, error: errorMessage };
     }
   }
 
-  public async signInWithGoogle(): Promise<AuthResult> {
+  public async signInWithGoogle(): Promise<{ success: boolean; error?: string }> {
     try {
-      this.updateState({ loading: true, error: null });
+      this.updateState({ isLoading: true, error: null });
       
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/oauth-login-callback`,
-        },
+          redirectTo: `${window.location.origin}/auth`
+        }
       });
 
       if (error) {
-        this.updateState({ error: error.message, loading: false });
+        this.updateState({ error: error.message, isLoading: false });
         return { success: false, error: error.message };
       }
 
@@ -232,19 +207,19 @@ export class AuthenticationService {
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Google sign in failed';
-      this.updateState({ error: errorMessage, loading: false });
+      this.updateState({ error: errorMessage, isLoading: false });
       return { success: false, error: errorMessage };
     }
   }
 
-  public async signOut(): Promise<AuthResult> {
+  public async signOut(): Promise<{ success: boolean; error?: string }> {
     try {
-      this.updateState({ loading: true, error: null });
+      this.updateState({ isLoading: true, error: null });
       
       const { error } = await supabase.auth.signOut();
 
       if (error) {
-        this.updateState({ error: error.message, loading: false });
+        this.updateState({ error: error.message, isLoading: false });
         return { success: false, error: error.message };
       }
 
@@ -252,21 +227,21 @@ export class AuthenticationService {
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Sign out failed';
-      this.updateState({ error: errorMessage, loading: false });
+      this.updateState({ error: errorMessage, isLoading: false });
       return { success: false, error: errorMessage };
     }
   }
 
-  public async resetPassword(email: string): Promise<AuthResult> {
+  public async resetPassword(email: string): Promise<{ success: boolean; error?: string }> {
     try {
-      this.updateState({ loading: true, error: null });
+      this.updateState({ isLoading: true, error: null });
       
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/reset-password`,
+        redirectTo: `${window.location.origin}/auth`
       });
 
       if (error) {
-        this.updateState({ error: error.message, loading: false });
+        this.updateState({ error: error.message, isLoading: false });
         return { success: false, error: error.message };
       }
 
@@ -274,69 +249,27 @@ export class AuthenticationService {
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Password reset failed';
-      this.updateState({ error: errorMessage, loading: false });
+      this.updateState({ error: errorMessage, isLoading: false });
       return { success: false, error: errorMessage };
     }
   }
 
-  public async refreshSession(): Promise<AuthResult> {
-    try {
-      const { data, error } = await supabase.auth.refreshSession();
-
-      if (error) {
-        return { success: false, error: error.message };
-      }
-
-      return { 
-        success: true, 
-        user: data.user || undefined,
-        session: data.session || undefined 
-      };
-
-    } catch (error) {
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Session refresh failed' 
-      };
-    }
+  public clearError(): void {
+    this.updateState({ error: null });
   }
 
   public isAuthenticated(): boolean {
-    // Ensure both user and session are available and valid
-    return !!(this.authState.user && this.authState.session);
-  }
-
-  public isInitializing(): boolean {
-    // Only show initializing if we have no user and no session yet
-    return !this.authState.user && !this.authState.session && this.authState.loading;
-  }
-
-  public isOperationLoading(): boolean {
-    // Show operation loading only during actual operations (sign in, sign up, etc.)
-    return this.authState.loading && (!!this.authState.user || !!this.authState.session);
-  }
-
-  public isAuthStateStable(): boolean {
-    // Check if authentication state is stable and ready for navigation decisions
-    // This prevents premature redirects during state transitions
-    return !this.authState.loading && (
-      (!!this.authState.user && !!this.authState.session) || 
-      (!this.authState.user && !this.authState.session)
-    );
+    return !!(this.state.user && this.state.session);
   }
 
   public getCurrentUser(): User | null {
-    return this.authState.user;
+    return this.state.user;
   }
 
   public getCurrentSession(): Session | null {
-    return this.authState.session;
-  }
-
-  public getAccessToken(): string | null {
-    return this.authState.session?.access_token || null;
+    return this.state.session;
   }
 }
 
 // Export singleton instance
-export const authService = AuthenticationService.getInstance();
+export const authService = new AuthenticationService();
