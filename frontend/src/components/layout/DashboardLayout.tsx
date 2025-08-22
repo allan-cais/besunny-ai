@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, Outlet } from 'react-router-dom';
 import { useAuth } from '@/providers/AuthProvider';
 import { useSupabase } from '@/hooks/use-supabase';
 import { supabaseService } from '@/lib/supabase';
@@ -16,8 +16,7 @@ import {
   AIChatSession
 } from '@/components/dashboard';
 
-
-const DashboardLayout = () => {
+const DashboardLayout: React.FC = () => {
   const { user, session } = useAuth();
   const { getProjectsForUser, getChatSessions, createChatSession, endChatSession, updateChatSession } = useSupabase();
   const [openSubmenus, setOpenSubmenus] = useState<{ [key: string]: boolean }>({});
@@ -33,24 +32,7 @@ const DashboardLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Debug logging
-  console.log('🔍 DashboardLayout Debug:', {
-    pathname: location.pathname,
-    search: location.search,
-    hasUser: !!user,
-    userId: user?.id,
-    hasSession: !!session,
-    timestamp: new Date().toISOString()
-  });
 
-  // Track location changes for debugging
-  useEffect(() => {
-    console.log('🔍 DashboardLayout Debug: Location changed:', {
-      pathname: location.pathname,
-      search: location.search,
-      timestamp: new Date().toISOString()
-    });
-  }, [location.pathname, location.search]);
 
   // Load projects for the current user
   useEffect(() => {
@@ -340,6 +322,7 @@ const DashboardLayout = () => {
           <div className="flex-1 flex overflow-hidden min-w-0">
             <div className="flex-1 flex flex-col overflow-hidden min-w-0">
               <div className="w-[70%] max-w-[90rem] mx-auto h-full flex flex-col">
+                {/* Outlet for nested routes */}
                 <Outlet />
               </div>
             </div>
