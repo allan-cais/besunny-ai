@@ -228,17 +228,21 @@ async def get_current_user_hybrid(
             
             logger.info(f"🔍 Auth Debug - Calling supabase.auth.get_user with token")
             response = supabase.auth.get_user(token)
-            logger.info(f"🔍 Auth Debug - Supabase response: error={response.error}, has_user={bool(response.user)}")
+            logger.info(f"🔍 Auth Debug - Supabase response type: {type(response)}")
+            logger.info(f"🔍 Auth Debug - Supabase response: {response}")
             
-            if response.error:
+            # Check if response has error attribute
+            if hasattr(response, 'error') and response.error:
                 logger.error(f"🔍 Auth Debug - Supabase auth error: {response.error}")
+                error_message = getattr(response.error, 'message', str(response.error))
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail=f"Supabase authentication error: {response.error.message}",
+                    detail=f"Supabase authentication error: {error_message}",
                     headers={"WWW-Authenticate": "Bearer"},
                 )
             
-            if not response.user:
+            # Check if response has user attribute
+            if not hasattr(response, 'user') or not response.user:
                 logger.error("🔍 Auth Debug - No user returned from Supabase")
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
@@ -252,8 +256,8 @@ async def get_current_user_hybrid(
             return {
                 "id": user.id,
                 "email": user.email,
-                "username": user.user_metadata.get("username"),
-                "permissions": user.user_metadata.get("permissions", []),
+                "username": user.user_metadata.get("username") if hasattr(user, 'user_metadata') else None,
+                "permissions": user.user_metadata.get("permissions", []) if hasattr(user, 'user_metadata') else [],
             }
             
         except HTTPException:
