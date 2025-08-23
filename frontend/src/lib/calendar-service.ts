@@ -352,7 +352,7 @@ export class CalendarService {
     const session = (await supabase.auth.getSession()).data.session;
     if (!session) throw new Error('Not authenticated');
     
-    const url = new URL(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/attendee/send-bot`);
+    const url = new URL(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/attendee/create-bot`);
     
     const response = await fetch(url.toString(), {
       method: 'POST',
@@ -362,7 +362,8 @@ export class CalendarService {
       },
       body: JSON.stringify({
         meeting_url: meetingId,
-        bot_config: configuration,
+        bot_name: configuration?.bot_name || 'Sunny AI Notetaker',
+        bot_chat_message: configuration?.bot_chat_message || 'Hi, I\'m here to transcribe this meeting!',
         user_id: session.user.id,
       }),
     });
@@ -371,7 +372,7 @@ export class CalendarService {
     return {
       ok: result.success,
       bot_id: result.bot_id,
-      error: result.message
+      error: result.error || result.message
     };
   }
 

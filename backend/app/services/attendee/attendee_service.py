@@ -1,6 +1,7 @@
 """
 Core attendee service for BeSunny.ai Python backend.
 Handles meeting bot management, transcript retrieval, and chat functionality.
+Implements Attendee.dev API according to their official documentation.
 """
 
 import asyncio
@@ -65,8 +66,11 @@ class AttendeeService:
     def __init__(self):
         self.settings = get_settings()
         self.supabase = get_supabase()
-        self.attendee_api_base_url = self.settings.attendee_api_base_url
+        self.attendee_api_base_url = self.settings.attendee_api_base_url or "https://app.attendee.dev"
         self.attendee_api_key = self.settings.master_attendee_api_key
+        
+        if not self.attendee_api_key:
+            raise ValueError("Attendee API key not configured")
         
         # HTTP client for external API calls
         self.http_client = httpx.AsyncClient(
@@ -79,74 +83,52 @@ class AttendeeService:
         
         logger.info("Attendee Service initialized")
     
-    async def poll_all_meetings(self, user_id: str) -> List[Dict[str, Any]]:
+    async def create_bot_for_meeting(self, options: Dict[str, Any], user_id: str) -> Dict[str, Any]:
         """
-        Poll all meetings for a user to get current status.
-        
-        Args:
-            user_id: User ID to poll meetings for
-            
-        Returns:
-            List of meeting status information
-        """
-        try:
-            # Get user's active meeting bots
-            bots = await self._get_user_meeting_bots(user_id)
-            if not bots:
-                logger.info(f"No active meeting bots found for user {user_id}")
-                return []
-            
-            # Poll each bot for current status
-            meeting_statuses = []
-            for bot in bots:
-                try:
-                    status = await self.get_bot_status(bot['bot_id'])
-                    if status:
-                        meeting_statuses.append(status)
-                except Exception as e:
-                    logger.error(f"Failed to poll bot {bot['bot_id']}: {e}")
-                    continue
-            
-            logger.info(f"Successfully polled {len(meeting_statuses)} meetings for user {user_id}")
-            return meeting_statuses
-            
-        except Exception as e:
-            logger.error(f"Failed to poll all meetings for user {user_id}: {e}")
-            return []
-    
-    async def send_bot_to_meeting(self, options: Dict[str, Any], user_id: str) -> Dict[str, Any]:
-        """
-        Send a bot to a meeting.
+        Create a bot for a meeting using Attendee.dev API.
         
         Args:
             options: Bot configuration options
             user_id: User ID requesting the bot
             
         Returns:
-            Bot deployment result
+            Bot creation result
         """
         try:
-            # Validate options
-            required_fields = ['meeting_url', 'meeting_time', 'project_id']
+            # Validate required fields
+            required_fields = ['meeting_url', 'bot_name']
             for field in required_fields:
                 if field not in options:
                     raise ValueError(f"Missing required field: {field}")
             
-            # Create bot deployment request
-            deployment_data = {
+            # Get webhook URL for this user
+            webhook_url = await self._get_user_webhook_url(user_id)
+            
+            # Create bot with webhook configuration according to Attendee.dev API
+            bot_data = {
                 "meeting_url": options['meeting_url'],
-                "meeting_time": options['meeting_time'],
-                "project_id": options['project_id'],
-                "user_id": user_id,
-                "bot_config": options.get('bot_config', {}),
-                "recording_enabled": options.get('recording_enabled', True),
-                "transcript_enabled": options.get('transcript_enabled', True)
+                "bot_name": options['bot_name'],
+                "webhooks": [
+                    {
+                        "url": webhook_url,
+                        "triggers": [
+                            "bot.state_change",
+                            "transcript.update", 
+                            "chat_messages.update",
+                            "participant_events.join_leave"
+                        ]
+                    }
+                ]
             }
             
-            # Call attendee API to deploy bot
+            # Add optional bot chat message if provided
+            if options.get('bot_chat_message'):
+                bot_data["bot_chat_message"] = options['bot_chat_message']
+            
+            # Call Attendee.dev API to create bot
             response = await self.http_client.post(
-                f"{self.attendee_api_base_url}/deploy-bot",
-                json=deployment_data
+                f"{self.attendee_api_base_url}/api/v1/bots",
+                json=bot_data
             )
             response.raise_for_status()
             
@@ -154,22 +136,27 @@ class AttendeeService:
             
             # Store bot information in database
             await self._store_meeting_bot(
-                bot_id=result['bot_id'],
+                bot_id=result['id'],
                 user_id=user_id,
-                project_id=options['project_id'],
                 meeting_url=options['meeting_url'],
-                meeting_time=options['meeting_time'],
-                status='deployed'
+                bot_name=options['bot_name'],
+                status='created',
+                attendee_project_id=result.get('project_id')
             )
             
-            logger.info(f"Bot deployed successfully for user {user_id}, bot ID: {result['bot_id']}")
-            return result
+            logger.info(f"Bot created successfully for user {user_id}, bot ID: {result['id']}")
+            return {
+                "success": True,
+                "bot_id": result['id'],
+                "project_id": result.get('project_id'),
+                "status": "created"
+            }
             
         except httpx.HTTPStatusError as e:
-            logger.error(f"HTTP error deploying bot: {e.response.status_code} - {e.response.text}")
-            return {"success": False, "error": f"HTTP error: {e.response.status_code}"}
+            logger.error(f"HTTP error creating bot: {e.response.status_code} - {e.response.text}")
+            return {"success": False, "error": f"HTTP error: {e.response.status_code}", "details": e.response.text}
         except Exception as e:
-            logger.error(f"Failed to deploy bot for user {user_id}: {e}")
+            logger.error(f"Failed to create bot for user {user_id}: {e}")
             return {"success": False, "error": str(e)}
     
     async def get_bot_status(self, bot_id: str) -> Optional[Dict[str, Any]]:
@@ -184,7 +171,7 @@ class AttendeeService:
         """
         try:
             response = await self.http_client.get(
-                f"{self.attendee_api_base_url}/bot-status/{bot_id}"
+                f"{self.attendee_api_base_url}/api/v1/bots/{bot_id}"
             )
             response.raise_for_status()
             
@@ -214,7 +201,7 @@ class AttendeeService:
         """
         try:
             response = await self.http_client.get(
-                f"{self.attendee_api_base_url}/transcript/{bot_id}"
+                f"{self.attendee_api_base_url}/api/v1/bots/{bot_id}/transcript"
             )
             response.raise_for_status()
             
@@ -232,64 +219,6 @@ class AttendeeService:
             logger.error(f"Failed to get transcript for bot {bot_id}: {e}")
             return None
     
-    async def auto_schedule_bots(self, user_id: str) -> List[Dict[str, Any]]:
-        """
-        Automatically schedule bots for upcoming meetings.
-        
-        Args:
-            user_id: User ID to auto-schedule for
-            
-        Returns:
-            List of scheduled bot results
-        """
-        try:
-            # Get user's upcoming meetings
-            upcoming_meetings = await self._get_upcoming_meetings(user_id)
-            if not upcoming_meetings:
-                logger.info(f"No upcoming meetings found for user {user_id}")
-                return []
-            
-            # Check which meetings need bots
-            meetings_needing_bots = []
-            for meeting in upcoming_meetings:
-                has_bot = await self._meeting_has_bot(meeting['id'])
-                if not has_bot and meeting.get('auto_bot_enabled', True):
-                    meetings_needing_bots.append(meeting)
-            
-            # Auto-schedule bots for eligible meetings
-            scheduled_results = []
-            for meeting in meetings_needing_bots:
-                try:
-                    bot_options = {
-                        'meeting_url': meeting.get('meeting_url'),
-                        'meeting_time': meeting['start_time'],
-                        'project_id': meeting.get('project_id'),
-                        'bot_config': {
-                            'auto_join': True,
-                            'recording_enabled': True,
-                            'transcript_enabled': True
-                        }
-                    }
-                    
-                    result = await self.send_bot_to_meeting(bot_options, user_id)
-                    if result.get('success'):
-                        scheduled_results.append({
-                            'meeting_id': meeting['id'],
-                            'bot_id': result.get('bot_id'),
-                            'status': 'scheduled'
-                        })
-                    
-                except Exception as e:
-                    logger.error(f"Failed to auto-schedule bot for meeting {meeting['id']}: {e}")
-                    continue
-            
-            logger.info(f"Auto-scheduled {len(scheduled_results)} bots for user {user_id}")
-            return scheduled_results
-            
-        except Exception as e:
-            logger.error(f"Failed to auto-schedule bots for user {user_id}: {e}")
-            return []
-    
     async def get_chat_messages(self, bot_id: str, limit: int = 100) -> List[Dict[str, Any]]:
         """
         Get chat messages for a meeting bot.
@@ -303,7 +232,7 @@ class AttendeeService:
         """
         try:
             response = await self.http_client.get(
-                f"{self.attendee_api_base_url}/chat-messages/{bot_id}",
+                f"{self.attendee_api_base_url}/api/v1/bots/{bot_id}/chat-messages",
                 params={"limit": limit}
             )
             response.raise_for_status()
@@ -322,31 +251,26 @@ class AttendeeService:
             logger.error(f"Failed to get chat messages for bot {bot_id}: {e}")
             return []
     
-    async def send_chat_message(self, bot_id: str, message: str, to: str, 
-                               from_user: str = "system") -> Optional[Dict[str, Any]]:
+    async def send_chat_message(self, bot_id: str, message: str, to: str = "everyone") -> Optional[Dict[str, Any]]:
         """
         Send a chat message through a meeting bot.
         
         Args:
             bot_id: Bot ID to send message through
             message: Message content
-            to: Recipient of the message
-            from_user: Sender of the message
+            to: Recipient of the message (default: "everyone")
             
         Returns:
             Message send result or None if failed
         """
         try:
             message_data = {
-                "bot_id": bot_id,
                 "message": message,
-                "to": to,
-                "from": from_user,
-                "timestamp": datetime.utcnow().isoformat()
+                "to": to
             }
             
             response = await self.http_client.post(
-                f"{self.attendee_api_base_url}/send-chat",
+                f"{self.attendee_api_base_url}/api/v1/bots/{bot_id}/chat-messages",
                 json=message_data
             )
             response.raise_for_status()
@@ -354,7 +278,7 @@ class AttendeeService:
             result = response.json()
             
             # Store message in database
-            await self._store_chat_message(bot_id, message_data, result.get('message_id'))
+            await self._store_chat_message(bot_id, message_data, result.get('id'))
             
             logger.info(f"Chat message sent successfully through bot {bot_id}")
             return result
@@ -378,7 +302,7 @@ class AttendeeService:
         """
         try:
             response = await self.http_client.get(
-                f"{self.attendee_api_base_url}/participant-events/{bot_id}"
+                f"{self.attendee_api_base_url}/api/v1/bots/{bot_id}/participant-events"
             )
             response.raise_for_status()
             
@@ -408,7 +332,7 @@ class AttendeeService:
         """
         try:
             response = await self.http_client.post(
-                f"{self.attendee_api_base_url}/pause-recording/{bot_id}"
+                f"{self.attendee_api_base_url}/api/v1/bots/{bot_id}/pause-recording"
             )
             response.raise_for_status()
             
@@ -439,7 +363,7 @@ class AttendeeService:
         """
         try:
             response = await self.http_client.post(
-                f"{self.attendee_api_base_url}/resume-recording/{bot_id}"
+                f"{self.attendee_api_base_url}/api/v1/bots/{bot_id}/resume-recording"
             )
             response.raise_for_status()
             
@@ -458,7 +382,73 @@ class AttendeeService:
             logger.error(f"Failed to resume recording for bot {bot_id}: {e}")
             return None
     
+    async def delete_bot(self, bot_id: str) -> bool:
+        """
+        Delete a meeting bot.
+        
+        Args:
+            bot_id: Bot ID to delete
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            response = await self.http_client.delete(
+                f"{self.attendee_api_base_url}/api/v1/bots/{bot_id}"
+            )
+            response.raise_for_status()
+            
+            # Remove bot from database
+            await self._remove_meeting_bot(bot_id)
+            
+            logger.info(f"Bot {bot_id} deleted successfully")
+            return True
+            
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error deleting bot: {e.response.status_code}")
+            return False
+        except Exception as e:
+            logger.error(f"Failed to delete bot {bot_id}: {e}")
+            return False
+    
+    async def list_user_bots(self, user_id: str) -> List[Dict[str, Any]]:
+        """
+        List all bots for a user.
+        
+        Args:
+            user_id: User ID to list bots for
+            
+        Returns:
+            List of user's bots
+        """
+        try:
+            # Get bots from database first
+            db_bots = await self._get_user_meeting_bots(user_id)
+            
+            # Fetch current status from Attendee API for each bot
+            updated_bots = []
+            for bot in db_bots:
+                try:
+                    status = await self.get_bot_status(bot['bot_id'])
+                    if status:
+                        bot.update(status)
+                        updated_bots.append(bot)
+                except Exception as e:
+                    logger.error(f"Failed to get status for bot {bot['bot_id']}: {e}")
+                    updated_bots.append(bot)  # Include bot even if status fetch failed
+            
+            return updated_bots
+            
+        except Exception as e:
+            logger.error(f"Failed to list bots for user {user_id}: {e}")
+            return []
+    
     # Private helper methods
+    
+    async def _get_user_webhook_url(self, user_id: str) -> str:
+        """Get webhook URL for a user."""
+        webhook_base_url = self.settings.webhook_base_url
+        return f"{webhook_base_url}/api/v1/webhooks/attendee/{user_id}"
     
     async def _get_user_meeting_bots(self, user_id: str) -> List[Dict[str, Any]]:
         """Get all meeting bots for a user."""
@@ -469,17 +459,17 @@ class AttendeeService:
             logger.error(f"Failed to get meeting bots for user {user_id}: {e}")
             return []
     
-    async def _store_meeting_bot(self, bot_id: str, user_id: str, project_id: str, 
-                                meeting_url: str, meeting_time: str, status: str):
+    async def _store_meeting_bot(self, bot_id: str, user_id: str, meeting_url: str, 
+                                bot_name: str, status: str, attendee_project_id: Optional[str] = None):
         """Store meeting bot information in database."""
         try:
             bot_data = {
                 "bot_id": bot_id,
                 "user_id": user_id,
-                "project_id": project_id,
                 "meeting_url": meeting_url,
-                "meeting_time": meeting_time,
+                "bot_name": bot_name,
                 "status": status,
+                "attendee_project_id": attendee_project_id,
                 "created_at": datetime.utcnow().isoformat(),
                 "updated_at": datetime.utcnow().isoformat()
             }
@@ -504,6 +494,13 @@ class AttendeeService:
         except Exception as e:
             logger.error(f"Failed to update bot status for {bot_id}: {e}")
     
+    async def _remove_meeting_bot(self, bot_id: str):
+        """Remove meeting bot from database."""
+        try:
+            self.supabase.table("meeting_bots").delete().eq("bot_id", bot_id).execute()
+        except Exception as e:
+            logger.error(f"Failed to remove meeting bot {bot_id}: {e}")
+    
     async def _store_transcript(self, bot_id: str, transcript_data: Dict[str, Any]):
         """Store transcript data in database."""
         try:
@@ -520,25 +517,6 @@ class AttendeeService:
             
         except Exception as e:
             logger.error(f"Failed to store transcript for bot {bot_id}: {e}")
-    
-    async def _get_upcoming_meetings(self, user_id: str) -> List[Dict[str, Any]]:
-        """Get upcoming meetings for a user."""
-        try:
-            # This would integrate with the calendar service
-            # For now, return empty list
-            return []
-        except Exception as e:
-            logger.error(f"Failed to get upcoming meetings for user {user_id}: {e}")
-            return []
-    
-    async def _meeting_has_bot(self, meeting_id: str) -> bool:
-        """Check if a meeting already has a bot assigned."""
-        try:
-            result = self.supabase.table("meeting_bots").select("bot_id").eq("meeting_id", meeting_id).execute()
-            return len(result.data) > 0 if result.data else False
-        except Exception as e:
-            logger.error(f"Failed to check if meeting {meeting_id} has bot: {e}")
-            return False
     
     async def _store_chat_messages(self, bot_id: str, messages: List[Dict[str, Any]]):
         """Store chat messages in database."""

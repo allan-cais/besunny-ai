@@ -20,6 +20,7 @@ export const apiKeyService = {
     // Ensure bot_chat_message is properly formatted
     const payload = {
       meeting_url: meetingUrl,
+      bot_name: options.bot_chat_message?.message || 'Sunny AI Notetaker',
       ...options
     };
     
@@ -39,9 +40,7 @@ export const apiKeyService = {
       };
     }
     
-
-    
-    const response = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/attendee/send-bot`, {
+    const response = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/attendee/create-bot`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -51,7 +50,6 @@ export const apiKeyService = {
     });
     const result = await response.json();
 
-    
     if (!result.ok) {
       // Attendee proxy error
       // Full error response data
@@ -62,7 +60,6 @@ export const apiKeyService = {
       } else if (result.data && result.data.error) {
         throw new Error(`Attendee API error: ${result.data.error}`);
       } else if (result.data && typeof result.data === 'object') {
-    
         // Error data keys
         throw new Error(`Attendee API error: ${JSON.stringify(result.data)}`);
       } else if (result.error) {
@@ -78,7 +75,6 @@ export const apiKeyService = {
       throw new Error('No data received from Attendee API');
     }
     
-
     return result.data;
   },
 

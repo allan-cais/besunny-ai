@@ -326,3 +326,79 @@ def batch_token_maintenance(self) -> Dict[str, Any]:
             'error': str(e),
             'timestamp': datetime.now().isoformat()
         }
+
+
+@shared_task(bind=True, name="auth.refresh_expiring_google_tokens")
+def refresh_expiring_google_tokens(self, minutes_before_expiry: int = 15) -> Dict[str, Any]:
+    """
+    Proactively refresh Google OAuth tokens that are about to expire.
+    
+    Args:
+        minutes_before_expiry: How many minutes before expiry to refresh tokens
+        
+    Returns:
+        Proactive refresh operation result
+    """
+    try:
+        logger.info(f"Starting proactive Google token refresh task (refresh {minutes_before_expiry} minutes before expiry)")
+        
+        async def _refresh_expiring_tokens():
+            service = GoogleTokenRefreshService()
+            result = await service.refresh_expiring_tokens(minutes_before_expiry)
+            return result
+        
+        # Run the async function
+        result = asyncio.run(_refresh_expiring_tokens())
+        
+        logger.info(f"Proactive Google token refresh task completed successfully")
+        return {
+            'success': True,
+            'batch_result': result.dict() if hasattr(result, 'dict') else result,
+            'timestamp': datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Proactive Google token refresh task failed: {e}")
+        return {
+            'success': False,
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }
+
+
+@shared_task(bind=True, name="auth.get_google_token_status")
+def get_google_token_status(self, user_id: str) -> Dict[str, Any]:
+    """
+    Get the current status of a user's Google OAuth tokens.
+    
+    Args:
+        user_id: User ID to check
+        
+    Returns:
+        Token status information
+    """
+    try:
+        logger.info(f"Getting Google token status for user {user_id}")
+        
+        async def _get_token_status():
+            service = GoogleTokenRefreshService()
+            result = await service.get_token_status(user_id)
+            return result
+        
+        # Run the async function
+        result = asyncio.run(_get_token_status())
+        
+        logger.info(f"Google token status task completed successfully for user {user_id}")
+        return {
+            'success': True,
+            'token_status': result,
+            'timestamp': datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Google token status task failed for user {user_id}: {e}")
+        return {
+            'success': False,
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }

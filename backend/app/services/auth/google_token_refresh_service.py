@@ -170,6 +170,201 @@ class GoogleTokenRefreshService:
                 timestamp=datetime.now()
             )
     
+    async def refresh_expiring_tokens(self, minutes_before_expiry: int = 15) -> BatchRefreshResult:
+        """
+        Proactively refresh tokens that are about to expire.
+        
+        Args:
+            minutes_before_expiry: How many minutes before expiry to refresh tokens
+            
+        Returns:
+            Batch refresh result with summary
+        """
+        try:
+            logger.info(f"Starting proactive token refresh for tokens expiring within {minutes_before_expiry} minutes")
+            
+            # Get tokens that will expire soon
+            now = datetime.now()
+            soon_expiry = now + timedelta(minutes=minutes_before_expiry)
+            
+            result = self.supabase.table("google_credentials") \
+                .select("user_id, access_token, refresh_token, expires_at") \
+                .not_.is_("refresh_token", None) \
+                .not_.is_("access_token", None) \
+                .not_.is_("expires_at", None) \
+                .execute()
+            
+            expiring_tokens = []
+            for token in result.data:
+                try:
+                    expires_at = token['expires_at']
+                    if isinstance(expires_at, str):
+                        expires_datetime = datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
+                    else:
+                        expires_datetime = expires_at
+                    
+                    # Check if token expires within the specified time
+                    if now < expires_datetime <= soon_expiry:
+                        expiring_tokens.append(token)
+                        logger.info(f"Token for user {token['user_id']} expires at {expires_at}, will refresh proactively")
+                        
+                except Exception as e:
+                    logger.warning(f"Failed to parse expiration time for user {token['user_id']}: {e}")
+            
+            if not expiring_tokens:
+                logger.info("No tokens need proactive refresh")
+                return BatchRefreshResult(
+                    total_users=0,
+                    successful_refreshes=0,
+                    failed_refreshes=0,
+                    results=[],
+                    timestamp=datetime.now()
+                )
+            
+            logger.info(f"Found {len(expiring_tokens)} tokens that need proactive refresh")
+            
+            # Refresh tokens for each user
+            results = []
+            successful = 0
+            failed = 0
+            
+            for token_info in expiring_tokens:
+                user_id = token_info['user_id']
+                result = await self.refresh_user_token(user_id)
+                results.append(result)
+                
+                if result.success:
+                    successful += 1
+                else:
+                    failed += 1
+                
+                # Small delay to avoid overwhelming Google's API
+                await asyncio.sleep(0.1)
+            
+            logger.info(f"Proactive token refresh completed: {successful} successful, {failed} failed")
+            
+            return BatchRefreshResult(
+                total_users=len(expiring_tokens),
+                successful_refreshes=successful,
+                failed_refreshes=failed,
+                results=results,
+                timestamp=datetime.now()
+            )
+            
+        except Exception as e:
+            logger.error(f"Proactive token refresh failed: {e}")
+            return BatchRefreshResult(
+                total_users=0,
+                successful_refreshes=0,
+                failed_refreshes=1,
+                results=[],
+                timestamp=datetime.now()
+            )
+
+    async def get_token_status(self, user_id: str) -> Dict[str, Any]:
+        """
+        Get the current status of a user's Google OAuth tokens.
+        
+        Args:
+            user_id: User ID to check
+            
+        Returns:
+            Token status information
+        """
+        try:
+            result = self.supabase.table("google_credentials") \
+                .select("access_token, refresh_token, expires_at, expires_in, updated_at") \
+                .eq("user_id", user_id) \
+                .single() \
+                .execute()
+            
+            if not result.data:
+                return {
+                    'user_id': user_id,
+                    'has_tokens': False,
+                    'status': 'no_credentials'
+                }
+            
+            token_data = result.data
+            now = datetime.now()
+            
+            # Check if access token exists
+            if not token_data.get('access_token'):
+                return {
+                    'user_id': user_id,
+                    'has_tokens': False,
+                    'status': 'no_access_token'
+                }
+            
+            # Check if refresh token exists
+            if not token_data.get('refresh_token'):
+                return {
+                    'user_id': user_id,
+                    'has_tokens': True,
+                    'status': 'no_refresh_token',
+                    'can_refresh': False
+                }
+            
+            # Check expiration
+            expires_at = token_data.get('expires_at')
+            if expires_at:
+                try:
+                    if isinstance(expires_at, str):
+                        expires_datetime = datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
+                    else:
+                        expires_datetime = expires_at
+                    
+                    time_until_expiry = expires_datetime - now
+                    minutes_until_expiry = time_until_expiry.total_seconds() / 60
+                    
+                    if expires_datetime <= now:
+                        status = 'expired'
+                        can_refresh = True
+                    elif minutes_until_expiry <= 15:
+                        status = 'expiring_soon'
+                        can_refresh = True
+                    else:
+                        status = 'valid'
+                        can_refresh = True
+                    
+                    return {
+                        'user_id': user_id,
+                        'has_tokens': True,
+                        'status': status,
+                        'can_refresh': can_refresh,
+                        'expires_at': expires_at,
+                        'minutes_until_expiry': int(minutes_until_expiry),
+                        'updated_at': token_data.get('updated_at')
+                    }
+                    
+                except Exception as e:
+                    logger.warning(f"Failed to parse expiration time for user {user_id}: {e}")
+                    return {
+                        'user_id': user_id,
+                        'has_tokens': True,
+                        'status': 'unknown_expiration',
+                        'can_refresh': True,
+                        'updated_at': token_data.get('updated_at')
+                    }
+            
+            # Fallback if no expires_at field
+            return {
+                'user_id': user_id,
+                'has_tokens': True,
+                'status': 'unknown_expiration',
+                'can_refresh': True,
+                'updated_at': token_data.get('updated_at')
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to get token status for user {user_id}: {e}")
+            return {
+                'user_id': user_id,
+                'has_tokens': False,
+                'status': 'error',
+                'error': str(e)
+            }
+    
     async def handle_refresh_results(self, results: List[TokenRefreshResult]) -> Dict[str, Any]:
         """
         Process and handle token refresh results.
@@ -257,19 +452,33 @@ class GoogleTokenRefreshService:
     async def _update_user_credentials(self, user_id: str, new_tokens: Dict[str, Any]):
         """Update user's stored Google credentials."""
         try:
+            # Calculate new expiration time
+            expires_in = new_tokens.get('expires_in', 3600)  # Default to 1 hour
+            expires_at = datetime.now() + timedelta(seconds=expires_in)
+            
             update_data = {
                 'access_token': new_tokens['access_token'],
-                'expires_in': new_tokens['expires_in'],
+                'expires_in': expires_in,
+                'expires_at': expires_at.isoformat(),
                 'updated_at': datetime.now().isoformat()
             }
             
-            self.supabase.table("google_credentials") \
+            logger.info(f"Updating credentials for user {user_id} - expires at {expires_at.isoformat()}")
+            
+            result = self.supabase.table("google_credentials") \
                 .update(update_data) \
                 .eq("user_id", user_id) \
                 .execute()
             
+            if result.data:
+                logger.info(f"Successfully updated credentials for user {user_id}")
+            else:
+                logger.warning(f"No rows updated for user {user_id}")
+            
         except Exception as e:
             logger.error(f"Failed to update credentials for user {user_id}: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
     
     async def _update_user_sessions(self, user_id: str, new_access_token: str):
         """Update user sessions with new access token."""
@@ -292,21 +501,72 @@ class GoogleTokenRefreshService:
         try:
             # Get tokens that are expired or will expire soon
             now = datetime.now()
-            soon_expiry = now + timedelta(hours=1)  # Refresh tokens expiring within 1 hour
+            soon_expiry = now + timedelta(minutes=15)  # Refresh tokens expiring within 15 minutes
             
+            # Query for tokens that need refresh
             result = self.supabase.table("google_credentials") \
-                .select("user_id, access_token, created_at, updated_at") \
+                .select("user_id, access_token, refresh_token, expires_at, expires_in, updated_at") \
                 .not_.is_("refresh_token", None) \
+                .not_.is_("access_token", None) \
                 .execute()
             
             expired_tokens = []
             for token in result.data:
-                # Check if token needs refresh
-                # This is a simplified check - in production you'd store expiration time
-                updated_at = datetime.fromisoformat(token['updated_at'].replace('Z', '+00:00'))
-                if updated_at < now - timedelta(hours=1):  # Assume 1 hour expiration
-                    expired_tokens.append(token)
+                user_id = token['user_id']
+                expires_at = token.get('expires_at')
+                updated_at = token.get('updated_at')
+                
+                # Check if token needs refresh based on expires_at field
+                if expires_at:
+                    try:
+                        # Parse the expiration time
+                        if isinstance(expires_at, str):
+                            expires_datetime = datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
+                        else:
+                            expires_datetime = expires_at
+                        
+                        # Check if token is expired or will expire soon
+                        if expires_datetime <= soon_expiry:
+                            expired_tokens.append({
+                                'user_id': user_id,
+                                'expires_at': expires_at,
+                                'updated_at': updated_at
+                            })
+                            logger.info(f"Token for user {user_id} expires at {expires_at}, will refresh")
+                            
+                    except Exception as e:
+                        logger.warning(f"Failed to parse expiration time for user {user_id}: {e}")
+                        # Fallback to time-based check
+                        if updated_at:
+                            try:
+                                updated_datetime = datetime.fromisoformat(updated_at.replace('Z', '+00:00'))
+                                # Assume 1 hour expiration if we can't parse expires_at
+                                if updated_datetime < now - timedelta(hours=1):
+                                    expired_tokens.append({
+                                        'user_id': user_id,
+                                        'expires_at': expires_at,
+                                        'updated_at': updated_at
+                                    })
+                                    logger.info(f"Token for user {user_id} marked for refresh (fallback method)")
+                            except Exception as parse_error:
+                                logger.error(f"Failed to parse updated_at for user {user_id}: {parse_error}")
+                
+                # Fallback: if no expires_at field, use updated_at with assumed expiration
+                elif updated_at:
+                    try:
+                        updated_datetime = datetime.fromisoformat(updated_at.replace('Z', '+00:00'))
+                        # Assume 1 hour expiration
+                        if updated_datetime < now - timedelta(hours=1):
+                            expired_tokens.append({
+                                'user_id': user_id,
+                                'expires_at': None,
+                                'updated_at': updated_at
+                            })
+                            logger.info(f"Token for user {user_id} marked for refresh (no expires_at field)")
+                    except Exception as parse_error:
+                        logger.error(f"Failed to parse updated_at for user {user_id}: {parse_error}")
             
+            logger.info(f"Found {len(expired_tokens)} tokens that need refresh")
             return expired_tokens
             
         except Exception as e:

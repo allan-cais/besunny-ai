@@ -177,6 +177,12 @@ celery_app.conf.beat_schedule = {
         "schedule": crontab(minute="*/30"),  # Every 30 minutes
     },
     
+    # Proactive Google token refresh (refresh tokens before they expire)
+    "refresh-expiring-google-tokens": {
+        "task": "auth.refresh_expiring_google_tokens",
+        "schedule": crontab(minute="*/15"),  # Every 15 minutes
+    },
+    
     # Google token validation
     "validate-google-tokens": {
         "task": "auth.validate_google_tokens",

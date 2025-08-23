@@ -447,46 +447,82 @@ class CalendarPollingService:
                 # Use sync token if available
                 sync_token = await self._get_sync_token(calendar_id)
                 if sync_token:
-                    changes = service.events().list(
-                        calendarId=calendar_id,
-                        syncToken=sync_token
-                    ).execute()
+                    try:
+                        changes = service.events().list(
+                            calendarId=calendar_id,
+                            syncToken=sync_token,
+                            singleEvents=True,
+                            showDeleted=True
+                        ).execute()
+                        
+                        # Store new sync token
+                        await self._update_sync_token(calendar_id, changes.get('nextSyncToken'))
+                        
+                        return changes.get('items', [])
+                        
+                    except HttpError as e:
+                        if e.resp.status == 410:
+                            # Sync token expired, fall back to time-based polling
+                            logger.info(f"Sync token expired for calendar {calendar_id}, falling back to time-based polling")
+                            return await self._get_changes_by_time(service, calendar_id, last_sync)
+                        else:
+                            logger.error(f"Google API error with sync token: {e}")
+                            return await self._get_changes_by_time(service, calendar_id, last_sync)
                 else:
-                    # Fall back to time-based polling
-                    changes = service.events().list(
-                        calendarId=calendar_id,
-                        timeMin=last_sync,
-                        singleEvents=True
-                    ).execute()
+                    # No sync token, use time-based polling
+                    return await self._get_changes_by_time(service, calendar_id, last_sync)
             else:
                 # First sync - get events from last 30 days
-                time_min = (datetime.now() - timedelta(days=30)).isoformat() + 'Z'
-                changes = service.events().list(
-                    calendarId=calendar_id,
-                    timeMin=time_min,
-                    singleEvents=True
-                ).execute()
-            
-            return changes.get('items', [])
+                return await self._get_changes_by_time(service, calendar_id, None)
             
         except Exception as e:
             logger.error(f"Failed to get calendar changes: {e}")
             return []
     
-    async def _get_sync_token(self, calendar_id: str) -> Optional[str]:
-        """Get sync token for a calendar."""
+    async def _get_changes_by_time(self, service, calendar_id: str, last_sync: Optional[str]) -> List[Dict[str, Any]]:
+        """Get calendar changes using time-based polling."""
         try:
-            result = self.supabase.table("calendar_sync_states") \
-                .select("sync_token") \
-                .eq("calendar_id", calendar_id) \
-                .single() \
-                .execute()
+            if last_sync:
+                # Use last sync time
+                time_min = last_sync
+            else:
+                # First sync - get events from last 30 days
+                time_min = (datetime.now() - timedelta(days=30)).isoformat() + 'Z'
             
-            return result.data.get('sync_token') if result.data else None
+            time_max = (datetime.now() + timedelta(days=30)).isoformat() + 'Z'
+            
+            changes = service.events().list(
+                calendarId=calendar_id,
+                timeMin=time_min,
+                timeMax=time_max,
+                singleEvents=True,
+                showDeleted=True,
+                orderBy='startTime'
+            ).execute()
+            
+            return changes.get('items', [])
             
         except Exception as e:
-            logger.error(f"Failed to get sync token for calendar {calendar_id}: {e}")
-            return None
+            logger.error(f"Failed to get changes by time: {e}")
+            return []
+    
+    async def _update_sync_token(self, calendar_id: str, sync_token: Optional[str]):
+        """Update sync token for a calendar."""
+        try:
+            if sync_token:
+                # Update sync token in database
+                await self.supabase.table("calendar_sync_states") \
+                    .upsert({
+                        'calendar_id': calendar_id,
+                        'sync_token': sync_token,
+                        'updated_at': datetime.now().isoformat()
+                    }) \
+                    .execute()
+                
+                logger.info(f"Updated sync token for calendar {calendar_id}")
+                
+        except Exception as e:
+            logger.error(f"Failed to update sync token for calendar {calendar_id}: {e}")
     
     async def _get_existing_event(self, event_id: str, user_id: str) -> Optional[Dict[str, Any]]:
         """Get existing calendar event from database."""
@@ -742,11 +778,43 @@ class CalendarPollingService:
                 if time_since_activity < timedelta(minutes=15):
                     return False
             
+            # Check if user has active meetings coming up
+            upcoming_meetings = await self._get_upcoming_meetings(user_id)
+            if upcoming_meetings:
+                # If user has meetings in next 2 hours, poll more frequently
+                next_meeting_time = upcoming_meetings[0].get('start_time')
+                if next_meeting_time:
+                    meeting_time = datetime.fromisoformat(next_meeting_time.replace('Z', '+00:00'))
+                    time_until_meeting = meeting_time - datetime.now()
+                    if time_until_meeting < timedelta(hours=2):
+                        return True
+            
             return True
             
         except Exception as e:
             logger.error(f"Failed to determine if calendar should be polled: {e}")
             return True
+    
+    async def _get_upcoming_meetings(self, user_id: str) -> List[Dict[str, Any]]:
+        """Get user's upcoming meetings."""
+        try:
+            now = datetime.now()
+            two_hours_from_now = now + timedelta(hours=2)
+            
+            result = await self.supabase.table("meetings") \
+                .select("*") \
+                .eq("user_id", user_id) \
+                .eq("status", "confirmed") \
+                .gte("start_time", now.isoformat()) \
+                .lte("start_time", two_hours_from_now.isoformat()) \
+                .order("start_time", asc=True) \
+                .execute()
+            
+            return result.data if result.data else []
+            
+        except Exception as e:
+            logger.error(f"Failed to get upcoming meetings for user {user_id}: {e}")
+            return []
     
     async def _update_smart_polling_metrics(self, user_id: str, result: Dict[str, Any]):
         """Update smart polling metrics based on polling results."""
@@ -754,15 +822,23 @@ class CalendarPollingService:
             # Calculate change frequency based on results
             total_changes = result.get('events_created', 0) + result.get('events_updated', 0) + result.get('events_deleted', 0)
             
+            # Get user's meeting schedule pattern
+            meeting_pattern = await self._analyze_meeting_pattern(user_id)
+            
+            # Adjust polling interval based on changes and patterns
             if total_changes == 0:
-                change_frequency = 'low'
-                next_poll_interval = 60  # 1 hour
+                if meeting_pattern == 'high_activity':
+                    change_frequency = 'medium'
+                    next_poll_interval = 30  # 30 minutes for active users
+                else:
+                    change_frequency = 'low'
+                    next_poll_interval = 60  # 1 hour for low activity
             elif total_changes <= 5:
                 change_frequency = 'medium'
-                next_poll_interval = 30  # 30 minutes
+                next_poll_interval = 20  # 20 minutes
             else:
                 change_frequency = 'high'
-                next_poll_interval = 15  # 15 minutes
+                next_poll_interval = 10  # 10 minutes for high activity
             
             # Update metrics
             metrics_data = {
@@ -775,10 +851,43 @@ class CalendarPollingService:
                 'updated_at': datetime.now().isoformat()
             }
             
-            self.supabase.table("user_sync_states").upsert(metrics_data).execute()
+            await self.supabase.table("user_sync_states").upsert(metrics_data).execute()
             
         except Exception as e:
             logger.error(f"Failed to update smart polling metrics: {e}")
+    
+    async def _analyze_meeting_pattern(self, user_id: str) -> str:
+        """Analyze user's meeting pattern to determine activity level."""
+        try:
+            # Get meetings from last 7 days
+            week_ago = datetime.now() - timedelta(days=7)
+            
+            result = await self.supabase.table("meetings") \
+                .select("start_time, end_time") \
+                .eq("user_id", user_id) \
+                .eq("status", "confirmed") \
+                .gte("start_time", week_ago.isoformat()) \
+                .execute()
+            
+            if not result.data:
+                return 'low_activity'
+            
+            meetings = result.data
+            total_meetings = len(meetings)
+            
+            # Calculate average meetings per day
+            avg_meetings_per_day = total_meetings / 7
+            
+            if avg_meetings_per_day >= 5:
+                return 'high_activity'
+            elif avg_meetings_per_day >= 2:
+                return 'medium_activity'
+            else:
+                return 'low_activity'
+                
+        except Exception as e:
+            logger.error(f"Failed to analyze meeting pattern for user {user_id}: {e}")
+            return 'medium_activity'
     
     async def _get_user_last_activity(self, user_id: str) -> Optional[datetime]:
         """Get user's last activity timestamp."""

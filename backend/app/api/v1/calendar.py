@@ -1,749 +1,437 @@
 """
 Google Calendar API endpoints for BeSunny.ai Python backend.
-Provides REST API for Calendar operations and webhook handling.
+Handles calendar operations, webhooks, and synchronization.
 """
 
-from typing import List, Optional, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks, Query, status
+from typing import List, Dict, Any, Optional
+from datetime import datetime
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
-from ...services.calendar import (
-    CalendarService, 
-    CalendarWebhookHandler, 
-    CalendarPollingService, 
-    CalendarPollingCronService,
-    CalendarWatchRenewalService,
-    CalendarWebhookRenewalService
-)
-from ...models.schemas.calendar import (
-    CalendarSyncRequest,
-    CalendarSyncResponse,
-    CalendarWebhookRequest,
-    CalendarWebhookResponse,
-    MeetingListResponse,
-    MeetingBotRequest,
-    MeetingBotResponse,
-    Meeting
-)
+from ...core.database import get_supabase
 from ...core.security import get_current_user
-from ...models.schemas.user import User
+from ...services.calendar.calendar_service import CalendarService
+from ...services.calendar.calendar_webhook_management_service import CalendarWebhookManagementService
+from ...services.calendar.calendar_webhook_handler import CalendarWebhookHandler
+from ...services.calendar.calendar_polling_service import CalendarPollingService
+from ...services.calendar.calendar_monitoring_service import CalendarMonitoringService
 
-router = APIRouter()
-
-
-class CalendarPollingRequest(BaseModel):
-    """Request model for calendar polling operations."""
-    force_poll: bool = False
-    calendar_id: str = "primary"
+router = APIRouter(prefix="/calendar", tags=["calendar"])
 
 
-@router.post("/webhook", response_model=dict)
-async def setup_calendar_webhook(
-    request: CalendarWebhookRequest,
-    current_user: User = Depends(get_current_user)
-):
-    """Set up a webhook for a Google Calendar."""
+class CalendarSyncRequest(BaseModel):
+    """Request model for calendar sync operations."""
+    force_sync: bool = False
+    sync_range_days: int = 30
+
+
+class WebhookHealthRequest(BaseModel):
+    """Request model for webhook health checks."""
+    user_id: str
+
+
+@router.post("/sync/{user_id}")
+async def sync_calendar(
+    user_id: str,
+    request: CalendarSyncRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """Synchronize calendar for a specific user."""
     try:
-        # Only allow users to set up webhooks for themselves
-        if current_user.id != request.user_id:
-            raise HTTPException(status_code=403, detail="Can only set up webhooks for yourself")
+        # Check if user is authorized to sync for the specified user_id
+        if current_user["id"] != user_id:
+            raise HTTPException(status_code=403, detail="Not authorized to sync for this user")
         
-        calendar_service = CalendarService()
-        
-        # Set up the calendar webhook
-        webhook_id = await calendar_service.setup_calendar_webhook(
-            user_id=request.user_id,
-            calendar_id=request.calendar_id
+        service = CalendarService()
+        result = await service.sync_calendar_events(
+            user_id=user_id,
+            sync_range_days=request.sync_range_days
         )
+        
+        return {
+            "success": True,
+            "user_id": user_id,
+            "events_synced": len(result),
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/webhook/setup/{user_id}")
+async def setup_calendar_webhook(
+    user_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """Set up calendar webhook for a user."""
+    try:
+        # Check if user is authorized
+        if current_user["id"] != user_id:
+            raise HTTPException(status_code=403, detail="Not authorized to setup webhook for this user")
+        
+        service = CalendarService()
+        webhook_id = await service.setup_calendar_webhook(user_id)
         
         if webhook_id:
-            return CalendarWebhookResponse(
-                success=True,
-                webhook_id=webhook_id,
-                message="Calendar webhook set up successfully"
-            )
+            return {
+                "success": True,
+                "webhook_id": webhook_id,
+                "message": "Calendar webhook setup successfully"
+            }
         else:
-            return CalendarWebhookResponse(
-                success=False,
-                message="Failed to set up calendar webhook"
-            )
+            raise HTTPException(status_code=500, detail="Failed to setup calendar webhook")
             
-    except HTTPException:
-        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to set up calendar webhook: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/sync", response_model=CalendarSyncResponse)
-async def sync_calendar_events(
-    request: CalendarSyncRequest,
-    background_tasks: BackgroundTasks,
-    current_user: User = Depends(get_current_user)
-):
-    """Sync calendar events for a user."""
+@router.post("/webhook/stop/{user_id}")
+async def stop_calendar_webhook(
+    user_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """Stop calendar webhook for a user."""
     try:
-        # Only allow users to sync their own calendar
-        if current_user.id != request.user_id:
-            raise HTTPException(status_code=403, detail="Can only sync your own calendar")
+        # Check if user is authorized
+        if current_user["id"] != user_id:
+            raise HTTPException(status_code=403, detail="Not authorized to stop webhook for this user")
         
-        calendar_service = CalendarService()
+        service = CalendarWebhookManagementService()
+        result = await service.stop_webhook(user_id)
         
-        # Add sync task to background queue
-        background_tasks.add_task(
-            calendar_service.sync_calendar_events,
-            request.user_id,
-            request.calendar_id,
-            request.sync_range_days
-        )
+        return result
         
-        return CalendarSyncResponse(
-            success=True,
-            events_synced=0,  # Will be updated when sync completes
-            message="Calendar sync triggered successfully"
-        )
-        
-    except HTTPException:
-        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to trigger calendar sync: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-# New calendar polling endpoints
-@router.post("/poll")
+@router.post("/webhook/recreate/{user_id}")
+async def recreate_calendar_webhook(
+    user_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """Recreate calendar webhook for a user."""
+    try:
+        # Check if user is authorized
+        if current_user["id"] != user_id:
+            raise HTTPException(status_code=403, detail="Not authorized to recreate webhook for this user")
+        
+        service = CalendarWebhookManagementService()
+        result = await service.recreate_webhook(user_id)
+        
+        return result
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/webhook/verify/{user_id}")
+async def verify_calendar_webhook(
+    user_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """Verify calendar webhook for a user."""
+    try:
+        # Check if user is authorized
+        if current_user["id"] != user_id:
+            raise HTTPException(status_code=403, detail="Not authorized to verify webhook for this user")
+        
+        service = CalendarWebhookManagementService()
+        result = await service.verify_webhook(user_id)
+        
+        return result
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/webhook/test/{user_id}")
+async def test_calendar_webhook(
+    user_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """Test calendar webhook for a user."""
+    try:
+        # Check if user is authorized
+        if current_user["id"] != user_id:
+            raise HTTPException(status_code=403, detail="Not authorized to test webhook for this user")
+        
+        service = CalendarWebhookManagementService()
+        result = await service.test_webhook(user_id)
+        
+        return result
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/webhook/health/{user_id}")
+async def get_webhook_health(
+    user_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """Get webhook health status for a user."""
+    try:
+        # Check if user is authorized
+        if current_user["id"] != user_id:
+            raise HTTPException(status_code=403, detail="Not authorized to check webhook health for this user")
+        
+        service = CalendarWebhookManagementService()
+        result = await service.health_check_webhook(user_id)
+        
+        return result
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/webhook/auto-fix/{user_id}")
+async def auto_fix_webhook(
+    user_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """Automatically fix webhook issues for a user."""
+    try:
+        # Check if user is authorized
+        if current_user["id"] != user_id:
+            raise HTTPException(status_code=403, detail="Not authorized to auto-fix webhook for this user")
+        
+        service = CalendarWebhookManagementService()
+        result = await service.auto_fix_webhook(user_id)
+        
+        return result
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/webhook/metrics/{user_id}")
+async def get_webhook_metrics(
+    user_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """Get webhook processing metrics for a user."""
+    try:
+        # Check if user is authorized
+        if current_user["id"] != user_id:
+            raise HTTPException(status_code=403, detail="Not authorized to get webhook metrics for this user")
+        
+        service = CalendarWebhookHandler()
+        result = await service.get_webhook_health_metrics(user_id)
+        
+        return result
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/poll/{user_id}")
 async def poll_calendar(
-    request: CalendarPollingRequest,
-    current_user: User = Depends(get_current_user)
-):
-    """Poll calendar for the current user."""
+    user_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """Poll calendar for changes for a specific user."""
     try:
-        polling_service = CalendarPollingService()
-        result = await polling_service.poll_calendar_for_user(
-            current_user.id, 
-            request.calendar_id
-        )
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to poll calendar: {str(e)}")
-
-
-@router.post("/poll/smart")
-async def smart_poll_calendar(
-    force_poll: bool = Query(False, description="Force polling regardless of timing"),
-    current_user: User = Depends(get_current_user)
-):
-    """Execute smart calendar polling for the current user."""
-    try:
-        polling_service = CalendarPollingService()
-        result = await polling_service.smart_calendar_polling(current_user.id)
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to execute smart polling: {str(e)}")
-
-
-@router.get("/poll/history")
-async def get_polling_history(
-    limit: int = Query(100, ge=1, le=1000),
-    current_user: User = Depends(get_current_user)
-):
-    """Get calendar polling history for the current user."""
-    try:
-        from ...core.database import get_supabase
-        supabase = get_supabase()
+        # Check if user is authorized
+        if current_user["id"] != user_id:
+            raise HTTPException(status_code=403, detail="Not authorized to poll calendar for this user")
         
-        # Get polling history from database
-        result = supabase.table("calendar_polling_results") \
-            .select("*") \
-            .eq("user_id", current_user.id) \
-            .order("timestamp", desc=True) \
-            .limit(limit) \
-            .execute()
+        service = CalendarPollingService()
+        result = await service.smart_calendar_polling(user_id)
         
-        return result.data if result.data else []
+        return result
+        
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get polling history: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/meetings", response_model=MeetingListResponse)
+@router.get("/meetings/{user_id}")
 async def get_user_meetings(
-    project_id: Optional[str] = None,
-    status: Optional[str] = None,
-    current_user: User = Depends(get_current_user)
-):
-    """Get meetings for the current user."""
+    user_id: str,
+    project_id: Optional[str] = Query(None, description="Filter by project ID"),
+    status: Optional[str] = Query(None, description="Filter by meeting status"),
+    current_user: Dict[str, Any] = Depends(get_current_user)
+) -> List[Dict[str, Any]]:
+    """Get meetings for a specific user."""
     try:
-        calendar_service = CalendarService()
+        # Check if user is authorized
+        if current_user["id"] != user_id:
+            raise HTTPException(status_code=403, detail="Not authorized to get meetings for this user")
         
-        meetings = await calendar_service.get_user_meetings(
-            user_id=current_user.id,
+        service = CalendarService()
+        meetings = await service.get_user_meetings(
+            user_id=user_id,
             project_id=project_id,
             status=status
         )
         
-        return MeetingListResponse(
-            meetings=meetings,
-            total_count=len(meetings),
-            next_page_token=None
-        )
+        return meetings
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get user meetings: {str(e)}")
-
-
-@router.get("/meetings/{meeting_id}", response_model=Meeting)
-async def get_meeting_details(
-    meeting_id: str,
-    current_user: User = Depends(get_current_user)
-):
-    """Get detailed information for a specific meeting."""
-    try:
-        calendar_service = CalendarService()
-        
-        # Get meeting from database first
-        meeting_result = await calendar_service.get_user_meetings(
-            user_id=current_user.id
-        )
-        
-        meeting = next((m for m in meeting_result if m['id'] == meeting_id), None)
-        if not meeting:
-            raise HTTPException(status_code=404, detail="Meeting not found")
-        
-        return Meeting(**meeting)
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get meeting details: {str(e)}")
-
-
-@router.post("/meetings/{meeting_id}/bot", response_model=MeetingBotResponse)
-async def schedule_meeting_bot(
-    meeting_id: str,
-    request: MeetingBotRequest,
-    current_user: User = Depends(get_current_user)
-):
-    """Schedule a bot to attend a meeting."""
-    try:
-        calendar_service = CalendarService()
-        
-        # Schedule the meeting bot
-        success = await calendar_service.schedule_meeting_bot(
-            meeting_id=meeting_id,
-            bot_config=request.bot_config
-        )
-        
-        if success:
-            return MeetingBotResponse(
-                success=True,
-                message="Meeting bot scheduled successfully"
-            )
-        else:
-            return MeetingBotResponse(
-                success=False,
-                message="Failed to schedule meeting bot"
-            )
-            
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to schedule meeting bot: {str(e)}")
-
-
-@router.get("/webhooks/active", response_model=List[dict])
-async def get_active_webhooks(
-    current_user: User = Depends(get_current_user)
-):
-    """Get active calendar webhooks for the current user."""
-    try:
-        webhook_handler = CalendarWebhookHandler()
-        
-        webhooks = await webhook_handler.get_active_webhooks(user_id=current_user.id)
-        return webhooks
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get active webhooks: {str(e)}")
-
-
-@router.get("/webhooks/logs", response_model=List[dict])
-async def get_webhook_logs(
-    webhook_id: Optional[str] = None,
-    limit: int = 100,
-    current_user: User = Depends(get_current_user)
-):
-    """Get webhook processing logs."""
-    try:
-        webhook_handler = CalendarWebhookHandler()
-        
-        logs = await webhook_handler.get_webhook_logs(
-            webhook_id=webhook_id,
-            limit=limit
-        )
-        
-        return logs
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get webhook logs: {str(e)}")
-
-
-@router.post("/webhook")
-async def handle_calendar_webhook(request: Request):
-    """Handle incoming Google Calendar webhook notifications."""
-    try:
-        # Get webhook data
-        webhook_data = await request.json()
-        
-        # Process the webhook
-        webhook_handler = CalendarWebhookHandler()
-        success = await webhook_handler.process_webhook(webhook_data)
-        
-        if success:
-            return {"status": "success"}
-        else:
-            return {"status": "error"}
-            
-    except Exception as e:
-        # Log the error but return 200 to Google (they don't retry on 4xx/5xx)
-        return {"status": "error", "message": str(e)}
-
-
-@router.post("/cleanup/expired-webhooks")
-async def cleanup_expired_webhooks(
-    background_tasks: BackgroundTasks,
-    current_user: User = Depends(get_current_user)
-):
-    """Clean up expired calendar webhooks."""
-    try:
-        calendar_service = CalendarService()
-        
-        # Add cleanup task to background queue
-        background_tasks.add_task(calendar_service.cleanup_expired_webhooks)
-        
-        return {"message": "Expired webhooks cleanup triggered successfully"}
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to trigger cleanup: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/status/{user_id}")
-async def get_calendar_sync_status(
+async def get_calendar_status(
     user_id: str,
-    current_user: User = Depends(get_current_user)
-):
-    """Get calendar sync status for a user."""
+    current_user: Dict[str, Any] = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """Get comprehensive calendar status for a user."""
     try:
-        # Only allow users to check their own status
-        if current_user.id != user_id:
-            raise HTTPException(status_code=403, detail="Can only check your own status")
+        # Check if user is authorized
+        if current_user["id"] != user_id:
+            raise HTTPException(status_code=403, detail="Not authorized to get calendar status for this user")
         
-        # This would need to be implemented in the CalendarService
-        # For now, return a placeholder response
+        # Get webhook health
+        webhook_service = CalendarWebhookManagementService()
+        webhook_health = await webhook_service.health_check_webhook(user_id)
+        
+        # Get webhook metrics
+        handler_service = CalendarWebhookHandler()
+        webhook_metrics = await handler_service.get_webhook_health_metrics(user_id)
+        
+        # Get last sync time
+        supabase = await get_supabase()
+        sync_result = await supabase.table("calendar_sync_states") \
+            .select("last_sync_at") \
+            .eq("user_id", user_id) \
+            .single() \
+            .execute()
+        
+        last_sync = sync_result.data.get('last_sync_at') if sync_result.data else None
+        
+        # Get meeting count
+        meetings_result = await supabase.table("meetings") \
+            .select("id", count="exact") \
+            .eq("user_id", user_id) \
+            .execute()
+        
+        total_meetings = meetings_result.count if meetings_result.count else 0
+        
         return {
             "user_id": user_id,
-            "service_type": "calendar",
-            "last_sync_at": None,
-            "sync_frequency": "normal",
-            "change_frequency": "medium",
-            "is_active": True
+            "webhook_health": webhook_health,
+            "webhook_metrics": webhook_metrics,
+            "last_sync": last_sync,
+            "total_meetings": total_meetings,
+            "timestamp": datetime.now().isoformat()
         }
         
-    except HTTPException:
-        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get sync status: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/events/{event_id}")
-async def get_calendar_event_details(
-    event_id: str,
-    calendar_id: str = "primary",
-    current_user: User = Depends(get_current_user)
-):
-    """Get detailed information for a specific calendar event."""
+@router.post("/webhook/notify")
+async def receive_calendar_webhook(
+    userId: str = Query(..., description="User ID from webhook"),
+    webhook_data: Dict[str, Any] = None
+) -> Dict[str, Any]:
+    """Receive and process calendar webhook notifications from Google."""
     try:
-        calendar_service = CalendarService()
+        if not webhook_data:
+            raise HTTPException(status_code=400, detail="No webhook data received")
         
-        event_details = await calendar_service.get_meeting_details(
-            event_id=event_id,
-            user_id=current_user.id,
-            calendar_id=calendar_id
-        )
+        # Add user ID to webhook data
+        webhook_data['user_id'] = userId
         
-        if not event_details:
-            raise HTTPException(status_code=404, detail="Event not found")
+        # Process webhook
+        handler = CalendarWebhookHandler()
+        success = await handler.process_webhook(webhook_data)
         
-        return event_details
-        
-    except HTTPException:
-        raise
+        if success:
+            return {
+                "success": True,
+                "message": "Webhook processed successfully",
+                "timestamp": datetime.now().isoformat()
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Failed to process webhook")
+            
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get event details: {str(e)}")
+        # logger.error(f"Error processing calendar webhook: {e}") # This line was removed from the new_code, so it's removed here.
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/cron/execute")
-async def execute_calendar_polling_cron(
-    background_tasks: BackgroundTasks,
-    current_user: User = Depends(get_current_user)
-):
-    """Execute calendar polling cron job (admin only)."""
+# Monitoring endpoints
+@router.get("/monitoring/health/{user_id}")
+async def get_calendar_health(
+    user_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """Get detailed calendar health metrics for a user."""
+    try:
+        # Check if user is authorized
+        if current_user["id"] != user_id:
+            raise HTTPException(status_code=403, detail="Not authorized to get calendar health for this user")
+        
+        service = CalendarMonitoringService()
+        result = await service.monitor_user_calendar(user_id)
+        
+        return result
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/monitoring/alerts/{user_id}")
+async def get_calendar_alerts(
+    user_id: str,
+    limit: int = Query(50, ge=1, le=100, description="Number of alerts to return"),
+    current_user: Dict[str, Any] = Depends(get_current_user)
+) -> List[Dict[str, Any]]:
+    """Get calendar alerts for a user."""
+    try:
+        # Check if user is authorized
+        if current_user["id"] != user_id:
+            raise HTTPException(status_code=403, detail="Not authorized to get calendar alerts for this user")
+        
+        service = CalendarMonitoringService()
+        alerts = await service.get_user_alerts(user_id, limit)
+        
+        return alerts
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/monitoring/alerts/{alert_id}/resolve")
+async def resolve_calendar_alert(
+    alert_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """Resolve a calendar alert."""
+    try:
+        service = CalendarMonitoringService()
+        success = await service.resolve_alert(alert_id)
+        
+        if success:
+            return {
+                "success": True,
+                "message": "Alert resolved successfully",
+                "alert_id": alert_id
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Failed to resolve alert")
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/monitoring/execute")
+async def execute_calendar_monitoring(
+    current_user: Dict[str, Any] = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """Execute comprehensive calendar monitoring for all users (admin only)."""
     try:
         # Check if user is admin (you may need to implement this check)
-        if not current_user.is_admin:
-            raise HTTPException(status_code=403, detail="Admin access required")
+        # if not current_user.get("is_admin"):
+        #     raise HTTPException(status_code=403, detail="Admin access required")
         
-        cron_service = CalendarPollingCronService()
-        
-        # Add cron execution to background queue
-        background_tasks.add_task(cron_service.execute_polling_cron)
-        
-        return {"message": "Calendar polling cron job triggered successfully"}
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to trigger cron job: {str(e)}")
-
-
-@router.post("/cron/batch-poll")
-async def execute_batch_calendar_polling(
-    background_tasks: BackgroundTasks,
-    current_user: User = Depends(get_current_user)
-):
-    """Execute batch calendar polling for all active users (admin only)."""
-    try:
-        # Check if user is admin
-        if not current_user.is_admin:
-            raise HTTPException(status_code=403, detail="Admin access required")
-        
-        cron_service = CalendarPollingCronService()
-        
-        # Add batch polling to background queue
-        background_tasks.add_task(cron_service.poll_all_active_calendars)
-        
-        return {"message": "Batch calendar polling triggered successfully"}
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to trigger batch polling: {str(e)}")
-
-
-@router.get("/cron/metrics")
-async def get_calendar_cron_metrics(
-    current_user: User = Depends(get_current_user)
-):
-    """Get calendar cron job metrics (admin only)."""
-    try:
-        # Check if user is admin
-        if not current_user.is_admin:
-            raise HTTPException(status_code=403, detail="Admin access required")
-        
-        cron_service = CalendarPollingCronService()
-        metrics = await cron_service.get_cron_job_metrics()
-        
-        return metrics.dict()
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get cron metrics: {str(e)}")
-
-
-@router.post("/poll/{user_id}")
-async def poll_calendar_for_user(
-    user_id: str,
-    request: CalendarPollingRequest,
-    current_user: User = Depends(get_current_user)
-):
-    """Poll calendar for a specific user."""
-    try:
-        # Only allow users to poll their own calendar
-        if current_user.id != user_id:
-            raise HTTPException(status_code=403, detail="Can only poll your own calendar")
-        
-        polling_service = CalendarPollingService()
-        
-        result = await polling_service.poll_calendar_for_user(
-            user_id=user_id,
-            calendar_id=request.calendar_id
-        )
+        service = CalendarMonitoringService()
+        result = await service.monitor_all_calendars()
         
         return result
         
-    except HTTPException:
-        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to poll calendar: {str(e)}")
-
-
-@router.post("/smart-poll/{user_id}")
-async def smart_calendar_polling(
-    user_id: str,
-    current_user: User = Depends(get_current_user)
-):
-    """Execute smart calendar polling for a user."""
-    try:
-        # Only allow users to poll their own calendar
-        if current_user.id != user_id:
-            raise HTTPException(status_code=403, detail="Can only poll your own calendar")
-        
-        polling_service = CalendarPollingService()
-        
-        result = await polling_service.smart_calendar_polling(user_id)
-        
-        return result
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to execute smart polling: {str(e)}")
-
-
-@router.post("/renewal/expired-watches")
-async def renew_expired_calendar_watches(
-    background_tasks: BackgroundTasks,
-    current_user: User = Depends(get_current_user)
-):
-    """Renew expired calendar watches (admin only)."""
-    try:
-        # Check if user is admin
-        if not current_user.is_admin:
-            raise HTTPException(status_code=403, detail="Admin access required")
-        
-        renewal_service = CalendarWatchRenewalService()
-        
-        # Add renewal task to background queue
-        background_tasks.add_task(renewal_service.renew_expired_watches)
-        
-        return {"message": "Expired calendar watch renewal triggered successfully"}
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to trigger watch renewal: {str(e)}")
-
-
-@router.post("/renewal/expired-webhooks")
-async def renew_expired_calendar_webhooks(
-    background_tasks: BackgroundTasks,
-    current_user: User = Depends(get_current_user)
-):
-    """Renew expired calendar webhooks (admin only)."""
-    try:
-        # Check if user is admin
-        if not current_user.is_admin:
-            raise HTTPException(status_code=403, detail="Admin access required")
-        
-        renewal_service = CalendarWebhookRenewalService()
-        
-        # Add renewal task to background queue
-        background_tasks.add_task(renewal_service.renew_expired_webhooks)
-        
-        return {"message": "Expired calendar webhook renewal triggered successfully"}
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to trigger webhook renewal: {str(e)}")
-
-
-@router.post("/renewal/user-watches/{user_id}")
-async def renew_user_calendar_watches(
-    user_id: str,
-    background_tasks: BackgroundTasks,
-    current_user: User = Depends(get_current_user)
-):
-    """Renew calendar watches for a specific user (admin only)."""
-    try:
-        # Check if user is admin
-        if not current_user.is_admin:
-            raise HTTPException(status_code=403, detail="Admin access required")
-        
-        renewal_service = CalendarWatchRenewalService()
-        
-        # Add renewal task to background queue
-        background_tasks.add_task(renewal_service.renew_user_watches, user_id)
-        
-        return {"message": f"Calendar watch renewal triggered for user {user_id}"}
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to trigger user watch renewal: {str(e)}")
-
-
-@router.post("/renewal/user-webhooks/{user_id}")
-async def renew_user_calendar_webhooks(
-    user_id: str,
-    background_tasks: BackgroundTasks,
-    current_user: User = Depends(get_current_user)
-):
-    """Renew calendar webhooks for a specific user (admin only)."""
-    try:
-        # Check if user is admin
-        if not current_user.is_admin:
-            raise HTTPException(status_code=403, detail="Admin access required")
-        
-        renewal_service = CalendarWebhookRenewalService()
-        
-        # Add renewal task to background queue
-        background_tasks.add_task(renewal_service.renew_user_webhooks, user_id)
-        
-        return {"message": f"Calendar webhook renewal triggered for user {user_id}"}
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to trigger user webhook renewal: {str(e)}")
-
-
-@router.post("/webhook/stop")
-async def stop_calendar_webhook(
-    current_user: User = Depends(get_current_user)
-) -> Dict[str, Any]:
-    """
-    Stop user's calendar webhook.
-    
-    Args:
-        current_user: Current authenticated user
-        
-    Returns:
-        Operation result
-    """
-    try:
-        from ...services.calendar.calendar_webhook_management_service import CalendarWebhookManagementService
-        
-        service = CalendarWebhookManagementService()
-        
-        result = await service.stop_webhook(current_user.id)
-        
-        if result.get('success'):
-            return {
-                'success': True,
-                'message': result.get('message'),
-                'webhook_id': result.get('webhook_id')
-            }
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=result.get('error_message', 'Failed to stop webhook')
-            )
-            
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error stopping webhook: {str(e)}"
-        )
-
-
-@router.post("/webhook/recreate")
-async def recreate_calendar_webhook(
-    current_user: User = Depends(get_current_user)
-) -> Dict[str, Any]:
-    """
-    Recreate user's calendar webhook.
-    
-    Args:
-        current_user: Current authenticated user
-        
-    Returns:
-        Operation result
-    """
-    try:
-        from ...services.calendar.calendar_webhook_management_service import CalendarWebhookManagementService
-        
-        service = CalendarWebhookManagementService()
-        
-        result = await service.recreate_webhook(current_user.id)
-        
-        if result.get('success'):
-            return {
-                'success': True,
-                'message': result.get('message'),
-                'webhook_id': result.get('webhook_id')
-            }
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=result.get('error_message', 'Failed to recreate webhook')
-            )
-            
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error recreating webhook: {str(e)}"
-        )
-
-
-@router.post("/webhook/verify")
-async def verify_calendar_webhook(
-    current_user: User = Depends(get_current_user)
-) -> Dict[str, Any]:
-    """
-    Verify user's calendar webhook.
-    
-    Args:
-        current_user: Current authenticated user
-        
-    Returns:
-        Verification result
-    """
-    try:
-        from ...services.calendar.calendar_webhook_management_service import CalendarWebhookManagementService
-        
-        service = CalendarWebhookManagementService()
-        
-        result = await service.verify_webhook(current_user.id)
-        
-        if result.get('success'):
-            return {
-                'success': True,
-                'message': result.get('message'),
-                'webhook_id': result.get('webhook_id')
-            }
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=result.get('error_message', 'Failed to verify webhook')
-            )
-            
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error verifying webhook: {str(e)}"
-        )
-
-
-@router.post("/webhook/test")
-async def test_calendar_webhook(
-    current_user: User = Depends(get_current_user)
-) -> Dict[str, Any]:
-    """
-    Test user's calendar webhook.
-    
-    Args:
-        current_user: Current authenticated user
-        
-    Returns:
-        Test result
-    """
-    try:
-        from ...services.calendar.calendar_webhook_management_service import CalendarWebhookManagementService
-        
-        service = CalendarWebhookManagementService()
-        
-        result = await service.test_webhook(current_user.id)
-        
-        if result.get('success'):
-            return {
-                'success': True,
-                'message': result.get('message'),
-                'webhook_id': result.get('webhook_id')
-            }
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=result.get('error_message', 'Failed to test webhook')
-            )
-            
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error testing webhook: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=str(e))

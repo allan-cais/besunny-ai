@@ -16,49 +16,48 @@ router = APIRouter()
 class BotDeploymentRequest(BaseModel):
     """Request model for bot deployment."""
     meeting_url: str
-    meeting_time: str
-    project_id: str
-    bot_config: Optional[Dict[str, Any]] = {}
-    recording_enabled: bool = True
-    transcript_enabled: bool = True
+    bot_name: str
+    bot_chat_message: Optional[str] = None
 
 
 class ChatMessageRequest(BaseModel):
     """Request model for sending chat messages."""
     message: str
-    to: str
-    from_user: str = "system"
+    to: str = "everyone"
 
 
-class AutoScheduleRequest(BaseModel):
-    """Request model for auto-scheduling bots."""
-    force_schedule: bool = False
-
-
-@router.post("/poll-all")
-async def poll_all_meetings(
+@router.post("/create-bot")
+async def create_bot_for_meeting(
+    request: BotDeploymentRequest,
     current_user: Dict[str, Any] = Depends(get_current_user)
-) -> List[Dict[str, Any]]:
-    """Poll all meetings for the current user."""
+) -> Dict[str, Any]:
+    """Create a bot for a meeting."""
     try:
         attendee_service = AttendeeService()
-        result = await attendee_service.poll_all_meetings(current_user["id"])
+        
+        # Prepare options for bot creation
+        options = {
+            "meeting_url": request.meeting_url,
+            "bot_name": request.bot_name
+        }
+        
+        if request.bot_chat_message:
+            options["bot_chat_message"] = request.bot_chat_message
+        
+        result = await attendee_service.create_bot_for_meeting(options, current_user["id"])
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/send-bot")
-async def send_bot_to_meeting(
-    request: BotDeploymentRequest,
+@router.get("/bots")
+async def list_user_bots(
     current_user: Dict[str, Any] = Depends(get_current_user)
-) -> Dict[str, Any]:
-    """Send a bot to a meeting."""
+) -> List[Dict[str, Any]]:
+    """List all bots for the current user."""
     try:
         attendee_service = AttendeeService()
-        result = await attendee_service.send_bot_to_meeting(
-            request.dict(), current_user["id"]
-        )
+        result = await attendee_service.list_user_bots(current_user["id"])
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -96,20 +95,6 @@ async def get_transcript(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/auto-schedule")
-async def auto_schedule_bots(
-    request: AutoScheduleRequest,
-    current_user: Dict[str, Any] = Depends(get_current_user)
-) -> List[Dict[str, Any]]:
-    """Automatically schedule bots for upcoming meetings."""
-    try:
-        attendee_service = AttendeeService()
-        result = await attendee_service.auto_schedule_bots(current_user["id"])
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @router.get("/chat-messages/{bot_id}")
 async def get_chat_messages(
     bot_id: str,
@@ -125,7 +110,7 @@ async def get_chat_messages(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/send-chat")
+@router.post("/send-chat/{bot_id}")
 async def send_chat_message(
     bot_id: str,
     request: ChatMessageRequest,
@@ -135,7 +120,7 @@ async def send_chat_message(
     try:
         attendee_service = AttendeeService()
         result = await attendee_service.send_chat_message(
-            bot_id, request.message, request.to, request.from_user
+            bot_id, request.message, request.to
         )
         if not result:
             raise HTTPException(status_code=500, detail="Failed to send message")
@@ -186,6 +171,23 @@ async def resume_recording(
         if not result:
             raise HTTPException(status_code=500, detail="Failed to resume recording")
         return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/bot/{bot_id}")
+async def delete_bot(
+    bot_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """Delete a meeting bot."""
+    try:
+        attendee_service = AttendeeService()
+        success = await attendee_service.delete_bot(bot_id)
+        if success:
+            return {"success": True, "message": "Bot deleted successfully"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to delete bot")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
