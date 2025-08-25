@@ -60,6 +60,32 @@ async def create_bot_for_meeting(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/send-bot")
+async def send_bot_to_meeting(
+    request: BotDeploymentRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """Send a bot to a meeting (alias for create-bot for frontend compatibility)."""
+    try:
+        attendee_service = AttendeeService()
+        
+        # Prepare options for bot creation
+        options = {
+            "meeting_url": request.meeting_url,
+            "bot_name": request.bot_name,
+            "deployment_method": "manual"
+        }
+        
+        if request.bot_chat_message:
+            options["bot_chat_message"] = request.bot_chat_message
+        
+        # Create the bot using the same service method
+        result = await attendee_service.create_bot_for_meeting(options, current_user["id"])
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/virtual-email/process-event")
 async def process_calendar_event_for_virtual_emails(
     request: VirtualEmailEventRequest,
