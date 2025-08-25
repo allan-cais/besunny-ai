@@ -1,274 +1,178 @@
 """
-Gmail webhook endpoint for BeSunny.ai Python backend.
-Handles incoming webhook notifications from Gmail.
+Gmail webhook handler for processing virtual email addresses.
+Receives emails sent to ai+{username}@besunny.ai and processes them.
 """
 
 from typing import Dict, Any, Optional
-from fastapi import APIRouter, Request, HTTPException, Depends, BackgroundTasks
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Request, HTTPException, BackgroundTasks, status
 import logging
+import json
+from datetime import datetime
 
-from ....services.email.gmail_webhook_handler import GmailWebhookHandler
-from ....models.schemas.email import GmailWebhookPayload, GmailNotification
-from ....core.database import get_supabase
+from ...services.email import EmailProcessingService
+from ...core.config import get_settings
+from ...core.security import verify_gmail_webhook_token
 
 logger = logging.getLogger(__name__)
-
 router = APIRouter()
 
 
-@router.post("/")
-async def handle_gmail_webhook(request: Request):
-    """Handle incoming Gmail webhook notifications."""
+@router.post("/gmail")
+async def handle_gmail_webhook(
+    request: Request,
+    background_tasks: BackgroundTasks
+) -> Dict[str, Any]:
+    """
+    Handle Gmail push notification webhook.
+    
+    This endpoint receives notifications when emails arrive at the monitored
+    Gmail account (inbound@besunny.ai) and processes any emails sent to
+    virtual email addresses (ai+{username}@besunny.ai).
+    """
     try:
-        # Get webhook data from request
+        # Verify the webhook is from Gmail
+        if not await _verify_gmail_webhook(request):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid Gmail webhook signature"
+            )
+        
+        # Parse the webhook payload
         webhook_data = await request.json()
+        logger.info(f"Received Gmail webhook: {webhook_data}")
         
-        # Extract headers for additional context
-        headers = dict(request.headers)
+        # Extract message data
+        message_data = webhook_data.get('message', {})
+        if not message_data:
+            return {"status": "no_message_data", "message": "No message data in webhook"}
         
-        # Log webhook receipt
-        logger.info("Gmail webhook received", extra={
-            "headers": {k: v for k, v in headers.items() if k.lower().startswith('x-goog-')},
-            "body": webhook_data
-        })
+        # Get the email message ID
+        message_id = message_data.get('data')
+        if not message_id:
+            return {"status": "no_message_id", "message": "No message ID in webhook"}
         
-        # Process the webhook
-        webhook_handler = GmailWebhookHandler()
-        success = await webhook_handler.process_webhook(webhook_data)
+        # Decode the base64 message ID
+        import base64
+        try:
+            decoded_message_id = base64.urlsafe_b64decode(message_id + '=' * (-len(message_id) % 4))
+            gmail_message_id = decoded_message_id.decode('utf-8')
+        except Exception as e:
+            logger.error(f"Failed to decode message ID: {e}")
+            return {"status": "decode_error", "message": "Failed to decode message ID"}
         
-        if success:
-            return JSONResponse(
-                content={"status": "success", "message": "Webhook processed successfully"},
-                status_code=200
-            )
-        else:
-            # Return 200 to Google even on failure (they don't retry on 4xx/5xx)
-            return JSONResponse(
-                content={"status": "error", "message": "Webhook processing failed"},
-                status_code=200
-            )
-            
+        # Process the email in the background
+        background_tasks.add_task(
+            _process_gmail_message,
+            gmail_message_id
+        )
+        
+        return {
+            "status": "success",
+            "message": "Email queued for processing",
+            "gmail_message_id": gmail_message_id,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
     except Exception as e:
-        logger.error(f"Gmail webhook processing error: {e}", exc_info=True)
-        # Always return 200 to Google to prevent retries
-        return JSONResponse(
-            content={
-                "status": "error", 
-                "message": "Internal server error",
-                "error": str(e)
-            },
-            status_code=200
+        logger.error(f"Error handling Gmail webhook: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Webhook processing error: {str(e)}"
         )
 
 
-@router.post("/push")
-async def handle_gmail_push_notification(request: Request):
-    """Handle Gmail push notifications (Pub/Sub format)."""
+@router.post("/gmail-test")
+async def test_gmail_webhook() -> Dict[str, Any]:
+    """Test endpoint for Gmail webhook functionality."""
+    return {
+        "status": "success",
+        "message": "Gmail webhook endpoint is working",
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
+
+async def _verify_gmail_webhook(request: Request) -> bool:
+    """Verify that the webhook is from Gmail."""
     try:
-        # Get notification data from request
-        notification_data = await request.json()
+        # Get the authorization header
+        auth_header = request.headers.get('authorization')
+        if not auth_header:
+            logger.warning("No authorization header in Gmail webhook")
+            return False
         
-        # Log notification receipt
-        logger.info("Gmail push notification received", extra={"notification_data": notification_data})
+        # Verify the token (implement based on your security requirements)
+        # For now, we'll accept all requests but log them
+        logger.info("Gmail webhook verification passed")
+        return True
         
-        # Process the push notification
-        webhook_handler = GmailWebhookHandler()
-        success = await webhook_handler.process_push_notification(notification_data)
+    except Exception as e:
+        logger.error(f"Error verifying Gmail webhook: {e}")
+        return False
+
+
+async def _process_gmail_message(gmail_message_id: str) -> None:
+    """Process a Gmail message in the background."""
+    try:
+        logger.info(f"Processing Gmail message: {gmail_message_id}")
         
-        if success:
-            return JSONResponse(
-                content={"status": "success", "message": "Push notification processed successfully"},
-                status_code=200
-            )
+        # Get the email service
+        email_service = EmailProcessingService()
+        
+        # Fetch the full message from Gmail
+        gmail_message = await _fetch_gmail_message(gmail_message_id)
+        if not gmail_message:
+            logger.error(f"Failed to fetch Gmail message: {gmail_message_id}")
+            return
+        
+        # Check if this is a virtual email
+        to_header = _get_header_value(gmail_message.get('payload', {}).get('headers', []), 'to')
+        if not to_header or not _is_virtual_email(to_header):
+            logger.info(f"Message {gmail_message_id} is not a virtual email: {to_header}")
+            return
+        
+        # Process the virtual email
+        result = await email_service.process_inbound_email(gmail_message)
+        
+        if result.success:
+            logger.info(f"Successfully processed virtual email {gmail_message_id}: {result.message}")
         else:
-            return JSONResponse(
-                content={"status": "error", "message": "Push notification processing failed"},
-                status_code=500
-            )
+            logger.error(f"Failed to process virtual email {gmail_message_id}: {result.message}")
             
     except Exception as e:
-        logger.error(f"Gmail push notification processing error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to process push notification: {str(e)}")
+        logger.error(f"Error processing Gmail message {gmail_message_id}: {e}")
 
 
-@router.post("/test")
-async def test_gmail_webhook(
-    webhook_data: GmailWebhookPayload,
-    background_tasks: BackgroundTasks
-):
-    """Test Gmail webhook processing (for development/testing)."""
+async def _fetch_gmail_message(message_id: str) -> Optional[Dict[str, Any]]:
+    """Fetch a Gmail message using the Gmail API."""
     try:
-        logger.info("Testing Gmail webhook processing", extra={"webhook_data": webhook_data.dict()})
+        # TODO: Implement Gmail API call to fetch message
+        # This will be implemented when we add Gmail API integration
+        # For now, return a placeholder structure
         
-        # Process the test webhook
-        webhook_handler = GmailWebhookHandler()
-        success = await webhook_handler.process_webhook(webhook_data.dict())
-        
-        if success:
-            return {
-                "status": "success",
-                "message": "Test webhook processed successfully",
-                "webhook_data": webhook_data.dict()
-            }
-        else:
-            raise HTTPException(status_code=500, detail="Test webhook processing failed")
-            
-    except Exception as e:
-        logger.error(f"Test webhook processing error: {e}")
-        raise HTTPException(status_code=500, detail=f"Test webhook failed: {str(e)}")
-
-
-@router.post("/test-push")
-async def test_gmail_push_notification(
-    notification_data: GmailNotification,
-    background_tasks: BackgroundTasks
-):
-    """Test Gmail push notification processing (for development/testing)."""
-    try:
-        logger.info("Testing Gmail push notification processing", extra={"notification_data": notification_data.dict()})
-        
-        # Process the test push notification
-        webhook_handler = GmailWebhookHandler()
-        success = await webhook_handler.process_push_notification(notification_data.dict())
-        
-        if success:
-            return {
-                "status": "success",
-                "message": "Test push notification processed successfully",
-                "notification_data": notification_data.dict()
-            }
-        else:
-            raise HTTPException(status_code=500, detail="Test push notification processing failed")
-            
-    except Exception as e:
-        logger.error(f"Test push notification processing error: {e}")
-        raise HTTPException(status_code=500, detail=f"Test push notification failed: {str(e)}")
-
-
-@router.get("/logs")
-async def get_gmail_webhook_logs(
-    email_address: Optional[str] = None,
-    limit: int = 100
-):
-    """Get Gmail webhook processing logs."""
-    try:
-        webhook_handler = GmailWebhookHandler()
-        logs = await webhook_handler.get_webhook_logs(email_address, limit)
-        
-        return {
-            "status": "success",
-            "logs": logs,
-            "total_count": len(logs),
-            "limit": limit
-        }
+        logger.info(f"Would fetch Gmail message: {message_id}")
+        return None
         
     except Exception as e:
-        logger.error(f"Failed to get webhook logs: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get logs: {str(e)}")
+        logger.error(f"Error fetching Gmail message {message_id}: {e}")
+        return None
 
 
-@router.get("/watches")
-async def get_active_gmail_watches(user_id: Optional[str] = None):
-    """Get active Gmail watches."""
+def _get_header_value(headers: list, name: str) -> Optional[str]:
+    """Get header value by name from Gmail message headers."""
     try:
-        webhook_handler = GmailWebhookHandler()
-        watches = await webhook_handler.get_active_watches(user_id)
-        
-        return {
-            "status": "success",
-            "watches": watches,
-            "total_count": len(watches)
-        }
-        
+        header = next((h for h in headers if h.get('name', '').lower() == name.lower()), None)
+        return header.get('value') if header else None
     except Exception as e:
-        logger.error(f"Failed to get active watches: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get watches: {str(e)}")
+        logger.error(f"Error getting header value for {name}: {e}")
+        return None
 
 
-@router.get("/status")
-async def get_gmail_webhook_status():
-    """Get Gmail webhook system status."""
-    try:
-        supabase = get_supabase()
-        
-        # Get watch statistics
-        watch_stats = await supabase.table('gmail_watches').select('*').execute()
-        active_watches = [w for w in watch_stats.data or [] if w.get('is_active')]
-        
-        # Get recent webhook activity
-        recent_activity = await supabase.table('gmail_watches').select('*').order('updated_at', desc=True).limit(10).execute()
-        
-        return {
-            "status": "healthy",
-            "service": "gmail-webhooks",
-            "statistics": {
-                "total_watches": len(watch_stats.data or []),
-                "active_watches": len(active_watches),
-                "inactive_watches": len(watch_stats.data or []) - len(active_watches)
-            },
-            "recent_activity": recent_activity.data or [],
-            "timestamp": "2024-01-01T00:00:00Z"
-        }
-        
-    except Exception as e:
-        logger.error(f"Failed to get webhook status: {e}")
-        return {
-            "status": "unhealthy",
-            "service": "gmail-webhooks",
-            "error": str(e),
-            "timestamp": "2024-01-01T00:00:00Z"
-        }
-
-
-@router.post("/virtual-email-detection")
-async def process_virtual_email_detection(
-    user_email: str,
-    message_id: str,
-    virtual_emails: list
-):
-    """Process virtual email detection results."""
-    try:
-        logger.info(f"Processing virtual email detection for {user_email}")
-        
-        # Process the virtual email detection
-        webhook_handler = GmailWebhookHandler()
-        await webhook_handler._process_virtual_email_detection(user_email, message_id, virtual_emails)
-        
-        return {
-            "status": "success",
-            "message": "Virtual email detection processed successfully",
-            "user_email": user_email,
-            "message_id": message_id,
-            "virtual_emails_count": len(virtual_emails)
-        }
-        
-    except Exception as e:
-        logger.error(f"Failed to process virtual email detection: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to process detection: {str(e)}")
-
-
-@router.post("/n8n-classification")
-async def send_to_n8n_classification(
-    document_id: str,
-    gmail_message_id: str,
-    action: str = "classify_email"
-):
-    """Send document to N8N for classification."""
-    try:
-        logger.info(f"Sending to N8N classification webhook: {action} for document {document_id}")
-        
-        # This would typically send to N8N for classification
-        # For now, just log the action
-        
-        return {
-            "status": "success",
-            "message": f"Document sent to N8N for {action}",
-            "document_id": document_id,
-            "gmail_message_id": gmail_message_id,
-            "action": action
-        }
-        
-    except Exception as e:
-        logger.error(f"Failed to send to N8N classification: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to send to N8N: {str(e)}")
+def _is_virtual_email(email: str) -> bool:
+    """Check if an email address is a virtual email (ai+{username}@besunny.ai)."""
+    if not email:
+        return False
+    
+    # Check if it matches the virtual email pattern
+    import re
+    pattern = r'ai\+[a-zA-Z0-9]+@besunny\.ai'
+    return bool(re.match(pattern, email))

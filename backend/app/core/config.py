@@ -64,6 +64,8 @@ class Settings(BaseSettings):
     google_client_secret: Optional[str] = Field(default=None, env="GOOGLE_CLIENT_SECRET")
     google_project_id: Optional[str] = Field(default=None, env="GOOGLE_PROJECT_ID")
     google_login_redirect_uri: Optional[str] = Field(default=None, env="GOOGLE_LOGIN_REDIRECT_URI")
+    google_service_account_key_path: Optional[str] = Field(default=None, env="GOOGLE_SERVICE_ACCOUNT_KEY_PATH")
+    google_service_account_key_base64: Optional[str] = Field(default=None, env="GOOGLE_SERVICE_ACCOUNT_KEY_BASE64")
     
     # Pinecone - vector database
     pinecone_api_key: Optional[str] = Field(default=None, env="PINECONE_API_KEY")

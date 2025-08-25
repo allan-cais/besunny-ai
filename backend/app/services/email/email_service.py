@@ -7,6 +7,7 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 import logging
 import re
+import base64
 from fastapi import HTTPException
 
 from ...core.database import get_supabase
@@ -56,6 +57,9 @@ class EmailProcessingService:
             to_header = self._get_header_value(gmail_message.payload.headers, 'to')
             subject_header = self._get_header_value(gmail_message.payload.headers, 'subject')
             from_header = self._get_header_value(gmail_message.payload.headers, 'from')
+            cc_header = self._get_header_value(gmail_message.payload.headers, 'cc')
+            bcc_header = self._get_header_value(gmail_message.payload.headers, 'bcc')
+            date_header = self._get_header_value(gmail_message.payload.headers, 'date')
             
             if not to_header:
                 return EmailProcessingResult(
@@ -92,12 +96,25 @@ class EmailProcessingService:
                     message=f"User not found for username: {username}"
                 )
             
-            # Create document
+            # Extract email content (body and attachments)
+            email_content = await self._extract_email_content(gmail_message)
+            
+            # Create document with enhanced metadata
             document_id = await self._create_document_from_email(
                 user.id,
                 gmail_message,
                 subject_header or 'No Subject',
-                from_header or 'Unknown Sender'
+                from_header or 'Unknown Sender',
+                email_content,
+                {
+                    'cc': cc_header,
+                    'bcc': bcc_header,
+                    'date': date_header,
+                    'message_id': gmail_message.id,
+                    'thread_id': getattr(gmail_message, 'threadId', None),
+                    'labels': getattr(gmail_message, 'labelIds', []),
+                    'has_attachments': bool(getattr(gmail_message, 'payload', {}).get('parts', []))
+                }
             )
             
             # Get the created document
@@ -111,11 +128,11 @@ class EmailProcessingService:
             
             # Build classification payload
             classification_payload = self._build_classification_payload(
-                document, user, projects
+                document, user, projects, email_content
             )
             
-            # Send to classification service
-            classification_result = await self.classification_service.classify_document(
+            # Send to classification service (to be implemented)
+            classification_result = await self._initiate_classification_agent(
                 classification_payload
             )
             
@@ -133,7 +150,7 @@ class EmailProcessingService:
             
             # Check for Drive file sharing and set up automatic Drive watch
             await self._handle_drive_file_sharing(
-                gmail_message, document_id, to_header, username
+                gmail_message, document_id, to_header, username, email_content
             )
             
             # Log the processing
@@ -234,7 +251,9 @@ class EmailProcessingService:
         user_id: str, 
         gmail_message: GmailMessage,
         subject: str,
-        sender: str
+        sender: str,
+        content: Dict[str, Any],
+        metadata: Dict[str, Any]
     ) -> str:
         """Create a document record from email."""
         try:
@@ -253,8 +272,9 @@ class EmailProcessingService:
                     int(gmail_message.internalDate) / 1000
                 ).isoformat(),
                 'created_by': user_id,
-                'summary': gmail_message.snippet or '',
-                'mimetype': gmail_message.payload.mimeType or None
+                'summary': content.get('full_content', content.get('body_text', '')), # Use full_content for summary
+                'mimetype': gmail_message.payload.mimeType or None,
+                'metadata': metadata # Store all metadata
             }).execute()
             
             if not result.data:
@@ -308,7 +328,8 @@ class EmailProcessingService:
         self, 
         document: DocumentCreate, 
         user: User, 
-        projects: List[Project]
+        projects: List[Project],
+        content: Dict[str, Any]
     ) -> ClassificationPayload:
         """Build classification payload for AI processing."""
         return ClassificationPayload(
@@ -319,12 +340,13 @@ class EmailProcessingService:
             title=document.title,
             author=document.author,
             received_at=document.received_at,
-            content=document.summary,
+            content=content['full_content'], # Use full_content for classification
             metadata={
                 'gmail_message_id': document.source_id,
                 'filename': document.title,
                 'mimetype': document.mimetype,
-                'notification_type': None
+                'notification_type': None,
+                'metadata': document.metadata # Include all metadata
             },
             project_metadata=[
                 {
@@ -376,13 +398,15 @@ class EmailProcessingService:
         gmail_message: GmailMessage, 
         document_id: str, 
         to_header: str, 
-        username: str
+        username: str,
+        email_content: Dict[str, Any]
     ):
         """Handle Drive file sharing in emails."""
         try:
-            email_content = gmail_message.snippet or ''
+            # Check for Drive URLs in email content
+            full_content = email_content.get('full_content', '') + ' ' + email_content.get('body_text', '') + ' ' + email_content.get('body_html', '')
             drive_url_pattern = r'https://drive\.google\.com/[^\s]+'
-            drive_urls = re.findall(drive_url_pattern, email_content)
+            drive_urls = re.findall(drive_url_pattern, full_content)
             
             if drive_urls:
                 logger.info(f"Found Drive URLs in virtual email: {len(drive_urls)} URLs")
@@ -394,8 +418,18 @@ class EmailProcessingService:
                         file_id = file_id_match.group(1)
                         logger.info(f"Setting up automatic Drive watch for file: {file_id}")
                         
-                        # Drive watch setup will be implemented in future iteration
-                        # await self.drive_service.setup_file_watch(file_id, document_id)
+                        # TODO: Drive watch setup will be implemented in Part 2
+                        # await self.drive_service.setup_file_watch(file_id, document_id, user_id)
+                        
+            # Also check for Drive file attachments
+            for attachment in email_content.get('attachments', []):
+                if attachment.get('mime_type', '').startswith('application/vnd.google-apps.drive-sdk'):
+                    file_id = attachment.get('attachment_id')
+                    if file_id:
+                        logger.info(f"Setting up automatic Drive watch for Drive attachment: {file_id}")
+                        
+                        # TODO: Drive watch setup will be implemented in Part 2
+                        # await self.drive_service.setup_file_watch(file_id, document_id, user_id)
                         
         except Exception as e:
             logger.error(f"Error handling Drive file sharing: {e}")
