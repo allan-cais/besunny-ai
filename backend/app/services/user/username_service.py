@@ -169,11 +169,15 @@ class UsernameService:
                 .eq("id", user_id) \
                 .execute()
             
+            # Automatically set up Gmail watch for virtual email
+            gmail_watch_result = await self._setup_gmail_watch_for_user(user_id, username)
+            
             logger.info(f"Username '{username}' set successfully for user {user_id}")
             return {
                 'success': True,
                 'username': username,
-                'virtual_email': virtual_email
+                'virtual_email': virtual_email,
+                'gmail_watch_setup': gmail_watch_result
             }
             
         except Exception as e:
@@ -181,6 +185,49 @@ class UsernameService:
             return {
                 'success': False,
                 'error': str(e)
+            }
+    
+    async def _setup_gmail_watch_for_user(self, user_id: str, username: str) -> Dict[str, Any]:
+        """
+        Automatically set up Gmail watch for a user's virtual email address.
+        
+        Args:
+            user_id: User ID
+            username: Username for virtual email
+            
+        Returns:
+            Gmail watch setup result
+        """
+        try:
+            logger.info(f"Setting up Gmail watch for user {user_id} with username {username}")
+            
+            # Import GmailWatchService here to avoid circular imports
+            from ...services.email.gmail_watch_service import GmailWatchService
+            
+            watch_service = GmailWatchService()
+            
+            # Set up the Gmail watch
+            watch_id = await watch_service.setup_virtual_email_watch(user_id)
+            
+            if watch_id:
+                logger.info(f"Gmail watch setup successful for user {user_id}: {watch_id}")
+                return {
+                    'success': True,
+                    'watch_id': watch_id,
+                    'message': 'Gmail watch setup successful'
+                }
+            else:
+                logger.warning(f"Gmail watch setup failed for user {user_id}")
+                return {
+                    'success': False,
+                    'message': 'Gmail watch setup failed - will retry later'
+                }
+                
+        except Exception as e:
+            logger.error(f"Error setting up Gmail watch for user {user_id}: {str(e)}")
+            return {
+                'success': False,
+                'message': f'Gmail watch setup error: {str(e)}'
             }
     
     def _generate_username_from_email(self, email: str) -> Optional[str]:
