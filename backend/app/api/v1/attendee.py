@@ -7,7 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 
-from ...services.attendee import AttendeeService, AttendeePollingService
+from ...services.attendee.attendee_service import AttendeeService
+from ...services.attendee.attendee_polling_service import AttendeePollingService
 from ...services.attendee.virtual_email_attendee_service import VirtualEmailAttendeeService
 from ...core.security import get_current_user
 

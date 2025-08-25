@@ -11,6 +11,7 @@ from celery import Celery
 
 from ...core.database import get_supabase
 from ...core.config import get_settings
+from ...core.celery_app import celery_app
 from .attendee_service import AttendeeService
 from .virtual_email_attendee_service import VirtualEmailAttendeeService
 
@@ -367,6 +368,125 @@ class AttendeePollingCron:
             
         except Exception as e:
             logger.error(f"Failed to update bot record {bot_id}: {e}")
+
+
+    # Additional methods for tasks compatibility
+    async def execute_polling_cron(self) -> Dict[str, Any]:
+        """Execute the main polling cron job."""
+        try:
+            # Run both cron jobs
+            virtual_email_result = await self.run_virtual_email_processing_cron()
+            bot_polling_result = await self.run_attendee_bot_polling_cron()
+            
+            return {
+                'virtual_email_processing': virtual_email_result,
+                'attendee_bot_polling': bot_polling_result,
+                'success': True
+            }
+        except Exception as e:
+            logger.error(f"Execute polling cron failed: {e}")
+            return {'success': False, 'error': str(e)}
+
+    async def poll_all_user_meetings(self, user_id: str) -> Dict[str, Any]:
+        """Poll all meetings for a specific user."""
+        try:
+            # Get user's calendar events
+            user = await self._get_user_by_id(user_id)
+            if not user:
+                return {'success': False, 'error': 'User not found'}
+            
+            # Process virtual emails for this user
+            result = await self._process_user_virtual_emails(user)
+            return result
+        except Exception as e:
+            logger.error(f"Poll all user meetings failed for user {user_id}: {e}")
+            return {'success': False, 'error': str(e)}
+
+    async def poll_all_active_meetings(self) -> Dict[str, Any]:
+        """Poll all active meetings for all users."""
+        try:
+            users = await self._get_users_with_usernames()
+            if not users:
+                return {'success': True, 'message': 'No users found', 'meetings_processed': 0}
+            
+            total_meetings_processed = 0
+            for user in users:
+                try:
+                    result = await self._process_user_virtual_emails(user)
+                    total_meetings_processed += result.get('meetings_processed', 0)
+                except Exception as e:
+                    logger.error(f"Failed to process user {user['id']}: {e}")
+            
+            return {
+                'success': True,
+                'total_meetings_processed': total_meetings_processed,
+                'users_processed': len(users)
+            }
+        except Exception as e:
+            logger.error(f"Poll all active meetings failed: {e}")
+            return {'success': False, 'error': str(e)}
+
+    async def auto_schedule_user_bots(self, user_id: str) -> Dict[str, Any]:
+        """Auto-schedule bots for a specific user."""
+        try:
+            user = await self._get_user_by_id(user_id)
+            if not user:
+                return {'success': False, 'error': 'User not found'}
+            
+            # Process virtual emails for this user (which includes bot scheduling)
+            result = await self._process_user_virtual_emails(user)
+            return result
+        except Exception as e:
+            logger.error(f"Auto-schedule user bots failed for user {user_id}: {e}")
+            return {'success': False, 'error': str(e)}
+
+    async def auto_schedule_all_bots(self) -> Dict[str, Any]:
+        """Auto-schedule bots for all users."""
+        try:
+            users = await self._get_users_with_usernames()
+            if not users:
+                return {'success': True, 'message': 'No users found', 'bots_scheduled': 0}
+            
+            total_bots_scheduled = 0
+            for user in users:
+                try:
+                    result = await self._process_user_virtual_emails(user)
+                    total_bots_scheduled += result.get('bots_scheduled', 0)
+                except Exception as e:
+                    logger.error(f"Failed to process user {user['id']}: {e}")
+            
+            return {
+                'success': True,
+                'total_bots_scheduled': total_bots_scheduled,
+                'users_processed': len(users)
+            }
+        except Exception as e:
+            logger.error(f"Auto-schedule all bots failed: {e}")
+            return {'success': False, 'error': str(e)}
+
+    async def cleanup_completed_meetings(self) -> Dict[str, Any]:
+        """Clean up completed meetings and transcripts."""
+        try:
+            # This is a placeholder implementation
+            # You can implement actual cleanup logic here
+            logger.info("Cleanup completed meetings called")
+            return {
+                'success': True,
+                'message': 'Cleanup completed meetings placeholder',
+                'meetings_cleaned': 0
+            }
+        except Exception as e:
+            logger.error(f"Cleanup completed meetings failed: {e}")
+            return {'success': False, 'error': str(e)}
+
+    async def _get_user_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """Get user by ID."""
+        try:
+            result = await self.supabase.table('users').select('*').eq('id', user_id).single().execute()
+            return result.data if result.data else None
+        except Exception as e:
+            logger.error(f"Failed to get user {user_id}: {e}")
+            return None
 
 
 # Celery tasks for cron jobs

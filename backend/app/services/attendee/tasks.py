@@ -8,7 +8,7 @@ import logging
 from celery import shared_task
 from datetime import datetime
 
-from .attendee_polling_cron import AttendeePollingCronService
+from .attendee_polling_cron import AttendeePollingCron
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ def attendee_polling_cron(self):
         start_time = datetime.now()
         
         # Create service instance
-        service = AttendeePollingCronService()
+        service = AttendeePollingCron()
         
         # Run the cron job
         result = asyncio.run(service.execute_polling_cron())
@@ -53,7 +53,7 @@ def poll_all_meetings(self, user_id: str = None):
         start_time = datetime.now()
         
         # Create service instance
-        service = AttendeePollingCronService()
+        service = AttendeePollingCron()
         
         if user_id:
             # Poll specific user
@@ -89,7 +89,7 @@ def auto_schedule_bots(self, user_id: str = None):
         start_time = datetime.now()
         
         # Create service instance
-        service = AttendeePollingCronService()
+        service = AttendeePollingCron()
         
         if user_id:
             # Auto-schedule for specific user
@@ -125,7 +125,7 @@ def cleanup_completed_meetings(self):
         start_time = datetime.now()
         
         # Create service instance
-        service = AttendeePollingCronService()
+        service = AttendeePollingCron()
         
         # Run cleanup
         result = asyncio.run(service.cleanup_completed_meetings())

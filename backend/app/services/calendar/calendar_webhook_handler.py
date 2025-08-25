@@ -15,7 +15,7 @@ import re
 from ...core.database import get_supabase
 from ...core.config import get_settings
 from ...models.schemas.calendar import CalendarWebhookPayload
-from ...services.attendee import AttendeeService
+from ...services.attendee.attendee_service import AttendeeService
 
 logger = logging.getLogger(__name__)
 
