@@ -28,6 +28,7 @@ router.include_router(drive.router, prefix="/drive", tags=["drive"])
 router.include_router(emails.router, prefix="/emails", tags=["emails"])
 router.include_router(documents.router, prefix="/documents", tags=["documents"])
 router.include_router(gmail_watches.router, prefix="/gmail-watches", tags=["gmail-watches"])
+router.include_router(webhooks.router, prefix="/webhooks", tags=["webhooks"])
 
 # Enterprise Routers - Phase 4
 router.include_router(enterprise.router, prefix="/enterprise", tags=["enterprise"])

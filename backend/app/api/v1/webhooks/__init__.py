@@ -8,7 +8,7 @@ from fastapi import APIRouter
 from . import calendar_webhook, drive_webhook, gmail_webhook, attendee_webhook
 
 # Create webhooks router
-router = APIRouter(prefix="/webhooks", tags=["webhooks"])
+router = APIRouter(tags=["webhooks"])
 
 # Include all webhook routers
 router.include_router(calendar_webhook.router, prefix="/calendar", tags=["calendar-webhooks"])
