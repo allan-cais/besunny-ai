@@ -299,23 +299,26 @@ def cleanup_old_tasks():
         return {"error": str(e), "timestamp": time.time()}
 
 
-# Task event handlers
-@celery_app.task_success.connect
+# Task event handlers - using modern Celery event registration
 def task_success_handler(sender=None, **kwargs):
     """Handle successful task completion."""
     logger.info(f"Task {sender.name} completed successfully")
 
 
-@celery_app.task_failure.connect
 def task_failure_handler(sender=None, task_id=None, exception=None, **kwargs):
     """Handle task failure."""
     logger.error(f"Task {sender.name} failed: {exception}")
 
 
-@celery_app.task_revoked.connect
 def task_revoked_handler(sender=None, request=None, terminated=None, signum=None, **kwargs):
     """Handle task revocation."""
     logger.warning(f"Task {sender.name} was revoked")
+
+
+# Register event handlers
+celery_app.task_success.connect(task_success_handler)
+celery_app.task_failure.connect(task_failure_handler)
+celery_app.task_revoked.connect(task_revoked_handler)
 
 
 # Import time to avoid circular imports
