@@ -30,9 +30,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# Copy backend code
+# Copy backend code (only the app directory)
 COPY app/ ./app/
-COPY supabase/ ./supabase/
 
 # Create a simple health check script
 RUN echo '#!/bin/bash\ncurl -f http://localhost:8000/health || exit 1' > /healthcheck.sh && \
