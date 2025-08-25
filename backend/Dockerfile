@@ -1,27 +1,7 @@
 # Backend Dockerfile for Railway deployment
-# Multi-stage build to avoid compilation issues
+# Simplified single-stage build for better Railway compatibility
 
-# Build stage - use full Python image for building packages
-FROM python:3.11-slim as builder
-
-WORKDIR /build
-
-# Install build dependencies
-RUN apt-get update && apt-get install -y \
-    gcc \
-    g++ \
-    libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy requirements
-COPY backend-service/requirements.txt .
-
-# Install packages and create wheels (including dependencies)
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip wheel --no-cache-dir --wheel-dir /wheels -r requirements.txt
-
-# Final stage - use Alpine for smaller image
-FROM python:3.11-alpine
+FROM python:3.11-slim
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
@@ -32,41 +12,30 @@ ENV HOST=0.0.0.0
 ENV PORT=8000
 ENV PYTHONPATH=/app
 
-# Set Python build environment variables
-ENV PYTHONHASHSEED=random
-ENV PIP_NO_CACHE_DIR=1
-ENV PIP_DISABLE_PIP_VERSION_CHECK=1
-
 # Set work directory
 WORKDIR /app
 
 # Install system dependencies
-RUN apk add --no-cache \
-    curl \
+RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
-    musl-dev \
-    libffi-dev \
-    build-base \
-    postgresql-dev \
-    && rm -rf /var/cache/apk/*
+    libpq-dev \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy wheels from builder stage
-COPY --from=builder /wheels /wheels
+# Copy requirements first for better caching
+COPY requirements.txt .
 
-# Copy requirements
-COPY backend-service/requirements.txt .
-
-# Install packages from wheels, fallback to pip for missing ones
+# Install Python packages
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir --find-links /wheels -r requirements.txt && \
-    rm -rf /wheels
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy backend code
-COPY . .
+COPY app/ ./app/
+COPY supabase/ ./supabase/
 
 # Create a simple health check script
-RUN echo '#!/bin/sh\ncurl -f http://localhost:8000/health || exit 1' > /healthcheck.sh && \
+RUN echo '#!/bin/bash\ncurl -f http://localhost:8000/health || exit 1' > /healthcheck.sh && \
     chmod +x /healthcheck.sh
 
 # Expose port
