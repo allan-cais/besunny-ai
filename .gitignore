@@ -36,8 +36,8 @@ supabase/.temp/
 env.staging
 env.production
 
-# Google Cloud Keys
-service-account-key.json
+# Google Cloud Keys - Ignore actual credential files
+backend/service-account-key.json
 client-secret.json
 
 # Do NOT ignore supabase-migrations or supabase/functions
