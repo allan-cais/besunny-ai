@@ -9,9 +9,9 @@ import logging
 import json
 from datetime import datetime
 
-from ...services.email import EmailProcessingService
-from ...core.config import get_settings
-from ...core.security import verify_gmail_webhook_token
+from ....services.email import EmailProcessingService
+from ....core.config import get_settings
+# from ....core.security import verify_gmail_webhook_token  # Function doesn't exist yet
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
