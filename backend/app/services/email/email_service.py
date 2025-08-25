@@ -12,7 +12,7 @@ from fastapi import HTTPException
 
 from ...core.database import get_supabase
 from ...core.config import get_settings
-from ...services.classification import DocumentClassificationService
+# from ...services.classification import DocumentClassificationService  # TODO: Implement later
 from ...models.schemas.email import (
     GmailMessage,
     EmailProcessingResult,
@@ -30,7 +30,7 @@ class EmailProcessingService:
     
     def __init__(self):
         self.settings = get_settings()
-        self.classification_service = DocumentClassificationService()
+        # self.classification_service = DocumentClassificationService()  # TODO: Implement later
     
     async def process_inbound_emails(self, messages: List[GmailMessage]) -> List[EmailProcessingResult]:
         """Process multiple inbound email messages."""
@@ -195,10 +195,10 @@ class EmailProcessingService:
                 message=f"Error processing email: {str(e)}"
             )
     
-    def _get_header_value(self, headers: List[Dict[str, str]], name: str) -> Optional[str]:
+    def _get_header_value(self, headers: List[Any], name: str) -> Optional[str]:
         """Get header value by name."""
-        header = next((h for h in headers if h['name'].lower() == name.lower()), None)
-        return header['value'] if header else None
+        header = next((h for h in headers if h.name.lower() == name.lower()), None)
+        return header.value if header else None
     
     def _extract_username_from_email(self, email: str) -> Optional[str]:
         """Extract username from email address."""
@@ -219,6 +219,100 @@ class EmailProcessingService:
                 return plus_parts[1]  # Return the part after the plus sign
         
         return None
+    
+    async def _extract_email_content(self, gmail_message: GmailMessage) -> Dict[str, Any]:
+        """Extract full email content including body and attachments."""
+        try:
+            content = {
+                'body_text': '',
+                'body_html': '',
+                'attachments': [],
+                'full_content': ''
+            }
+            
+            # Extract content from payload
+            if hasattr(gmail_message, 'payload') and gmail_message.payload:
+                content.update(self._extract_payload_content(gmail_message.payload))
+            
+            # Fallback to snippet if no body content found
+            if not content['body_text'] and not content['body_html']:
+                content['body_text'] = gmail_message.snippet or ''
+            
+            # Combine all text content for full content
+            content['full_content'] = f"{content['body_text']} {content['body_html']}".strip()
+            
+            return content
+            
+        except Exception as e:
+            logger.error(f"Error extracting email content: {e}")
+            return {
+                'body_text': gmail_message.snippet or '',
+                'body_html': '',
+                'attachments': [],
+                'full_content': gmail_message.snippet or ''
+            }
+    
+    def _extract_payload_content(self, payload: Any, depth: int = 0) -> Dict[str, Any]:
+        """Recursively extract content from Gmail message payload."""
+        if depth > 10:  # Prevent infinite recursion
+            return {}
+        
+        content = {
+            'body_text': '',
+            'body_html': '',
+            'attachments': []
+        }
+        
+        try:
+            # Handle multipart messages
+            if payload.mime_type == 'multipart/alternative' or payload.mime_type == 'multipart/mixed':
+                if hasattr(payload, 'parts') and payload.parts:
+                    for part in payload.parts:
+                        part_content = self._extract_payload_content(part, depth + 1)
+                        content['body_text'] += part_content.get('body_text', '')
+                        content['body_html'] += part_content.get('body_html', '')
+                        content['attachments'].extend(part_content.get('attachments', []))
+            
+            # Handle text content
+            elif payload.mime_type == 'text/plain':
+                if hasattr(payload, 'body') and payload.body and hasattr(payload.body, 'data'):
+                    try:
+                        decoded_data = base64.urlsafe_b64decode(payload.body.data + '=' * (-len(payload.body.data) % 4))
+                        content['body_text'] = decoded_data.decode('utf-8', errors='ignore')
+                    except Exception as e:
+                        logger.warning(f"Failed to decode text content: {e}")
+            
+            elif payload.mime_type == 'text/html':
+                if hasattr(payload, 'body') and payload.body and hasattr(payload.body, 'data'):
+                    try:
+                        decoded_data = base64.urlsafe_b64decode(payload.body.data + '=' * (-len(payload.body.data) % 4))
+                        content['body_text'] = decoded_data.decode('utf-8', errors='ignore')
+                    except Exception as e:
+                        logger.warning(f"Failed to decode HTML content: {e}")
+            
+            # Handle attachments
+            elif payload.mime_type and not payload.mime_type.startswith('text/'):
+                if hasattr(payload, 'filename') and payload.filename:
+                    attachment_info = {
+                        'filename': payload.filename,
+                        'mime_type': payload.mime_type,
+                        'size': getattr(payload.body, 'size', 0) if hasattr(payload, 'body') else 0,
+                        'attachment_id': getattr(payload.body, 'attachment_id', None) if hasattr(payload, 'body') else None
+                    }
+                    content['attachments'].append(attachment_info)
+            
+            # Recursively process parts
+            if hasattr(payload, 'parts') and payload.parts:
+                for part in payload.parts:
+                    part_content = self._extract_payload_content(part, depth + 1)
+                    content['body_text'] += part_content.get('body_text', '')
+                    content['body_html'] += part_content.get('body_html', '')
+                    content['attachments'].extend(part_content.get('attachments', []))
+                    
+        except Exception as e:
+            logger.error(f"Error extracting payload content at depth {depth}: {e}")
+        
+        return content
     
     async def _find_user_by_username(self, username: str) -> Optional[User]:
         """Find user by username."""
@@ -269,11 +363,11 @@ class EmailProcessingService:
                 'title': subject or 'No Subject',
                 'author': sender,
                 'received_at': datetime.fromtimestamp(
-                    int(gmail_message.internalDate) / 1000
+                    int(gmail_message.internal_date) / 1000
                 ).isoformat(),
                 'created_by': user_id,
                 'summary': content.get('full_content', content.get('body_text', '')), # Use full_content for summary
-                'mimetype': gmail_message.payload.mimeType or None,
+                'mimetype': gmail_message.payload.mime_type or None,
                 'metadata': metadata # Store all metadata
             }).execute()
             

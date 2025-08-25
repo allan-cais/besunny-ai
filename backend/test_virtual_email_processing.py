@@ -13,7 +13,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / "app"))
 
 from app.services.email import EmailProcessingService
-from app.models.schemas.email import GmailMessage, GmailMessagePayload, GmailMessageBody
+from app.models.schemas.email import GmailMessage, GmailPayload, GmailBody
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -26,12 +26,15 @@ async def test_email_processing():
     # Create a sample Gmail message
     sample_message = GmailMessage(
         id="test_message_123",
-        threadId="test_thread_456",
-        labelIds=["INBOX"],
+        thread_id="test_thread_456",
+        label_ids=["INBOX"],
         snippet="This is a test email sent to a virtual email address",
-        internalDate="1704067200000",  # January 1, 2024
-        payload=GmailMessagePayload(
-            mimeType="text/plain",
+        history_id="test_history_789",
+        internal_date="1704067200000",  # January 1, 2024
+        size_estimate=1024,
+        payload=GmailPayload(
+            part_id="0",
+            mime_type="text/plain",
             headers=[
                 {"name": "to", "value": "ai+johndoe@besunny.ai"},
                 {"name": "from", "value": "sender@example.com"},
@@ -39,7 +42,7 @@ async def test_email_processing():
                 {"name": "cc", "value": "cc@example.com"},
                 {"name": "date", "value": "Mon, 1 Jan 2024 12:00:00 +0000"}
             ],
-            body=GmailMessageBody(
+            body=GmailBody(
                 data="VGhpcyBpcyBhIHRlc3QgZW1haWwgc2VudCB0byBhIHZpcnR1YWwgZW1haWwgYWRkcmVzcy4=",  # Base64 encoded
                 size=45
             ),
@@ -53,8 +56,8 @@ async def test_email_processing():
         
         logger.info("Testing email processing service...")
         logger.info(f"Sample message: {sample_message.id}")
-        logger.info(f"To: {sample_message.payload.headers[0]['value']}")
-        logger.info(f"Subject: {sample_message.payload.headers[2]['value']}")
+        logger.info(f"To: {sample_message.payload.headers[0].value}")
+        logger.info(f"Subject: {sample_message.payload.headers[2].value}")
         
         # Test username extraction
         username = email_service._extract_username_from_email("ai+johndoe@besunny.ai")
@@ -73,7 +76,7 @@ async def test_email_processing():
         
         # Test Drive URL detection
         test_content = "Check out this document: https://drive.google.com/file/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/view"
-        drive_urls = email_service._handle_drive_file_sharing(
+        await email_service._handle_drive_file_sharing(
             sample_message, "test_doc_123", to_header, username, {"full_content": test_content}
         )
         logger.info("Drive file sharing detection completed")
@@ -89,7 +92,7 @@ async def test_gmail_watch_service():
     """Test the Gmail watch service."""
     
     try:
-        from app.services.email import GmailWatchService
+        from app.services.email.gmail_watch_service import GmailWatchService
         
         watch_service = GmailWatchService()
         logger.info("Gmail watch service initialized successfully")
