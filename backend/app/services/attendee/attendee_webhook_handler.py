@@ -58,30 +58,47 @@ class AttendeeWebhookHandler:
         """Handle bot state change webhook."""
         try:
             data = webhook_data.get('data', {})
-            bot_id = webhook_data.get('bot_id')
-            
-            if not bot_id:
-                logger.warning("No bot_id in bot state change webhook")
-                return
-            
-            # Extract state information
             new_state = data.get('new_state')
             old_state = data.get('old_state')
             event_type = data.get('event_type')
+            bot_id = webhook_data.get('bot_id')
             
-            logger.info(f"Bot {bot_id} state change: {old_state} -> {new_state} (event: {event_type})")
+            logger.info(f"Bot state change: {old_state} -> {new_state}, event_type: {event_type}, bot_id: {bot_id}")
+            
+            # Check if meeting has ended and recording is available
+            # Based on Attendee.dev webhook documentation: https://docs.attendee.dev/guides/webhooks
+            if (event_type == 'post_processing_completed' and 
+                new_state == 'ended' and 
+                old_state == 'post_processing'):
+                
+                logger.info(f"Meeting ended and recording available for bot {bot_id}")
+                
+                # Trigger transcript retrieval
+                await self._retrieve_final_transcript(bot_id, user_id)
+                
+                # Update meeting status to completed
+                await self._update_meeting_status(bot_id, 'completed')
+                
+            # Handle other state changes
+            elif new_state == 'joined':
+                logger.info(f"Bot {bot_id} joined the meeting")
+                await self._update_meeting_status(bot_id, 'bot_joined')
+                
+            elif new_state == 'recording':
+                logger.info(f"Bot {bot_id} started recording")
+                await self._update_meeting_status(bot_id, 'transcribing')
+                
+            elif new_state == 'post_processing':
+                logger.info(f"Bot {bot_id} finished recording, processing transcript")
+                await self._update_meeting_status(bot_id, 'post_processing')
             
             # Update bot status in database
             await self._update_bot_status(bot_id, {
                 'status': new_state,
-                'last_state_change': datetime.now().isoformat(),
-                'event_type': event_type
+                'last_state_change': data.get('created_at'),
+                'event_type': event_type,
+                'event_sub_type': data.get('event_sub_type')
             })
-            
-            # Handle specific state changes
-            if event_type == 'post_processing_completed' and new_state == 'ended':
-                # Meeting has ended and recording is available
-                await self._handle_meeting_completed(bot_id, user_id)
             
         except Exception as e:
             logger.error(f"Failed to handle bot state change: {e}")
@@ -354,3 +371,113 @@ class AttendeeWebhookHandler:
             
         except Exception as e:
             logger.error(f"Failed to update meeting status: {e}")
+
+    async def _retrieve_final_transcript(self, bot_id: str, user_id: str):
+        """Retrieve final transcript when meeting ends."""
+        try:
+            logger.info(f"Retrieving final transcript for bot {bot_id}")
+            
+            # Get transcript from Attendee.dev API
+            transcript_data = await self.attendee_service.get_transcript(bot_id)
+            
+            if transcript_data:
+                # Store transcript in database
+                await self._store_transcript(bot_id, transcript_data)
+                
+                # Update meeting record with transcript
+                await self._update_meeting_transcript(bot_id, transcript_data)
+                
+                # TODO: Send to classification agent for project association
+                # await self._send_to_classification_agent(bot_id, transcript_data, user_id)
+                
+                # TODO: Process through vector embedding workflow
+                # await self._process_vector_embedding(bot_id, transcript_data, user_id)
+                
+                logger.info(f"Final transcript retrieved and stored for bot {bot_id}")
+                
+                # Mark transcript as ready for future processing
+                await self._mark_transcript_ready_for_processing(bot_id)
+                
+            else:
+                logger.warning(f"No transcript data received for bot {bot_id}")
+                
+        except Exception as e:
+            logger.error(f"Failed to retrieve final transcript for bot {bot_id}: {e}")
+    
+    async def _update_meeting_status(self, bot_id: str, status: str):
+        """Update meeting status based on bot state changes."""
+        try:
+            # Find meeting by bot ID
+            meeting_result = await self.supabase.table('meetings').select('id').eq('attendee_bot_id', bot_id).single().execute()
+            
+            if meeting_result.data:
+                meeting_id = meeting_result.data['id']
+                
+                # Update meeting status
+                await self.supabase.table('meetings').update({
+                    'bot_status': status,
+                    'updated_at': datetime.now().isoformat()
+                }).eq('id', meeting_id).execute()
+                
+                logger.info(f"Updated meeting {meeting_id} status to {status}")
+            else:
+                logger.warning(f"No meeting found for bot {bot_id}")
+                
+        except Exception as e:
+            logger.error(f"Failed to update meeting status for bot {bot_id}: {e}")
+    
+    async def _update_meeting_transcript(self, bot_id: str, transcript_data: Dict[str, Any]):
+        """Update meeting record with transcript information."""
+        try:
+            # Find meeting by bot ID
+            meeting_result = await self.supabase.table('meetings').select('id').eq('attendee_bot_id', bot_id).single().execute()
+            
+            if meeting_result.data:
+                meeting_id = meeting_result.data['id']
+                
+                # Extract transcript information
+                transcript_text = transcript_data.get('transcript_text', '')
+                participants = transcript_data.get('participants', [])
+                duration_minutes = transcript_data.get('duration_minutes', 0)
+                
+                # Update meeting with transcript
+                update_data = {
+                    'transcript': transcript_text,
+                    'transcript_participants': participants,
+                    'transcript_duration_seconds': duration_minutes * 60,
+                    'transcript_retrieved_at': datetime.now().isoformat(),
+                    'bot_status': 'completed',
+                    'updated_at': datetime.now().isoformat()
+                }
+                
+                await self.supabase.table('meetings').update(update_data).eq('id', meeting_id).execute()
+                
+                logger.info(f"Updated meeting {meeting_id} with transcript data")
+            else:
+                logger.warning(f"No meeting found for bot {bot_id}")
+                
+        except Exception as e:
+            logger.error(f"Failed to update meeting transcript for bot {bot_id}: {e}")
+    
+    async def _mark_transcript_ready_for_processing(self, bot_id: str):
+        """Mark transcript as ready for future classification and embedding processing."""
+        try:
+            # Find meeting by bot ID
+            meeting_result = await self.supabase.table('meetings').select('id').eq('attendee_bot_id', bot_id).single().execute()
+            
+            if meeting_result.data:
+                meeting_id = meeting_result.data['id']
+                
+                # Mark transcript as ready for future processing workflows
+                await self.supabase.table('meetings').update({
+                    'transcript_ready_for_classification': True,
+                    'transcript_ready_for_embedding': True,
+                    'updated_at': datetime.now().isoformat()
+                }).eq('id', meeting_id).execute()
+                
+                logger.info(f"Marked meeting {meeting_id} transcript as ready for future processing")
+            else:
+                logger.warning(f"No meeting found for bot {bot_id}")
+                
+        except Exception as e:
+            logger.error(f"Failed to mark transcript ready for processing for bot {bot_id}: {e}")

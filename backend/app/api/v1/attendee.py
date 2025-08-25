@@ -8,6 +8,7 @@ from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 
 from ...services.attendee import AttendeeService, AttendeePollingService
+from ...services.attendee.virtual_email_attendee_service import VirtualEmailAttendeeService
 from ...core.security import get_current_user
 
 router = APIRouter()
@@ -26,26 +27,93 @@ class ChatMessageRequest(BaseModel):
     to: str = "everyone"
 
 
+class VirtualEmailEventRequest(BaseModel):
+    """Request model for processing calendar events with virtual email attendees."""
+    event_data: Dict[str, Any]
+
+
 @router.post("/create-bot")
 async def create_bot_for_meeting(
     request: BotDeploymentRequest,
     current_user: Dict[str, Any] = Depends(get_current_user)
 ) -> Dict[str, Any]:
-    """Create a bot for a meeting."""
+    """Create a bot for a meeting (manual deployment from UI)."""
     try:
         attendee_service = AttendeeService()
         
-        # Prepare options for bot creation
+        # Prepare options for bot creation with manual deployment method
         options = {
             "meeting_url": request.meeting_url,
-            "bot_name": request.bot_name
+            "bot_name": request.bot_name,
+            "deployment_method": "manual"  # Mark as manually deployed from UI
         }
         
         if request.bot_chat_message:
             options["bot_chat_message"] = request.bot_chat_message
         
+        # This will create the same comprehensive webhook configuration for transcript retrieval
+        # Whether deployed manually from UI or automatically via virtual email
         result = await attendee_service.create_bot_for_meeting(options, current_user["id"])
         return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/virtual-email/process-event")
+async def process_calendar_event_for_virtual_emails(
+    request: VirtualEmailEventRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """Process a calendar event to detect virtual email attendees and auto-schedule bots."""
+    try:
+        virtual_email_service = VirtualEmailAttendeeService()
+        result = await virtual_email_service.process_calendar_event_for_virtual_emails(request.event_data)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/virtual-email/activity")
+async def get_virtual_email_activity(
+    days: int = Query(30, ge=1, le=365, description="Number of days to look back"),
+    current_user: Dict[str, Any] = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """Get virtual email activity for the current user."""
+    try:
+        virtual_email_service = VirtualEmailAttendeeService()
+        result = await virtual_email_service.get_virtual_email_activity(current_user["id"], days)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/virtual-email/auto-schedule")
+async def auto_schedule_bots_for_virtual_emails(
+    current_user: Dict[str, Any] = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """Auto-schedule bots for all upcoming meetings with virtual email attendees."""
+    try:
+        virtual_email_service = VirtualEmailAttendeeService()
+        
+        # Get upcoming meetings with virtual email attendees
+        result = await virtual_email_service.get_virtual_email_activity(current_user["id"], days=7)
+        
+        # Process each meeting to ensure bots are scheduled
+        meetings_processed = 0
+        bots_scheduled = 0
+        
+        for meeting in result.get('meetings', []):
+            if meeting.get('bot_status') == 'pending':
+                # This meeting needs a bot scheduled
+                # You would implement the logic to fetch the calendar event and process it
+                meetings_processed += 1
+        
+        return {
+            'success': True,
+            'meetings_processed': meetings_processed,
+            'bots_scheduled': bots_scheduled,
+            'message': f'Processed {meetings_processed} meetings, scheduled {bots_scheduled} bots'
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

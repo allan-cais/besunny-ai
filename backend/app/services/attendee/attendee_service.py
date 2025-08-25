@@ -104,7 +104,8 @@ class AttendeeService:
             # Get webhook URL for this user
             webhook_url = await self._get_user_webhook_url(user_id)
             
-            # Create bot with webhook configuration according to Attendee.dev API
+            # Create bot with comprehensive webhook configuration for transcript retrieval
+            # Based on Attendee.dev webhook documentation: https://docs.attendee.dev/guides/webhooks
             bot_data = {
                 "meeting_url": options['meeting_url'],
                 "bot_name": options['bot_name'],
@@ -112,10 +113,10 @@ class AttendeeService:
                     {
                         "url": webhook_url,
                         "triggers": [
-                            "bot.state_change",
-                            "transcript.update", 
-                            "chat_messages.update",
-                            "participant_events.join_leave"
+                            "bot.state_change",        # For meeting end/recording availability
+                            "transcript.update",        # Real-time transcript updates during meeting
+                            "chat_messages.update",     # Chat message updates in the meeting
+                            "participant_events.join_leave"  # Participant join/leave events
                         ]
                     }
                 ]
@@ -124,6 +125,22 @@ class AttendeeService:
             # Add optional bot chat message if provided
             if options.get('bot_chat_message'):
                 bot_data["bot_chat_message"] = options['bot_chat_message']
+            
+            # Add deployment method to track how bot was created
+            deployment_method = options.get('deployment_method', 'manual')
+            if deployment_method == 'automatic':
+                bot_data["metadata"] = {
+                    "deployment_method": "automatic",
+                    "virtual_email_triggered": True,
+                    "created_via": "virtual_email_attendee"
+                }
+            else:
+                bot_data["metadata"] = {
+                    "deployment_method": "manual",
+                    "created_via": "ui_deployment"
+                }
+            
+            logger.info(f"Creating bot with webhook configuration: {bot_data['webhooks']}")
             
             # Call Attendee.dev API to create bot
             response = await self.http_client.post(
@@ -134,22 +151,26 @@ class AttendeeService:
             
             result = response.json()
             
-            # Store bot information in database
+            # Store bot information in database with deployment method
             await self._store_meeting_bot(
                 bot_id=result['id'],
                 user_id=user_id,
                 meeting_url=options['meeting_url'],
                 bot_name=options['bot_name'],
                 status='created',
-                attendee_project_id=result.get('project_id')
+                attendee_project_id=result.get('project_id'),
+                deployment_method=deployment_method,
+                metadata=bot_data.get('metadata', {})
             )
             
-            logger.info(f"Bot created successfully for user {user_id}, bot ID: {result['id']}")
+            logger.info(f"Bot created successfully for user {user_id}, bot ID: {result['id']}, deployment: {deployment_method}")
             return {
                 "success": True,
                 "bot_id": result['id'],
                 "project_id": result.get('project_id'),
-                "status": "created"
+                "status": "created",
+                "deployment_method": deployment_method,
+                "webhooks_configured": True
             }
             
         except httpx.HTTPStatusError as e:
@@ -460,7 +481,8 @@ class AttendeeService:
             return []
     
     async def _store_meeting_bot(self, bot_id: str, user_id: str, meeting_url: str, 
-                                bot_name: str, status: str, attendee_project_id: Optional[str] = None):
+                                bot_name: str, status: str, attendee_project_id: Optional[str] = None,
+                                deployment_method: str = 'manual', metadata: Optional[Dict[str, Any]] = None):
         """Store meeting bot information in database."""
         try:
             bot_data = {
@@ -470,6 +492,8 @@ class AttendeeService:
                 "bot_name": bot_name,
                 "status": status,
                 "attendee_project_id": attendee_project_id,
+                "deployment_method": deployment_method,
+                "metadata": metadata,
                 "created_at": datetime.utcnow().isoformat(),
                 "updated_at": datetime.utcnow().isoformat()
             }

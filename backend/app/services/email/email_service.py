@@ -497,6 +497,11 @@ class EmailProcessingService:
     ):
         """Handle Drive file sharing in emails."""
         try:
+            # Import the email alias drive service
+            from ...services.drive.email_alias_drive_service import EmailAliasDriveService
+            
+            drive_service = EmailAliasDriveService()
+            
             # Check for Drive URLs in email content
             full_content = email_content.get('full_content', '') + ' ' + email_content.get('body_text', '') + ' ' + email_content.get('body_html', '')
             drive_url_pattern = r'https://drive\.google\.com/[^\s]+'
@@ -505,28 +510,187 @@ class EmailProcessingService:
             if drive_urls:
                 logger.info(f"Found Drive URLs in virtual email: {len(drive_urls)} URLs")
                 
-                # Extract file IDs from Drive URLs and set up watches
+                # Extract file IDs from Drive URLs and process them
                 for drive_url in drive_urls:
                     file_id_match = re.search(r'/d/([a-zA-Z0-9-_]+)', drive_url)
                     if file_id_match:
                         file_id = file_id_match.group(1)
-                        logger.info(f"Setting up automatic Drive watch for file: {file_id}")
+                        logger.info(f"Processing Drive file from email alias: {file_id}")
                         
-                        # TODO: Drive watch setup will be implemented in Part 2
-                        # await self.drive_service.setup_file_watch(file_id, document_id, user_id)
-                        
+                        # Get user ID from username
+                        user_id = await self._get_user_id_from_username(username)
+                        if user_id:
+                            # Process the Drive file using the email alias service
+                            result = await drive_service.process_drive_file_from_email(
+                                file_id=file_id,
+                                document_id=document_id,
+                                user_id=user_id,
+                                drive_url=drive_url,
+                                email_content=email_content
+                            )
+                            
+                            if result['success']:
+                                logger.info(f"Drive file {file_id} processed successfully: {result['message']}")
+                            else:
+                                logger.error(f"Failed to process Drive file {file_id}: {result['error']}")
+                        else:
+                            logger.warning(f"Could not find user for username: {username}")
+            
             # Also check for Drive file attachments
             for attachment in email_content.get('attachments', []):
                 if attachment.get('mime_type', '').startswith('application/vnd.google-apps.drive-sdk'):
                     file_id = attachment.get('attachment_id')
                     if file_id:
-                        logger.info(f"Setting up automatic Drive watch for Drive attachment: {file_id}")
+                        logger.info(f"Processing Drive attachment from email alias: {file_id}")
                         
-                        # TODO: Drive watch setup will be implemented in Part 2
-                        # await self.drive_service.setup_file_watch(file_id, document_id, user_id)
+                        # Get user ID from username
+                        user_id = await self._get_user_id_from_username(username)
+                        if user_id:
+                            # Process the Drive attachment using the email alias service
+                            result = await drive_service.process_drive_file_from_email(
+                                file_id=file_id,
+                                document_id=document_id,
+                                user_id=user_id,
+                                drive_url=None,
+                                email_content=email_content
+                            )
+                            
+                            if result['success']:
+                                logger.info(f"Drive attachment {file_id} processed successfully: {result['message']}")
+                            else:
+                                logger.error(f"Failed to process Drive attachment {file_id}: {result['error']}")
+                        else:
+                            logger.warning(f"Could not find user for username: {username}")
                         
         except Exception as e:
             logger.error(f"Error handling Drive file sharing: {e}")
+    
+    async def _get_user_id_from_username(self, username: str) -> Optional[str]:
+        """Get user ID from username."""
+        try:
+            supabase = await get_supabase()
+            if not supabase.client:
+                return None
+            
+            result = supabase.client.table('users').select('id').eq('username', username).single().execute()
+            
+            if result.data:
+                return result.data['id']
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error getting user ID from username {username}: {e}")
+            return None
+    
+    async def _setup_drive_file_watch(self, file_id: str, document_id: str, user_id: str, drive_url: Optional[str]):
+        """Set up Drive file watch for monitoring changes."""
+        try:
+            # Import drive service here to avoid circular imports
+            from ...services.drive.drive_service import DriveService
+            
+            drive_service = DriveService()
+            
+            # Set up email alias-specific file watch
+            watch_id = await drive_service.setup_file_watch_for_email_alias(
+                file_id=file_id,
+                user_id=user_id,
+                document_id=document_id
+            )
+            
+            if watch_id:
+                logger.info(f"Drive watch set up successfully for file {file_id}: {watch_id}")
+                
+                # Update document with file watch information
+                await self._update_document_with_drive_info(document_id, file_id, watch_id, drive_url)
+            else:
+                logger.warning(f"Failed to set up Drive watch for file {file_id}")
+                
+        except Exception as e:
+            logger.error(f"Error setting up Drive watch for file {file_id}: {e}")
+    
+    async def _store_drive_file_metadata(self, file_id: str, document_id: str, user_id: str, drive_url: Optional[str]):
+        """Store Drive file metadata in the documents table."""
+        try:
+            supabase = await get_supabase()
+            if not supabase.client:
+                return
+            
+            # Get file metadata from Google Drive API
+            file_metadata = await self._get_drive_file_metadata(file_id, user_id)
+            
+            if file_metadata:
+                # Update document with Drive file information
+                update_data = {
+                    'file_id': file_id,
+                    'source': 'drive_shared',
+                    'source_id': file_id,
+                    'title': file_metadata.get('name', f'Drive File {file_id}'),
+                    'mimetype': file_metadata.get('mimeType', 'application/octet-stream'),
+                    'file_size': str(file_metadata.get('size', 0)),
+                    'drive_url': drive_url,
+                    'drive_metadata': file_metadata,
+                    'last_synced_at': datetime.utcnow().isoformat()
+                }
+                
+                supabase.client.table('documents').update(update_data).eq('id', document_id).execute()
+                
+                logger.info(f"Updated document {document_id} with Drive file metadata")
+            else:
+                logger.warning(f"Could not retrieve metadata for Drive file {file_id}")
+                
+        except Exception as e:
+            logger.error(f"Error storing Drive file metadata for file {file_id}: {e}")
+    
+    async def _get_drive_file_metadata(self, file_id: str, user_id: str) -> Optional[Dict[str, Any]]:
+        """Get file metadata from Google Drive API."""
+        try:
+            # Import drive service here to avoid circular imports
+            from ...services.drive.drive_service import DriveService
+            
+            drive_service = DriveService()
+            
+            # Get file metadata
+            file_metadata = await drive_service.get_file_metadata(file_id, user_id)
+            
+            if file_metadata:
+                return {
+                    'id': file_metadata.id,
+                    'name': file_metadata.name,
+                    'mimeType': file_metadata.mime_type,
+                    'size': file_metadata.size,
+                    'modifiedTime': file_metadata.modified_time,
+                    'parents': file_metadata.parents,
+                    'webViewLink': file_metadata.web_view_link
+                }
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error getting Drive file metadata for file {file_id}: {e}")
+            return None
+    
+    async def _update_document_with_drive_info(self, document_id: str, file_id: str, watch_id: str, drive_url: Optional[str]):
+        """Update document with Drive file watch information."""
+        try:
+            supabase = await get_supabase()
+            if not supabase.client:
+                return
+            
+            update_data = {
+                'watch_active': True,
+                'drive_watch_id': watch_id,
+                'drive_file_id': file_id,
+                'drive_url': drive_url,
+                'last_synced_at': datetime.utcnow().isoformat()
+            }
+            
+            supabase.client.table('documents').update(update_data).eq('id', document_id).execute()
+            
+            logger.info(f"Updated document {document_id} with Drive watch information")
+            
+        except Exception as e:
+            logger.error(f"Error updating document with Drive info: {e}")
     
     async def _log_email_processing(
         self,

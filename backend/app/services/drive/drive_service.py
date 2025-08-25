@@ -29,7 +29,7 @@ class DriveService:
         self.settings = get_settings()
         self.supabase = get_supabase()
     
-    async def setup_file_watch(self, file_id: str, project_id: str, user_id: str) -> Optional[str]:
+    async def setup_file_watch(self, file_id: str, project_id: Optional[str], user_id: str) -> Optional[str]:
         """Set up a file watch for a specific Drive file."""
         try:
             # Get user's Google credentials
@@ -70,6 +70,49 @@ class DriveService:
             return None
         except Exception as e:
             logger.error(f"Unexpected error setting up file watch: {e}")
+            return None
+    
+    async def setup_file_watch_for_email_alias(self, file_id: str, user_id: str, document_id: str) -> Optional[str]:
+        """Set up a file watch specifically for email alias workflow."""
+        try:
+            # Get user's Google credentials
+            credentials = await self._get_user_credentials(user_id)
+            if not credentials:
+                logger.error(f"No Google credentials found for user {user_id}")
+                return None
+            
+            # Create Drive API service
+            service = build('drive', 'v3', credentials=credentials)
+            
+            # Create file watch
+            watch_request = {
+                'id': f"email_alias_watch_{file_id}_{int(datetime.now().timestamp())}",
+                'type': 'web_hook',
+                'address': f"{self.settings.webhook_base_url}/api/v1/drive/webhook",
+                'expiration': (datetime.now() + timedelta(days=7)).isoformat() + 'Z'
+            }
+            
+            # Create the watch
+            watch = service.files().watch(fileId=file_id, body=watch_request).execute()
+            
+            # Store watch information in database with email alias context
+            await self._store_email_alias_file_watch(
+                file_id=file_id,
+                channel_id=watch['id'],
+                resource_id=watch['resourceId'],
+                expiration=watch['expiration'],
+                user_id=user_id,
+                document_id=document_id
+            )
+            
+            logger.info(f"Email alias file watch created for file {file_id}")
+            return watch['id']
+            
+        except HttpError as e:
+            logger.error(f"Failed to create email alias file watch for {file_id}: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error setting up email alias file watch: {e}")
             return None
     
     async def process_file_changes(self, user_id: str) -> List[DriveFileChange]:
@@ -203,6 +246,29 @@ class DriveService:
         except Exception as e:
             logger.error(f"Failed to store file watch: {e}")
     
+    async def _store_email_alias_file_watch(self, file_id: str, channel_id: str, resource_id: str, 
+                                          expiration: str, user_id: str, document_id: str):
+        """Store email alias file watch information in database."""
+        try:
+            watch_data = {
+                'file_id': file_id,
+                'channel_id': channel_id,
+                'resource_id': resource_id,
+                'expiration': expiration,
+                'project_id': None,  # Will be assigned by classification agent
+                'user_id': user_id,
+                'document_id': document_id,
+                'watch_type': 'email_alias',
+                'is_active': True,
+                'created_at': datetime.now().isoformat()
+            }
+            
+            await self.supabase.table('drive_file_watches').insert(watch_data).execute()
+            logger.info(f"Email alias file watch stored for file {file_id}")
+            
+        except Exception as e:
+            logger.error(f"Failed to store email alias file watch: {e}")
+    
     async def _get_last_sync_time(self, user_id: str, service_type: str) -> Optional[str]:
         """Get last sync time for a service."""
         try:
@@ -246,3 +312,77 @@ class DriveService:
                     
         except Exception as e:
             logger.error(f"Failed to cleanup expired watches: {e}")
+
+    async def get_file_content_for_classification(self, file_id: str, user_id: str) -> Optional[Dict[str, Any]]:
+        """Get file content and metadata for classification agent."""
+        try:
+            # Get file metadata
+            file_metadata = await self.get_file_metadata(file_id, user_id)
+            if not file_metadata:
+                return None
+            
+            # Get user's Google credentials
+            credentials = await self._get_user_credentials(user_id)
+            if not credentials:
+                logger.error(f"No Google credentials found for user {user_id}")
+                return None
+            
+            # Create Drive API service
+            service = build('drive', 'v3', credentials=credentials)
+            
+            # Prepare classification payload
+            classification_data = {
+                'file_id': file_id,
+                'file_name': file_metadata.name,
+                'file_type': file_metadata.mime_type,
+                'file_size': file_metadata.size,
+                'modified_time': file_metadata.modified_time,
+                'web_view_link': file_metadata.web_view_link,
+                'parents': file_metadata.parents,
+                'metadata': file_metadata.__dict__,
+                'retrieved_at': datetime.now().isoformat()
+            }
+            
+            # For text-based files, try to get content
+            if file_metadata.mime_type.startswith('text/') or file_metadata.mime_type in [
+                'application/json', 'application/xml', 'application/javascript'
+            ]:
+                try:
+                    # Download file content
+                    file_content = service.files().get_media(fileId=file_id).execute()
+                    classification_data['file_content'] = file_content.decode('utf-8')
+                    classification_data['content_type'] = 'text'
+                except Exception as e:
+                    logger.warning(f"Could not download text content for file {file_id}: {e}")
+                    classification_data['content_type'] = 'metadata_only'
+            
+            # For Google Docs, try to export as text
+            elif file_metadata.mime_type in [
+                'application/vnd.google-apps.document',
+                'application/vnd.google-apps.spreadsheet',
+                'application/vnd.google-apps.presentation'
+            ]:
+                try:
+                    # Export as plain text
+                    export_mime = 'text/plain'
+                    if file_metadata.mime_type == 'application/vnd.google-apps.spreadsheet':
+                        export_mime = 'text/csv'
+                    
+                    file_content = service.files().export_media(
+                        fileId=file_id, 
+                        mimeType=export_mime
+                    ).execute()
+                    
+                    classification_data['file_content'] = file_content.decode('utf-8')
+                    classification_data['content_type'] = 'exported_text'
+                except Exception as e:
+                    logger.warning(f"Could not export content for Google Doc {file_id}: {e}")
+                    classification_data['content_type'] = 'metadata_only'
+            else:
+                classification_data['content_type'] = 'metadata_only'
+            
+            return classification_data
+            
+        except Exception as e:
+            logger.error(f"Failed to get file content for classification: {e}")
+            return None

@@ -1,652 +1,394 @@
 """
 Attendee polling cron service for BeSunny.ai Python backend.
-Handles scheduled meeting polling and batch operations.
+Handles periodic polling of attendee bots and virtual email attendee processing.
 """
 
 import asyncio
 import logging
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
-from pydantic import BaseModel
+from celery import Celery
 
 from ...core.database import get_supabase
 from ...core.config import get_settings
-from .attendee_polling_service import AttendeePollingService
+from .attendee_service import AttendeeService
+from .virtual_email_attendee_service import VirtualEmailAttendeeService
 
 logger = logging.getLogger(__name__)
 
 
-class CronExecutionResult(BaseModel):
-    """Result of a cron job execution."""
-    execution_id: str
-    start_time: datetime
-    end_time: datetime
-    total_users: int
-    successful_polls: int
-    failed_polls: int
-    total_processing_time_ms: int
-    status: str
-    error_message: Optional[str] = None
-
-
-class CronJobMetrics(BaseModel):
-    """Metrics for cron job performance."""
-    total_executions: int
-    successful_executions: int
-    failed_executions: int
-    average_processing_time_ms: float
-    last_execution: Optional[datetime]
-    last_success: Optional[datetime]
-    last_failure: Optional[datetime]
-
-
-class AttendeePollingCronService:
-    """Service for executing scheduled attendee polling operations."""
+class AttendeePollingCron:
+    """Cron service for attendee bot polling and virtual email processing."""
     
     def __init__(self):
         self.settings = get_settings()
         self.supabase = get_supabase()
-        self.polling_service = AttendeePollingService()
+        self.attendee_service = AttendeeService()
+        self.virtual_email_service = VirtualEmailAttendeeService()
         
         logger.info("Attendee Polling Cron Service initialized")
     
-    async def execute_polling_cron(self) -> Dict[str, Any]:
+    async def run_virtual_email_processing_cron(self) -> Dict[str, Any]:
         """
-        Execute the main polling cron job.
+        Run the virtual email attendee processing cron job.
+        
+        This job:
+        1. Finds calendar events with virtual email attendees
+        2. Auto-schedules attendee bots for meetings
+        3. Updates meeting records with bot information
         
         Returns:
-            Execution results and metrics
+            Cron job execution results
         """
-        execution_id = f"cron_{int(datetime.now().timestamp())}"
         start_time = datetime.now()
+        execution_id = f"virtual_email_cron_{start_time.strftime('%Y%m%d_%H%M%S')}"
         
         try:
-            logger.info(f"Starting attendee polling cron execution {execution_id}")
+            logger.info(f"Starting virtual email processing cron job {execution_id}")
             
-            # Get all active users with meeting bots
-            active_users = await self._get_active_users_with_bots()
-            if not active_users:
-                logger.info("No active users with meeting bots found")
-                return await self._create_cron_result(
-                    execution_id, start_time, 0, 0, 0, 0, "completed", None
-                )
+            # Get all users with usernames (who can have virtual emails)
+            users = await self._get_users_with_usernames()
             
-            # Execute polling for each user
-            successful_polls = 0
-            failed_polls = 0
-            total_processing_time = 0
-            
-            for user in active_users:
-                try:
-                    user_start_time = datetime.now()
-                    
-                    # Execute smart polling for user
-                    result = await self.polling_service.smart_polling(user['id'])
-                    
-                    user_processing_time = (datetime.now() - user_start_time).microseconds // 1000
-                    total_processing_time += user_processing_time
-                    
-                    if result and not result.get('skipped'):
-                        if result.get('error'):
-                            failed_polls += 1
-                            logger.warning(f"User {user['id']} polling failed: {result.get('error')}")
-                        else:
-                            successful_polls += 1
-                            logger.info(f"User {user['id']} polling completed successfully")
-                    else:
-                        logger.info(f"User {user['id']} polling skipped: {result.get('reason', 'Unknown')}")
-                        
-                except Exception as e:
-                    failed_polls += 1
-                    logger.error(f"Failed to poll user {user['id']}: {e}")
-                    continue
-            
-            end_time = datetime.now()
-            total_processing_time = (end_time - start_time).microseconds // 1000
-            
-            # Create execution result
-            cron_result = await self._create_cron_result(
-                execution_id, start_time, len(active_users), 
-                successful_polls, failed_polls, total_processing_time, 
-                "completed", None
-            )
-            
-            # Update metrics
-            await self._update_cron_metrics(execution_id, cron_result)
-            
-            logger.info(f"Attendee polling cron execution {execution_id} completed successfully")
-            return cron_result
-            
-        except Exception as e:
-            end_time = datetime.now()
-            total_processing_time = (end_time - start_time).microseconds // 1000
-            
-            error_message = str(e)
-            logger.error(f"Attendee polling cron execution {execution_id} failed: {error_message}")
-            
-            # Create failed execution result
-            cron_result = await self._create_cron_result(
-                execution_id, start_time, 0, 0, 0, total_processing_time, 
-                "failed", error_message
-            )
-            
-            # Update metrics
-            await self._update_cron_metrics(execution_id, cron_result)
-            
-            return cron_result
-    
-    async def poll_all_active_meetings(self) -> Dict[str, Any]:
-        """
-        Poll all active meetings across all users.
-        
-        Returns:
-            Batch polling results
-        """
-        try:
-            start_time = datetime.now()
-            logger.info("Starting batch polling of all active meetings")
-            
-            # Get all active meetings
-            active_meetings = await self._get_all_active_meetings()
-            if not active_meetings:
-                logger.info("No active meetings found")
+            if not users:
                 return {
-                    'total_meetings': 0,
-                    'meetings_polled': 0,
-                    'successful_polls': 0,
-                    'failed_polls': 0,
-                    'processing_time_ms': 0,
-                    'timestamp': datetime.now().isoformat()
+                    'execution_id': execution_id,
+                    'success': True,
+                    'message': 'No users with usernames found',
+                    'users_processed': 0,
+                    'meetings_processed': 0,
+                    'bots_scheduled': 0,
+                    'execution_time_ms': 0
                 }
             
-            # Poll each meeting
-            successful_polls = 0
-            failed_polls = 0
+            total_meetings_processed = 0
+            total_bots_scheduled = 0
+            user_results = []
             
-            for meeting in active_meetings:
-                try:
-                    result = await self.polling_service.poll_meeting_status(meeting['id'])
-                    if result:
-                        successful_polls += 1
-                    else:
-                        failed_polls += 1
-                except Exception as e:
-                    failed_polls += 1
-                    logger.error(f"Failed to poll meeting {meeting['id']}: {e}")
-                    continue
-            
-            end_time = datetime.now()
-            processing_time = (end_time - start_time).microseconds // 1000
-            
-            result = {
-                'total_meetings': len(active_meetings),
-                'meetings_polled': len(active_meetings),
-                'successful_polls': successful_polls,
-                'failed_polls': failed_polls,
-                'processing_time_ms': processing_time,
-                'timestamp': datetime.now().isoformat()
-            }
-            
-            logger.info(f"Batch polling completed: {successful_polls} successful, {failed_polls} failed")
-            return result
-            
-        except Exception as e:
-            logger.error(f"Batch polling failed: {e}")
-            return {
-                'error': str(e),
-                'timestamp': datetime.now().isoformat()
-            }
-    
-    async def handle_cron_results(self, results: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """
-        Process and analyze cron job results.
-        
-        Args:
-            results: List of cron job results to process
-            
-        Returns:
-            Analysis of cron job results
-        """
-        try:
-            if not results:
-                return {
-                    'total_executions': 0,
-                    'successful_executions': 0,
-                    'failed_executions': 0,
-                    'average_processing_time': 0,
-                    'recommendations': []
-                }
-            
-            # Analyze results
-            total_executions = len(results)
-            successful_executions = len([r for r in results if r.get('status') == 'completed'])
-            failed_executions = total_executions - successful_executions
-            
-            # Calculate average processing time
-            total_processing_time = sum(r.get('total_processing_time_ms', 0) for r in results)
-            average_processing_time = total_processing_time / total_executions if total_executions > 0 else 0
-            
-            # Generate recommendations
-            recommendations = []
-            if failed_executions > 0:
-                recommendations.append(f"Investigate {failed_executions} failed cron executions")
-            
-            if average_processing_time > 30000:  # 30 seconds
-                recommendations.append("Cron job is taking too long, consider optimization")
-            
-            if failed_executions / total_executions > 0.1:  # More than 10% failure rate
-                recommendations.append("High failure rate detected, check system health")
-            
-            return {
-                'total_executions': total_executions,
-                'successful_executions': successful_executions,
-                'failed_executions': failed_executions,
-                'average_processing_time': average_processing_time,
-                'recommendations': recommendations,
-                'timestamp': datetime.now().isoformat()
-            }
-            
-        except Exception as e:
-            logger.error(f"Failed to handle cron results: {e}")
-            return {
-                'error': str(e),
-                'timestamp': datetime.now().isoformat()
-            }
-    
-    async def get_cron_metrics(self) -> CronJobMetrics:
-        """
-        Get performance metrics for the cron job.
-        
-        Returns:
-            Cron job performance metrics
-        """
-        try:
-            # Get recent executions
-            result = self.supabase.table("cron_executions") \
-                .select("*") \
-                .eq("job_type", "attendee_polling") \
-                .order("start_time", desc=True) \
-                .limit(100) \
-                .execute()
-            
-            executions = result.data if result.data else []
-            
-            if not executions:
-                return CronJobMetrics(
-                    total_executions=0,
-                    successful_executions=0,
-                    failed_executions=0,
-                    average_processing_time_ms=0.0,
-                    last_execution=None,
-                    last_success=None,
-                    last_failure=None
-                )
-            
-            # Calculate metrics
-            total_executions = len(executions)
-            successful_executions = len([e for e in executions if e.get('status') == 'completed'])
-            failed_executions = total_executions - successful_executions
-            
-            # Calculate average processing time
-            total_processing_time = sum(e.get('total_processing_time_ms', 0) for e in executions)
-            average_processing_time = total_processing_time / total_executions if total_executions > 0 else 0
-            
-            # Get last execution times
-            last_execution = datetime.fromisoformat(executions[0]['start_time'].replace('Z', '+00:00')) if executions else None
-            
-            last_success = None
-            last_failure = None
-            
-            for execution in executions:
-                if execution.get('status') == 'completed' and not last_success:
-                    last_success = datetime.fromisoformat(execution['start_time'].replace('Z', '+00:00'))
-                elif execution.get('status') == 'failed' and not last_failure:
-                    last_failure = datetime.fromisoformat(execution['start_time'].replace('Z', '+00:00'))
-                
-                if last_success and last_failure:
-                    break
-            
-            return CronJobMetrics(
-                total_executions=total_executions,
-                successful_executions=successful_executions,
-                failed_executions=failed_executions,
-                average_processing_time_ms=average_processing_time,
-                last_execution=last_execution,
-                last_success=last_success,
-                last_failure=last_failure
-            )
-            
-        except Exception as e:
-            logger.error(f"Failed to get cron metrics: {e}")
-            return CronJobMetrics(
-                total_executions=0,
-                successful_executions=0,
-                failed_executions=0,
-                average_processing_time_ms=0.0,
-                last_execution=None,
-                last_success=None,
-                last_failure=None
-            )
-    
-    # Private helper methods
-    
-    async def _get_active_users_with_bots(self) -> List[Dict[str, Any]]:
-        """Get all active users who have meeting bots."""
-        try:
-            result = self.supabase.table("users") \
-                .select("id, email, created_at") \
-                .eq("status", "active") \
-                .execute()
-            
-            users = result.data if result.data else []
-            
-            # Filter users who have meeting bots
-            users_with_bots = []
+            # Process each user's calendar for virtual email attendees
             for user in users:
-                bot_count = await self._get_user_bot_count(user['id'])
-                if bot_count > 0:
-                    users_with_bots.append(user)
+                try:
+                    user_result = await self._process_user_virtual_emails(user)
+                    user_results.append(user_result)
+                    
+                    total_meetings_processed += user_result.get('meetings_processed', 0)
+                    total_bots_scheduled += user_result.get('bots_scheduled', 0)
+                    
+                except Exception as e:
+                    logger.error(f"Failed to process virtual emails for user {user['id']}: {e}")
+                    user_results.append({
+                        'user_id': user['id'],
+                        'username': user.get('username'),
+                        'success': False,
+                        'error': str(e)
+                    })
             
-            return users_with_bots
+            execution_time = (datetime.now() - start_time).total_seconds() * 1000
             
-        except Exception as e:
-            logger.error(f"Failed to get active users with bots: {e}")
-            return []
-    
-    async def _get_user_bot_count(self, user_id: str) -> int:
-        """Get count of meeting bots for a user."""
-        try:
-            result = self.supabase.table("meeting_bots") \
-                .select("bot_id", count="exact") \
-                .eq("user_id", user_id) \
-                .eq("status", "active") \
-                .execute()
+            # Log cron execution
+            await self._log_cron_execution(
+                execution_id, 'virtual_email_processing', len(users), 
+                total_meetings_processed, total_bots_scheduled, execution_time, 'completed'
+            )
             
-            return result.count if result.count else 0
-            
-        except Exception as e:
-            logger.error(f"Failed to get bot count for user {user_id}: {e}")
-            return 0
-    
-    async def _get_all_active_meetings(self) -> List[Dict[str, Any]]:
-        """Get all active meetings across all users."""
-        try:
-            result = self.supabase.table("meetings") \
-                .select("id, user_id, title, start_time, end_time, status") \
-                .eq("status", "active") \
-                .gte("start_time", (datetime.now() - timedelta(days=1)).isoformat()) \
-                .lte("end_time", (datetime.now() + timedelta(days=7)).isoformat()) \
-                .execute()
-            
-            return result.data if result.data else []
-            
-        except Exception as e:
-            logger.error(f"Failed to get all active meetings: {e}")
-            return []
-    
-    async def _create_cron_result(self, execution_id: str, start_time: datetime, 
-                                total_users: int, successful_polls: int, 
-                                failed_polls: int, total_processing_time: int,
-                                status: str, error_message: Optional[str]) -> Dict[str, Any]:
-        """Create a cron execution result record."""
-        try:
-            end_time = datetime.now()
-            
-            cron_result = {
+            return {
                 'execution_id': execution_id,
-                'job_type': 'attendee_polling',
-                'start_time': start_time.isoformat(),
-                'end_time': end_time.isoformat(),
-                'total_users': total_users,
-                'successful_polls': successful_polls,
-                'failed_polls': failed_polls,
-                'total_processing_time_ms': total_processing_time,
+                'success': True,
+                'message': f'Processed {len(users)} users, {total_meetings_processed} meetings, {total_bots_scheduled} bots scheduled',
+                'users_processed': len(users),
+                'meetings_processed': total_meetings_processed,
+                'bots_scheduled': total_bots_scheduled,
+                'execution_time_ms': round(execution_time, 2),
+                'user_results': user_results
+            }
+            
+        except Exception as e:
+            execution_time = (datetime.now() - start_time).total_seconds() * 1000
+            logger.error(f"Virtual email processing cron job failed: {e}")
+            
+            # Log failed execution
+            await self._log_cron_execution(
+                execution_id, 'virtual_email_processing', 0, 0, 0, execution_time, 'failed', str(e)
+            )
+            
+            return {
+                'execution_id': execution_id,
+                'success': False,
+                'error': str(e),
+                'execution_time_ms': round(execution_time, 2)
+            }
+    
+    async def _process_user_virtual_emails(self, user: Dict[str, Any]) -> Dict[str, Any]:
+        """Process virtual emails for a specific user."""
+        try:
+            user_id = user['id']
+            username = user.get('username')
+            
+            logger.info(f"Processing virtual emails for user {user_id} (username: {username})")
+            
+            # Get upcoming meetings with virtual email attendees
+            activity_result = await self.virtual_email_service.get_virtual_email_activity(user_id, days=7)
+            
+            meetings = activity_result.get('meetings', [])
+            meetings_processed = 0
+            bots_scheduled = 0
+            
+            # Process each meeting that needs a bot
+            for meeting in meetings:
+                if meeting.get('bot_status') == 'pending':
+                    try:
+                        # Fetch the calendar event from Google Calendar
+                        event_data = await self._fetch_calendar_event(meeting.get('google_calendar_event_id'), user_id)
+                        
+                        if event_data:
+                            # Process the event for virtual email attendees
+                            result = await self.virtual_email_service.process_calendar_event_for_virtual_emails(event_data)
+                            
+                            if result.get('processed'):
+                                meetings_processed += 1
+                                bots_scheduled += result.get('bots_scheduled', 0)
+                                
+                                logger.info(f"Processed meeting {meeting['id']} for user {user_id}, scheduled {result.get('bots_scheduled', 0)} bots")
+                        
+                    except Exception as e:
+                        logger.error(f"Failed to process meeting {meeting.get('id')} for user {user_id}: {e}")
+                        continue
+            
+            return {
+                'user_id': user_id,
+                'username': username,
+                'success': True,
+                'meetings_processed': meetings_processed,
+                'bots_scheduled': bots_scheduled,
+                'total_meetings': len(meetings)
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to process virtual emails for user {user.get('id')}: {e}")
+            return {
+                'user_id': user.get('id'),
+                'username': user.get('username'),
+                'success': False,
+                'error': str(e)
+            }
+    
+    async def _fetch_calendar_event(self, event_id: str, user_id: str) -> Optional[Dict[str, Any]]:
+        """Fetch calendar event data from Google Calendar."""
+        try:
+            # This would integrate with the Google Calendar service
+            # For now, we'll return None and implement this later
+            logger.info(f"Would fetch calendar event {event_id} for user {user_id}")
+            return None
+            
+        except Exception as e:
+            logger.error(f"Failed to fetch calendar event {event_id}: {e}")
+            return None
+    
+    async def _get_users_with_usernames(self) -> List[Dict[str, Any]]:
+        """Get all users who have usernames set."""
+        try:
+            result = await self.supabase.table('users').select('id, username, email').not_.is_('username', None).execute()
+            return result.data if result.data else []
+        except Exception as e:
+            logger.error(f"Failed to get users with usernames: {e}")
+            return []
+    
+    async def _log_cron_execution(self, execution_id: str, job_type: str, users_processed: int, 
+                                 meetings_processed: int, bots_scheduled: int, execution_time_ms: float, 
+                                 status: str, error_message: Optional[str] = None):
+        """Log cron job execution details."""
+        try:
+            log_data = {
+                'execution_id': execution_id,
+                'job_type': job_type,
+                'users_processed': users_processed,
+                'meetings_processed': meetings_processed,
+                'bots_scheduled': bots_scheduled,
+                'execution_time_ms': execution_time_ms,
                 'status': status,
                 'error_message': error_message,
+                'executed_at': datetime.now().isoformat(),
                 'created_at': datetime.now().isoformat()
             }
             
-            # Store in database
-            self.supabase.table("cron_executions").insert(cron_result).execute()
-            
-            return cron_result
+            await self.supabase.table('cron_execution_logs').insert(log_data).execute()
             
         except Exception as e:
-            logger.error(f"Failed to create cron result: {e}")
+            logger.error(f"Failed to log cron execution: {e}")
+    
+    async def run_attendee_bot_polling_cron(self) -> Dict[str, Any]:
+        """
+        Run the attendee bot polling cron job.
+        
+        This job:
+        1. Polls all active attendee bots for status updates
+        2. Retrieves transcripts and chat messages
+        3. Updates meeting records with latest information
+        
+        Returns:
+            Cron job execution results
+        """
+        start_time = datetime.now()
+        execution_id = f"attendee_polling_cron_{start_time.strftime('%Y%m%d_%H%M%S')}"
+        
+        try:
+            logger.info(f"Starting attendee bot polling cron job {execution_id}")
+            
+            # Get all active attendee bots
+            active_bots = await self._get_active_attendee_bots()
+            
+            if not active_bots:
+                return {
+                    'execution_id': execution_id,
+                    'success': True,
+                    'message': 'No active attendee bots found',
+                    'bots_processed': 0,
+                    'execution_time_ms': 0
+                }
+            
+            bots_processed = 0
+            bot_results = []
+            
+            # Poll each bot for updates
+            for bot in active_bots:
+                try:
+                    bot_result = await self._poll_bot_for_updates(bot)
+                    bot_results.append(bot_result)
+                    
+                    if bot_result.get('success'):
+                        bots_processed += 1
+                    
+                except Exception as e:
+                    logger.error(f"Failed to poll bot {bot.get('bot_id')}: {e}")
+                    bot_results.append({
+                        'bot_id': bot.get('bot_id'),
+                        'success': False,
+                        'error': str(e)
+                    })
+            
+            execution_time = (datetime.now() - start_time).total_seconds() * 1000
+            
+            # Log cron execution
+            await self._log_cron_execution(
+                execution_id, 'attendee_bot_polling', 0, 0, 0, execution_time, 'completed'
+            )
+            
             return {
                 'execution_id': execution_id,
-                'status': 'error',
-                'error_message': f"Failed to create result: {str(e)}"
-            }
-    
-    async def _update_cron_metrics(self, execution_id: str, cron_result: Dict[str, Any]):
-        """Update cron job metrics."""
-        try:
-            # This could update aggregated metrics tables
-            # For now, just log the update
-            logger.info(f"Updated cron metrics for execution {execution_id}")
-            
-        except Exception as e:
-            logger.error(f"Failed to update cron metrics: {e}")
-    
-    async def cleanup_completed_meetings(self) -> Dict[str, Any]:
-        """Clean up completed meetings and transcripts."""
-        try:
-            logger.info("Starting cleanup of completed meetings")
-            
-            # Get completed meetings
-            completed_meetings = await self._get_completed_meetings()
-            if not completed_meetings:
-                return {
-                    'total_meetings': 0,
-                    'cleaned_meetings': 0,
-                    'message': 'No completed meetings found'
-                }
-            
-            cleaned_count = 0
-            
-            for meeting in completed_meetings:
-                try:
-                    success = await self._cleanup_meeting(meeting['id'])
-                    if success:
-                        cleaned_count += 1
-                        
-                except Exception as e:
-                    logger.error(f"Failed to cleanup meeting {meeting['id']}: {e}")
-                    continue
-            
-            logger.info(f"Meeting cleanup completed: {cleaned_count} cleaned")
-            
-            return {
-                'total_meetings': len(completed_meetings),
-                'cleaned_meetings': cleaned_count,
-                'success_rate': cleaned_count / len(completed_meetings) if completed_meetings else 0
+                'success': True,
+                'message': f'Polled {len(active_bots)} bots, {bots_processed} successfully updated',
+                'bots_processed': bots_processed,
+                'total_bots': len(active_bots),
+                'execution_time_ms': round(execution_time, 2),
+                'bot_results': bot_results
             }
             
         except Exception as e:
-            logger.error(f"Meeting cleanup failed: {e}")
+            execution_time = (datetime.now() - start_time).total_seconds() * 1000
+            logger.error(f"Attendee bot polling cron job failed: {e}")
+            
+            # Log failed execution
+            await self._log_cron_execution(
+                execution_id, 'attendee_bot_polling', 0, 0, 0, execution_time, 'failed', str(e)
+            )
+            
             return {
+                'execution_id': execution_id,
+                'success': False,
                 'error': str(e),
-                'total_meetings': 0,
-                'cleaned_meetings': 0
+                'execution_time_ms': round(execution_time, 2)
             }
     
-    async def _get_completed_meetings(self) -> List[Dict[str, Any]]:
-        """Get completed meetings that can be cleaned up."""
+    async def _get_active_attendee_bots(self) -> List[Dict[str, Any]]:
+        """Get all active attendee bots."""
         try:
-            result = self.supabase.table("meetings") \
-                .select("id, user_id, title, end_time, transcript") \
-                .eq("bot_status", "completed") \
-                .lt("end_time", (datetime.now() - timedelta(days=30)).isoformat()) \
-                .execute()
-            
+            result = await self.supabase.table('meeting_bots').select('*').eq('status', 'active').execute()
             return result.data if result.data else []
-            
         except Exception as e:
-            logger.error(f"Failed to get completed meetings: {e}")
+            logger.error(f"Failed to get active attendee bots: {e}")
             return []
     
-    async def _cleanup_meeting(self, meeting_id: str) -> bool:
-        """Clean up a specific meeting."""
+    async def _poll_bot_for_updates(self, bot: Dict[str, Any]) -> Dict[str, Any]:
+        """Poll a specific bot for updates."""
         try:
-            # Archive transcript data if needed
-            # For now, just mark as archived
+            bot_id = bot['bot_id']
+            
+            # Get bot status
+            status_result = await self.attendee_service.get_bot_status(bot_id)
+            
+            if not status_result:
+                return {
+                    'bot_id': bot_id,
+                    'success': False,
+                    'error': 'Failed to get bot status'
+                }
+            
+            # Get transcript if available
+            transcript_result = await self.attendee_service.get_transcript(bot_id)
+            
+            # Get chat messages
+            chat_messages = await self.attendee_service.get_chat_messages(bot_id)
+            
+            # Update bot record with latest information
+            await self._update_bot_record(bot_id, status_result, transcript_result, chat_messages)
+            
+            return {
+                'bot_id': bot_id,
+                'success': True,
+                'status_updated': True,
+                'transcript_updated': transcript_result is not None,
+                'chat_messages_count': len(chat_messages) if chat_messages else 0
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to poll bot {bot.get('bot_id')}: {e}")
+            return {
+                'bot_id': bot.get('bot_id'),
+                'success': False,
+                'error': str(e)
+            }
+    
+    async def _update_bot_record(self, bot_id: str, status_data: Dict[str, Any], 
+                                transcript_data: Optional[Dict[str, Any]], chat_messages: List[Dict[str, Any]]):
+        """Update bot record with latest information."""
+        try:
             update_data = {
-                'bot_status': 'archived',
+                'status': status_data.get('status'),
+                'is_recording': status_data.get('is_recording', False),
+                'is_paused': status_data.get('is_paused', False),
                 'updated_at': datetime.now().isoformat()
             }
             
-            result = self.supabase.table("meetings") \
-                .update(update_data) \
-                .eq("id", meeting_id) \
-                .execute()
+            # Add transcript information if available
+            if transcript_data:
+                update_data['transcript_retrieved_at'] = datetime.now().isoformat()
+                update_data['transcript_duration_seconds'] = transcript_data.get('duration_minutes', 0) * 60
             
-            return result.data is not None
-            
-        except Exception as e:
-            logger.error(f"Failed to cleanup meeting {meeting_id}: {e}")
-            return False
-    
-    async def auto_schedule_user_bots(self, user_id: str) -> Dict[str, Any]:
-        """Auto-schedule bots for a specific user's meetings."""
-        try:
-            logger.info(f"Starting auto-schedule bots for user: {user_id}")
-            
-            # Get user's upcoming meetings
-            upcoming_meetings = await self._get_user_upcoming_meetings(user_id)
-            if not upcoming_meetings:
-                return {
-                    'success': True,
-                    'message': 'No upcoming meetings found',
-                    'user_id': user_id,
-                    'scheduled_bots': 0
-                }
-            
-            # Auto-schedule bots for meetings
-            scheduled_count = 0
-            for meeting in upcoming_meetings:
-                if await self._should_auto_schedule_bot(meeting):
-                    success = await self._schedule_meeting_bot(meeting, user_id)
-                    if success:
-                        scheduled_count += 1
-            
-            return {
-                'success': True,
-                'message': f'Auto-scheduled {scheduled_count} bots',
-                'user_id': user_id,
-                'scheduled_bots': scheduled_count,
-                'total_meetings': len(upcoming_meetings)
-            }
+            await self.supabase.table('meeting_bots').update(update_data).eq('bot_id', bot_id).execute()
             
         except Exception as e:
-            logger.error(f"Auto-schedule bots failed for user {user_id}: {e}")
-            return {
-                'success': False,
-                'error': str(e),
-                'user_id': user_id,
-                'scheduled_bots': 0
-            }
-    
-    async def auto_schedule_all_bots(self) -> Dict[str, Any]:
-        """Auto-schedule bots for all users' meetings."""
-        try:
-            logger.info("Starting auto-schedule bots for all users")
-            
-            # Get all active users
-            users = await self._get_active_users()
-            if not users:
-                return {
-                    'success': True,
-                    'message': 'No active users found',
-                    'total_scheduled': 0
-                }
-            
-            # Auto-schedule for each user
-            total_scheduled = 0
-            for user in users:
-                result = await self.auto_schedule_user_bots(user['id'])
-                if result.get('success'):
-                    total_scheduled += result.get('scheduled_bots', 0)
-            
-            return {
-                'success': True,
-                'message': f'Auto-scheduled {total_scheduled} bots total',
-                'total_scheduled': total_scheduled,
-                'total_users': len(users)
-            }
-            
-        except Exception as e:
-            logger.error(f"Auto-schedule all bots failed: {e}")
-            return {
-                'success': False,
-                'error': str(e),
-                'total_scheduled': 0
-            }
-    
-    async def _get_user_upcoming_meetings(self, user_id: str) -> List[Dict[str, Any]]:
-        """Get user's upcoming meetings."""
-        try:
-            result = self.supabase.table("meetings") \
-                .select("*") \
-                .eq("user_id", user_id) \
-                .gte("start_time", datetime.now().isoformat()) \
-                .eq("bot_status", "pending") \
-                .execute()
-            
-            return result.data if result.data else []
-            
-        except Exception as e:
-            logger.error(f"Failed to get user upcoming meetings: {e}")
-            return []
-    
-    async def _should_auto_schedule_bot(self, meeting: Dict[str, Any]) -> bool:
-        """Determine if a bot should be auto-scheduled for a meeting."""
-        # Check if meeting has a URL
-        if not meeting.get('meeting_url'):
-            return False
-        
-        # Check if bot is not already scheduled
-        if meeting.get('bot_status') != 'pending':
-            return False
-        
-        # Check if meeting is within next 24 hours
-        meeting_time = datetime.fromisoformat(meeting['start_time'])
-        if meeting_time > datetime.now() + timedelta(days=1):
-            return False
-        
-        return True
-    
-    async def _schedule_meeting_bot(self, meeting: Dict[str, Any], user_id: str) -> bool:
-        """Schedule a bot for a specific meeting."""
-        try:
-            # Update meeting with bot configuration
-            update_data = {
-                'bot_status': 'bot_scheduled',
-                'bot_deployment_method': 'auto',
-                'auto_bot_notification_sent': True,
-                'updated_at': datetime.now().isoformat()
-            }
-            
-            result = self.supabase.table("meetings") \
-                .update(update_data) \
-                .eq("id", meeting['id']) \
-                .execute()
-            
-            return bool(result.data)
-            
-        except Exception as e:
-            logger.error(f"Failed to schedule bot for meeting {meeting['id']}: {e}")
-            return False
-    
-    async def _get_active_users(self) -> List[Dict[str, Any]]:
-        """Get all active users."""
-        try:
-            result = self.supabase.table("users") \
-                .select("id") \
-                .execute()
-            
-            return result.data if result.data else []
-            
-        except Exception as e:
-            logger.error(f"Failed to get active users: {e}")
-            return []
+            logger.error(f"Failed to update bot record {bot_id}: {e}")
+
+
+# Celery tasks for cron jobs
+@celery_app.task
+def run_virtual_email_processing_cron():
+    """Celery task to run virtual email processing cron job."""
+    try:
+        cron_service = AttendeePollingCron()
+        result = asyncio.run(cron_service.run_virtual_email_processing_cron())
+        return result
+    except Exception as e:
+        logger.error(f"Virtual email processing cron task failed: {e}")
+        return {'success': False, 'error': str(e)}
+
+
+@celery_app.task
+def run_attendee_bot_polling_cron():
+    """Celery task to run attendee bot polling cron job."""
+    try:
+        cron_service = AttendeePollingCron()
+        result = asyncio.run(cron_service.run_attendee_bot_polling_cron())
+        return result
+    except Exception as e:
+        logger.error(f"Attendee bot polling cron task failed: {e}")
+        return {'success': False, 'error': str(e)}

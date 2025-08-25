@@ -10,10 +10,12 @@ from datetime import datetime, timedelta
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+import re
 
 from ...core.database import get_supabase
 from ...core.config import get_settings
 from ...models.schemas.calendar import CalendarWebhookPayload
+from ...services.attendee import AttendeeService
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +28,7 @@ class CalendarWebhookHandler:
         self.settings = get_settings()
         self.max_retries = 3
         self.retry_delay = 1  # seconds
+        self.attendee_service = AttendeeService()
     
     async def process_webhook(self, webhook_data: Dict[str, Any]) -> bool:
         """Process incoming Calendar webhook data."""
@@ -79,10 +82,17 @@ class CalendarWebhookHandler:
                 # Update existing meeting
                 await self._update_meeting_from_event(existing_meeting['id'], event_data, user_id)
                 logger.info(f"Updated meeting {existing_meeting['id']} for calendar change")
+                
+                # Check for virtual email attendees and auto-schedule bots
+                await self._process_virtual_email_attendees(existing_meeting['id'], event_data)
             else:
                 # Create new meeting entry
-                await self._create_meeting_from_event(event_data, user_id)
+                meeting_id = await self._create_meeting_from_event(event_data, user_id)
                 logger.info(f"Created new meeting for calendar event {payload.event_id}")
+                
+                # Check for virtual email attendees and auto-schedule bots
+                if meeting_id:
+                    await self._process_virtual_email_attendees(meeting_id, event_data)
             
             # Update webhook last received time
             await self._update_webhook_last_received(payload.webhook_id)
@@ -233,11 +243,18 @@ class CalendarWebhookHandler:
                 'updated_at': datetime.now().isoformat()
             }
             
-            await self.supabase.table('meetings').insert(meeting_data).execute()
-            logger.info(f"Created new meeting for event {event_data['id']}")
+            result = await self.supabase.table('meetings').insert(meeting_data).execute()
+            if result.data:
+                meeting_id = result.data[0]['id']
+                logger.info(f"Created new meeting {meeting_id} for event {event_data['id']}")
+                return meeting_id
+            else:
+                logger.error(f"Failed to create meeting for event {event_data['id']}")
+                return None
             
         except Exception as e:
             logger.error(f"Failed to create meeting from event {event_data.get('id')}: {e}")
+            return None
     
     async def _update_meeting_from_event(self, meeting_id: str, event_data: Dict[str, Any], user_id: str):
         """Update existing meeting from calendar event data."""
@@ -490,3 +507,194 @@ class CalendarWebhookHandler:
                 'error': str(e),
                 'timestamp': datetime.now().isoformat()
             }
+    
+    async def _process_virtual_email_attendees(self, meeting_id: str, event_data: Dict[str, Any]):
+        """Process virtual email attendees and auto-schedule bots if needed."""
+        try:
+            # Extract attendees from event
+            attendees = event_data.get('attendees', [])
+            if not attendees:
+                return
+            
+            # Look for virtual email attendees (ai+{username}@besunny.ai)
+            virtual_email_pattern = r'ai\+([^@]+)@besunny\.ai'
+            virtual_attendees = []
+            
+            for attendee in attendees:
+                if isinstance(attendee, dict) and attendee.get('email'):
+                    email = attendee['email']
+                    match = re.search(virtual_email_pattern, email)
+                    if match:
+                        username = match.group(1)
+                        virtual_attendees.append({
+                            'email': email,
+                            'username': username,
+                            'response_status': attendee.get('responseStatus', 'needsAction')
+                        })
+            
+            if not virtual_attendees:
+                return
+            
+            logger.info(f"Found {len(virtual_attendees)} virtual email attendees for meeting {meeting_id}")
+            
+            # Process each virtual email attendee
+            for virtual_attendee in virtual_attendees:
+                await self._auto_schedule_bot_for_virtual_email(meeting_id, virtual_attendee, event_data)
+                
+        except Exception as e:
+            logger.error(f"Failed to process virtual email attendees for meeting {meeting_id}: {e}")
+    
+    async def _auto_schedule_bot_for_virtual_email(self, meeting_id: str, virtual_attendee: Dict[str, Any], event_data: Dict[str, Any]):
+        """Auto-schedule a bot for a meeting with a virtual email attendee."""
+        try:
+            username = virtual_attendee['username']
+            virtual_email = virtual_attendee['email']
+            
+            # Find user by username
+            user_result = await self.supabase.table('users').select('id').eq('username', username).single().execute()
+            if not user_result.data:
+                logger.warning(f"User not found for username: {username}")
+                return
+            
+            user_id = user_result.data['id']
+            
+            # Check if meeting already has a bot for this user
+            existing_bot = await self._check_existing_bot(meeting_id, user_id)
+            if existing_bot:
+                logger.info(f"Bot already exists for meeting {meeting_id} and user {user_id}")
+                return
+            
+            # Extract meeting URL
+            meeting_url = self._extract_meeting_url(event_data)
+            if not meeting_url:
+                logger.warning(f"No meeting URL found for event {event_data.get('id')}")
+                return
+            
+            # Check if this is a Google Meet or other video conference
+            if not self._is_video_conference_url(meeting_url):
+                logger.info(f"Meeting URL {meeting_url} is not a video conference, skipping bot scheduling")
+                return
+            
+            # Auto-schedule bot using Attendee.dev API
+            bot_result = await self._schedule_attendee_bot(meeting_id, user_id, meeting_url, event_data)
+            
+            if bot_result.get('success'):
+                logger.info(f"Successfully auto-scheduled bot for meeting {meeting_id} with virtual email {virtual_email}")
+                
+                # Update meeting record to mark as auto-scheduled
+                await self._update_meeting_auto_scheduled(meeting_id, user_id, virtual_email, bot_result)
+            else:
+                logger.error(f"Failed to auto-schedule bot for meeting {meeting_id}: {bot_result.get('error')}")
+                
+        except Exception as e:
+            logger.error(f"Failed to auto-schedule bot for virtual email attendee: {e}")
+    
+    async def _schedule_attendee_bot(self, meeting_id: str, user_id: str, meeting_url: str, event_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Schedule an attendee bot for a meeting."""
+        try:
+            # Prepare bot configuration
+            bot_options = {
+                'meeting_url': meeting_url,
+                'bot_name': 'Sunny AI Notetaker',
+                'bot_chat_message': 'Hi, I\'m here to transcribe this meeting!'
+            }
+            
+            # Create bot using Attendee service
+            result = await self.attendee_service.create_bot_for_meeting(bot_options, user_id)
+            
+            if result.get('success'):
+                # Store bot information in meetings table
+                await self._store_meeting_bot_info(meeting_id, user_id, result)
+                
+            return result
+            
+        except Exception as e:
+            logger.error(f"Failed to schedule attendee bot: {e}")
+            return {'success': False, 'error': str(e)}
+    
+    async def _store_meeting_bot_info(self, meeting_id: str, user_id: str, bot_result: Dict[str, Any]):
+        """Store bot information in the meetings table."""
+        try:
+            update_data = {
+                'attendee_bot_id': bot_result.get('bot_id'),
+                'bot_status': 'bot_scheduled',
+                'bot_deployment_method': 'automatic',
+                'auto_scheduled_via_email': True,
+                'virtual_email_attendee': f"ai+{user_id}@besunny.ai",  # This will be updated with actual username
+                'bot_configuration': {
+                    'provider': 'attendee',
+                    'bot_id': bot_result.get('bot_id'),
+                    'project_id': bot_result.get('project_id'),
+                    'auto_scheduled': True
+                },
+                'updated_at': datetime.now().isoformat()
+            }
+            
+            await self.supabase.table('meetings').update(update_data).eq('id', meeting_id).execute()
+            
+        except Exception as e:
+            logger.error(f"Failed to store meeting bot info: {e}")
+    
+    async def _update_meeting_auto_scheduled(self, meeting_id: str, user_id: str, virtual_email: str, bot_result: Dict[str, Any]):
+        """Update meeting record to mark as auto-scheduled."""
+        try:
+            # Get username for the virtual email
+            username_match = re.search(r'ai\+([^@]+)@besunny\.ai', virtual_email)
+            username = username_match.group(1) if username_match else 'unknown'
+            
+            update_data = {
+                'auto_scheduled_via_email': True,
+                'virtual_email_attendee': virtual_email,
+                'bot_deployment_method': 'automatic',
+                'bot_status': 'bot_scheduled',
+                'attendee_bot_id': bot_result.get('bot_id'),
+                'bot_configuration': {
+                    'provider': 'attendee',
+                    'bot_id': bot_result.get('bot_id'),
+                    'project_id': bot_result.get('project_id'),
+                    'auto_scheduled': True,
+                    'scheduled_for_user': user_id,
+                    'username': username
+                },
+                'updated_at': datetime.now().isoformat()
+            }
+            
+            await self.supabase.table('meetings').update(update_data).eq('id', meeting_id).execute()
+            
+        except Exception as e:
+            logger.error(f"Failed to update meeting auto-scheduled status: {e}")
+    
+    async def _check_existing_bot(self, meeting_id: str, user_id: str) -> Optional[Dict[str, Any]]:
+        """Check if a meeting already has a bot for a specific user."""
+        try:
+            result = await self.supabase.table('meetings').select(
+                'attendee_bot_id, bot_status, bot_configuration'
+            ).eq('id', meeting_id).eq('user_id', user_id).single().execute()
+            
+            if result.data and result.data.get('attendee_bot_id'):
+                return result.data
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Failed to check existing bot: {e}")
+            return None
+    
+    def _is_video_conference_url(self, url: str) -> bool:
+        """Check if a URL is a video conference URL."""
+        if not url:
+            return False
+        
+        video_patterns = [
+            r'https://meet\.google\.com/[a-z-]+',
+            r'https://zoom\.us/j/\d+',
+            r'https://teams\.microsoft\.com/l/meetup-join/[^\s]+',
+            r'https://meet\.jitsi\.net/[^\s]+',
+            r'https://app\.whereby\.com/[^\s]+'
+        ]
+        
+        for pattern in video_patterns:
+            if re.search(pattern, url, re.IGNORECASE):
+                return True
+        
+        return False
