@@ -315,14 +315,16 @@ def task_revoked_handler(sender=None, request=None, terminated=None, signum=None
     logger.warning(f"Task {sender.name} was revoked")
 
 
-# Register event handlers
-celery_app.task_success.connect(task_success_handler)
-celery_app.task_failure.connect(task_failure_handler)
-celery_app.task_revoked.connect(task_revoked_handler)
+def register_celery_event_handlers():
+    """Register Celery event handlers after the app is fully initialized."""
+    try:
+        celery_app.task_success.connect(task_success_handler)
+        celery_app.task_failure.connect(task_failure_handler)
+        celery_app.task_revoked.connect(task_revoked_handler)
+        logger.info("Celery event handlers registered successfully")
+    except Exception as e:
+        logger.warning(f"Failed to register Celery event handlers: {e}")
 
 
 # Import time to avoid circular imports
 import time
-from .database import db_manager
-from .redis_client import redis_client
-from .external_services import check_external_services
