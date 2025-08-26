@@ -64,41 +64,38 @@ class UsernameValidationResponse(BaseModel):
 
 @router.post("/username/set", response_model=UsernameResponse)
 async def set_username(
-    request: UsernameRequest
+    request: UsernameRequest,
+    current_user: dict = Depends(get_current_user_from_supabase_token)
 ) -> Dict[str, Any]:
     """
     Set username for the current user.
     
     Args:
         request: Username setting request
+        current_user: Current authenticated user
         
     Returns:
         Username setting result
     """
     try:
-        # Simplified version for testing - will be replaced with full functionality
         username = request.username
         
-        # Basic validation
-        if len(username) < 3:
+        # Use the UsernameService to actually set the username
+        service = UsernameService()
+        result = await service.set_username(current_user.id, username)
+        
+        if result.get('success'):
+            return UsernameResponse(
+                success=True,
+                username=result.get('username'),
+                virtual_email=result.get('virtual_email'),
+                gmail_watch_setup=result.get('gmail_watch_setup')
+            )
+        else:
             return UsernameResponse(
                 success=False,
-                error_message="Username must be at least 3 characters long"
+                error_message=result.get('error', 'Failed to set username')
             )
-        
-        if not username.isalnum():
-            return UsernameResponse(
-                success=False,
-                error_message="Username can only contain letters and numbers"
-            )
-        
-        # For now, just return success (we'll add database saving later)
-        return UsernameResponse(
-            success=True,
-            username=username,
-            virtual_email=f"{username}@virtual.besunny.ai",
-            gmail_watch_setup={"success": True, "message": "Gmail watch setup successful"}
-        )
             
     except Exception as e:
         raise HTTPException(
@@ -110,7 +107,7 @@ async def set_username(
 @router.get("/username/validate/{username}", response_model=UsernameValidationResponse)
 async def validate_username(
     username: str,
-    current_user: User = Depends(get_current_user_from_supabase_token)
+    current_user: dict = Depends(get_current_user_from_supabase_token)
 ) -> Dict[str, Any]:
     """
     Validate username format and availability.
@@ -163,7 +160,7 @@ async def validate_username(
 
 @router.get("/username/generate", response_model=UsernameResponse)
 async def generate_username(
-    current_user: User = Depends(get_current_user_from_supabase_token)
+    current_user: dict = Depends(get_current_user_from_supabase_token)
 ) -> Dict[str, Any]:
     """
     Generate a username from the user's email.

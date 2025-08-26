@@ -26,21 +26,32 @@ class SupabaseConfig:
         self._load_config()
     
     def _load_config(self):
-        """Load Supabase configuration from environment variables."""
-        self.supabase_url = os.getenv('SUPABASE_URL') or os.getenv('VITE_SUPABASE_URL')
-        self.supabase_anon_key = os.getenv('SUPABASE_ANON_KEY') or os.getenv('VITE_SUPABASE_ANON_KEY')
-        self.supabase_service_role_key = os.getenv('SUPABASE_SERVICE_ROLE_KEY') or os.getenv('VITE_SUPABASE_SERVICE_ROLE_KEY')
-        
-        logger.info(f"🔍 Supabase Config Debug - SUPABASE_URL: {bool(self.supabase_url)}")
-        logger.info(f"🔍 Supabase Config Debug - SUPABASE_ANON_KEY: {bool(self.supabase_anon_key)}")
-        logger.info(f"🔍 Supabase Config Debug - SUPABASE_SERVICE_ROLE_KEY: {bool(self.supabase_service_role_key)}")
-        
-        if not self.supabase_url:
-            logger.warning("SUPABASE_URL not found in environment variables")
-        if not self.supabase_anon_key:
-            logger.warning("SUPABASE_ANON_KEY not found in environment variables")
-        if not self.supabase_service_role_key:
-            logger.warning("SUPABASE_SERVICE_ROLE_KEY not found in environment variables")
+        """Load Supabase configuration from settings."""
+        try:
+            from .config import get_settings
+            settings = get_settings()
+            
+            self.supabase_url = settings.supabase_url
+            self.supabase_anon_key = settings.supabase_anon_key
+            self.supabase_service_role_key = settings.supabase_service_role_key
+            
+            logger.info(f"🔍 Supabase Config Debug - SUPABASE_URL: {bool(self.supabase_url)}")
+            logger.info(f"🔍 Supabase Config Debug - SUPABASE_ANON_KEY: {bool(self.supabase_anon_key)}")
+            logger.info(f"🔍 Supabase Config Debug - SUPABASE_SERVICE_ROLE_KEY: {bool(self.supabase_service_role_key)}")
+            
+            if not self.supabase_url:
+                logger.warning("SUPABASE_URL not found in settings")
+            if not self.supabase_anon_key:
+                logger.warning("SUPABASE_ANON_KEY not found in settings")
+            if not self.supabase_service_role_key:
+                logger.warning("SUPABASE_SERVICE_ROLE_KEY not found in settings")
+                
+        except Exception as e:
+            logger.error(f"Error loading Supabase config from settings: {e}")
+            # Fallback to environment variables
+            self.supabase_url = os.getenv('SUPABASE_URL') or os.getenv('VITE_SUPABASE_URL')
+            self.supabase_anon_key = os.getenv('SUPABASE_ANON_KEY') or os.getenv('VITE_SUPABASE_ANON_KEY')
+            self.supabase_service_role_key = os.getenv('SUPABASE_SERVICE_ROLE_KEY') or os.getenv('VITE_SUPABASE_SERVICE_ROLE_KEY')
     
     def initialize(self) -> bool:
         """Initialize Supabase client."""
