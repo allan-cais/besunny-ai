@@ -175,24 +175,35 @@ async def get_current_user_from_supabase_token(
         response = supabase.auth.get_user(token)
         
         logger.info(f"🔍 Auth Debug - Supabase response: {response}")
+        logger.info(f"🔍 Auth Debug - Response type: {type(response)}")
+        logger.info(f"🔍 Auth Debug - Response attributes: {[attr for attr in dir(response) if not attr.startswith('_')]}")
         
-        if response.error:
-            logger.error(f"🔍 Auth Debug - Supabase auth error: {response.error}")
+        # Handle different response types from Supabase client
+        # Supabase v2+ returns UserResponse directly, not a wrapper
+        try:
+            # Check if this is a UserResponse object directly (Supabase v2+)
+            if hasattr(response, 'id') and hasattr(response, 'email'):
+                logger.info("🔍 Auth Debug - Detected UserResponse object (Supabase v2+), using directly")
+                user = response
+            else:
+                # Legacy format with response.user (Supabase v1)
+                if not hasattr(response, 'user') or not response.user:
+                    logger.error("🔍 Auth Debug - No user returned from Supabase")
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="No user found for token",
+                        headers={"WWW-Authenticate": "Bearer"},
+                    )
+                user = response.user
+                
+        except AttributeError as attr_error:
+            logger.error(f"🔍 Auth Debug - Attribute error accessing response: {attr_error}")
+            logger.error(f"🔍 Auth Debug - Response object: {response}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=f"Invalid Supabase token: {response.error.message}",
+                detail="Invalid response format from Supabase",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        
-        if not response.user:
-            logger.error("🔍 Auth Debug - No user returned from Supabase")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="No user found for token",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-        
-        user = response.user
         logger.info(f"🔍 Auth Debug - Successfully authenticated user: {user.id}")
         
         return {
@@ -279,10 +290,12 @@ async def get_current_user_hybrid(
             logger.info(f"🔍 Auth Debug - Response attributes: {[attr for attr in dir(response) if not attr.startswith('_')]}")
             
             # Handle different Supabase response formats
+            # Supabase v2+ returns UserResponse directly, not a wrapper
             try:
-                # Newer Supabase client returns response directly
-                if hasattr(response, 'user') and response.user:
-                    user = response.user
+                # Check if this is a UserResponse object directly (Supabase v2+)
+                if hasattr(response, 'id') and hasattr(response, 'email'):
+                    logger.info("🔍 Auth Debug - Detected UserResponse object (Supabase v2+), using directly")
+                    user = response
                     logger.info(f"🔍 Auth Debug - Supabase validation successful for user: {user.id}")
                     
                     return {
@@ -291,24 +304,26 @@ async def get_current_user_hybrid(
                         "username": user.user_metadata.get("username") if hasattr(user, 'user_metadata') else None,
                         "permissions": user.user_metadata.get("permissions", []) if hasattr(user, 'user_metadata') else [],
                     }
-                
-                # Check if response is an error response
-                if hasattr(response, 'error') and response.error:
-                    logger.error(f"🔍 Auth Debug - Supabase auth error: {response.error}")
-                    error_message = getattr(response.error, 'message', str(response.error))
-                    raise HTTPException(
-                        status_code=status.HTTP_401_UNAUTHORIZED,
-                        detail=f"Supabase authentication error: {error_message}",
-                        headers={"WWW-Authenticate": "Bearer"},
-                    )
-                
-                # If we get here, no user was found
-                logger.error("🔍 Auth Debug - No user returned from Supabase")
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="No user found for token",
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
+                else:
+                    # Legacy format with response.user (Supabase v1)
+                    if hasattr(response, 'user') and response.user:
+                        user = response.user
+                        logger.info(f"🔍 Auth Debug - Supabase validation successful for user: {user.id}")
+                        
+                        return {
+                            "id": user.id,
+                            "email": user.email,
+                            "username": user.user_metadata.get("username") if hasattr(user, 'user_metadata') else None,
+                            "permissions": user.user_metadata.get("permissions", []) if hasattr(user, 'user_metadata') else [],
+                        }
+                    else:
+                        # No user found
+                        logger.error("🔍 Auth Debug - No user returned from Supabase")
+                        raise HTTPException(
+                            status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail="No user found for token",
+                            headers={"WWW-Authenticate": "Bearer"},
+                        )
                 
             except AttributeError as attr_error:
                 logger.error(f"🔍 Auth Debug - Attribute error accessing response: {attr_error}")
