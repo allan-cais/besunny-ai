@@ -407,6 +407,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return { hasUsername: false };
       }
 
+      console.log('🔍 Frontend Debug - Checking username status with token:', {
+        tokenLength: session.access_token?.length,
+        tokenPreview: session.access_token?.substring(0, 20) + '...',
+        backendUrl: import.meta.env.VITE_PYTHON_BACKEND_URL
+      });
+      
       const response = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/user/username/status`, {
         method: 'GET',
         headers: {
@@ -416,6 +422,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       if (!response.ok) {
         console.warn('Username status check failed:', response.status, response.statusText);
+        const errorText = await response.text();
+        console.error('🔍 Frontend Debug - Error response:', errorText);
         return { hasUsername: false };
       }
 

@@ -4,6 +4,7 @@ Handles JWT tokens, password hashing, and authentication.
 """
 
 from datetime import datetime, timedelta
+import datetime as dt
 from typing import Optional, Union
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -139,39 +140,77 @@ async def get_current_user_from_supabase_token(
     """Dependency to get current authenticated user from Supabase token."""
     try:
         token = credentials.credentials
+        logger.info(f"🔍 Auth Debug - Validating Supabase token of length: {len(token) if token else 0}")
         
         # Validate the Supabase token by making a request to Supabase
-        from .supabase_config import get_supabase
+        from .supabase_config import get_supabase, get_supabase_config
+        
+        # Check Supabase configuration first
+        supabase_config = get_supabase_config()
+        config_info = supabase_config.get_config_info()
+        logger.info(f"🔍 Auth Debug - Supabase config: {config_info}")
+        
+        if not supabase_config.is_initialized():
+            logger.warning("🔍 Auth Debug - Supabase not initialized, attempting to initialize")
+            if not supabase_config.initialize():
+                logger.error("🔍 Auth Debug - Failed to initialize Supabase")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Supabase service unavailable",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+        
         supabase = get_supabase()
+        if not supabase:
+            logger.error("🔍 Auth Debug - Failed to get Supabase client")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Supabase client unavailable",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        logger.info("🔍 Auth Debug - Attempting to validate token with Supabase")
         
         # Use the token to get user info from Supabase
         response = supabase.auth.get_user(token)
         
-        if response.error or not response.user:
+        logger.info(f"🔍 Auth Debug - Supabase response: {response}")
+        
+        if response.error:
+            logger.error(f"🔍 Auth Debug - Supabase auth error: {response.error}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid Supabase token",
+                detail=f"Invalid Supabase token: {response.error.message}",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        if not response.user:
+            logger.error("🔍 Auth Debug - No user returned from Supabase")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="No user found for token",
                 headers={"WWW-Authenticate": "Bearer"},
             )
         
         user = response.user
+        logger.info(f"🔍 Auth Debug - Successfully authenticated user: {user.id}")
         
         return {
             "id": user.id,
             "email": user.email,
             "username": user.user_metadata.get("username"),
-            "created_at": user.created_at or datetime.utcnow(),
-            "updated_at": user.last_sign_in_at or datetime.utcnow(),
+            "created_at": user.created_at or dt.datetime.utcnow(),
+            "updated_at": user.last_sign_in_at or dt.datetime.utcnow(),
             "permissions": user.user_metadata.get("permissions", []),
         }
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Supabase authentication error: {e}")
+        logger.error(f"🔍 Auth Debug - Supabase authentication error: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Supabase authentication failed",
+            detail=f"Supabase authentication failed: {str(e)}",
             headers={"WWW-Authenticate": "Bearer"},
         )
 

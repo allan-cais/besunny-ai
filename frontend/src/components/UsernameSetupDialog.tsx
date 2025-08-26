@@ -93,6 +93,13 @@ const UsernameSetupDialog: React.FC<UsernameSetupDialogProps> = ({ open, onClose
       if (!session?.access_token) {
         throw new Error('No valid session found');
       }
+      
+      console.log('🔍 Frontend Debug - Session found:', {
+        hasSession: !!session,
+        hasAccessToken: !!session?.access_token,
+        tokenLength: session?.access_token?.length,
+        tokenPreview: session?.access_token?.substring(0, 20) + '...'
+      });
 
       // Use Python backend instead of Supabase edge function
       const response = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/user/username/set`, {

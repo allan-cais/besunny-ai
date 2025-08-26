@@ -271,6 +271,17 @@ def create_app() -> FastAPI:
             "timestamp": time.time()
         }
     
+    # Authentication test endpoint
+    @app.get("/api/auth-test")
+    async def auth_test():
+        """Test endpoint to verify authentication is working."""
+        return {
+            "status": "success",
+            "message": "Authentication test endpoint accessible",
+            "backend": "python",
+            "timestamp": time.time()
+        }
+    
     logger.info("FastAPI application configured successfully")
     return app
 
