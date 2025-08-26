@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from typing import Dict, Any, Optional
 from pydantic import BaseModel
 
-# Temporarily comment out complex dependencies for testing
+# Temporarily use minimal imports for testing
 # from ...services.user.username_service import UsernameService
 # from ...core.security import get_current_user_from_supabase_token
 # from ...models.schemas.user import User
@@ -22,6 +22,21 @@ async def user_api_health():
         "status": "healthy",
         "service": "user-api",
         "timestamp": "2024-01-01T00:00:00Z"
+    }
+
+
+@router.get("/test")
+async def user_api_test():
+    """Test endpoint for user API - no authentication required."""
+    return {
+        "status": "success",
+        "message": "User API is working correctly",
+        "timestamp": "2024-01-01T00:00:00Z",
+        "features": [
+            "username_setup",
+            "gmail_watch_integration",
+            "virtual_email_generation"
+        ]
     }
 
 
@@ -61,11 +76,27 @@ async def set_username(
         Username setting result
     """
     try:
-        # Temporarily simplified for testing
+        # Simplified version for testing - will be replaced with full functionality
+        username = request.username
+        
+        # Basic validation
+        if len(username) < 3:
+            return UsernameResponse(
+                success=False,
+                error_message="Username must be at least 3 characters long"
+            )
+        
+        if not username.isalnum():
+            return UsernameResponse(
+                success=False,
+                error_message="Username can only contain letters and numbers"
+            )
+        
+        # For now, just return success (we'll add database saving later)
         return UsernameResponse(
             success=True,
-            username=request.username,
-            virtual_email=f"{request.username}@virtual.besunny.ai",
+            username=username,
+            virtual_email=f"{username}@virtual.besunny.ai",
             gmail_watch_setup={"success": True, "message": "Gmail watch setup successful"}
         )
             
@@ -78,7 +109,8 @@ async def set_username(
 
 @router.get("/username/validate/{username}", response_model=UsernameValidationResponse)
 async def validate_username(
-    username: str
+    username: str,
+    current_user: User = Depends(get_current_user_from_supabase_token)
 ) -> Dict[str, Any]:
     """
     Validate username format and availability.
@@ -93,13 +125,33 @@ async def validate_username(
     try:
         service = UsernameService()
         
-        # Temporarily simplified for testing
-        is_valid = len(username) >= 3 and username.isalnum()
+        # Validate format
+        is_valid = service._validate_username(username)
+        
+        if not is_valid:
+            return UsernameValidationResponse(
+                is_valid=False,
+                is_available=False,
+                error_message="Invalid username format"
+            )
+        
+        # Check availability
+        is_available = not await service._is_username_taken(username, current_user.id)
+        
+        # Generate suggestions if username is taken
+        suggestions = None
+        if not is_available:
+            suggestions = [
+                f"{username}1",
+                f"{username}2", 
+                f"{username}_{current_user.id[:8]}",
+                f"{username}2024"
+            ]
         
         return UsernameValidationResponse(
-            is_valid=is_valid,
-            is_available=is_valid,
-            suggestions=["testuser1", "testuser2"] if not is_valid else None
+            is_valid=True,
+            is_available=is_available,
+            suggestions=suggestions
         )
         
     except Exception as e:
@@ -110,7 +162,9 @@ async def validate_username(
 
 
 @router.get("/username/generate", response_model=UsernameResponse)
-async def generate_username() -> Dict[str, Any]:
+async def generate_username(
+    current_user: User = Depends(get_current_user_from_supabase_token)
+) -> Dict[str, Any]:
     """
     Generate a username from the user's email.
     
@@ -121,15 +175,41 @@ async def generate_username() -> Dict[str, Any]:
         Generated username result
     """
     try:
-        # Temporarily simplified for testing
-        username = "testuser"
-        virtual_email = f"{username}@virtual.besunny.ai"
+        service = UsernameService()
+        username = service._generate_username_from_email(current_user.email)
         
-        return UsernameResponse(
-            success=True,
-            username=username,
-            virtual_email=virtual_email
-        )
+        if username:
+            # Check if generated username is available
+            is_available = not await service._is_username_taken(username, current_user.id)
+            
+            if is_available:
+                virtual_email = service._generate_virtual_email(username)
+                return UsernameResponse(
+                    success=True,
+                    username=username,
+                    virtual_email=virtual_email
+                )
+            else:
+                # Try with variations
+                for i in range(1, 10):
+                    variation = f"{username}{i}"
+                    if not await service._is_username_taken(variation, current_user.id):
+                        virtual_email = service._generate_virtual_email(variation)
+                        return UsernameResponse(
+                            success=True,
+                            username=variation,
+                            virtual_email=virtual_email
+                        )
+                
+                return UsernameResponse(
+                    success=False,
+                    error_message="Could not generate available username"
+                )
+        else:
+            return UsernameResponse(
+                success=False,
+                error_message="Could not generate username from email"
+            )
             
     except Exception as e:
         raise HTTPException(
@@ -144,13 +224,13 @@ async def get_username_status() -> Dict[str, Any]:
     Get current username status for the user.
     
     Args:
-        current_user: Current authenticated user
+        None (simplified for testing)
         
     Returns:
         Username status information
     """
     try:
-        # Temporarily simplified for testing
+        # Simplified version for testing - will be replaced with full functionality
         return {
             "has_username": False,
             "username": None,
