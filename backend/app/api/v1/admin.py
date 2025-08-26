@@ -5,6 +5,8 @@ Simple admin endpoints for testing and setup.
 from typing import Dict, Any
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
+import base64
+import json
 
 router = APIRouter()
 
@@ -34,8 +36,6 @@ async def admin_login(request: AdminLoginRequest) -> Dict[str, Any]:
     if request.email in admin_credentials and request.password == admin_credentials[request.email]:
         # For now, return a simple token for testing
         # TODO: Implement proper JWT generation later
-        import base64
-        import json
         
         token_data = {
             "email": request.email,
