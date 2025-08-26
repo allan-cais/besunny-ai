@@ -42,6 +42,12 @@ class GmailWatchService:
                 logger.error(f"No Google credentials found for user {user_id}")
                 return None
             
+            # Log credentials information for debugging
+            logger.info(f"Credentials type: {type(credentials).__name__}")
+            logger.info(f"Credentials valid: {credentials.valid}")
+            logger.info(f"Credentials expired: {credentials.expired}")
+            logger.info(f"Credentials scopes: {credentials.scopes}")
+            
             # Create Gmail API service
             service = build('gmail', 'v1', credentials=credentials)
             
@@ -67,9 +73,12 @@ class GmailWatchService:
             
         except HttpError as e:
             logger.error(f"Failed to create Gmail watch for user {user_id}: {e}")
+            logger.error(f"HTTP Error details: {e.resp.status} - {e.content}")
             return None
         except Exception as e:
             logger.error(f"Unexpected error setting up Gmail watch: {e}")
+            logger.error(f"Error type: {type(e).__name__}")
+            logger.error(f"Error details: {str(e)}")
             return None
     
     async def setup_master_account_watch(self) -> Optional[str]:
@@ -263,7 +272,13 @@ class GmailWatchService:
                         ]
                     )
                     
+                    # Ensure credentials are valid and have access token
+                    if not credentials.valid:
+                        logger.info("Refreshing Google service account credentials...")
+                        credentials.refresh(None)
+                    
                     logger.info("Master account Google credentials loaded from base64")
+                    logger.debug(f"Credentials valid: {credentials.valid}, expired: {credentials.expired}")
                     return credentials
                     
                 except Exception as e:
@@ -282,7 +297,13 @@ class GmailWatchService:
                         ]
                     )
                     
+                    # Ensure credentials are valid and have access token
+                    if not credentials.valid:
+                        logger.info("Refreshing Google service account credentials...")
+                        credentials.refresh(None)
+                    
                     logger.info("Master account Google credentials loaded from file")
+                    logger.debug(f"Credentials valid: {credentials.valid}, expired: {credentials.expired}")
                     return credentials
                     
                 except Exception as e:
