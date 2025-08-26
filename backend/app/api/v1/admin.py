@@ -62,3 +62,44 @@ async def admin_login(request: AdminLoginRequest) -> Dict[str, Any]:
 async def admin_health():
     """Health check for admin service."""
     return {"status": "healthy", "service": "admin"}
+
+
+@router.post("/jwt-token")
+async def get_jwt_token(request: AdminLoginRequest) -> Dict[str, Any]:
+    """Get a JWT token for testing purposes."""
+    # Check credentials
+    admin_credentials = {
+        "ai@besunny.ai": "HardWork2025!",
+        "admin@besunny.ai": "HardWork2025!"
+    }
+    
+    if request.email in admin_credentials and request.password == admin_credentials[request.email]:
+        try:
+            # Generate a proper JWT token
+            from ...core.security import security_manager
+            
+            token_data = {
+                "sub": request.email,
+                "email": request.email,
+                "is_admin": True
+            }
+            
+            jwt_token = security_manager.create_access_token(data=token_data)
+            
+            return {
+                "success": True,
+                "message": "JWT token generated successfully",
+                "jwt_token": jwt_token,
+                "admin_token": base64.b64encode(json.dumps(token_data).encode()).decode()
+            }
+            
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Failed to generate JWT token: {str(e)}"
+            }
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid admin credentials"
+        )
