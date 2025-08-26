@@ -3,8 +3,7 @@ Security module for BeSunny.ai Python backend.
 Handles JWT tokens, password hashing, and authentication.
 """
 
-from datetime import datetime, timedelta
-import datetime as dt
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Union
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -46,9 +45,9 @@ class SecurityManager:
         to_encode = data.copy()
         
         if expires_delta:
-            expire = datetime.now(datetime.timezone.utc) + expires_delta
+            expire = datetime.now(timezone.utc) + expires_delta
         else:
-            expire = datetime.now(datetime.timezone.utc) + timedelta(
+            expire = datetime.now(timezone.utc) + timedelta(
                 minutes=self.settings.access_token_expire_minutes
             )
         
@@ -77,7 +76,7 @@ class SecurityManager:
         """Create JWT refresh token."""
         to_encode = data.copy()
         # Refresh tokens have longer expiration
-        expire = datetime.now(datetime.timezone.utc) + timedelta(days=7)
+        expire = datetime.now(timezone.utc) + timedelta(days=7)
         to_encode.update({"exp": expire, "type": "refresh"})
         encoded_jwt = jwt.encode(
             to_encode, 
