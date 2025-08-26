@@ -14,7 +14,6 @@ router = APIRouter()
 @router.post("/watch/setup")
 async def setup_gmail_watch(
     background_tasks: BackgroundTasks,
-    current_user: dict = Depends(get_current_user_from_supabase_token),
     x_admin_token: str = Header(None)
 ) -> Dict[str, Any]:
     """Set up Gmail watch for the master account."""
@@ -25,26 +24,31 @@ async def setup_gmail_watch(
     logger.info("=" * 50)
     
     try:
-        # Check for admin bypass token or admin user
-        admin_emails = ["ai@besunny.ai", "admin@besunny.ai"]
-        is_admin_user = current_user.get("email") in admin_emails
-        
-        # Allow admin bypass with X-Admin-Token header
-        if x_admin_token and not is_admin_user:
-            try:
-                import base64
-                import json
-                token_data = json.loads(base64.b64decode(x_admin_token).decode())
-                if token_data.get("is_admin") and token_data.get("email") in admin_emails:
-                    is_admin_user = True
-                    logger.info(f"Admin access granted via token for {token_data.get('email')}")
-            except Exception as e:
-                logger.warning(f"Invalid admin token: {e}")
-        
-        if not is_admin_user:
+        # Check for admin token
+        if not x_admin_token:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Admin access required - only authorized users can setup Gmail watch"
+                detail="Admin token required - use X-Admin-Token header"
+            )
+        
+        # Validate admin token
+        admin_emails = ["ai@besunny.ai", "admin@besunny.ai"]
+        try:
+            import base64
+            import json
+            token_data = json.loads(base64.b64decode(x_admin_token).decode())
+            if token_data.get("is_admin") and token_data.get("email") in admin_emails:
+                logger.info(f"Admin access granted via token for {token_data.get('email')}")
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Invalid admin token"
+                )
+        except Exception as e:
+            logger.warning(f"Invalid admin token: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Invalid admin token format"
             )
         
         gmail_service = GmailService()
@@ -155,16 +159,41 @@ async def get_recent_emails(
 
 @router.get("/test-auth")
 async def test_authentication(
-    current_user: dict = Depends(get_current_user_from_supabase_token)
+    x_admin_token: str = Header(None)
 ) -> Dict[str, Any]:
-    """Test endpoint to verify authentication is working."""
-    logger.info(f"Test auth endpoint called - current_user: {current_user}")
-    return {
-        "status": "success",
-        "message": "Authentication working",
-        "user": current_user,
-        "timestamp": "2024-01-01T00:00:00Z"
-    }
+    """Test endpoint to verify admin token is working."""
+    logger.info(f"Test auth endpoint called with admin token: {x_admin_token}")
+    
+    if not x_admin_token:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin token required - use X-Admin-Token header"
+        )
+    
+    # Validate admin token
+    admin_emails = ["ai@besunny.ai", "admin@besunny.ai"]
+    try:
+        import base64
+        import json
+        token_data = json.loads(base64.b64decode(x_admin_token).decode())
+        if token_data.get("is_admin") and token_data.get("email") in admin_emails:
+            return {
+                "status": "success",
+                "message": "Admin authentication working",
+                "user": token_data,
+                "timestamp": "2024-01-01T00:00:00Z"
+            }
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Invalid admin token"
+            )
+    except Exception as e:
+        logger.warning(f"Invalid admin token: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid admin token format"
+        )
 
 
 @router.get("/status")
