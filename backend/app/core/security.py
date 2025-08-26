@@ -46,9 +46,9 @@ class SecurityManager:
         to_encode = data.copy()
         
         if expires_delta:
-            expire = datetime.utcnow() + expires_delta
+            expire = datetime.now(datetime.timezone.utc) + expires_delta
         else:
-            expire = datetime.utcnow() + timedelta(
+            expire = datetime.now(datetime.timezone.utc) + timedelta(
                 minutes=self.settings.access_token_expire_minutes
             )
         
@@ -77,7 +77,7 @@ class SecurityManager:
         """Create JWT refresh token."""
         to_encode = data.copy()
         # Refresh tokens have longer expiration
-        expire = datetime.utcnow() + timedelta(days=7)
+        expire = datetime.now(datetime.timezone.utc) + timedelta(days=7)
         to_encode.update({"exp": expire, "type": "refresh"})
         encoded_jwt = jwt.encode(
             to_encode, 
@@ -199,8 +199,8 @@ async def get_current_user_from_supabase_token(
             "id": user.id,
             "email": user.email,
             "username": user.user_metadata.get("username"),
-            "created_at": user.created_at or dt.datetime.utcnow(),
-            "updated_at": user.last_sign_in_at or dt.datetime.utcnow(),
+            "created_at": user.created_at or datetime.now(datetime.timezone.utc),
+            "updated_at": user.last_sign_in_at or datetime.now(datetime.timezone.utc),
             "permissions": user.user_metadata.get("permissions", []),
         }
         
@@ -424,7 +424,7 @@ class RateLimiter:
     
     def is_allowed(self, identifier: str) -> bool:
         """Check if request is allowed based on rate limits."""
-        now = datetime.utcnow()
+        now = datetime.now(datetime.timezone.utc)
         window_start = now - timedelta(seconds=self.settings.rate_limit_window)
         
         # Clean old requests

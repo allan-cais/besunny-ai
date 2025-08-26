@@ -7,10 +7,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from typing import Dict, Any, Optional
 from pydantic import BaseModel
 
-# Temporarily use minimal imports for testing
-# from ...services.user.username_service import UsernameService
-# from ...core.security import get_current_user_from_supabase_token
-# from ...models.schemas.user import User
+# Import required modules
+from ...services.user.username_service import UsernameService
+from ...core.security import get_current_user_from_supabase_token
+from ...models.schemas.user import User
 
 router = APIRouter()
 
