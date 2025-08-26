@@ -41,7 +41,9 @@ class UsernameService:
     
     def __init__(self):
         self.settings = get_settings()
-        self.supabase = get_supabase()
+        # Use service role client to bypass RLS policies
+        from ...core.supabase_config import get_supabase_service_client
+        self.supabase = get_supabase_service_client()
         
         logger.info("Username Service initialized")
     
@@ -59,7 +61,7 @@ class UsernameService:
             logger.info(f"Starting username management cron execution {execution_id}")
             
             # Get all users without usernames
-            users_without_usernames = await self._get_users_without_usernames()
+            users_without_usernames = self._get_users_without_usernames()
             if not users_without_usernames:
                 logger.info("No users need username setup")
                 return await self._create_cron_result(
@@ -149,7 +151,7 @@ class UsernameService:
                 }
             
             # Check if username is already taken
-            if await self._is_username_taken(username, user_id):
+            if self._is_username_taken(username, user_id):
                 return {
                     'success': False,
                     'error': 'Username already taken'
@@ -159,7 +161,7 @@ class UsernameService:
             virtual_email = self._generate_virtual_email(username)
             
             # Ensure user exists in the users table
-            await self._ensure_user_exists(user_id)
+            self._ensure_user_exists(user_id)
             
             # Update user record with username
             update_data = {
@@ -167,6 +169,7 @@ class UsernameService:
                 'username_set_at': datetime.now().isoformat()
             }
             
+            # Execute update synchronously (service role client)
             self.supabase.table("users") \
                 .update(update_data) \
                 .eq("id", user_id) \
@@ -190,7 +193,7 @@ class UsernameService:
                 'error': str(e)
             }
     
-    async def _ensure_user_exists(self, user_id: str) -> None:
+    def _ensure_user_exists(self, user_id: str) -> None:
         """
         Ensure that a user record exists in the users table.
         If not, create it with basic information.
@@ -217,6 +220,7 @@ class UsernameService:
                 'created_at': datetime.now().isoformat()
             }
             
+            # Execute insert synchronously (service role client)
             self.supabase.table("users") \
                 .insert(user_data) \
                 .execute()
@@ -317,7 +321,7 @@ class UsernameService:
         
         return True
     
-    async def _is_username_taken(self, username: str, exclude_user_id: str = None) -> bool:
+    def _is_username_taken(self, username: str, exclude_user_id: str = None) -> bool:
         """Check if username is already taken by another user."""
         try:
             query = self.supabase.table("users") \
@@ -346,7 +350,7 @@ class UsernameService:
             logger.error(f"Error generating virtual email: {str(e)}")
             return f"{username}@virtual.besunny.ai"
     
-    async def _get_users_without_usernames(self) -> List[Dict[str, Any]]:
+    def _get_users_without_usernames(self) -> List[Dict[str, Any]]:
         """Get all users without usernames."""
         try:
             result = self.supabase.table("users") \
