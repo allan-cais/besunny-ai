@@ -4,9 +4,12 @@ Clean Gmail API endpoints for email watching and processing.
 
 from typing import Dict, Any, List
 from fastapi import APIRouter, HTTPException, status, Depends, BackgroundTasks, Header
+import logging
 
 from ...core.security import get_current_user_from_supabase_token
 from ...services.email.gmail_service import GmailService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
