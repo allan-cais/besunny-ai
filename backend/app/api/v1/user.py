@@ -82,7 +82,7 @@ async def set_username(
         
         # Use the UsernameService to actually set the username
         service = UsernameService()
-        result = await service.set_username(current_user.id, username)
+        result = await service.set_username(current_user["id"], username)
         
         if result.get('success'):
             return UsernameResponse(
@@ -133,7 +133,7 @@ async def validate_username(
             )
         
         # Check availability
-        is_available = not await service._is_username_taken(username, current_user.id)
+        is_available = not await service._is_username_taken(username, current_user["id"])
         
         # Generate suggestions if username is taken
         suggestions = None
@@ -141,7 +141,7 @@ async def validate_username(
             suggestions = [
                 f"{username}1",
                 f"{username}2", 
-                f"{username}_{current_user.id[:8]}",
+                f"{username}_{current_user['id'][:8]}",
                 f"{username}2024"
             ]
         
@@ -173,11 +173,11 @@ async def generate_username(
     """
     try:
         service = UsernameService()
-        username = service._generate_username_from_email(current_user.email)
+        username = service._generate_username_from_email(current_user["email"])
         
         if username:
             # Check if generated username is available
-            is_available = not await service._is_username_taken(username, current_user.id)
+            is_available = not await service._is_username_taken(username, current_user["id"])
             
             if is_available:
                 virtual_email = service._generate_virtual_email(username)
@@ -190,7 +190,7 @@ async def generate_username(
                 # Try with variations
                 for i in range(1, 10):
                     variation = f"{username}{i}"
-                    if not await service._is_username_taken(variation, current_user.id):
+                    if not await service._is_username_taken(variation, current_user["id"]):
                         virtual_email = service._generate_virtual_email(variation)
                         return UsernameResponse(
                             success=True,

@@ -158,9 +158,13 @@ class UsernameService:
             # Generate virtual email
             virtual_email = self._generate_virtual_email(username)
             
-            # Update user record
+            # Ensure user exists in the users table
+            await self._ensure_user_exists(user_id)
+            
+            # Update user record with username
             update_data = {
                 'username': username,
+                'username_set_at': datetime.now().isoformat(),
                 'updated_at': datetime.now().isoformat()
             }
             
@@ -186,6 +190,45 @@ class UsernameService:
                 'success': False,
                 'error': str(e)
             }
+    
+    async def _ensure_user_exists(self, user_id: str) -> None:
+        """
+        Ensure that a user record exists in the users table.
+        If not, create it with basic information.
+        
+        Args:
+            user_id: User ID from Supabase Auth
+        """
+        try:
+            # Check if user already exists
+            result = self.supabase.table("users") \
+                .select("id") \
+                .eq("id", user_id) \
+                .execute()
+            
+            if result.data and len(result.data) > 0:
+                logger.info(f"User {user_id} already exists in users table")
+                return
+            
+            # User doesn't exist, create basic record
+            # We'll need to get the user info from Supabase Auth
+            # For now, create a minimal record
+            user_data = {
+                'id': user_id,
+                'created_at': datetime.now().isoformat(),
+                'updated_at': datetime.now().isoformat()
+            }
+            
+            self.supabase.table("users") \
+                .insert(user_data) \
+                .execute()
+            
+            logger.info(f"Created user record for {user_id} in users table")
+            
+        except Exception as e:
+            logger.error(f"Error ensuring user exists: {str(e)}")
+            # Don't raise - this is not critical for username setting
+            # The update operation might still work if the user exists
     
     async def _setup_gmail_watch_for_user(self, user_id: str, username: str) -> Dict[str, Any]:
         """
