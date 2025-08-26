@@ -255,13 +255,21 @@ class GmailWatchService:
             import json
             import base64
             
+            # Debug: Log what settings are available
+            logger.info(f"Settings object type: {type(self.settings)}")
+            logger.info(f"Settings attributes: {dir(self.settings)}")
+            
             # Try to get base64 encoded key first (for production)
             key_base64 = getattr(self.settings, 'google_service_account_key_base64', None)
+            logger.info(f"Base64 key available: {key_base64 is not None}")
             if key_base64:
+                logger.info(f"Base64 key length: {len(key_base64) if key_base64 else 0}")
                 try:
                     # Decode base64 and parse JSON
                     key_json = base64.b64decode(key_base64).decode('utf-8')
                     key_data = json.loads(key_json)
+                    
+                    logger.info(f"Service account email: {key_data.get('client_email', 'Not found')}")
                     
                     credentials = service_account.Credentials.from_service_account_info(
                         key_data,
@@ -278,14 +286,18 @@ class GmailWatchService:
                         credentials.refresh(None)
                     
                     logger.info("Master account Google credentials loaded from base64")
-                    logger.debug(f"Credentials valid: {credentials.valid}, expired: {credentials.expired}")
+                    logger.info(f"Credentials valid: {credentials.valid}, expired: {credentials.expired}")
                     return credentials
                     
                 except Exception as e:
-                    logger.warning(f"Failed to load base64 credentials: {e}")
+                    logger.error(f"Failed to load base64 credentials: {e}")
+                    logger.error(f"Error type: {type(e).__name__}")
+                    import traceback
+                    logger.error(f"Traceback: {traceback.format_exc()}")
             
             # Fallback to file path (for local development)
             key_path = getattr(self.settings, 'google_service_account_key_path', None)
+            logger.info(f"Key path available: {key_path}")
             if key_path:
                 try:
                     credentials = service_account.Credentials.from_service_account_file(
@@ -303,17 +315,24 @@ class GmailWatchService:
                         credentials.refresh(None)
                     
                     logger.info("Master account Google credentials loaded from file")
-                    logger.debug(f"Credentials valid: {credentials.valid}, expired: {credentials.expired}")
+                    logger.info(f"Credentials valid: {credentials.valid}, expired: {credentials.expired}")
                     return credentials
                     
                 except Exception as e:
-                    logger.warning(f"Failed to load file credentials: {e}")
+                    logger.error(f"Failed to load file credentials: {e}")
+                    logger.error(f"Error type: {type(e).__name__}")
+                    import traceback
+                    logger.error(f"Traceback: {traceback.format_exc()}")
             
             logger.error("No Google service account credentials configured")
+            logger.error("Please ensure GOOGLE_SERVICE_ACCOUNT_KEY_BASE64 is set in production")
             return None
             
         except Exception as e:
             logger.error(f"Error getting master account credentials: {e}")
+            logger.error(f"Error type: {type(e).__name__}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return None
     
     def _store_gmail_watch(
