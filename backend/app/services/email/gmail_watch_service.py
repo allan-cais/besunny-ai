@@ -280,13 +280,10 @@ class GmailWatchService:
                         ]
                     )
                     
-                    # Ensure credentials are valid and have access token
-                    if not credentials.valid:
-                        logger.info("Refreshing Google service account credentials...")
-                        credentials.refresh(None)
-                    
+                    # Service account credentials are automatically valid and don't need manual refresh
                     logger.info("Master account Google credentials loaded from base64")
                     logger.info(f"Credentials valid: {credentials.valid}, expired: {credentials.expired}")
+                    logger.info(f"Service account email: {credentials.service_account_email}")
                     return credentials
                     
                 except Exception as e:
@@ -309,13 +306,10 @@ class GmailWatchService:
                         ]
                     )
                     
-                    # Ensure credentials are valid and have access token
-                    if not credentials.valid:
-                        logger.info("Refreshing Google service account credentials...")
-                        credentials.refresh(None)
-                    
+                    # Service account credentials are automatically valid and don't need manual refresh
                     logger.info("Master account Google credentials loaded from file")
                     logger.info(f"Credentials valid: {credentials.valid}, expired: {credentials.expired}")
+                    logger.info(f"Service account email: {credentials.service_account_email}")
                     return credentials
                     
                 except Exception as e:
