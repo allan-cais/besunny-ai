@@ -164,8 +164,7 @@ class UsernameService:
             # Update user record with username
             update_data = {
                 'username': username,
-                'username_set_at': datetime.now().isoformat(),
-                'updated_at': datetime.now().isoformat()
+                'username_set_at': datetime.now().isoformat()
             }
             
             self.supabase.table("users") \
@@ -215,8 +214,7 @@ class UsernameService:
             # For now, create a minimal record
             user_data = {
                 'id': user_id,
-                'created_at': datetime.now().isoformat(),
-                'updated_at': datetime.now().isoformat()
+                'created_at': datetime.now().isoformat()
             }
             
             self.supabase.table("users") \
