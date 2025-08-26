@@ -34,30 +34,55 @@ class GmailService:
     def _init_service(self):
         """Initialize Gmail service with service account credentials."""
         try:
-            # Get service account key from environment
-            service_account_key = os.getenv('GOOGLE_SERVICE_ACCOUNT_KEY_BASE64')
+            # Get service account key from config
+            service_account_key = self.settings.google_service_account_key_base64
             if not service_account_key:
-                logger.error("GOOGLE_SERVICE_ACCOUNT_KEY_BASE64 not set")
+                logger.error("GOOGLE_SERVICE_ACCOUNT_KEY_BASE64 not set in config")
                 return
             
             # Decode and create credentials
             import base64
             import json
             
-            key_data = json.loads(base64.b64decode(service_account_key))
-            self.credentials = service_account.Credentials.from_service_account_info(
-                key_data,
-                scopes=[
-                    'https://www.googleapis.com/auth/gmail.readonly',
-                    'https://www.googleapis.com/auth/gmail.modify'
-                ]
-            )
-            
-            # Create delegated credentials for ai@besunny.ai
-            self.credentials = self.credentials.with_subject(self.master_email)
-            
-            # Build Gmail service
-            self.gmail_service = build('gmail', 'v1', credentials=self.credentials)
+            try:
+                key_data = json.loads(base64.b64decode(service_account_key))
+                logger.info(f"Service account key decoded successfully")
+                logger.info(f"Service account email: {key_data.get('client_email')}")
+                logger.info(f"Project ID: {key_data.get('project_id')}")
+                
+                self.credentials = service_account.Credentials.from_service_account_info(
+                    key_data,
+                    scopes=[
+                        'https://www.googleapis.com/auth/gmail.readonly',
+                        'https://www.googleapis.com/auth/gmail.modify'
+                    ]
+                )
+                
+                logger.info(f"Service account credentials created successfully")
+                logger.info(f"Has scopes: {self.credentials.has_scopes(['https://www.googleapis.com/auth/gmail.readonly'])}")
+                
+                # Create delegated credentials for ai@besunny.ai
+                logger.info(f"Creating delegated credentials for {self.master_email}")
+                try:
+                    self.credentials = self.credentials.with_subject(self.master_email)
+                    logger.info(f"Delegated credentials created successfully")
+                except Exception as e:
+                    logger.error(f"Failed to create delegated credentials: {e}")
+                    logger.error(f"This usually means domain-wide delegation is not properly configured")
+                    logger.error(f"Please check Google Workspace Admin > Security > API controls > Domain-wide delegation")
+                    raise
+                
+                # Build Gmail service
+                logger.info("Building Gmail API service...")
+                self.gmail_service = build('gmail', 'v1', credentials=self.credentials)
+                logger.info("Gmail API service built successfully")
+                
+            except Exception as e:
+                logger.error(f"Error during credential setup: {e}")
+                logger.error(f"Error type: {type(e).__name__}")
+                import traceback
+                logger.error(f"Traceback: {traceback.format_exc()}")
+                raise
             
             logger.info(f"Gmail service initialized for {self.master_email}")
             logger.info(f"Service account: {key_data.get('client_email')}")
@@ -87,13 +112,20 @@ class GmailService:
                 'labelFilterAction': 'include'
             }
             
+            logger.info(f"Setting up Gmail watch with request: {watch_request}")
+            logger.info(f"Using user ID: {self.master_email}")
+            
             # Set up the watch
+            logger.info("Executing Gmail watch API call...")
             watch = self.gmail_service.users().watch(
                 userId=self.master_email, 
                 body=watch_request
             ).execute()
             
+            logger.info(f"Gmail watch API call successful: {watch}")
+            
             # Store watch info
+            logger.info("Storing watch info in database...")
             watch_id = await self._store_watch_info(watch)
             
             logger.info(f"Gmail watch setup successful: {watch_id}")
@@ -101,9 +133,16 @@ class GmailService:
             
         except HttpError as e:
             logger.error(f"Gmail API error setting up watch: {e}")
+            logger.error(f"HTTP Error details: {e.resp.status} - {e.content}")
+            logger.error(f"Error type: {type(e).__name__}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return None
         except Exception as e:
             logger.error(f"Error setting up Gmail watch: {e}")
+            logger.error(f"Error type: {type(e).__name__}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return None
     
     async def process_email(self, message_id: str) -> bool:
@@ -286,7 +325,7 @@ class GmailService:
         """Store Gmail watch information in database."""
         try:
             watch_data = {
-                'email': self.master_email,
+                'user_email': self.master_email,
                 'history_id': watch_response.get('historyId'),
                 'expiration': watch_response.get('expiration'),
                 'is_active': True,

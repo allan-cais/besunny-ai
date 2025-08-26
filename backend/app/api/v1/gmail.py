@@ -22,7 +22,6 @@ async def setup_gmail_watch(
     """Set up Gmail watch for the master account."""
     logger.info("=" * 50)
     logger.info("GMAIL WATCH SETUP ENDPOINT CALLED")
-    logger.info(f"Current user: {current_user}")
     logger.info(f"Admin token header: {x_admin_token}")
     logger.info("=" * 50)
     
@@ -70,22 +69,34 @@ async def setup_gmail_watch(
                 detail="Gmail service not ready - check service account configuration"
             )
         
-        # Get topic name from environment or use default
-        topic_name = "projects/sunny-ai-468016/topics/gmail-notifications"
-        
-        # Set up the watch in the background
-        background_tasks.add_task(
-            gmail_service.setup_watch,
-            topic_name
-        )
-        
-        return {
-            "status": "success",
-            "message": "Gmail watch setup initiated for master account",
-            "master_email": gmail_service.master_email,
-            "topic_name": topic_name,
-            "timestamp": "2024-01-01T00:00:00Z"
-        }
+        # For now, just verify the Gmail service is working
+        # The PubSub topic needs to be created in Google Cloud Console
+        try:
+            # Test basic Gmail connectivity instead of setting up watch
+            profile = gmail_service.gmail_service.users().getProfile(userId=gmail_service.master_email).execute()
+            
+            return {
+                "status": "success",
+                "message": "Gmail service is working - PubSub topic setup pending",
+                "master_email": gmail_service.master_email,
+                "gmail_status": {
+                    "email": profile.get('emailAddress'),
+                    "messages_total": profile.get('messagesTotal'),
+                    "threads_total": profile.get('threadsTotal')
+                },
+                "note": "To enable Gmail watch, create PubSub topic 'gmail-notifications' in Google Cloud Console",
+                "timestamp": "2024-01-01T00:00:00Z"
+            }
+            
+        except Exception as e:
+            logger.error(f"Error testing Gmail connectivity: {e}")
+            logger.error(f"Error type: {type(e).__name__}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Gmail service error: {str(e)}"
+            )
         
     except HTTPException:
         raise
@@ -112,11 +123,20 @@ async def process_email(
                 detail="Gmail service not ready"
             )
         
-        # Process the email in the background
-        background_tasks.add_task(
-            gmail_service.process_email,
-            message_id
-        )
+        # Process the email directly (not in background for now)
+        try:
+            success = await gmail_service.process_email(message_id)
+            if not success:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to process email"
+                )
+        except Exception as e:
+            logger.error(f"Error processing email: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to process email: {str(e)}"
+            )
         
         return {
             "status": "success",
@@ -290,3 +310,79 @@ async def gmail_webhook(
         logger.error(f"Error processing Gmail webhook: {e}")
         
         return {"status": "error", "error": str(e)}
+
+
+@router.get("/test-gmail-connection")
+async def test_gmail_connection(
+    x_admin_token: str = Header(None)
+) -> Dict[str, Any]:
+    """Test endpoint to verify Gmail service can connect to Gmail API."""
+    try:
+        logger.info("=" * 50)
+        logger.info("TEST GMAIL CONNECTION ENDPOINT CALLED")
+        
+        # Check for admin token
+        if not x_admin_token:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Admin token required - use X-Admin-Token header"
+            )
+        
+        # Validate admin token (simplified for now)
+        try:
+            import base64
+            import json
+            decoded_bytes = base64.b64decode(x_admin_token)
+            decoded_string = decoded_bytes.decode('utf-8')
+            token_data = json.loads(decoded_string)
+            
+            if not (token_data.get("is_admin") and token_data.get('email') in ["ai@besunny.ai", "admin@besunny.ai"]):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Invalid admin token - insufficient privileges"
+                )
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid admin token format: {str(e)}"
+            )
+        
+        # Test Gmail service
+        gmail_service = GmailService()
+        
+        if not gmail_service.is_ready():
+            return {
+                "status": "error",
+                "message": "Gmail service not ready",
+                "details": "Service account credentials or configuration issue",
+                "timestamp": "2024-01-01T00:00:00Z"
+            }
+        
+        # Try to get Gmail profile to test connection
+        try:
+            profile = gmail_service.gmail_service.users().getProfile(userId=gmail_service.master_email).execute()
+            return {
+                "status": "success",
+                "message": "Gmail API connection successful",
+                "email": profile.get('emailAddress'),
+                "messages_total": profile.get('messagesTotal'),
+                "threads_total": profile.get('threadsTotal'),
+                "timestamp": "2024-01-01T00:00:00Z"
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": "Gmail API connection failed",
+                "error": str(e),
+                "error_type": type(e).__name__,
+                "timestamp": "2024-01-01T00:00:00Z"
+            }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in test-gmail-connection: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Unexpected error: {str(e)}"
+        )

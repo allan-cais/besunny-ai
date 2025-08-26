@@ -1,75 +1,57 @@
 #!/usr/bin/env python3
 """
-Test script for setting up and testing Gmail watches.
+Test Gmail watch setup functionality.
 """
 
 import asyncio
-import logging
+import os
 import sys
-from pathlib import Path
+import logging
 
 # Add the app directory to the Python path
-sys.path.insert(0, str(Path(__file__).parent / "app"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'app'))
 
-from app.services.email.gmail_watch_service import GmailWatchService
+from app.services.email.gmail_service import GmailService
 
-# Configure logging
+# Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
 async def test_gmail_watch_setup():
     """Test Gmail watch setup functionality."""
+    print("🔍 Testing Gmail watch setup...")
     
     try:
-        logger.info("🔧 Testing Gmail watch setup...")
+        # Initialize Gmail service
+        gmail_service = GmailService()
         
-        # Initialize the watch service
-        watch_service = GmailWatchService()
-        logger.info("✅ Gmail watch service initialized")
+        if not gmail_service.is_ready():
+            print("❌ Gmail service not ready")
+            return
         
-        # Test getting active watches
-        active_watches = await watch_service.get_active_watches()
-        logger.info(f"📊 Current active watches: {len(active_watches)}")
+        print("✅ Gmail service ready")
         
-        if active_watches:
-            for watch in active_watches:
-                logger.info(f"  - Watch ID: {watch.get('id')}")
-                logger.info(f"    Username: {watch.get('username')}")
-                logger.info(f"    Active: {watch.get('is_active')}")
-                logger.info(f"    Expires: {watch.get('expiration')}")
+        # Test with a simple topic name first
+        topic_name = "projects/sunny-ai-468016/topics/gmail-notifications"
+        print(f"📧 Testing watch setup with topic: {topic_name}")
         
-        # Test setting up a new watch (this will fail locally without credentials)
-        logger.info("🔄 Attempting to set up a new Gmail watch...")
-        logger.info("   Note: This will fail locally without Google credentials")
-        
-        # You would normally call this with a real user ID
-        # watch_id = await watch_service.setup_virtual_email_watch("test_user_id")
-        
-        logger.info("✅ Gmail watch service test completed")
-        logger.info("\n📋 Next steps:")
-        logger.info("1. Deploy to Railway with proper Google credentials")
-        logger.info("2. Set up Gmail watches via API endpoints")
-        logger.info("3. Send test emails to ai+username@besunny.ai")
-        logger.info("4. Monitor webhook processing")
-        
+        try:
+            watch_id = await gmail_service.setup_watch(topic_name)
+            if watch_id:
+                print(f"✅ Gmail watch setup successful: {watch_id}")
+            else:
+                print("❌ Gmail watch setup failed - no watch ID returned")
+        except Exception as e:
+            print(f"❌ Gmail watch setup error: {e}")
+            print(f"Error type: {type(e).__name__}")
+            import traceback
+            traceback.print_exc()
+            
     except Exception as e:
-        logger.error(f"❌ Gmail watch test failed: {e}")
-        raise
-
-
-async def main():
-    """Main test function."""
-    logger.info("🚀 Starting Gmail watch setup tests...")
-    
-    try:
-        await test_gmail_watch_setup()
-        logger.info("🎉 All tests completed successfully!")
-        
-    except Exception as e:
-        logger.error(f"💥 Test suite failed: {e}")
-        sys.exit(1)
-
+        print(f"❌ Error during testing: {e}")
+        print(f"Error type: {type(e).__name__}")
+        import traceback
+        traceback.print_exc()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(test_gmail_watch_setup())
