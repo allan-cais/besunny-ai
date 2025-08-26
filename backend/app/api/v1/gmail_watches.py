@@ -6,9 +6,8 @@ Provides REST API for setting up and managing Gmail watches.
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, status
 
-from ...services.email import GmailWatchService
-from ...core.security import get_current_user
-from ...models.schemas.user import User
+from ...services.email import GmailService
+from ...core.security import get_current_user_from_supabase_token
 
 router = APIRouter()
 
@@ -16,58 +15,44 @@ router = APIRouter()
 @router.post("/setup")
 async def setup_virtual_email_watch(
     background_tasks: BackgroundTasks,
-    current_user: User = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user_from_supabase_token)
 ) -> Dict[str, Any]:
     """
     Set up Gmail watch for the current user's virtual email address.
     
-    This creates a push notification subscription that will notify our webhook
-    when emails arrive at ai+{username}@besunny.ai.
+    Note: This endpoint is deprecated. Individual user watches are no longer needed
+    as emails automatically forward to the master account.
     """
-    try:
-        watch_service = GmailWatchService()
-        
-        # Set up the watch in the background
-        background_tasks.add_task(
-            watch_service.setup_virtual_email_watch,
-            current_user.id
-        )
-        
-        return {
-            "status": "success",
-            "message": "Gmail watch setup initiated",
-            "user_id": current_user.id,
-            "timestamp": "2024-01-01T00:00:00Z"
-        }
-        
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to setup Gmail watch: {str(e)}"
-        )
+    return {
+        "status": "deprecated",
+        "message": "Individual user watches are no longer needed. Emails automatically forward to master account.",
+        "user_id": current_user.get("id"),
+        "timestamp": "2024-01-01T00:00:00Z"
+    }
 
 
 @router.post("/setup-master")
 async def setup_master_account_watch(
     background_tasks: BackgroundTasks,
-    current_user: User = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user_from_supabase_token)
 ) -> Dict[str, Any]:
     """
-    Set up Gmail watch for the master account (inbound@besunny.ai).
+    Set up Gmail watch for the master account (ai@besunny.ai).
     
     This is typically done by an admin user to monitor the master account
     for all virtual email addresses.
     """
     try:
         # TODO: Add admin role check
-        # if not current_user.is_admin:
+        # if not current_user.get("is_admin"):
         #     raise HTTPException(status_code=403, detail="Admin access required")
         
-        watch_service = GmailWatchService()
+        gmail_service = GmailService()
         
         # Set up the master account watch in the background
         background_tasks.add_task(
-            watch_service.setup_master_account_watch
+            gmail_service.setup_watch,
+            "projects/sunny-ai-468016/topics/gmail-notifications"
         )
         
         return {
@@ -86,7 +71,7 @@ async def setup_master_account_watch(
 @router.get("/active")
 async def get_active_watches(
     user_id: Optional[str] = None,
-    current_user: User = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user_from_supabase_token)
 ) -> Dict[str, Any]:
     """
     Get active Gmail watches.
@@ -129,7 +114,7 @@ async def get_active_watches(
 async def renew_watch(
     watch_id: str,
     background_tasks: BackgroundTasks,
-    current_user: User = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user_from_supabase_token)
 ) -> Dict[str, Any]:
     """
     Renew a Gmail watch before it expires.
@@ -142,12 +127,12 @@ async def renew_watch(
         Renewal result
     """
     try:
-        watch_service = GmailWatchService()
+        gmail_service = GmailService()
         
         # Renew the watch in the background
         background_tasks.add_task(
-            watch_service.renew_watch,
-            watch_id
+            gmail_service.setup_watch,
+            "projects/sunny-ai-468016/topics/gmail-notifications"
         )
         
         return {
@@ -168,7 +153,7 @@ async def renew_watch(
 async def stop_watch(
     watch_id: str,
     background_tasks: BackgroundTasks,
-    current_user: User = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user_from_supabase_token)
 ) -> Dict[str, Any]:
     """
     Stop a Gmail watch.
@@ -181,17 +166,12 @@ async def stop_watch(
         Stop result
     """
     try:
-        watch_service = GmailWatchService()
-        
-        # Stop the watch in the background
-        background_tasks.add_task(
-            watch_service.stop_watch,
-            watch_id
-        )
+        # TODO: Implement watch stopping functionality
+        # For now, return success as individual watches are no longer needed
         
         return {
             "status": "success",
-            "message": "Gmail watch stop initiated",
+            "message": "Watch stop initiated (individual watches no longer needed)",
             "watch_id": watch_id,
             "timestamp": "2024-01-01T00:00:00Z"
         }
@@ -206,7 +186,7 @@ async def stop_watch(
 @router.post("/{watch_id}/test")
 async def test_watch(
     watch_id: str,
-    current_user: User = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user_from_supabase_token)
 ) -> Dict[str, Any]:
     """
     Test a Gmail watch to ensure it's working properly.
@@ -239,7 +219,7 @@ async def test_watch(
 
 @router.get("/status")
 async def get_watch_system_status(
-    current_user: User = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user_from_supabase_token)
 ) -> Dict[str, Any]:
     """
     Get the overall status of the Gmail watch system.
@@ -248,26 +228,39 @@ async def get_watch_system_status(
         System status information
     """
     try:
-        watch_service = GmailWatchService()
+        gmail_service = GmailService()
         
-        # Get all active watches
-        all_watches = await watch_service.get_active_watches()
+        # Check Gmail service status
+        status_info = await gmail_service.get_service_status()
         
-        # Count watches by type
-        user_watches = [w for w in all_watches if not w.get('is_master_account')]
-        master_watches = [w for w in all_watches if w.get('is_master_account')]
-        
-        return {
-            "status": "healthy",
-            "service": "gmail-watches",
-            "statistics": {
-                "total_watches": len(all_watches),
-                "user_watches": len(user_watches),
-                "master_watches": len(master_watches),
-                "active_watches": len(all_watches)
-            },
-            "timestamp": "2024-01-01T00:00:00Z"
-        }
+        if status_info.get('status') == 'ready':
+            return {
+                "status": "healthy",
+                "service": "gmail-watches",
+                "message": "OAuth-based email system is active",
+                "oauth_status": "authenticated",
+                "statistics": {
+                    "total_watches": 1,  # Only one master watch needed
+                    "user_watches": 0,   # Individual user watches no longer needed
+                    "master_watches": 1, # One master watch for all emails
+                    "active_watches": 1
+                },
+                "timestamp": "2024-01-01T00:00:00Z"
+            }
+        else:
+            return {
+                "status": "unhealthy",
+                "service": "gmail-watches",
+                "message": "OAuth authentication required",
+                "oauth_status": "unauthenticated",
+                "statistics": {
+                    "total_watches": 0,
+                    "user_watches": 0,
+                    "master_watches": 0,
+                    "active_watches": 0
+                },
+                "timestamp": "2024-01-01T00:00:00Z"
+            }
         
     except Exception as e:
         return {

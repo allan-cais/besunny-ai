@@ -1,13 +1,16 @@
 """
-Gmail watch service for monitoring virtual email addresses.
-Sets up push notifications for emails sent to ai+{username}@besunny.ai.
+Gmail OAuth service for monitoring virtual email addresses.
+Uses app-level OAuth for ai@besunny.ai to receive emails sent to +username@besunny.ai.
 """
 
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
 import logging
 import json
+import os
 from google.oauth2.credentials import Credentials
+from google.oauth2.oauth2_credentials import Credentials as OAuth2Credentials
+from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
@@ -17,8 +20,8 @@ from ...core.config import get_settings
 logger = logging.getLogger(__name__)
 
 
-class GmailWatchService:
-    """Service for managing Gmail watches and push notifications."""
+class GmailOAuthService:
+    """Service for managing Gmail OAuth authentication and email monitoring."""
     
     def __init__(self):
         self.settings = get_settings()
@@ -281,6 +284,7 @@ class GmailWatchService:
         """Get Google credentials for the master account."""
         try:
             from google.oauth2 import service_account
+            from google.auth.transport.requests import Request
             import json
             import base64
             
@@ -299,7 +303,9 @@ class GmailWatchService:
                     key_data = json.loads(key_json)
                     
                     logger.info(f"Service account email: {key_data.get('client_email', 'Not found')}")
+                    logger.info(f"Service account project: {key_data.get('project_id', 'Not found')}")
                     
+                    # Create credentials with explicit scopes
                     credentials = service_account.Credentials.from_service_account_info(
                         key_data,
                         scopes=[
@@ -309,7 +315,15 @@ class GmailWatchService:
                         ]
                     )
                     
-                    # Service account credentials are automatically valid and don't need manual refresh
+                    # Explicitly refresh the credentials to get an access token
+                    logger.info("Refreshing service account credentials to get access token...")
+                    try:
+                        credentials.refresh(Request())
+                        logger.info("Credentials refreshed successfully")
+                    except Exception as refresh_error:
+                        logger.warning(f"Could not refresh credentials: {refresh_error}")
+                    
+                    # Service account credentials should now be valid
                     logger.info("Master account Google credentials loaded from base64")
                     logger.info(f"Credentials valid: {credentials.valid}, expired: {credentials.expired}")
                     logger.info(f"Service account email: {credentials.service_account_email}")
@@ -318,11 +332,14 @@ class GmailWatchService:
                     try:
                         # Try to get the token to see if it's available
                         token = credentials.token
-                        logger.info(f"Initial token available: {token is not None}")
+                        logger.info(f"Access token available: {token is not None}")
                         if token:
-                            logger.info(f"Initial token length: {len(token)}")
+                            logger.info(f"Access token length: {len(token)}")
+                            logger.info(f"Token type: {type(token).__name__}")
+                        else:
+                            logger.warning("No access token available after refresh")
                     except Exception as e:
-                        logger.warning(f"Could not get initial token: {e}")
+                        logger.warning(f"Could not get access token: {e}")
                     
                     return credentials
                     
@@ -346,10 +363,32 @@ class GmailWatchService:
                         ]
                     )
                     
-                    # Service account credentials are automatically valid and don't need manual refresh
+                    # Explicitly refresh the credentials to get an access token
+                    logger.info("Refreshing service account credentials to get access token...")
+                    try:
+                        credentials.refresh(Request())
+                        logger.info("Credentials refreshed successfully")
+                    except Exception as refresh_error:
+                        logger.warning(f"Could not refresh credentials: {refresh_error}")
+                    
+                    # Service account credentials should now be valid
                     logger.info("Master account Google credentials loaded from file")
                     logger.info(f"Credentials valid: {credentials.valid}, expired: {credentials.expired}")
                     logger.info(f"Service account email: {credentials.service_account_email}")
+                    
+                    # Debug: Check if we can get an access token
+                    try:
+                        # Try to get the token to see if it's available
+                        token = credentials.token
+                        logger.info(f"Access token available: {token is not None}")
+                        if token:
+                            logger.info(f"Access token length: {len(token)}")
+                            logger.info(f"Token type: {type(token).__name__}")
+                        else:
+                            logger.warning("No access token available after refresh")
+                    except Exception as e:
+                        logger.warning(f"Could not get access token: {e}")
+                    
                     return credentials
                     
                 except Exception as e:

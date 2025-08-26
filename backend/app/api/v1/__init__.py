@@ -5,7 +5,7 @@ Optimized for maximum efficiency and reliability.
 
 from fastapi import APIRouter
 
-from . import documents, projects, emails, drive, calendar, classification, attendee, ai, embeddings, meeting_intelligence, microservices, enterprise, webhooks, auth, user, drive_subscription, ai_orchestration, performance_monitoring, sync, gmail_watches
+from . import documents, projects, emails, drive, calendar, classification, attendee, ai, embeddings, meeting_intelligence, microservices, enterprise, webhooks, auth, user, drive_subscription, ai_orchestration, performance_monitoring, sync, gmail_watches, oauth, gmail
 
 # Create the main router
 router = APIRouter()
@@ -29,6 +29,8 @@ router.include_router(emails.router, prefix="/emails", tags=["emails"])
 router.include_router(documents.router, prefix="/documents", tags=["documents"])
 router.include_router(gmail_watches.router, prefix="/gmail-watches", tags=["gmail-watches"])
 router.include_router(webhooks.router, prefix="/webhooks", tags=["webhooks"])
+router.include_router(oauth.router, prefix="/oauth", tags=["oauth"])
+router.include_router(gmail.router, prefix="/gmail", tags=["gmail"])
 
 # Enterprise Routers - Phase 4
 router.include_router(enterprise.router, prefix="/enterprise", tags=["enterprise"])
@@ -68,6 +70,8 @@ async def health_check():
             "/auth",
             "/user",
             "/gmail-watches",
-            "/drive-subscription"
+            "/drive-subscription",
+            "/oauth",
+            "/gmail"
         ]
     }
