@@ -33,7 +33,7 @@ async def admin_login(request: AdminLoginRequest) -> Dict[str, Any]:
     
     if request.email in admin_credentials and request.password == admin_credentials[request.email]:
         # Generate a proper JWT token that works with Supabase
-        from ...core.security import create_access_token
+        from ...core.security import security_manager
         
         # Create token data
         token_data = {
@@ -42,8 +42,8 @@ async def admin_login(request: AdminLoginRequest) -> Dict[str, Any]:
             "is_admin": True
         }
         
-        # Generate JWT token
-        token = create_access_token(data=token_data)
+        # Generate JWT token using the security manager
+        token = security_manager.create_access_token(data=token_data)
         
         return AdminLoginResponse(
             success=True,
