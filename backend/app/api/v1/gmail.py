@@ -18,6 +18,12 @@ async def setup_gmail_watch(
     x_admin_token: str = Header(None)
 ) -> Dict[str, Any]:
     """Set up Gmail watch for the master account."""
+    logger.info("=" * 50)
+    logger.info("GMAIL WATCH SETUP ENDPOINT CALLED")
+    logger.info(f"Current user: {current_user}")
+    logger.info(f"Admin token header: {x_admin_token}")
+    logger.info("=" * 50)
+    
     try:
         # Check for admin bypass token or admin user
         admin_emails = ["ai@besunny.ai", "admin@besunny.ai"]
@@ -145,6 +151,20 @@ async def get_recent_emails(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to fetch recent emails: {str(e)}"
         )
+
+
+@router.get("/test-auth")
+async def test_authentication(
+    current_user: dict = Depends(get_current_user_from_supabase_token)
+) -> Dict[str, Any]:
+    """Test endpoint to verify authentication is working."""
+    logger.info(f"Test auth endpoint called - current_user: {current_user}")
+    return {
+        "status": "success",
+        "message": "Authentication working",
+        "user": current_user,
+        "timestamp": "2024-01-01T00:00:00Z"
+    }
 
 
 @router.get("/status")
