@@ -36,19 +36,27 @@ async def setup_gmail_watch(
         try:
             import base64
             import json
-            token_data = json.loads(base64.b64decode(x_admin_token).decode())
+            
+            # Decode the token
+            decoded_bytes = base64.b64decode(x_admin_token)
+            decoded_string = decoded_bytes.decode('utf-8')
+            token_data = json.loads(decoded_string)
+            
+            logger.info(f"Decoded admin token data: {token_data}")
+            
             if token_data.get("is_admin") and token_data.get("email") in admin_emails:
                 logger.info(f"Admin access granted via token for {token_data.get('email')}")
             else:
+                logger.warning(f"Admin token validation failed: is_admin={token_data.get('is_admin')}, email={token_data.get('email')}")
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Invalid admin token"
+                    detail="Invalid admin token - insufficient privileges"
                 )
         except Exception as e:
-            logger.warning(f"Invalid admin token: {e}")
+            logger.error(f"Error processing admin token: {e}")
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Invalid admin token format"
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid admin token format: {str(e)}"
             )
         
         gmail_service = GmailService()
@@ -175,7 +183,14 @@ async def test_authentication(
     try:
         import base64
         import json
-        token_data = json.loads(base64.b64decode(x_admin_token).decode())
+        
+        # Decode the token
+        decoded_bytes = base64.b64decode(x_admin_token)
+        decoded_string = decoded_bytes.decode('utf-8')
+        token_data = json.loads(decoded_string)
+        
+        logger.info(f"Decoded token data: {token_data}")
+        
         if token_data.get("is_admin") and token_data.get("email") in admin_emails:
             return {
                 "status": "success",
@@ -184,15 +199,16 @@ async def test_authentication(
                 "timestamp": "2024-01-01T00:00:00Z"
             }
         else:
+            logger.warning(f"Token validation failed: is_admin={token_data.get('is_admin')}, email={token_data.get('email')}")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Invalid admin token"
+                detail="Invalid admin token - insufficient privileges"
             )
     except Exception as e:
-        logger.warning(f"Invalid admin token: {e}")
+        logger.error(f"Error processing admin token: {e}")
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Invalid admin token format"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid admin token format: {str(e)}"
         )
 
 
