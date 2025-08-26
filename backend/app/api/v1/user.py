@@ -24,6 +24,7 @@ class UsernameResponse(BaseModel):
     success: bool
     username: Optional[str] = None
     virtual_email: Optional[str] = None
+    gmail_watch_setup: Optional[Dict[str, Any]] = None
     error_message: Optional[str] = None
 
 
@@ -58,7 +59,8 @@ async def set_username(
             return UsernameResponse(
                 success=True,
                 username=result.get('username'),
-                virtual_email=result.get('virtual_email')
+                virtual_email=result.get('virtual_email'),
+                gmail_watch_setup=result.get('gmail_watch_setup')
             )
         else:
             return UsernameResponse(

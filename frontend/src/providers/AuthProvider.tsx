@@ -14,6 +14,7 @@ interface AuthContextType extends AuthState {
   updateProfile: (updates: Partial<User>) => Promise<{ success: boolean; error?: string }>;
   clearError: () => void;
   refreshSession: () => Promise<void>;
+  checkUsernameStatus: () => Promise<{ hasUsername: boolean; username?: string; virtualEmail?: string }>;
 }
 
 // Create auth context
@@ -148,6 +149,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 error: null,
                 loading: false 
               });
+              
+              // Check username status after successful authentication
+              // This will trigger the UsernameSetupManager to show the dialog if needed
+              setTimeout(() => {
+                checkUsernameStatus();
+              }, 1000); // Small delay to ensure state is updated
             }
             break;
             
@@ -212,6 +219,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           error: null,
           loading: false 
         });
+        
+        // Check username status after successful login
+        // This will trigger the UsernameSetupManager to show the dialog if needed
+        setTimeout(() => {
+          checkUsernameStatus();
+        }, 1000); // Small delay to ensure state is updated
+        
         return { success: true };
       }
 
@@ -289,6 +303,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               error: null,
               loading: false 
             });
+            
+            // Check username status after successful signup
+            // This will trigger the UsernameSetupManager to show the dialog if needed
+            setTimeout(() => {
+              checkUsernameStatus();
+            }, 1000); // Small delay to ensure state is updated
+            
             return { success: true };
           }
         } else {
@@ -392,6 +413,41 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, [updateState]);
 
+  // Check username status
+  const checkUsernameStatus = useCallback(async (): Promise<{ hasUsername: boolean; username?: string; virtualEmail?: string }> => {
+    try {
+      if (!state.user?.id) {
+        return { hasUsername: false };
+      }
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        return { hasUsername: false };
+      }
+
+      const response = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/user/username/status`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (!response.ok) {
+        return { hasUsername: false };
+      }
+
+      const result = await response.json();
+      return {
+        hasUsername: result.has_username,
+        username: result.username,
+        virtualEmail: result.virtual_email
+      };
+    } catch (err) {
+      console.error('Error checking username status:', err);
+      return { hasUsername: false };
+    }
+  }, [state.user?.id]);
+
   // Context value
   const value: AuthContextType = {
     ...state,
@@ -403,6 +459,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     updateProfile,
     clearError,
     refreshSession,
+    checkUsernameStatus,
   };
 
   return (

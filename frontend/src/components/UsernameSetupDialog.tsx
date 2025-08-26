@@ -85,6 +85,8 @@ const UsernameSetupDialog: React.FC<UsernameSetupDialogProps> = ({ open, onClose
     if (!isValid || !user) return;
 
     setIsLoading(true);
+    setSetupStep('username');
+    
     try {
       // Get the current session for authentication
       const { data: { session } } = await supabase.auth.getSession();
@@ -108,20 +110,29 @@ const UsernameSetupDialog: React.FC<UsernameSetupDialogProps> = ({ open, onClose
         throw new Error(result.message || 'Failed to set username');
       }
 
+      // Show Gmail watch setup progress
+      setSetupStep('gmail-watch');
+      
       // Check if Gmail watch was set up successfully
       if (result.gmail_watch_setup?.success) {
+        setSetupStep('complete');
         toast({
           title: 'Username set successfully!',
           description: `Your virtual email address is ready: ${result.virtual_email}. Gmail monitoring is now active!`,
         });
       } else {
+        setSetupStep('complete');
         toast({
           title: 'Username set successfully!',
           description: `Your virtual email address is: ${result.virtual_email}. Gmail monitoring will be set up shortly.`,
         });
       }
 
-      onClose();
+      // Close dialog after a short delay to show completion
+      setTimeout(() => {
+        onClose();
+      }, 1500);
+      
     } catch (error) {
       // Error setting username
       toast({
@@ -202,7 +213,8 @@ const UsernameSetupDialog: React.FC<UsernameSetupDialogProps> = ({ open, onClose
           </div>
 
           {/* Username Setup Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
+          {setupStep !== 'complete' && (
+            <form id="username-form" onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="username" className="text-xs font-bold text-[#4a5565] dark:text-zinc-300">CHOOSE YOUR USERNAME</Label>
               <div className="flex gap-2">
@@ -216,7 +228,7 @@ const UsernameSetupDialog: React.FC<UsernameSetupDialogProps> = ({ open, onClose
                   value={username}
                   onChange={handleUsernameChange}
                   className="flex-1 bg-white dark:bg-zinc-900 border border-[#4a5565] dark:border-zinc-700 text-xs font-mono"
-                  disabled={isLoading}
+                  disabled={isLoading || setupStep === 'complete'}
                 />
                 <Badge variant="secondary" className="px-3 py-2 text-xs font-mono bg-stone-200 dark:bg-zinc-700 text-[#4a5565] dark:text-zinc-300 border border-[#4a5565] dark:border-zinc-700">
                   @besunny.ai
@@ -246,12 +258,14 @@ const UsernameSetupDialog: React.FC<UsernameSetupDialogProps> = ({ open, onClose
                   <div className={`w-4 h-4 rounded-full border-2 ${
                     setupStep === 'username' ? 'border-blue-500 bg-blue-500' : 
                     setupStep === 'gmail-watch' ? 'border-green-500 bg-green-500' : 
+                    setupStep === 'complete' ? 'border-green-500 bg-green-500' : 
                     'border-gray-300 bg-gray-300'
                   }`} />
                   <span className="text-xs text-gray-600 dark:text-gray-400">
                     {setupStep === 'username' ? 'Setting up username...' : 
                      setupStep === 'gmail-watch' ? 'Setting up Gmail monitoring...' : 
-                     'Setup complete!'}
+                     setupStep === 'complete' ? 'Setup complete!' : 
+                     'Preparing...'}
                   </span>
                 </div>
                 {setupStep === 'gmail-watch' && (
@@ -262,11 +276,37 @@ const UsernameSetupDialog: React.FC<UsernameSetupDialogProps> = ({ open, onClose
                     </span>
                   </div>
                 )}
+                {setupStep === 'complete' && (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded-full border-2 border-green-500 bg-green-500" />
+                    <span className="text-xs text-gray-600 dark:text-gray-400">
+                      Gmail monitoring setup complete
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Success Message */}
+            {setupStep === 'complete' && (
+              <div className="bg-green-50 dark:bg-green-950/20 p-4 rounded border border-green-200 dark:border-green-800">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+                  <div>
+                    <h4 className="text-sm font-bold text-green-800 dark:text-green-200">
+                      Setup Complete!
+                    </h4>
+                    <p className="text-xs text-green-700 dark:text-green-300">
+                      Your virtual email address is ready and Gmail monitoring is now active. 
+                      You'll receive notifications for emails sent to {virtualEmailAddress}.
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
 
             {/* Preview */}
-            {username && isValid && (
+            {username && isValid && setupStep !== 'complete' && (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-sm">Your Virtual Email Address</CardTitle>
@@ -293,7 +333,7 @@ const UsernameSetupDialog: React.FC<UsernameSetupDialogProps> = ({ open, onClose
             )}
 
             {/* Usage Instructions */}
-            {username && isValid && (
+            {username && isValid && setupStep !== 'complete' && (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-sm">How to Use</CardTitle>
@@ -306,25 +346,31 @@ const UsernameSetupDialog: React.FC<UsernameSetupDialogProps> = ({ open, onClose
               </Card>
             )}
 
+            </form>
+          )}
+
+            {/* Action Buttons */}
             <div className="flex gap-3 pt-4">
               <Button
                 type="button"
                 variant="outline"
                 onClick={onClose}
-                disabled={isLoading}
+                disabled={isLoading || setupStep === 'complete'}
                 className="flex-1 font-mono text-xs px-3 py-2 h-auto hover:bg-stone-300 dark:hover:bg-zinc-700 focus:bg-stone-300 dark:focus:bg-zinc-700 border border-[#4a5565] dark:border-zinc-700 bg-stone-100 dark:bg-zinc-800 text-[#4a5565] dark:text-zinc-300"
               >
-                SKIP FOR NOW
+                {setupStep === 'complete' ? 'CLOSE' : 'SKIP FOR NOW'}
               </Button>
-              <Button
-                type="submit"
-                disabled={!isValid || isLoading}
-                className="flex-1 font-mono text-xs px-3 py-2 h-auto bg-[#4a5565] dark:bg-zinc-700 hover:bg-[#3a4555] dark:hover:bg-zinc-600 focus:bg-[#3a4555] dark:focus:bg-zinc-600 text-white border border-[#4a5565] dark:border-zinc-700"
-              >
-                {isLoading ? 'SETTING UP...' : 'SET USERNAME'}
-              </Button>
+              {setupStep !== 'complete' && (
+                <Button
+                  type="submit"
+                  form="username-form"
+                  disabled={!isValid || isLoading}
+                  className="flex-1 font-mono text-xs px-3 py-2 h-auto bg-[#4a5565] dark:bg-zinc-700 hover:bg-[#3a4555] dark:hover:bg-zinc-600 focus:bg-[#3a4555] dark:focus:bg-zinc-600 text-white border border-[#4a5565] dark:border-zinc-700"
+                >
+                  {isLoading ? 'SETTING UP...' : 'SET USERNAME'}
+                </Button>
+              )}
             </div>
-          </form>
         </div>
       </DialogContent>
     </Dialog>

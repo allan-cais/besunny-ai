@@ -16,6 +16,7 @@ import type { Project, Meeting, Document, ChatSession } from '@/types';
 import CreateProjectDialog from '@/components/CreateProjectDialog';
 import AIAssistant from '@/components/AIAssistant';
 import ProjectChat from '@/components/ProjectChat';
+import UsernameSetupManager from '@/components/UsernameSetupManager';
 import { v4 as uuidv4 } from 'uuid';
 import {
   Header,
@@ -280,6 +281,9 @@ const DashboardLayout: React.FC = () => {
           </div>
         </div>
       </div>
+      {/* Username Setup Manager */}
+      <UsernameSetupManager />
+      
       <CreateProjectDialog
         open={createProjectDialogOpen}
         onOpenChange={setCreateProjectDialogOpen}
