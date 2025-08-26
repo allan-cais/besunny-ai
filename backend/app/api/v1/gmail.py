@@ -69,22 +69,26 @@ async def setup_gmail_watch(
                 detail="Gmail service not ready - check service account configuration"
             )
         
-        # For now, just verify the Gmail service is working
-        # The PubSub topic needs to be created in Google Cloud Console
+        # Now that PubSub is working, set up the actual Gmail watch
         try:
-            # Test basic Gmail connectivity instead of setting up watch
-            profile = gmail_service.gmail_service.users().getProfile(userId=gmail_service.master_email).execute()
+            # Get topic name from environment or use default
+            topic_name = "projects/sunny-ai-468016/topics/gmail-notifications"
+            
+            # Set up the watch
+            watch_id = await gmail_service.setup_watch(topic_name)
+            if not watch_id:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to setup Gmail watch - check service configuration"
+                )
             
             return {
                 "status": "success",
-                "message": "Gmail service is working - PubSub topic setup pending",
+                "message": "Gmail watch setup successful!",
                 "master_email": gmail_service.master_email,
-                "gmail_status": {
-                    "email": profile.get('emailAddress'),
-                    "messages_total": profile.get('messagesTotal'),
-                    "threads_total": profile.get('threadsTotal')
-                },
-                "note": "To enable Gmail watch, create PubSub topic 'gmail-notifications' in Google Cloud Console",
+                "watch_id": watch_id,
+                "topic_name": topic_name,
+                "note": "Gmail watch is now active and will receive email notifications",
                 "timestamp": "2024-01-01T00:00:00Z"
             }
             
