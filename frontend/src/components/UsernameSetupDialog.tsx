@@ -22,6 +22,7 @@ const UsernameSetupDialog: React.FC<UsernameSetupDialogProps> = ({ open, onClose
   const [validationMessage, setValidationMessage] = useState('');
   const [isValid, setIsValid] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [setupStep, setSetupStep] = useState<'username' | 'gmail-watch' | 'complete'>('username');
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -107,10 +108,18 @@ const UsernameSetupDialog: React.FC<UsernameSetupDialogProps> = ({ open, onClose
         throw new Error(result.message || 'Failed to set username');
       }
 
-      toast({
-        title: 'Username set successfully!',
-        description: `Your virtual email address is: ${result.email_address}`,
-      });
+      // Check if Gmail watch was set up successfully
+      if (result.gmail_watch_setup?.success) {
+        toast({
+          title: 'Username set successfully!',
+          description: `Your virtual email address is ready: ${result.virtual_email}. Gmail monitoring is now active!`,
+        });
+      } else {
+        toast({
+          title: 'Username set successfully!',
+          description: `Your virtual email address is: ${result.virtual_email}. Gmail monitoring will be set up shortly.`,
+        });
+      }
 
       onClose();
     } catch (error) {
@@ -229,6 +238,32 @@ const UsernameSetupDialog: React.FC<UsernameSetupDialogProps> = ({ open, onClose
                 </p>
               </div>
             </div>
+
+            {/* Setup Progress */}
+            {isLoading && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className={`w-4 h-4 rounded-full border-2 ${
+                    setupStep === 'username' ? 'border-blue-500 bg-blue-500' : 
+                    setupStep === 'gmail-watch' ? 'border-green-500 bg-green-500' : 
+                    'border-gray-300 bg-gray-300'
+                  }`} />
+                  <span className="text-xs text-gray-600 dark:text-gray-400">
+                    {setupStep === 'username' ? 'Setting up username...' : 
+                     setupStep === 'gmail-watch' ? 'Setting up Gmail monitoring...' : 
+                     'Setup complete!'}
+                  </span>
+                </div>
+                {setupStep === 'gmail-watch' && (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded-full border-2 border-green-500 bg-green-500" />
+                    <span className="text-xs text-gray-600 dark:text-gray-400">
+                      Username set successfully
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Preview */}
             {username && isValid && (

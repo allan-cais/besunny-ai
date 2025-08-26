@@ -6,7 +6,7 @@
 [[services]]
 name = "besunny-frontend"
 builder = "dockerfile"
-dockerfilePath = "Dockerfile"
+dockerfilePath = "frontend/Dockerfile"
 
 [services.besunny-frontend.build.environment]
 NODE_ENV = "production"
@@ -20,7 +20,7 @@ healthcheckInterval = 30
 [[services]]
 name = "besunny-backend"
 builder = "dockerfile"
-dockerfilePath = "Dockerfile"
+dockerfilePath = "backend/Dockerfile"
 
 [services.besunny-backend.build.environment]
 ENVIRONMENT = "production"
