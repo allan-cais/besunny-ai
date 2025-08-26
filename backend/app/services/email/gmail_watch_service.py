@@ -51,6 +51,10 @@ class GmailWatchService:
             # Create Gmail API service
             service = build('gmail', 'v1', credentials=credentials)
             
+            # For service accounts, we need to use the actual user's email address
+            # The service account needs domain-wide delegation to access user's Gmail
+            user_email = f"{username}@virtual.besunny.ai"
+            
             # Create watch request
             watch_request = {
                 'labelIds': ['INBOX'],  # Watch INBOX for new messages
@@ -58,8 +62,8 @@ class GmailWatchService:
                 'labelFilterAction': 'include'
             }
             
-            # Create the watch
-            watch = service.users().watch(userId='me', body=watch_request).execute()
+            # Create the watch using the user's email address
+            watch = service.users().watch(userId=user_email, body=watch_request).execute()
             
             # Store watch information in database
             watch_id = await self._store_gmail_watch(
@@ -100,8 +104,9 @@ class GmailWatchService:
                 'labelFilterAction': 'include'
             }
             
-            # Create the watch
-            watch = service.users().watch(userId='me', body=watch_request).execute()
+            # Create the watch using the master account email
+            master_email = 'inbound@besunny.ai'
+            watch = service.users().watch(userId=master_email, body=watch_request).execute()
             
             # Store master account watch
             watch_id = await self._store_master_gmail_watch(
@@ -147,9 +152,15 @@ class GmailWatchService:
             # Create Gmail API service
             service = build('gmail', 'v1', credentials=credentials)
             
+            # Get the user email from the watch info
+            user_email = watch_info.get('user_email')
+            if not user_email:
+                logger.error(f"Watch {watch_id} has no user_email")
+                return False
+            
             # Stop existing watch
             try:
-                service.users().stop(userId='me').execute()
+                service.users().stop(userId=user_email).execute()
             except HttpError:
                 pass  # Watch may have already expired
             
@@ -160,7 +171,7 @@ class GmailWatchService:
                 'labelFilterAction': 'include'
             }
             
-            watch = service.users().watch(userId='me', body=watch_request).execute()
+            watch = service.users().watch(userId=user_email, body=watch_request).execute()
             
             # Update watch in database
             self._update_gmail_watch(
@@ -192,7 +203,10 @@ class GmailWatchService:
                 # Create Gmail API service and stop watch
                 service = build('gmail', 'v1', credentials=credentials)
                 try:
-                    service.users().stop(userId='me').execute()
+                    # Use the user email from the watch info
+                    user_email = watch_info.get('user_email')
+                    if user_email:
+                        service.users().stop(userId=user_email).execute()
                 except HttpError:
                     pass  # Watch may have already expired
             
