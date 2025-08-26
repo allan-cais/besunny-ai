@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -95,7 +95,7 @@ const UsernameSetupDialog: React.FC<UsernameSetupDialogProps> = ({ open, onClose
       }
 
       // Use Python backend instead of Supabase edge function
-      const response = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/user/set-username`, {
+      const response = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/user/username/set`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -107,7 +107,8 @@ const UsernameSetupDialog: React.FC<UsernameSetupDialogProps> = ({ open, onClose
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.message || 'Failed to set username');
+        console.error('Username setup failed:', response.status, response.statusText, result);
+        throw new Error(result.message || result.error_message || `Failed to set username (${response.status})`);
       }
 
       // Show Gmail watch setup progress
@@ -162,13 +163,16 @@ const UsernameSetupDialog: React.FC<UsernameSetupDialogProps> = ({ open, onClose
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px] bg-stone-100 dark:bg-zinc-800 border border-[#4a5565] dark:border-zinc-700 font-mono">
-        <DialogHeader>
-          <DialogTitle className="text-base font-bold text-[#4a5565] dark:text-zinc-300">
-            SET UP YOUR PERSONAL PROJECT INBOX
-          </DialogTitle>
-        </DialogHeader>
+          <Dialog open={open} onOpenChange={onClose}>
+        <DialogContent className="sm:max-w-[600px] bg-stone-100 dark:bg-zinc-800 border border-[#4a5565] dark:border-zinc-700 font-mono">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold text-[#4a5565] dark:text-zinc-300">
+              SET UP YOUR PERSONAL PROJECT INBOX
+            </DialogTitle>
+            <DialogDescription className="text-sm text-gray-600 dark:text-gray-400">
+              Choose a username to create your personal virtual email address for project organization.
+            </DialogDescription>
+          </DialogHeader>
 
         <div className="space-y-6">
           {/* Feature Description */}

@@ -39,7 +39,6 @@ router.include_router(sync.router, prefix="/sync", tags=["sync"])
 router.include_router(attendee.router, prefix="/attendee", tags=["attendee"])
 
 # Utility Functions Router - Phase 7
-router.include_router(user.router, prefix="/user", tags=["user-utilities"])
 router.include_router(drive_subscription.router, prefix="/drive-subscription", tags=["drive-subscription"])
 
 # Lightweight health check endpoint

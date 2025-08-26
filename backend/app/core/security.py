@@ -160,6 +160,8 @@ async def get_current_user_from_supabase_token(
             "id": user.id,
             "email": user.email,
             "username": user.user_metadata.get("username"),
+            "created_at": user.created_at or datetime.utcnow(),
+            "updated_at": user.last_sign_in_at or datetime.utcnow(),
             "permissions": user.user_metadata.get("permissions", []),
         }
         

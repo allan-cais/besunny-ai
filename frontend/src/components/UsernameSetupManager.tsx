@@ -13,14 +13,6 @@ const UsernameSetupManager: React.FC = () => {
     }
   }, [user, hasChecked, checkUsernameStatus]);
 
-  // Also check when user changes (e.g., after login)
-  useEffect(() => {
-    if (user && hasChecked) {
-      // Re-check username status when user changes
-      setHasChecked(false);
-    }
-  }, [user]);
-
   const checkUsernameStatusFromAPI = async () => {
     if (!user) return;
 
@@ -36,9 +28,18 @@ const UsernameSetupManager: React.FC = () => {
       setHasChecked(true);
     } catch (error) {
       console.error('Error checking username status:', error);
-      // If there's an error, we'll show the dialog anyway
-      setShowDialog(true);
-      setHasChecked(true);
+      
+      // If there's an error, wait a bit and retry once
+      if (!hasChecked) {
+        setTimeout(() => {
+          console.log('Retrying username status check...');
+          checkUsernameStatusFromAPI();
+        }, 2000);
+      } else {
+        // If retry also failed, show the dialog anyway
+        setShowDialog(true);
+        setHasChecked(true);
+      }
     }
   };
 

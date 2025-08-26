@@ -8,7 +8,7 @@ from typing import Dict, Any, Optional
 from pydantic import BaseModel
 
 from ...services.user.username_service import UsernameService
-from ...core.security import get_current_user
+from ...core.security import get_current_user_from_supabase_token
 from ...models.schemas.user import User
 
 router = APIRouter()
@@ -39,7 +39,7 @@ class UsernameValidationResponse(BaseModel):
 @router.post("/username/set", response_model=UsernameResponse)
 async def set_username(
     request: UsernameRequest,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_from_supabase_token)
 ) -> Dict[str, Any]:
     """
     Set username for the current user.
@@ -78,7 +78,7 @@ async def set_username(
 @router.get("/username/validate/{username}", response_model=UsernameValidationResponse)
 async def validate_username(
     username: str,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_from_supabase_token)
 ) -> Dict[str, Any]:
     """
     Validate username format and availability.
@@ -131,7 +131,7 @@ async def validate_username(
 
 @router.get("/username/generate", response_model=UsernameResponse)
 async def generate_username(
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_from_supabase_token)
 ) -> Dict[str, Any]:
     """
     Generate a username from the user's email.
@@ -188,7 +188,7 @@ async def generate_username(
 
 @router.get("/username/status", response_model=Dict[str, Any])
 async def get_username_status(
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_from_supabase_token)
 ) -> Dict[str, Any]:
     """
     Get current username status for the user.

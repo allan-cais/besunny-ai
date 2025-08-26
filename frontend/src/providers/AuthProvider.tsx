@@ -149,12 +149,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 error: null,
                 loading: false 
               });
-              
-              // Check username status after successful authentication
-              // This will trigger the UsernameSetupManager to show the dialog if needed
-              setTimeout(() => {
-                checkUsernameStatus();
-              }, 1000); // Small delay to ensure state is updated
             }
             break;
             
@@ -219,12 +213,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           error: null,
           loading: false 
         });
-        
-        // Check username status after successful login
-        // This will trigger the UsernameSetupManager to show the dialog if needed
-        setTimeout(() => {
-          checkUsernameStatus();
-        }, 1000); // Small delay to ensure state is updated
         
         return { success: true };
       }
@@ -303,12 +291,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               error: null,
               loading: false 
             });
-            
-            // Check username status after successful signup
-            // This will trigger the UsernameSetupManager to show the dialog if needed
-            setTimeout(() => {
-              checkUsernameStatus();
-            }, 1000); // Small delay to ensure state is updated
             
             return { success: true };
           }
@@ -433,6 +415,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       });
 
       if (!response.ok) {
+        console.warn('Username status check failed:', response.status, response.statusText);
         return { hasUsername: false };
       }
 
