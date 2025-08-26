@@ -3,7 +3,7 @@ Clean Gmail API endpoints for email watching and processing.
 """
 
 from typing import Dict, Any, List
-from fastapi import APIRouter, HTTPException, status, Depends, BackgroundTasks
+from fastapi import APIRouter, HTTPException, status, Depends, BackgroundTasks, Header
 
 from ...core.security import get_current_user_from_supabase_token
 from ...services.email.gmail_service import GmailService
@@ -14,18 +14,32 @@ router = APIRouter()
 @router.post("/watch/setup")
 async def setup_gmail_watch(
     background_tasks: BackgroundTasks,
-    current_user: dict = Depends(get_current_user_from_supabase_token)
+    current_user: dict = Depends(get_current_user_from_supabase_token),
+    x_admin_token: str = Header(None)
 ) -> Dict[str, Any]:
     """Set up Gmail watch for the master account."""
     try:
-        # TODO: Add proper admin role check later
-        # For now, allow any authenticated user to test
-        # admin_emails = ["ai@besunny.ai", "admin@besunny.ai"]
-        # if current_user.get("email") not in admin_emails:
-        #     raise HTTPException(
-        #         status_code=status.HTTP_403_FORBIDDEN,
-        #         detail="Admin access required - only authorized users can setup Gmail watch"
-        #     )
+        # Check for admin bypass token or admin user
+        admin_emails = ["ai@besunny.ai", "admin@besunny.ai"]
+        is_admin_user = current_user.get("email") in admin_emails
+        
+        # Allow admin bypass with X-Admin-Token header
+        if x_admin_token and not is_admin_user:
+            try:
+                import base64
+                import json
+                token_data = json.loads(base64.b64decode(x_admin_token).decode())
+                if token_data.get("is_admin") and token_data.get("email") in admin_emails:
+                    is_admin_user = True
+                    logger.info(f"Admin access granted via token for {token_data.get('email')}")
+            except Exception as e:
+                logger.warning(f"Invalid admin token: {e}")
+        
+        if not is_admin_user:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Admin access required - only authorized users can setup Gmail watch"
+            )
         
         gmail_service = GmailService()
         
