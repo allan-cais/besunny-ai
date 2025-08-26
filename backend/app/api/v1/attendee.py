@@ -3,16 +3,85 @@ Attendee API endpoints for BeSunny.ai Python backend.
 Handles meeting bot management, transcript retrieval, and chat functionality.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
+from datetime import datetime
 
 from ...services.attendee.attendee_service import AttendeeService
 from ...services.attendee.attendee_polling_service import AttendeePollingService
 from ...services.attendee.virtual_email_attendee_service import VirtualEmailAttendeeService
-from ...core.security import get_current_user_from_supabase_token
+from ...core.security import get_current_user_hybrid
 
 router = APIRouter()
+
+
+@router.get("/debug/auth")
+async def debug_auth(
+    current_user: Dict[str, Any] = Depends(get_current_user_hybrid)
+) -> Dict[str, Any]:
+    """Debug endpoint to test authentication."""
+    return {
+        "success": True,
+        "message": "Authentication successful",
+        "user": current_user,
+        "timestamp": datetime.now().isoformat()
+    }
+
+
+@router.get("/debug/headers")
+async def debug_headers(
+    request: Request
+) -> Dict[str, Any]:
+    """Debug endpoint to check request headers."""
+    headers = dict(request.headers)
+    # Remove sensitive headers for security
+    sensitive_headers = ['authorization', 'cookie', 'x-api-key']
+    for header in sensitive_headers:
+        if header in headers:
+            headers[header] = f"[REDACTED] (length: {len(headers[header])})"
+    
+    return {
+        "headers": headers,
+        "method": request.method,
+        "url": str(request.url),
+        "timestamp": datetime.now().isoformat()
+    }
+
+
+@router.get("/debug/public")
+async def debug_public() -> Dict[str, Any]:
+    """Public debug endpoint that doesn't require authentication."""
+    return {
+        "success": True,
+        "message": "Public endpoint accessible without authentication",
+        "timestamp": datetime.now().isoformat()
+    }
+
+
+@router.get("/debug/supabase")
+async def debug_supabase() -> Dict[str, Any]:
+    """Debug endpoint to check Supabase configuration."""
+    try:
+        from ...core.supabase_config import get_supabase_config, get_supabase
+        supabase_config = get_supabase_config()
+        config_info = supabase_config.get_config_info()
+        
+        # Try to get a Supabase client
+        supabase = get_supabase()
+        
+        return {
+            "success": True,
+            "supabase_config": config_info,
+            "client_available": bool(supabase),
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
 
 
 class BotDeploymentRequest(BaseModel):
@@ -36,7 +105,7 @@ class VirtualEmailEventRequest(BaseModel):
 @router.post("/create-bot")
 async def create_bot_for_meeting(
     request: BotDeploymentRequest,
-    current_user: Dict[str, Any] = Depends(get_current_user_from_supabase_token)
+    current_user: Dict[str, Any] = Depends(get_current_user_hybrid)
 ) -> Dict[str, Any]:
     """Create a bot for a meeting (manual deployment from UI)."""
     try:
@@ -63,7 +132,7 @@ async def create_bot_for_meeting(
 @router.post("/send-bot")
 async def send_bot_to_meeting(
     request: BotDeploymentRequest,
-    current_user: Dict[str, Any] = Depends(get_current_user_from_supabase_token)
+    current_user: Dict[str, Any] = Depends(get_current_user_hybrid)
 ) -> Dict[str, Any]:
     """Send a bot to a meeting (alias for create-bot for frontend compatibility)."""
     try:
@@ -86,10 +155,30 @@ async def send_bot_to_meeting(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/send-bot-test")
+async def send_bot_to_meeting_test(
+    request: BotDeploymentRequest
+) -> Dict[str, Any]:
+    """Test endpoint for send-bot without authentication."""
+    try:
+        return {
+            "success": True,
+            "message": "Test endpoint reached successfully",
+            "data": {
+                "meeting_url": request.meeting_url,
+                "bot_name": request.bot_name,
+                "bot_chat_message": request.bot_chat_message
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/virtual-email/process-event")
 async def process_calendar_event_for_virtual_emails(
     request: VirtualEmailEventRequest,
-    current_user: Dict[str, Any] = Depends(get_current_user_from_supabase_token)
+    current_user: Dict[str, Any] = Depends(get_current_user_hybrid)
 ) -> Dict[str, Any]:
     """Process a calendar event to detect virtual email attendees and auto-schedule bots."""
     try:
@@ -103,7 +192,7 @@ async def process_calendar_event_for_virtual_emails(
 @router.get("/virtual-email/activity")
 async def get_virtual_email_activity(
     days: int = Query(30, ge=1, le=365, description="Number of days to look back"),
-    current_user: Dict[str, Any] = Depends(get_current_user_from_supabase_token)
+    current_user: Dict[str, Any] = Depends(get_current_user_hybrid)
 ) -> Dict[str, Any]:
     """Get virtual email activity for the current user."""
     try:
@@ -116,7 +205,7 @@ async def get_virtual_email_activity(
 
 @router.post("/virtual-email/auto-schedule")
 async def auto_schedule_bots_for_virtual_emails(
-    current_user: Dict[str, Any] = Depends(get_current_user_from_supabase_token)
+    current_user: Dict[str, Any] = Depends(get_current_user_hybrid)
 ) -> Dict[str, Any]:
     """Auto-schedule bots for all upcoming meetings with virtual email attendees."""
     try:
@@ -147,7 +236,7 @@ async def auto_schedule_bots_for_virtual_emails(
 
 @router.get("/bots")
 async def list_user_bots(
-    current_user: Dict[str, Any] = Depends(get_current_user_from_supabase_token)
+    current_user: Dict[str, Any] = Depends(get_current_user_hybrid)
 ) -> List[Dict[str, Any]]:
     """List all bots for the current user."""
     try:
@@ -161,7 +250,7 @@ async def list_user_bots(
 @router.get("/bot-status/{bot_id}")
 async def get_bot_status(
     bot_id: str,
-    current_user: Dict[str, Any] = Depends(get_current_user_from_supabase_token)
+    current_user: Dict[str, Any] = Depends(get_current_user_hybrid)
 ) -> Dict[str, Any]:
     """Get current status of a meeting bot."""
     try:
@@ -177,7 +266,7 @@ async def get_bot_status(
 @router.get("/transcript/{bot_id}")
 async def get_transcript(
     bot_id: str,
-    current_user: Dict[str, Any] = Depends(get_current_user_from_supabase_token)
+    current_user: Dict[str, Any] = Depends(get_current_user_hybrid)
 ) -> Dict[str, Any]:
     """Get transcript for a meeting bot."""
     try:
@@ -194,7 +283,7 @@ async def get_transcript(
 async def get_chat_messages(
     bot_id: str,
     limit: int = Query(100, ge=1, le=1000),
-    current_user: Dict[str, Any] = Depends(get_current_user_from_supabase_token)
+    current_user: Dict[str, Any] = Depends(get_current_user_hybrid)
 ) -> List[Dict[str, Any]]:
     """Get chat messages for a meeting bot."""
     try:
@@ -209,7 +298,7 @@ async def get_chat_messages(
 async def send_chat_message(
     bot_id: str,
     request: ChatMessageRequest,
-    current_user: Dict[str, Any] = Depends(get_current_user_from_supabase_token)
+    current_user: Dict[str, Any] = Depends(get_current_user_hybrid)
 ) -> Dict[str, Any]:
     """Send a chat message through a meeting bot."""
     try:
@@ -227,7 +316,7 @@ async def send_chat_message(
 @router.get("/participant-events/{bot_id}")
 async def get_participant_events(
     bot_id: str,
-    current_user: Dict[str, Any] = Depends(get_current_user_from_supabase_token)
+    current_user: Dict[str, Any] = Depends(get_current_user_hybrid)
 ) -> List[Dict[str, Any]]:
     """Get participant events for a meeting bot."""
     try:
@@ -241,7 +330,7 @@ async def get_participant_events(
 @router.post("/pause-recording/{bot_id}")
 async def pause_recording(
     bot_id: str,
-    current_user: Dict[str, Any] = Depends(get_current_user_from_supabase_token)
+    current_user: Dict[str, Any] = Depends(get_current_user_hybrid)
 ) -> Dict[str, Any]:
     """Pause recording for a meeting bot."""
     try:
@@ -257,7 +346,7 @@ async def pause_recording(
 @router.post("/resume-recording/{bot_id}")
 async def resume_recording(
     bot_id: str,
-    current_user: Dict[str, Any] = Depends(get_current_user_from_supabase_token)
+    current_user: Dict[str, Any] = Depends(get_current_user_hybrid)
 ) -> Dict[str, Any]:
     """Resume recording for a meeting bot."""
     try:
@@ -273,7 +362,7 @@ async def resume_recording(
 @router.delete("/bot/{bot_id}")
 async def delete_bot(
     bot_id: str,
-    current_user: Dict[str, Any] = Depends(get_current_user_from_supabase_token)
+    current_user: Dict[str, Any] = Depends(get_current_user_hybrid)
 ) -> Dict[str, Any]:
     """Delete a meeting bot."""
     try:
@@ -291,7 +380,7 @@ async def delete_bot(
 @router.post("/poll/meeting/{meeting_id}")
 async def poll_meeting_status(
     meeting_id: str,
-    current_user: Dict[str, Any] = Depends(get_current_user_from_supabase_token)
+    current_user: Dict[str, Any] = Depends(get_current_user_hybrid)
 ) -> Dict[str, Any]:
     """Poll status for a specific meeting."""
     try:
@@ -306,7 +395,7 @@ async def poll_meeting_status(
 
 @router.post("/poll/all-meetings")
 async def poll_all_user_meetings(
-    current_user: Dict[str, Any] = Depends(get_current_user_from_supabase_token)
+    current_user: Dict[str, Any] = Depends(get_current_user_hybrid)
 ) -> List[Dict[str, Any]]:
     """Poll all meetings for the current user."""
     try:
@@ -320,7 +409,7 @@ async def poll_all_user_meetings(
 @router.post("/poll/smart")
 async def smart_polling(
     force_poll: bool = Query(False, description="Force polling regardless of timing"),
-    current_user: Dict[str, Any] = Depends(get_current_user_from_supabase_token)
+    current_user: Dict[str, Any] = Depends(get_current_user_hybrid)
 ) -> Dict[str, Any]:
     """Execute smart polling for the current user."""
     try:
@@ -334,7 +423,7 @@ async def smart_polling(
 @router.get("/poll/history")
 async def get_polling_history(
     limit: int = Query(100, ge=1, le=1000),
-    current_user: Dict[str, Any] = Depends(get_current_user_from_supabase_token)
+    current_user: Dict[str, Any] = Depends(get_current_user_hybrid)
 ) -> List[Dict[str, Any]]:
     """Get polling history for the current user."""
     try:

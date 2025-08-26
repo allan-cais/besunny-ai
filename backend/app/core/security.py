@@ -226,39 +226,57 @@ async def get_current_user_hybrid(
                     headers={"WWW-Authenticate": "Bearer"},
                 )
             
+            # Test if Supabase client is working
+            logger.info(f"🔍 Auth Debug - Supabase client type: {type(supabase)}")
+            logger.info(f"🔍 Auth Debug - Supabase client attributes: {[attr for attr in dir(supabase) if not attr.startswith('_')]}")
+            
             logger.info(f"🔍 Auth Debug - Calling supabase.auth.get_user with token")
             response = supabase.auth.get_user(token)
             logger.info(f"🔍 Auth Debug - Supabase response type: {type(response)}")
             logger.info(f"🔍 Auth Debug - Supabase response: {response}")
+            logger.info(f"🔍 Auth Debug - Response dir: {dir(response)}")
+            logger.info(f"🔍 Auth Debug - Response attributes: {[attr for attr in dir(response) if not attr.startswith('_')]}")
             
-            # Check if response has error attribute
-            if hasattr(response, 'error') and response.error:
-                logger.error(f"🔍 Auth Debug - Supabase auth error: {response.error}")
-                error_message = getattr(response.error, 'message', str(response.error))
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail=f"Supabase authentication error: {error_message}",
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
-            
-            # Check if response has user attribute
-            if not hasattr(response, 'user') or not response.user:
+            # Handle different Supabase response formats
+            try:
+                # Newer Supabase client returns response directly
+                if hasattr(response, 'user') and response.user:
+                    user = response.user
+                    logger.info(f"🔍 Auth Debug - Supabase validation successful for user: {user.id}")
+                    
+                    return {
+                        "id": user.id,
+                        "email": user.email,
+                        "username": user.user_metadata.get("username") if hasattr(user, 'user_metadata') else None,
+                        "permissions": user.user_metadata.get("permissions", []) if hasattr(user, 'user_metadata') else [],
+                    }
+                
+                # Check if response is an error response
+                if hasattr(response, 'error') and response.error:
+                    logger.error(f"🔍 Auth Debug - Supabase auth error: {response.error}")
+                    error_message = getattr(response.error, 'message', str(response.error))
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail=f"Supabase authentication error: {error_message}",
+                        headers={"WWW-Authenticate": "Bearer"},
+                    )
+                
+                # If we get here, no user was found
                 logger.error("🔍 Auth Debug - No user returned from Supabase")
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="No user found for token",
                     headers={"WWW-Authenticate": "Bearer"},
                 )
-            
-            user = response.user
-            logger.info(f"🔍 Auth Debug - Supabase validation successful for user: {user.id}")
-            
-            return {
-                "id": user.id,
-                "email": user.email,
-                "username": user.user_metadata.get("username") if hasattr(user, 'user_metadata') else None,
-                "permissions": user.user_metadata.get("permissions", []) if hasattr(user, 'user_metadata') else [],
-            }
+                
+            except AttributeError as attr_error:
+                logger.error(f"🔍 Auth Debug - Attribute error accessing response: {attr_error}")
+                logger.error(f"🔍 Auth Debug - Response object: {response}")
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid response format from Supabase",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
             
         except HTTPException:
             raise
