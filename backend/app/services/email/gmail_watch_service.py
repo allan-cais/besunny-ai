@@ -48,12 +48,24 @@ class GmailWatchService:
             logger.info(f"Credentials expired: {credentials.expired}")
             logger.info(f"Credentials scopes: {credentials.scopes}")
             
+            # Try to get access token for debugging
+            try:
+                access_token = credentials.token
+                logger.info(f"Access token available: {access_token is not None}")
+                if access_token:
+                    logger.info(f"Access token length: {len(access_token)}")
+            except Exception as e:
+                logger.warning(f"Could not get access token: {e}")
+            
             # Create Gmail API service
+            logger.info("Creating Gmail API service...")
             service = build('gmail', 'v1', credentials=credentials)
+            logger.info("Gmail API service created successfully")
             
             # For service accounts, we need to use the actual user's email address
             # The service account needs domain-wide delegation to access user's Gmail
             user_email = f"{username}@virtual.besunny.ai"
+            logger.info(f"Setting up Gmail watch for user email: {user_email}")
             
             # Create watch request
             watch_request = {
@@ -61,9 +73,12 @@ class GmailWatchService:
                 'topicName': f"projects/{self.settings.google_project_id}/topics/gmail-notifications",
                 'labelFilterAction': 'include'
             }
+            logger.info(f"Watch request: {watch_request}")
             
             # Create the watch using the user's email address
+            logger.info("Executing Gmail watch creation...")
             watch = service.users().watch(userId=user_email, body=watch_request).execute()
+            logger.info(f"Gmail watch created successfully: {watch}")
             
             # Store watch information in database
             watch_id = await self._store_gmail_watch(
@@ -298,6 +313,17 @@ class GmailWatchService:
                     logger.info("Master account Google credentials loaded from base64")
                     logger.info(f"Credentials valid: {credentials.valid}, expired: {credentials.expired}")
                     logger.info(f"Service account email: {credentials.service_account_email}")
+                    
+                    # Debug: Check if we can get an access token
+                    try:
+                        # Try to get the token to see if it's available
+                        token = credentials.token
+                        logger.info(f"Initial token available: {token is not None}")
+                        if token:
+                            logger.info(f"Initial token length: {len(token)}")
+                    except Exception as e:
+                        logger.warning(f"Could not get initial token: {e}")
+                    
                     return credentials
                     
                 except Exception as e:
