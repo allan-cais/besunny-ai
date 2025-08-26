@@ -22,14 +22,16 @@ class GmailWatchService:
     
     def __init__(self):
         self.settings = get_settings()
-        self.supabase = get_supabase()
+        # Use service role client to bypass RLS policies
+        from ...core.supabase_config import get_supabase_service_client
+        self.supabase = get_supabase_service_client()
         self.webhook_url = f"{self.settings.webhook_base_url}/api/v1/webhooks/gmail"
     
     async def setup_virtual_email_watch(self, user_id: str) -> Optional[str]:
         """Set up Gmail watch for a user's virtual email address."""
         try:
             # Get user's username
-            username = await self._get_user_username(user_id)
+            username = self._get_user_username(user_id)
             if not username:
                 logger.error(f"No username found for user {user_id}")
                 return None
@@ -55,10 +57,8 @@ class GmailWatchService:
             
             # Store watch information in database
             watch_id = await self._store_gmail_watch(
-                user_id=user_id,
-                username=username,
-                channel_id=watch.get('historyId'),
-                resource_id=watch.get('expiration'),
+                user_email=f"{username}@virtual.besunny.ai",
+                history_id=watch.get('historyId'),
                 expiration=watch.get('expiration')
             )
             
@@ -96,8 +96,7 @@ class GmailWatchService:
             
             # Store master account watch
             watch_id = await self._store_master_gmail_watch(
-                channel_id=watch.get('historyId'),
-                resource_id=watch.get('expiration'),
+                history_id=watch.get('historyId'),
                 expiration=watch.get('expiration')
             )
             
@@ -155,10 +154,9 @@ class GmailWatchService:
             watch = service.users().watch(userId='me', body=watch_request).execute()
             
             # Update watch in database
-            await self._update_gmail_watch(
+            self._update_gmail_watch(
                 watch_id=watch_id,
-                channel_id=watch.get('historyId'),
-                resource_id=watch.get('expiration'),
+                history_id=watch.get('historyId'),
                 expiration=watch.get('expiration')
             )
             
@@ -173,16 +171,13 @@ class GmailWatchService:
         """Stop a Gmail watch."""
         try:
             # Get watch information
-            watch_info = await self._get_gmail_watch(watch_id)
+            watch_info = self._get_gmail_watch(watch_id)
             if not watch_info:
                 logger.warning(f"Watch {watch_id} not found for stopping")
                 return True
             
-            # Get credentials
-            if watch_info.get('is_master_account'):
-                credentials = await self._get_master_account_credentials()
-            else:
-                credentials = await self._get_user_google_credentials(watch_info['user_id'])
+            # Get credentials - for now, use master account credentials for all watches
+            credentials = await self._get_master_account_credentials()
             
             if credentials:
                 # Create Gmail API service and stop watch
@@ -193,7 +188,7 @@ class GmailWatchService:
                     pass  # Watch may have already expired
             
             # Mark watch as inactive in database
-            await self._deactivate_gmail_watch(watch_id)
+            self._deactivate_gmail_watch(watch_id)
             
             logger.info(f"Successfully stopped Gmail watch {watch_id}")
             return True
@@ -202,17 +197,16 @@ class GmailWatchService:
             logger.error(f"Error stopping Gmail watch {watch_id}: {e}")
             return False
     
-    async def get_active_watches(self, user_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_active_watches(self, user_email: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get active Gmail watches."""
         try:
-            supabase = await self.supabase
-            if not supabase.client:
+            if not self.supabase:
                 return []
             
-            query = supabase.client.table('gmail_watches').select('*').eq('is_active', True)
+            query = self.supabase.table('gmail_watches').select('*').eq('is_active', True)
             
-            if user_id:
-                query = query.eq('user_id', user_id)
+            if user_email:
+                query = query.eq('user_email', user_email)
             
             result = query.execute()
             return result.data or []
@@ -221,14 +215,13 @@ class GmailWatchService:
             logger.error(f"Error getting active Gmail watches: {e}")
             return []
     
-    async def _get_user_username(self, user_id: str) -> Optional[str]:
+    def _get_user_username(self, user_id: str) -> Optional[str]:
         """Get username for a user."""
         try:
-            supabase = await self.supabase
-            if not supabase.client:
+            if not self.supabase:
                 return None
             
-            result = supabase.client.table('users').select('username').eq('id', user_id).single().execute()
+            result = self.supabase.table('users').select('username').eq('id', user_id).single().execute()
             return result.data.get('username') if result.data else None
             
         except Exception as e:
@@ -302,30 +295,24 @@ class GmailWatchService:
             logger.error(f"Error getting master account credentials: {e}")
             return None
     
-    async def _store_gmail_watch(
+    def _store_gmail_watch(
         self, 
-        user_id: str, 
-        username: str, 
-        channel_id: str, 
-        resource_id: str, 
+        user_email: str, 
+        history_id: str, 
         expiration: str
     ) -> str:
         """Store Gmail watch information in database."""
         try:
-            supabase = await self.supabase
-            if not supabase.client:
+            if not self.supabase:
                 raise Exception("Supabase client not available")
             
-            result = supabase.client.table('gmail_watches').insert({
-                'user_id': user_id,
-                'username': username,
-                'channel_id': channel_id,
-                'resource_id': resource_id,
+            result = self.supabase.table('gmail_watches').insert({
+                'user_email': user_email,
+                'history_id': history_id,
                 'expiration': expiration,
                 'is_active': True,
-                'is_master_account': False,
-                'created_at': datetime.utcnow().isoformat(),
-                'updated_at': datetime.utcnow().isoformat()
+                'created_at': datetime.now().isoformat(),
+                'updated_at': datetime.now().isoformat()
             }).execute()
             
             if not result.data:
@@ -337,28 +324,23 @@ class GmailWatchService:
             logger.error(f"Error storing Gmail watch: {e}")
             raise
     
-    async def _store_master_gmail_watch(
+    def _store_master_gmail_watch(
         self, 
-        channel_id: str, 
-        resource_id: str, 
+        history_id: str, 
         expiration: str
     ) -> str:
         """Store master account Gmail watch information in database."""
         try:
-            supabase = await self.supabase
-            if not supabase.client:
+            if not self.supabase:
                 raise Exception("Supabase client not available")
             
-            result = supabase.client.table('gmail_watches').insert({
-                'user_id': None,  # Master account
-                'username': 'master',
-                'channel_id': channel_id,
-                'resource_id': resource_id,
+            result = self.supabase.table('gmail_watches').insert({
+                'user_email': 'inbound@besunny.ai',  # Master account email
+                'history_id': history_id,
                 'expiration': expiration,
                 'is_active': True,
-                'is_master_account': True,
-                'created_at': datetime.utcnow().isoformat(),
-                'updated_at': datetime.utcnow().isoformat()
+                'created_at': datetime.now().isoformat(),
+                'updated_at': datetime.now().isoformat()
             }).execute()
             
             if not result.data:
@@ -370,54 +352,49 @@ class GmailWatchService:
             logger.error(f"Error storing master Gmail watch: {e}")
             raise
     
-    async def _get_gmail_watch(self, watch_id: str) -> Optional[Dict[str, Any]]:
+    def _get_gmail_watch(self, watch_id: str) -> Optional[Dict[str, Any]]:
         """Get Gmail watch information by ID."""
         try:
-            supabase = await self.supabase
-            if not supabase.client:
+            if not self.supabase:
                 return None
             
-            result = supabase.client.table('gmail_watches').select('*').eq('id', watch_id).single().execute()
+            result = self.supabase.table('gmail_watches').select('*').eq('id', watch_id).single().execute()
             return result.data if result.data else None
             
         except Exception as e:
             logger.error(f"Error getting Gmail watch {watch_id}: {e}")
             return None
     
-    async def _update_gmail_watch(
+    def _update_gmail_watch(
         self, 
         watch_id: str, 
-        channel_id: str, 
-        resource_id: str, 
+        history_id: str, 
         expiration: str
     ) -> None:
         """Update Gmail watch information."""
         try:
-            supabase = await self.supabase
-            if not supabase.client:
+            if not self.supabase:
                 raise Exception("Supabase client not available")
             
-            supabase.client.table('gmail_watches').update({
-                'channel_id': channel_id,
-                'resource_id': resource_id,
+            self.supabase.table('gmail_watches').update({
+                'history_id': history_id,
                 'expiration': expiration,
-                'updated_at': datetime.utcnow().isoformat()
+                'updated_at': datetime.now().isoformat()
             }).eq('id', watch_id).execute()
             
         except Exception as e:
             logger.error(f"Error updating Gmail watch {watch_id}: {e}")
             raise
     
-    async def _deactivate_gmail_watch(self, watch_id: str) -> None:
+    def _deactivate_gmail_watch(self, watch_id: str) -> None:
         """Mark a Gmail watch as inactive."""
         try:
-            supabase = await self.supabase
-            if not supabase.client:
+            if not self.supabase:
                 raise Exception("Supabase client not available")
             
-            supabase.client.table('gmail_watches').update({
+            self.supabase.table('gmail_watches').update({
                 'is_active': False,
-                'updated_at': datetime.utcnow().isoformat()
+                'updated_at': datetime.now().isoformat()
             }).eq('id', watch_id).execute()
             
         except Exception as e:
