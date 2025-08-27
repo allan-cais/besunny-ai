@@ -425,3 +425,21 @@ class GmailService:
                 "master_email": self.master_email,
                 "message": "Gmail service is not ready - check credentials"
             }
+    
+    def _build_drive_service(self):
+        """Build Google Drive API service using the same credentials."""
+        try:
+            if not self.is_ready():
+                logger.error("Gmail service not ready, cannot build Drive service")
+                return None
+            
+            # Use the same credentials that work for Gmail
+            from googleapiclient.discovery import build
+            
+            drive_service = build('drive', 'v3', credentials=self.credentials)
+            logger.info("Drive service built successfully")
+            return drive_service
+            
+        except Exception as e:
+            logger.error(f"Error building Drive service: {e}")
+            return None

@@ -11,6 +11,7 @@ from googleapiclient.errors import HttpError
 
 from ...core.supabase_config import get_supabase_service_client
 from ...services.email.gmail_service import GmailService
+from ...services.drive.drive_file_watch_service import DriveFileWatchService
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,7 @@ class EmailProcessingService:
     def __init__(self):
         self.supabase = get_supabase_service_client()
         self.gmail_service = GmailService()
+        self.drive_watch_service = DriveFileWatchService()
         self.master_email = "ai@besunny.ai"
         
     async def process_gmail_webhook(self, webhook_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -149,26 +151,47 @@ class EmailProcessingService:
             # Step 3: Extract virtual email information
             virtual_email_info = self._extract_virtual_email_info(parsed_email['to'])
             
-            # Step 4: Store in email_processing_logs (master level)
+            # Step 4: Detect Drive file sharing (if applicable)
+            drive_info = self._detect_drive_file_sharing(parsed_email)
+            
+            # Step 5: Store in email_processing_logs (master level)
             log_id = await self._store_email_processing_log(
-                message_id, email_address, parsed_email, virtual_email_info
+                message_id, email_address, parsed_email, virtual_email_info, drive_info
             )
             
-            # Step 5: Store in virtual_email_detections (alias level)
+            # Step 6: Store in virtual_email_detections (alias level)
             detection_id = None
             if virtual_email_info['is_virtual']:
                 detection_id = await self._store_virtual_email_detection(
-                    message_id, virtual_email_info, log_id
+                    message_id, virtual_email_info, log_id, drive_info
                 )
             
-            # Step 6: Store in documents (content storage)
+            # Step 7: Store in documents (content storage)
             document_id = await self._store_email_document(
-                message_id, parsed_email, virtual_email_info, log_id
+                message_id, parsed_email, virtual_email_info, log_id, drive_info
             )
             
-            # Step 7: Update processing log with document ID
+            # Step 8: Update processing log with document ID
             if document_id:
                 await self._update_processing_log_document_id(log_id, document_id)
+            
+            # Step 9: Set up Drive file watch if this is a Drive file
+            drive_watch_id = None
+            if drive_info and drive_info.get('is_drive_file') and virtual_email_info.get('username'):
+                for file_id in drive_info.get('file_ids', []):
+                    try:
+                        watch_id = await self.drive_watch_service.setup_file_watch(
+                            file_id, 
+                            drive_info.get('file_name', 'Unknown File'), 
+                            virtual_email_info['username']
+                        )
+                        if watch_id:
+                            drive_watch_id = watch_id
+                            logger.info(f"Drive file watch set up for {file_id}: {watch_id}")
+                        else:
+                            logger.warning(f"Failed to set up Drive file watch for {file_id}")
+                    except Exception as e:
+                        logger.error(f"Error setting up Drive file watch for {file_id}: {e}")
             
             logger.info(f"Successfully processed email {message_id}")
             
@@ -178,8 +201,10 @@ class EmailProcessingService:
                 "log_id": log_id,
                 "detection_id": detection_id,
                 "document_id": document_id,
+                "drive_watch_id": drive_watch_id,
                 "virtual_email": virtual_email_info['virtual_email'],
-                "username": virtual_email_info['username']
+                "username": virtual_email_info['username'],
+                "is_drive_file": drive_info.get('is_drive_file', False) if drive_info else False
             }
             
         except Exception as e:
@@ -311,12 +336,173 @@ class EmailProcessingService:
                 'master_email': None
             }
     
+    def _detect_drive_file_sharing(self, email_content: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Detect if email is a Google Drive file sharing notification."""
+        try:
+            subject = email_content.get('subject', '').lower()
+            body = email_content.get('body', '').lower()
+            snippet = email_content.get('snippet', '').lower()
+            
+            # Check for Drive sharing indicators
+            drive_indicators = [
+                'shared a google drive file',
+                'shared a file with you',
+                'shared a document with you',
+                'shared a folder with you',
+                'shared with you:',
+                'shared:',
+                'drive.google.com',
+                'docs.google.com',
+                'sheets.google.com',
+                'slides.google.com'
+            ]
+            
+            # Check if any Drive indicators are present
+            is_drive_sharing = any(indicator in subject or indicator in body or indicator in snippet 
+                                 for indicator in drive_indicators)
+            
+            if not is_drive_sharing:
+                return None
+            
+            # Extract Drive file information
+            drive_info = self._extract_drive_file_metadata(email_content)
+            
+            logger.info(f"Detected Drive file sharing email: {drive_info.get('file_name', 'Unknown')}")
+            return drive_info
+            
+        except Exception as e:
+            logger.error(f"Error detecting Drive file sharing: {e}")
+            return None
+    
+    def _extract_drive_file_metadata(self, email_content: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract Google Drive file metadata from email content."""
+        try:
+            subject = email_content.get('subject', '')
+            body = email_content.get('body', '')
+            snippet = email_content.get('snippet', '')
+            
+            # Extract file name from subject (common pattern: "Shared: filename.ext")
+            file_name = self._extract_file_name_from_subject(subject)
+            
+            # Extract Drive URLs and file IDs
+            drive_urls = self._extract_drive_urls(body)
+            file_ids = self._extract_file_ids(body)
+            
+            # Extract sharing permissions
+            permissions = self._extract_sharing_permissions(body)
+            
+            return {
+                'is_drive_file': True,
+                'file_name': file_name,
+                'drive_urls': drive_urls,
+                'file_ids': file_ids,
+                'permissions': permissions,
+                'email_type': 'drive_file_sharing',
+                'detected_at': datetime.now().isoformat()
+            }
+            
+        except Exception as e:
+            logger.error(f"Error extracting Drive file metadata: {e}")
+            return {'is_drive_file': True, 'error': str(e)}
+    
+    def _extract_file_name_from_subject(self, subject: str) -> str:
+        """Extract file name from email subject."""
+        try:
+            # Common patterns: "Shared: filename.ext", "filename.ext shared with you"
+            patterns = [
+                r'shared:\s*(.+)',
+                r'shared\s+with\s+you:\s*(.+)',
+                r'(.+)\s+shared\s+with\s+you',
+                r'(.+)\s+shared'
+            ]
+            
+            for pattern in patterns:
+                match = re.search(pattern, subject, re.IGNORECASE)
+                if match:
+                    return match.group(1).strip()
+            
+            # Fallback: use subject as filename
+            return subject.strip()
+            
+        except Exception as e:
+            logger.error(f"Error extracting filename from subject: {e}")
+            return subject.strip()
+    
+    def _extract_drive_urls(self, body: str) -> list:
+        """Extract Google Drive URLs from email body."""
+        try:
+            # Pattern for Drive URLs
+            drive_patterns = [
+                r'https://drive\.google\.com/[^\s<>"]+',
+                r'https://docs\.google\.com/[^\s<>"]+',
+                r'https://sheets\.google\.com/[^\s<>"]+',
+                r'https://slides\.google\.com/[^\s<>"]+'
+            ]
+            
+            urls = []
+            for pattern in drive_patterns:
+                matches = re.findall(pattern, body)
+                urls.extend(matches)
+            
+            return list(set(urls))  # Remove duplicates
+            
+        except Exception as e:
+            logger.error(f"Error extracting Drive URLs: {e}")
+            return []
+    
+    def _extract_file_ids(self, body: str) -> list:
+        """Extract Google Drive file IDs from URLs."""
+        try:
+            # Extract file IDs from Drive URLs
+            file_id_pattern = r'/d/([a-zA-Z0-9-_]+)'
+            file_ids = re.findall(file_id_pattern, body)
+            
+            return list(set(file_ids))  # Remove duplicates
+            
+        except Exception as e:
+            logger.error(f"Error extracting file IDs: {e}")
+            return []
+    
+    def _extract_sharing_permissions(self, body: str) -> Dict[str, Any]:
+        """Extract sharing permissions from email body."""
+        try:
+            permissions = {
+                'can_view': False,
+                'can_edit': False,
+                'can_comment': False,
+                'can_share': False
+            }
+            
+            body_lower = body.lower()
+            
+            # Check for permission indicators
+            if 'can view' in body_lower or 'viewer' in body_lower:
+                permissions['can_view'] = True
+            
+            if 'can edit' in body_lower or 'editor' in body_lower:
+                permissions['can_edit'] = True
+                permissions['can_view'] = True
+            
+            if 'can comment' in body_lower or 'commenter' in body_lower:
+                permissions['can_comment'] = True
+                permissions['can_view'] = True
+            
+            if 'can share' in body_lower or 'sharing' in body_lower:
+                permissions['can_share'] = True
+            
+            return permissions
+            
+        except Exception as e:
+            logger.error(f"Error extracting sharing permissions: {e}")
+            return {'can_view': True, 'can_edit': False, 'can_comment': False, 'can_share': False}
+    
     async def _store_email_processing_log(
         self, 
         message_id: str, 
         email_address: str, 
         parsed_email: Dict[str, Any],
-        virtual_email_info: Dict[str, Any]
+        virtual_email_info: Dict[str, Any],
+        drive_info: Optional[Dict[str, Any]] = None
     ) -> str:
         """Store email processing log in email_processing_logs table."""
         try:
@@ -331,6 +517,11 @@ class EmailProcessingService:
                 'status': 'success',
                 'created_at': datetime.now().isoformat()
             }
+            
+            # Add Drive file information if available
+            if drive_info and drive_info.get('is_drive_file'):
+                log_data['n8n_webhook_sent'] = False  # Will be updated when Drive watch is set up
+                log_data['n8n_webhook_response'] = None
             
             result = self.supabase.table('email_processing_logs').insert(log_data).execute()
             
@@ -349,7 +540,8 @@ class EmailProcessingService:
         self, 
         message_id: str, 
         virtual_email_info: Dict[str, Any],
-        log_id: str
+        log_id: str,
+        drive_info: Optional[Dict[str, Any]] = None
     ) -> str:
         """Store virtual email detection in virtual_email_detections table."""
         try:
@@ -360,6 +552,11 @@ class EmailProcessingService:
                 'email_type': 'alias',
                 'detected_at': datetime.now().isoformat()
             }
+            
+            # Add Drive file information if available
+            if drive_info and drive_info.get('is_drive_file'):
+                detection_data['email_type'] = 'drive_file_sharing'
+                detection_data['gmail_message_id'] = message_id
             
             result = self.supabase.table('virtual_email_detections').insert(detection_data).execute()
             
@@ -379,7 +576,8 @@ class EmailProcessingService:
         message_id: str, 
         parsed_email: Dict[str, Any],
         virtual_email_info: Dict[str, Any],
-        log_id: str
+        log_id: str,
+        drive_info: Optional[Dict[str, Any]] = None
     ) -> str:
         """Store email content in documents table."""
         try:
@@ -397,6 +595,25 @@ class EmailProcessingService:
                 'project_id': None,  # Will be assigned later
                 'knowledge_space_id': None  # Will be assigned later
             }
+            
+            # Add Drive file information if available
+            if drive_info and drive_info.get('is_drive_file'):
+                document_data['source'] = 'google_drive'
+                document_data['type'] = 'drive_file'
+                document_data['file_size'] = 'unknown'  # Will be updated when Drive watch is set up
+                
+                # Store Drive metadata in transcript_metadata (JSONB field)
+                drive_metadata = {
+                    'drive_file_info': {
+                        'file_name': drive_info.get('file_name'),
+                        'drive_urls': drive_info.get('drive_urls', []),
+                        'file_ids': drive_info.get('file_ids', []),
+                        'permissions': drive_info.get('permissions', {}),
+                        'email_type': drive_info.get('email_type'),
+                        'detected_at': drive_info.get('detected_at')
+                    }
+                }
+                document_data['transcript_metadata'] = drive_metadata
             
             result = self.supabase.table('documents').insert(document_data).execute()
             
