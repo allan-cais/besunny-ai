@@ -373,6 +373,14 @@ class GmailService:
                 'updated_at': datetime.now().isoformat()
             }
             
+            # First, try to delete any existing watch for this user
+            try:
+                self.supabase.table('gmail_watches').delete().eq('user_email', self.master_email).execute()
+                logger.info(f"Deleted existing watch for {self.master_email}")
+            except Exception as delete_error:
+                logger.warning(f"Could not delete existing watch (this is OK): {delete_error}")
+            
+            # Insert new watch record
             result = self.supabase.table('gmail_watches') \
                 .insert(watch_data) \
                 .execute()
