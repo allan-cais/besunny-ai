@@ -3,7 +3,7 @@ Clean Gmail API endpoints for email watching and processing.
 """
 
 from typing import Dict, Any, List
-from fastapi import APIRouter, HTTPException, status, Depends, BackgroundTasks, Header
+from fastapi import APIRouter, HTTPException, status, Depends, BackgroundTasks, Header, Request
 import logging
 
 from ...core.security import get_current_user_from_supabase_token
@@ -292,15 +292,19 @@ async def get_gmail_service_status(
 
 @router.post("/webhook")
 async def gmail_webhook(
-    request: Dict[str, Any]
+    request: Request
 ) -> Dict[str, str]:
     """
     Handle Gmail webhook notifications from Pub/Sub.
     This endpoint receives push notifications when emails arrive.
     """
     try:
+        # Get the webhook payload from the request
+        webhook_data = await request.json()
+        logger.info(f"Received Gmail webhook: {webhook_data}")
+        
         # Extract message data from Pub/Sub
-        message_data = request.get('message', {})
+        message_data = webhook_data.get('message', {})
         data = message_data.get('data', '')
         
         if not data:
@@ -310,7 +314,11 @@ async def gmail_webhook(
         import base64
         import json
         
-        decoded_data = json.loads(base64.b64decode(data).decode('utf-8'))
+        try:
+            decoded_data = json.loads(base64.b64decode(data).decode('utf-8'))
+        except Exception as e:
+            logger.error(f"Failed to decode webhook data: {e}")
+            return {"status": "decode_error", "error": str(e)}
         
         # Check if this is for our master account
         email_address = decoded_data.get('emailAddress')
@@ -324,6 +332,7 @@ async def gmail_webhook(
         
         # TODO: Process the history to get new messages
         # For now, just acknowledge receipt
+        logger.info(f"Gmail webhook received for {email_address}, history ID: {history_id}")
         
         return {
             "status": "received",
