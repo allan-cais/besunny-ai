@@ -364,7 +364,7 @@ async def gmail_webhook(
         return {
             "status": "received",
             "email": email_address,
-            "history_id": history_id,
+            "history_id": str(history_id),  # Convert to string to match response model
             "message": "Webhook received, processing will be implemented"
         }
         
