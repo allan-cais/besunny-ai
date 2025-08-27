@@ -84,23 +84,48 @@ async def setup_gmail_watch(
             
             return {
                 "status": "success",
-                "message": "Gmail watch setup successful!",
+                "message": "Gmail watch setup successful! 🎉",
                 "master_email": gmail_service.master_email,
                 "watch_id": watch_id,
                 "topic_name": topic_name,
-                "note": "Gmail watch is now active and will receive email notifications",
+                "note": "Gmail watch is now active and will receive real-time email notifications",
                 "timestamp": "2024-01-01T00:00:00Z"
             }
             
         except Exception as e:
+            error_msg = str(e)
             logger.error(f"Error testing Gmail connectivity: {e}")
             logger.error(f"Error type: {type(e).__name__}")
             import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Gmail service error: {str(e)}"
-            )
+            
+            # Check for specific IAM policy errors
+            if "Domain Restricted Sharing" in error_msg or "constraints/iam.allowedPolicyMemberDomains" in error_msg:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail={
+                        "error": "IAM Policy Domain Restriction Error",
+                        "message": "Your Google Cloud organization has domain restricted sharing enabled. This prevents setting up Gmail API webhooks.",
+                        "solution": "Contact your Google Workspace admin to add '*.iam.gserviceaccount.com' to the allowed domains in the organization policy, or create a new project without domain restrictions.",
+                        "technical_details": error_msg,
+                        "request_id": "7710829603618251089" if "7710829603618251089" in error_msg else None
+                    }
+                )
+            elif "IAM" in error_msg and "policy" in error_msg.lower():
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail={
+                        "error": "IAM Policy Error",
+                        "message": "Unable to set IAM policies for Gmail webhook setup.",
+                        "solution": "Ensure your service account has the necessary permissions: 'Pub/Sub Publisher' and 'Gmail API Admin' roles.",
+                        "technical_details": error_msg
+                    }
+                )
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Gmail service error: {error_msg}"
+                )
         
     except HTTPException:
         raise

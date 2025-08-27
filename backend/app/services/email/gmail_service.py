@@ -98,7 +98,7 @@ class GmailService:
         """Check if the Gmail service is ready."""
         return self.gmail_service is not None and self.credentials is not None
     
-    async def setup_watch(self, topic_name: str) -> Optional[str]:
+    async def setup_watch(self, topic_name: str = None) -> Optional[str]:
         """Set up Gmail watch for the master account."""
         if not self.is_ready():
             logger.error("Gmail service not ready")
@@ -108,11 +108,17 @@ class GmailService:
             # Create watch request
             watch_request = {
                 'labelIds': ['INBOX'],
-                'topicName': topic_name,
                 'labelFilterAction': 'include'
             }
             
-            logger.info(f"Setting up Gmail watch with request: {watch_request}")
+            # Only add topicName if provided and not None
+            if topic_name:
+                watch_request['topicName'] = topic_name
+                logger.info(f"Setting up Gmail watch with PubSub topic: {topic_name}")
+            else:
+                logger.info("Setting up Gmail watch without PubSub topic (polling mode)")
+            
+            logger.info(f"Watch request: {watch_request}")
             logger.info(f"Using user ID: {self.master_email}")
             
             # Set up the watch
@@ -137,6 +143,31 @@ class GmailService:
             logger.error(f"Error type: {type(e).__name__}")
             import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")
+            
+            # Check for specific IAM policy errors
+            error_content = str(e.content) if hasattr(e, 'content') else str(e)
+            if "Domain Restricted Sharing" in error_content or "constraints/iam.allowedPolicyMemberDomains" in error_content:
+                logger.error("🔒 IAM Policy Domain Restriction Error Detected")
+                logger.error("This error occurs when your Google Cloud organization has domain restricted sharing enabled.")
+                logger.error("Solutions:")
+                logger.error("1. Contact your Google Workspace admin to add '*.iam.gserviceaccount.com' to allowed domains")
+                logger.error("2. Create a new project without domain restrictions")
+                logger.error("3. Use a different Google Cloud project for Gmail integration")
+                raise Exception(f"IAM Policy Domain Restriction: {error_content}")
+            elif "IAM" in error_content and "policy" in error_content.lower():
+                logger.error("🔒 IAM Policy Error Detected")
+                logger.error("This error occurs when setting IAM policies for Gmail webhook setup.")
+                logger.error("Solutions:")
+                logger.error("1. Ensure your service account has 'Pub/Sub Publisher' and 'Gmail API Admin' roles")
+                logger.error("2. Check if your project has the necessary APIs enabled")
+                logger.error("3. Verify your service account has domain-wide delegation enabled")
+                raise Exception(f"IAM Policy Error: {error_content}")
+            elif "403" in str(e.resp.status):
+                logger.error("🔒 Permission Denied Error")
+                logger.error("This usually indicates insufficient permissions or domain restrictions.")
+                logger.error("Check your service account permissions and organization policies.")
+                raise Exception(f"Permission Denied: {error_content}")
+            
             return None
         except Exception as e:
             logger.error(f"Error setting up Gmail watch: {e}")
@@ -324,10 +355,19 @@ class GmailService:
     async def _store_watch_info(self, watch_response: Dict[str, Any]) -> str:
         """Store Gmail watch information in database."""
         try:
+            # Convert expiration timestamp from milliseconds to ISO format
+            expiration_timestamp = watch_response.get('expiration')
+            if expiration_timestamp:
+                # Convert from milliseconds to seconds, then to datetime
+                expiration_datetime = datetime.fromtimestamp(int(expiration_timestamp) / 1000)
+                expiration_iso = expiration_datetime.isoformat()
+            else:
+                expiration_iso = None
+            
             watch_data = {
                 'user_email': self.master_email,
                 'history_id': watch_response.get('historyId'),
-                'expiration': watch_response.get('expiration'),
+                'expiration': expiration_iso,
                 'is_active': True,
                 'created_at': datetime.now().isoformat(),
                 'updated_at': datetime.now().isoformat()
