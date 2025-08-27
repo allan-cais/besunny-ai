@@ -305,9 +305,13 @@ async def gmail_webhook(
         
         # Extract message data from Pub/Sub
         message_data = webhook_data.get('message', {})
+        logger.info(f"Message data: {message_data}")
+        
         data = message_data.get('data', '')
+        logger.info(f"Raw data field: {data}")
         
         if not data:
+            logger.warning("No data field in webhook")
             return {"status": "no_data"}
         
         # Decode base64 data
@@ -315,19 +319,35 @@ async def gmail_webhook(
         import json
         
         try:
-            decoded_data = json.loads(base64.b64decode(data).decode('utf-8'))
+            logger.info(f"Attempting to decode base64 data: {data[:50]}...")
+            decoded_bytes = base64.b64decode(data)
+            logger.info(f"Base64 decoded to {len(decoded_bytes)} bytes")
+            
+            decoded_string = decoded_bytes.decode('utf-8')
+            logger.info(f"Decoded string: {decoded_string}")
+            
+            decoded_data = json.loads(decoded_string)
+            logger.info(f"JSON parsed successfully: {decoded_data}")
+            
         except Exception as e:
             logger.error(f"Failed to decode webhook data: {e}")
+            logger.error(f"Data that failed: {data}")
             return {"status": "decode_error", "error": str(e)}
         
         # Check if this is for our master account
         email_address = decoded_data.get('emailAddress')
+        logger.info(f"Email address from webhook: {email_address}")
+        
         if email_address != 'ai@besunny.ai':
+            logger.warning(f"Webhook for wrong account: {email_address}")
             return {"status": "wrong_account", "email": email_address}
         
         # Get history ID for processing
         history_id = decoded_data.get('historyId')
+        logger.info(f"History ID from webhook: {history_id}")
+        
         if not history_id:
+            logger.warning("No history ID in webhook")
             return {"status": "no_history_id"}
         
         # TODO: Process the history to get new messages
@@ -344,6 +364,9 @@ async def gmail_webhook(
     except Exception as e:
         # Log error but don't fail the webhook
         logger.error(f"Error processing Gmail webhook: {e}")
+        logger.error(f"Error type: {type(e).__name__}")
+        import traceback
+        logger.error(f"Full traceback: {traceback.format_exc()}")
         
         return {"status": "error", "error": str(e)}
 
