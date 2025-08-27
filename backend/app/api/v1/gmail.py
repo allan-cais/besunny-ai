@@ -298,6 +298,13 @@ async def gmail_webhook(
     Handle Gmail webhook notifications from Pub/Sub.
     This endpoint receives push notifications when emails arrive.
     """
+    logger.info("=" * 50)
+    logger.info("GMAIL WEBHOOK ENDPOINT CALLED")
+    logger.info(f"Request method: {request.method}")
+    logger.info(f"Request URL: {request.url}")
+    logger.info(f"Request headers: {dict(request.headers)}")
+    logger.info("=" * 50)
+    
     try:
         # Get the webhook payload from the request
         webhook_data = await request.json()
@@ -370,6 +377,12 @@ async def gmail_webhook(
         
         return {"status": "error", "error": str(e)}
 
+
+@router.get("/webhook-test")
+async def test_webhook_endpoint() -> Dict[str, str]:
+    """Test endpoint to verify webhook routing is working."""
+    logger.info("Webhook test endpoint called")
+    return {"status": "webhook_routing_working", "message": "Webhook endpoint is accessible"}
 
 @router.get("/test-gmail-connection")
 async def test_gmail_connection(
