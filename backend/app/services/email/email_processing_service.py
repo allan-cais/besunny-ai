@@ -1,229 +1,457 @@
 """
-Email processing service for handling incoming emails from master account.
-Parses +username aliases and routes emails to appropriate users.
+Complete Email Processing Service for BeSunny.ai
+Handles webhook processing, virtual email parsing, and multi-table storage.
 """
 
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, Tuple
 from datetime import datetime
 import logging
 import re
-from email import message_from_string
-from email.mime.text import MIMEText
+from googleapiclient.errors import HttpError
 
-from ...core.config import get_settings
 from ...core.supabase_config import get_supabase_service_client
-from .master_oauth_service import MasterOAuthService
+from ...services.email.gmail_service import GmailService
 
 logger = logging.getLogger(__name__)
 
-
 class EmailProcessingService:
-    """Service for processing incoming emails and routing them to users."""
+    """Complete email processing service for handling incoming emails."""
     
     def __init__(self):
-        self.settings = get_settings()
         self.supabase = get_supabase_service_client()
-        self.master_oauth = MasterOAuthService()
+        self.gmail_service = GmailService()
         self.master_email = "ai@besunny.ai"
-    
-    async def process_incoming_email(self, email_data: Dict[str, Any]) -> bool:
-        """Process an incoming email and route it to the appropriate user."""
+        
+    async def process_gmail_webhook(self, webhook_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Process Gmail webhook and store email data in all relevant tables.
+        
+        Args:
+            webhook_data: Raw webhook payload from Gmail
+            
+        Returns:
+            Dict with processing results
+        """
         try:
-            logger.info(f"Processing incoming email: {email_data.get('id', 'unknown')}")
+            logger.info("Starting Gmail webhook processing")
             
-            # Extract email content
-            email_content = email_data.get('snippet', '')
-            email_headers = email_data.get('payload', {}).get('headers', [])
+            # Step 1: Extract message data from webhook
+            message_data = webhook_data.get('message', {})
+            data = message_data.get('data', '')
             
-            # Parse email headers
-            from_email = self._extract_header(email_headers, 'From')
-            to_email = self._extract_header(email_headers, 'To')
-            subject = self._extract_header(email_headers, 'Subject')
+            if not data:
+                logger.warning("No data field in webhook")
+                return {"status": "error", "message": "No data field in webhook"}
             
-            logger.info(f"Email from: {from_email}, to: {to_email}, subject: {subject}")
+            # Step 2: Decode and parse webhook data
+            decoded_data = await self._decode_webhook_data(data)
+            if not decoded_data:
+                return {"status": "error", "message": "Failed to decode webhook data"}
             
-            # Check if this is a +username email
-            username = self._extract_username_from_email(to_email)
-            if not username:
-                logger.info(f"Email {email_data.get('id')} is not a +username email, skipping")
-                return False
+            # Step 3: Extract key information
+            email_address = decoded_data.get('emailAddress')
+            history_id = decoded_data.get('historyId')
             
-            # Find user by username
-            user = await self._get_user_by_username(username)
-            if not user:
-                logger.warning(f"No user found for username: {username}")
-                return False
+            if not email_address or not history_id:
+                return {"status": "error", "message": "Missing email address or history ID"}
             
-            # Process and store the email
-            email_id = await self._store_incoming_email(email_data, user['id'], username)
+            logger.info(f"Processing webhook for {email_address}, history ID: {history_id}")
             
-            # Trigger any necessary workflows (AI processing, notifications, etc.)
-            await self._trigger_email_workflows(email_id, user['id'], username)
+            # Step 4: Get Gmail history to find new messages
+            new_messages = await self._get_gmail_history(email_address, history_id)
+            if not new_messages:
+                logger.info("No new messages found in history")
+                return {"status": "success", "message": "No new messages to process"}
             
-            logger.info(f"Email {email_data.get('id')} processed successfully for user {username}")
-            return True
+            # Step 5: Process each new message
+            processing_results = []
+            for message_id in new_messages:
+                try:
+                    result = await self._process_single_email(message_id, email_address)
+                    processing_results.append(result)
+                except Exception as e:
+                    logger.error(f"Error processing message {message_id}: {e}")
+                    processing_results.append({
+                        "message_id": message_id,
+                        "status": "error",
+                        "error": str(e)
+                    })
+            
+            # Step 6: Return processing summary
+            successful = sum(1 for r in processing_results if r.get("status") == "success")
+            total = len(processing_results)
+            
+            logger.info(f"Email processing complete: {successful}/{total} successful")
+            
+            return {
+                "status": "success",
+                "message": f"Processed {total} emails, {successful} successful",
+                "total_processed": total,
+                "successful": successful,
+                "results": processing_results
+            }
             
         except Exception as e:
-            logger.error(f"Error processing incoming email: {e}")
-            return False
+            logger.error(f"Error in process_gmail_webhook: {e}")
+            return {"status": "error", "message": str(e)}
     
-    async def fetch_recent_emails(self, max_results: int = 100) -> List[Dict[str, Any]]:
-        """Fetch recent emails from the master account inbox."""
+    async def _decode_webhook_data(self, data: str) -> Optional[Dict[str, Any]]:
+        """Decode base64 webhook data."""
         try:
-            credentials = await self.master_oauth.get_valid_credentials()
-            if not credentials:
-                logger.error("No valid OAuth credentials available for email fetching")
-                return []
+            import base64
+            import json
             
-            from googleapiclient.discovery import build
-            service = build('gmail', 'v1', credentials=credentials)
+            decoded_bytes = base64.b64decode(data)
+            decoded_string = decoded_bytes.decode('utf-8')
+            return json.loads(decoded_string)
             
-            # Get recent emails from inbox
-            results = service.users().messages().list(
-                userId=self.master_email,
-                labelIds=['INBOX'],
-                maxResults=max_results
+        except Exception as e:
+            logger.error(f"Failed to decode webhook data: {e}")
+            return None
+    
+    async def _get_gmail_history(self, email_address: str, history_id: str) -> list:
+        """Get new messages from Gmail history."""
+        try:
+            # Get Gmail history to see what changed
+            history = self.gmail_service.gmail_service.users().history().list(
+                userId=email_address,
+                startHistoryId=history_id
             ).execute()
             
-            messages = results.get('messages', [])
-            emails = []
+            new_message_ids = []
             
-            for message in messages:
-                try:
-                    # Get full message details
-                    msg = service.users().messages().get(
-                        userId=self.master_email,
-                        id=message['id']
-                    ).execute()
-                    
-                    emails.append(msg)
-                    
-                except Exception as e:
-                    logger.warning(f"Could not fetch message {message['id']}: {e}")
-                    continue
+            # Extract new message IDs from history
+            for history_item in history.get('history', []):
+                for message_added in history_item.get('messagesAdded', []):
+                    message_id = message_added['message']['id']
+                    new_message_ids.append(message_id)
             
-            logger.info(f"Fetched {len(emails)} recent emails")
-            return emails
+            logger.info(f"Found {len(new_message_ids)} new messages in history")
+            return new_message_ids
             
         except Exception as e:
-            logger.error(f"Error fetching recent emails: {e}")
+            logger.error(f"Error getting Gmail history: {e}")
             return []
     
-    def _extract_username_from_email(self, email: str) -> Optional[str]:
-        """Extract username from +username@besunny.ai email address."""
-        if not email:
-            return None
-        
-        # Pattern: +username@besunny.ai
-        pattern = r'\+([^@]+)@besunny\.ai'
-        match = re.search(pattern, email)
-        
-        if match:
-            username = match.group(1)
-            logger.info(f"Extracted username '{username}' from email: {email}")
-            return username
-        
-        return None
+    async def _process_single_email(self, message_id: str, email_address: str) -> Dict[str, Any]:
+        """Process a single email message and store in all relevant tables."""
+        try:
+            logger.info(f"Processing email {message_id}")
+            
+            # Step 1: Get full email content from Gmail
+            email_content = await self._fetch_email_content(message_id, email_address)
+            if not email_content:
+                return {"message_id": message_id, "status": "error", "message": "Failed to fetch email content"}
+            
+            # Step 2: Parse email headers and content
+            parsed_email = self._parse_email_content(email_content)
+            
+            # Step 3: Extract virtual email information
+            virtual_email_info = self._extract_virtual_email_info(parsed_email['to'])
+            
+            # Step 4: Store in email_processing_logs (master level)
+            log_id = await self._store_email_processing_log(
+                message_id, email_address, parsed_email, virtual_email_info
+            )
+            
+            # Step 5: Store in virtual_email_detections (alias level)
+            detection_id = None
+            if virtual_email_info['is_virtual']:
+                detection_id = await self._store_virtual_email_detection(
+                    message_id, virtual_email_info, log_id
+                )
+            
+            # Step 6: Store in documents (content storage)
+            document_id = await self._store_email_document(
+                message_id, parsed_email, virtual_email_info, log_id
+            )
+            
+            # Step 7: Update processing log with document ID
+            if document_id:
+                await self._update_processing_log_document_id(log_id, document_id)
+            
+            logger.info(f"Successfully processed email {message_id}")
+            
+            return {
+                "message_id": message_id,
+                "status": "success",
+                "log_id": log_id,
+                "detection_id": detection_id,
+                "document_id": document_id,
+                "virtual_email": virtual_email_info['virtual_email'],
+                "username": virtual_email_info['username']
+            }
+            
+        except Exception as e:
+            logger.error(f"Error processing email {message_id}: {e}")
+            return {"message_id": message_id, "status": "error", "error": str(e)}
     
-    def _extract_header(self, headers: List[Dict[str, str]], name: str) -> Optional[str]:
-        """Extract header value from email headers."""
+    async def _fetch_email_content(self, message_id: str, email_address: str) -> Optional[Dict[str, Any]]:
+        """Fetch full email content from Gmail API."""
+        try:
+            message = self.gmail_service.gmail_service.users().messages().get(
+                userId=email_address,
+                id=message_id,
+                format='full'
+            ).execute()
+            
+            return message
+            
+        except HttpError as e:
+            logger.error(f"Gmail API error fetching message {message_id}: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Error fetching message {message_id}: {e}")
+            return None
+    
+    def _parse_email_content(self, email_content: Dict[str, Any]) -> Dict[str, Any]:
+        """Parse email content and extract key information."""
+        try:
+            payload = email_content.get('payload', {})
+            headers = payload.get('headers', [])
+            
+            # Extract headers
+            subject = self._extract_header(headers, 'Subject') or 'No Subject'
+            sender = self._extract_header(headers, 'From') or 'Unknown Sender'
+            to_address = self._extract_header(headers, 'To') or 'Unknown Recipient'
+            date = self._extract_header(headers, 'Date') or datetime.now().isoformat()
+            
+            # Extract body content
+            body = self._extract_email_body(payload)
+            
+            # Extract snippet
+            snippet = email_content.get('snippet', '')
+            
+            return {
+                'subject': subject,
+                'sender': sender,
+                'to': to_address,
+                'date': date,
+                'body': body,
+                'snippet': snippet,
+                'gmail_id': email_content.get('id'),
+                'thread_id': email_content.get('threadId'),
+                'label_ids': email_content.get('labelIds', [])
+            }
+            
+        except Exception as e:
+            logger.error(f"Error parsing email content: {e}")
+            return {}
+    
+    def _extract_header(self, headers: list, name: str) -> Optional[str]:
+        """Extract header value by name."""
         for header in headers:
             if header.get('name') == name:
                 return header.get('value')
         return None
     
-    async def _get_user_by_username(self, username: str) -> Optional[Dict[str, Any]]:
-        """Get user by username from database."""
+    def _extract_email_body(self, payload: Dict[str, Any]) -> str:
+        """Extract email body content."""
         try:
-            result = self.supabase.table('users') \
-                .select('id, username, email') \
-                .eq('username', username) \
-                .single() \
-                .execute()
+            if payload.get('body', {}).get('data'):
+                import base64
+                body_data = payload['body']['data']
+                decoded = base64.urlsafe_b64decode(body_data + '=' * (-len(body_data) % 4))
+                return decoded.decode('utf-8', errors='ignore')
             
-            return result.data if result.data else None
+            # Handle multipart messages
+            if payload.get('parts'):
+                for part in payload['parts']:
+                    if part.get('mimeType') == 'text/plain':
+                        if part.get('body', {}).get('data'):
+                            import base64
+                            body_data = part['body']['data']
+                            decoded = base64.urlsafe_b64decode(body_data + '=' * (-len(body_data) % 4))
+                            return decoded.decode('utf-8', errors='ignore')
+            
+            return "No readable body content"
             
         except Exception as e:
-            logger.error(f"Error getting user by username {username}: {e}")
-            return None
+            logger.error(f"Error extracting email body: {e}")
+            return "Error extracting body content"
     
-    async def _store_incoming_email(self, email_data: Dict[str, Any], user_id: str, username: str) -> str:
-        """Store incoming email in database."""
+    def _extract_virtual_email_info(self, to_address: str) -> Dict[str, Any]:
+        """Extract virtual email information from recipient address."""
         try:
-            # Extract email details
-            email_id = email_data.get('id')
-            thread_id = email_data.get('threadId')
-            snippet = email_data.get('snippet', '')
+            # Check if this is a virtual email (ai+username@besunny.ai)
+            virtual_pattern = r'ai\+([^@]+)@besunny\.ai'
+            match = re.match(virtual_pattern, to_address)
             
-            # Get email headers
-            headers = email_data.get('payload', {}).get('headers', [])
-            from_email = self._extract_header(headers, 'From')
-            to_email = self._extract_header(headers, 'To')
-            subject = self._extract_header(headers, 'Subject')
-            date = self._extract_header(headers, 'Date')
-            
-            # Store email in database
-            email_record = {
-                'gmail_id': email_id,
-                'thread_id': thread_id,
-                'user_id': user_id,
-                'username': username,
-                'from_email': from_email,
-                'to_email': to_email,
-                'subject': subject,
-                'snippet': snippet,
-                'date_received': date,
-                'is_processed': False,
-                'created_at': datetime.now().isoformat(),
-                'updated_at': datetime.now().isoformat()
+            if match:
+                username = match.group(1)
+                return {
+                    'is_virtual': True,
+                    'virtual_email': to_address,
+                    'username': username,
+                    'master_email': self.master_email
+                }
+            else:
+                # Check if it's the master account
+                if to_address == self.master_email:
+                    return {
+                        'is_virtual': False,
+                        'virtual_email': to_address,
+                        'username': None,
+                        'master_email': self.master_email
+                    }
+                else:
+                    return {
+                        'is_virtual': False,
+                        'virtual_email': to_address,
+                        'username': None,
+                        'master_email': None
+                    }
+                    
+        except Exception as e:
+            logger.error(f"Error extracting virtual email info: {e}")
+            return {
+                'is_virtual': False,
+                'virtual_email': to_address,
+                'username': None,
+                'master_email': None
+            }
+    
+    async def _store_email_processing_log(
+        self, 
+        message_id: str, 
+        email_address: str, 
+        parsed_email: Dict[str, Any],
+        virtual_email_info: Dict[str, Any]
+    ) -> str:
+        """Store email processing log in email_processing_logs table."""
+        try:
+            log_data = {
+                'gmail_message_id': message_id,
+                'inbound_address': email_address,
+                'extracted_username': virtual_email_info.get('username'),
+                'subject': parsed_email.get('subject'),
+                'sender': parsed_email.get('sender'),
+                'received_at': parsed_email.get('date'),
+                'processed_at': datetime.now().isoformat(),
+                'status': 'success',
+                'created_at': datetime.now().isoformat()
             }
             
-            result = self.supabase.table('incoming_emails') \
-                .insert(email_record) \
-                .execute()
+            result = self.supabase.table('email_processing_logs').insert(log_data).execute()
             
             if result.data:
-                stored_id = result.data[0]['id']
-                logger.info(f"Stored incoming email {email_id} with ID {stored_id}")
-                return stored_id
+                log_id = result.data[0]['id']
+                logger.info(f"Stored email processing log: {log_id}")
+                return log_id
             else:
-                raise Exception("Failed to store incoming email")
+                raise Exception("No log ID returned from database insert")
                 
         except Exception as e:
-            logger.error(f"Error storing incoming email: {e}")
+            logger.error(f"Error storing email processing log: {e}")
             raise
     
-    async def _trigger_email_workflows(self, email_id: str, user_id: str, username: str) -> None:
-        """Trigger workflows for the processed email (AI processing, notifications, etc.)."""
+    async def _store_virtual_email_detection(
+        self, 
+        message_id: str, 
+        virtual_email_info: Dict[str, Any],
+        log_id: str
+    ) -> str:
+        """Store virtual email detection in virtual_email_detections table."""
         try:
-            logger.info(f"Triggering workflows for email {email_id} (user: {username})")
+            detection_data = {
+                'virtual_email': virtual_email_info['virtual_email'],
+                'username': virtual_email_info['username'],
+                'gmail_message_id': message_id,
+                'email_type': 'alias',
+                'detected_at': datetime.now().isoformat()
+            }
             
-            # TODO: Implement email workflows
-            # - AI classification and processing
-            # - User notifications
-            # - Project context updates
-            # - Meeting scheduling
-            # - Document processing
+            result = self.supabase.table('virtual_email_detections').insert(detection_data).execute()
             
-            logger.info(f"Workflows triggered for email {email_id}")
-            
+            if result.data:
+                detection_id = result.data[0]['id']
+                logger.info(f"Stored virtual email detection: {detection_id}")
+                return detection_id
+            else:
+                raise Exception("No detection ID returned from database insert")
+                
         except Exception as e:
-            logger.error(f"Error triggering workflows for email {email_id}: {e}")
+            logger.error(f"Error storing virtual email detection: {e}")
+            raise
     
-    async def setup_email_monitoring(self) -> bool:
-        """Set up email monitoring for the master account."""
+    async def _store_email_document(
+        self, 
+        message_id: str, 
+        parsed_email: Dict[str, Any],
+        virtual_email_info: Dict[str, Any],
+        log_id: str
+    ) -> str:
+        """Store email content in documents table."""
         try:
-            logger.info("Setting up email monitoring for master account...")
+            document_data = {
+                'title': parsed_email.get('subject'),
+                'summary': parsed_email.get('snippet'),
+                'author': parsed_email.get('sender'),
+                'received_at': parsed_email.get('date'),
+                'source': 'gmail',
+                'source_id': message_id,
+                'type': 'email',
+                'status': 'received',
+                'created_at': datetime.now().isoformat(),
+                'created_by': None,  # System created
+                'project_id': None,  # Will be assigned later
+                'knowledge_space_id': None  # Will be assigned later
+            }
             
-            # Set up Gmail watch
-            watch_id = await self.master_oauth.setup_gmail_watch()
-            if not watch_id:
-                logger.error("Failed to setup Gmail watch for email monitoring")
-                return False
+            result = self.supabase.table('documents').insert(document_data).execute()
             
-            logger.info(f"Email monitoring setup successful, watch ID: {watch_id}")
-            return True
+            if result.data:
+                document_id = result.data[0]['id']
+                logger.info(f"Stored email document: {document_id}")
+                return document_id
+            else:
+                raise Exception("No document ID returned from database insert")
+                
+        except Exception as e:
+            logger.error(f"Error storing email document: {e}")
+            raise
+    
+    async def _update_processing_log_document_id(self, log_id: str, document_id: str):
+        """Update processing log with document ID reference."""
+        try:
+            self.supabase.table('email_processing_logs').update({
+                'document_id': document_id,
+                'updated_at': datetime.now().isoformat()
+            }).eq('id', log_id).execute()
+            
+            logger.info(f"Updated processing log {log_id} with document ID {document_id}")
             
         except Exception as e:
-            logger.error(f"Error setting up email monitoring: {e}")
-            return False
+            logger.error(f"Error updating processing log: {e}")
+    
+    async def get_processing_status(self, message_id: str) -> Dict[str, Any]:
+        """Get processing status for a specific email."""
+        try:
+            # Check processing log
+            log_result = self.supabase.table('email_processing_logs').select('*').eq('gmail_message_id', message_id).execute()
+            
+            if log_result.data:
+                log_entry = log_result.data[0]
+                
+                # Check virtual email detection
+                detection_result = self.supabase.table('virtual_email_detections').select('*').eq('gmail_message_id', message_id).execute()
+                
+                # Check document
+                document_result = self.supabase.table('documents').select('*').eq('source_id', message_id).execute()
+                
+                return {
+                    'message_id': message_id,
+                    'processing_log': log_entry,
+                    'virtual_email_detection': detection_result.data[0] if detection_result.data else None,
+                    'document': document_result.data[0] if document_result.data else None,
+                    'status': 'complete' if log_entry and detection_result.data and document_result.data else 'partial'
+                }
+            else:
+                return {
+                    'message_id': message_id,
+                    'status': 'not_found'
+                }
+                
+        except Exception as e:
+            logger.error(f"Error getting processing status: {e}")
+            return {'status': 'error', 'error': str(e)}

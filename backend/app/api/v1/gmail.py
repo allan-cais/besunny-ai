@@ -5,9 +5,11 @@ Clean Gmail API endpoints for email watching and processing.
 from typing import Dict, Any, List
 from fastapi import APIRouter, HTTPException, status, Depends, BackgroundTasks, Header, Request
 import logging
+from datetime import datetime
 
 from ...core.security import get_current_user_from_supabase_token
 from ...services.email.gmail_service import GmailService
+from ...services.email.email_processing_service import EmailProcessingService
 
 logger = logging.getLogger(__name__)
 
@@ -310,63 +312,28 @@ async def gmail_webhook(
         webhook_data = await request.json()
         logger.info(f"Received Gmail webhook: {webhook_data}")
         
-        # Extract message data from Pub/Sub
-        message_data = webhook_data.get('message', {})
-        logger.info(f"Message data: {message_data}")
+        # Initialize email processing service
+        email_processor = EmailProcessingService()
         
-        data = message_data.get('data', '')
-        logger.info(f"Raw data field: {data}")
+        # Process the webhook and store email data
+        processing_result = await email_processor.process_gmail_webhook(webhook_data)
         
-        if not data:
-            logger.warning("No data field in webhook")
-            return {"status": "no_data"}
-        
-        # Decode base64 data
-        import base64
-        import json
-        
-        try:
-            logger.info(f"Attempting to decode base64 data: {data[:50]}...")
-            decoded_bytes = base64.b64decode(data)
-            logger.info(f"Base64 decoded to {len(decoded_bytes)} bytes")
-            
-            decoded_string = decoded_bytes.decode('utf-8')
-            logger.info(f"Decoded string: {decoded_string}")
-            
-            decoded_data = json.loads(decoded_string)
-            logger.info(f"JSON parsed successfully: {decoded_data}")
-            
-        except Exception as e:
-            logger.error(f"Failed to decode webhook data: {e}")
-            logger.error(f"Data that failed: {data}")
-            return {"status": "decode_error", "error": str(e)}
-        
-        # Check if this is for our master account
-        email_address = decoded_data.get('emailAddress')
-        logger.info(f"Email address from webhook: {email_address}")
-        
-        if email_address != 'ai@besunny.ai':
-            logger.warning(f"Webhook for wrong account: {email_address}")
-            return {"status": "wrong_account", "email": email_address}
-        
-        # Get history ID for processing
-        history_id = decoded_data.get('historyId')
-        logger.info(f"History ID from webhook: {history_id}")
-        
-        if not history_id:
-            logger.warning("No history ID in webhook")
-            return {"status": "no_history_id"}
-        
-        # TODO: Process the history to get new messages
-        # For now, just acknowledge receipt
-        logger.info(f"Gmail webhook received for {email_address}, history ID: {history_id}")
-        
-        return {
-            "status": "received",
-            "email": email_address,
-            "history_id": str(history_id),  # Convert to string to match response model
-            "message": "Webhook received, processing will be implemented"
-        }
+        if processing_result.get("status") == "success":
+            logger.info(f"Email processing successful: {processing_result.get('message')}")
+            return {
+                "status": "success",
+                "message": processing_result.get("message"),
+                "total_processed": processing_result.get("total_processed", 0),
+                "successful": processing_result.get("successful", 0),
+                "timestamp": datetime.now().isoformat()
+            }
+        else:
+            logger.warning(f"Email processing completed with issues: {processing_result.get('message')}")
+            return {
+                "status": "partial_success",
+                "message": processing_result.get("message"),
+                "timestamp": datetime.now().isoformat()
+            }
         
     except Exception as e:
         # Log error but don't fail the webhook
