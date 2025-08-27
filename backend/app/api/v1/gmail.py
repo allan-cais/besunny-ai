@@ -343,8 +343,6 @@ async def gmail_webhook(
         
     except Exception as e:
         # Log error but don't fail the webhook
-        import logging
-        logger = logging.getLogger(__name__)
         logger.error(f"Error processing Gmail webhook: {e}")
         
         return {"status": "error", "error": str(e)}
