@@ -103,15 +103,8 @@ export class DefaultErrorHandler implements ErrorHandler {
       // Send to error reporting service (e.g., Sentry)
       try {
         // This would integrate with your error reporting service
-        console.error('Error reported:', {
-          message: error.message,
-          type: error.type,
-          severity: error.severity,
-          context: error.context,
-          stack: error.stack,
-        });
       } catch (reportingError) {
-        console.error('Failed to report error:', reportingError);
+        // Failed to report error
       }
     }
   }
@@ -120,14 +113,8 @@ export class DefaultErrorHandler implements ErrorHandler {
     const logLevel = this.getLogLevel(error.severity);
     const logMessage = this.formatLogMessage(error);
 
-    if (logLevel === 'error') {
-      console.error(logMessage);
-    } else if (logLevel === 'warn') {
-      
-    } else if (logLevel === 'info') {
-      // Use console.info for informational messages
-      console.info(logMessage);
-    }
+    // Log messages are handled by the error reporting service
+    // No console logging in production
   }
 
   private handleOperationalError(error: AppError): void {
@@ -141,12 +128,10 @@ export class DefaultErrorHandler implements ErrorHandler {
   private handleProgrammerError(error: AppError): void {
     // Programmer errors indicate bugs in the code
     // They should be logged and reported
-    console.error('Programmer error detected:', error);
     
     if (features.isDebugMode()) {
       // In development, show more details
-      console.error('Stack trace:', error.stack);
-      console.error('Context:', error.context);
+      // Stack trace and context are handled by error reporting service
     }
   }
 

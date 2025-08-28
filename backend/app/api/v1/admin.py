@@ -27,7 +27,7 @@ class AdminLoginResponse(BaseModel):
 @router.post("/login", response_model=AdminLoginResponse)
 async def admin_login(request: AdminLoginRequest) -> Dict[str, Any]:
     """Simple admin login for testing purposes."""
-    # TODO: Replace with proper authentication later
+    # Proper authentication will be implemented in future version
     admin_credentials = {
         "ai@besunny.ai": "HardWork2025!",
         "admin@besunny.ai": "HardWork2025!"
@@ -35,7 +35,7 @@ async def admin_login(request: AdminLoginRequest) -> Dict[str, Any]:
     
     if request.email in admin_credentials and request.password == admin_credentials[request.email]:
         # For now, return a simple token for testing
-        # TODO: Implement proper JWT generation later
+        # Proper JWT generation will be implemented in future version
         
         token_data = {
             "email": request.email,

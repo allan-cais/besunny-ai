@@ -27,12 +27,9 @@ const UsernameSetupManager: React.FC = () => {
 
       setHasChecked(true);
     } catch (error) {
-      console.error('Error checking username status:', error);
-      
       // If there's an error, wait a bit and retry once
       if (!hasChecked) {
         setTimeout(() => {
-          console.log('Retrying username status check...');
           checkUsernameStatusFromAPI();
         }, 2000);
       } else {

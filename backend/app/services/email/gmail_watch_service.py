@@ -45,18 +45,15 @@ class GmailOAuthService:
                 logger.error(f"No Google credentials found for user {user_id}")
                 return None
             
-            # Log credentials information for debugging
-            logger.info(f"Credentials type: {type(credentials).__name__}")
+            # Check credentials status
             logger.info(f"Credentials valid: {credentials.valid}")
             logger.info(f"Credentials expired: {credentials.expired}")
-            logger.info(f"Credentials scopes: {credentials.scopes}")
             
-            # Try to get access token for debugging
+            # Verify access token availability
             try:
                 access_token = credentials.token
-                logger.info(f"Access token available: {access_token is not None}")
-                if access_token:
-                    logger.info(f"Access token length: {len(access_token)}")
+                if not access_token:
+                    logger.warning("No access token available")
             except Exception as e:
                 logger.warning(f"Could not get access token: {e}")
             
@@ -273,7 +270,7 @@ class GmailOAuthService:
         """Get Google credentials for a user."""
         try:
             # For now, use the master account credentials
-            # TODO: Implement user-specific OAuth credentials
+            # User-specific OAuth credentials will be implemented in future version
             return await self._get_master_account_credentials()
             
         except Exception as e:
@@ -288,9 +285,7 @@ class GmailOAuthService:
             import json
             import base64
             
-            # Debug: Log what settings are available
-            logger.info(f"Settings object type: {type(self.settings)}")
-            logger.info(f"Settings attributes: {dir(self.settings)}")
+            # Check available settings
             
             # Try to get base64 encoded key first (for production)
             key_base64 = getattr(self.settings, 'google_service_account_key_base64', None)
@@ -328,15 +323,10 @@ class GmailOAuthService:
                     logger.info(f"Credentials valid: {credentials.valid}, expired: {credentials.expired}")
                     logger.info(f"Service account email: {credentials.service_account_email}")
                     
-                    # Debug: Check if we can get an access token
+                    # Verify access token availability
                     try:
-                        # Try to get the token to see if it's available
                         token = credentials.token
-                        logger.info(f"Access token available: {token is not None}")
-                        if token:
-                            logger.info(f"Access token length: {len(token)}")
-                            logger.info(f"Token type: {type(token).__name__}")
-                        else:
+                        if not token:
                             logger.warning("No access token available after refresh")
                     except Exception as e:
                         logger.warning(f"Could not get access token: {e}")
@@ -345,9 +335,7 @@ class GmailOAuthService:
                     
                 except Exception as e:
                     logger.error(f"Failed to load base64 credentials: {e}")
-                    logger.error(f"Error type: {type(e).__name__}")
-                    import traceback
-                    logger.error(f"Traceback: {traceback.format_exc()}")
+                    return None
             
             # Fallback to file path (for local development)
             key_path = getattr(self.settings, 'google_service_account_key_path', None)
@@ -376,15 +364,10 @@ class GmailOAuthService:
                     logger.info(f"Credentials valid: {credentials.valid}, expired: {credentials.expired}")
                     logger.info(f"Service account email: {credentials.service_account_email}")
                     
-                    # Debug: Check if we can get an access token
+                    # Verify access token availability
                     try:
-                        # Try to get the token to see if it's available
                         token = credentials.token
-                        logger.info(f"Access token available: {token is not None}")
-                        if token:
-                            logger.info(f"Access token length: {len(token)}")
-                            logger.info(f"Token type: {type(token).__name__}")
-                        else:
+                        if not token:
                             logger.warning("No access token available after refresh")
                     except Exception as e:
                         logger.warning(f"Could not get access token: {e}")
@@ -393,9 +376,7 @@ class GmailOAuthService:
                     
                 except Exception as e:
                     logger.error(f"Failed to load file credentials: {e}")
-                    logger.error(f"Error type: {type(e).__name__}")
-                    import traceback
-                    logger.error(f"Traceback: {traceback.format_exc()}")
+                    return None
             
             logger.error("No Google service account credentials configured")
             logger.error("Please ensure GOOGLE_SERVICE_ACCOUNT_KEY_BASE64 is set in production")
@@ -403,9 +384,6 @@ class GmailOAuthService:
             
         except Exception as e:
             logger.error(f"Error getting master account credentials: {e}")
-            logger.error(f"Error type: {type(e).__name__}")
-            import traceback
-            logger.error(f"Traceback: {traceback.format_exc()}")
             return None
     
     def _store_gmail_watch(

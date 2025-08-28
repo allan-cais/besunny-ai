@@ -46,9 +46,7 @@ class GmailService:
             
             try:
                 key_data = json.loads(base64.b64decode(service_account_key))
-                logger.info(f"Service account key decoded successfully")
-                logger.info(f"Service account email: {key_data.get('client_email')}")
-                logger.info(f"Project ID: {key_data.get('project_id')}")
+                logger.info("Service account key decoded successfully")
                 
                 self.credentials = service_account.Credentials.from_service_account_info(
                     key_data,
@@ -58,36 +56,22 @@ class GmailService:
                     ]
                 )
                 
-                logger.info(f"Service account credentials created successfully")
-                logger.info(f"Has scopes: {self.credentials.has_scopes(['https://www.googleapis.com/auth/gmail.readonly'])}")
-                
                 # Create delegated credentials for ai@besunny.ai
-                logger.info(f"Creating delegated credentials for {self.master_email}")
                 try:
                     self.credentials = self.credentials.with_subject(self.master_email)
-                    logger.info(f"Delegated credentials created successfully")
+                    logger.info(f"Delegated credentials created for {self.master_email}")
                 except Exception as e:
                     logger.error(f"Failed to create delegated credentials: {e}")
-                    logger.error(f"This usually means domain-wide delegation is not properly configured")
-                    logger.error(f"Please check Google Workspace Admin > Security > API controls > Domain-wide delegation")
+                    logger.error("Check Google Workspace Admin > Security > API controls > Domain-wide delegation")
                     raise
                 
                 # Build Gmail service
-                logger.info("Building Gmail API service...")
                 self.gmail_service = build('gmail', 'v1', credentials=self.credentials)
-                logger.info("Gmail API service built successfully")
+                logger.info("Gmail API service initialized successfully")
                 
             except Exception as e:
                 logger.error(f"Error during credential setup: {e}")
-                logger.error(f"Error type: {type(e).__name__}")
-                import traceback
-                logger.error(f"Traceback: {traceback.format_exc()}")
                 raise
-            
-            logger.info(f"Gmail service initialized for {self.master_email}")
-            logger.info(f"Service account: {key_data.get('client_email')}")
-            logger.info(f"Domain-wide delegation enabled: {self.credentials.has_scopes(['https://www.googleapis.com/auth/gmail.readonly'])}")
-            logger.info("✅ No token storage needed - Google handles everything automatically!")
             
         except Exception as e:
             logger.error(f"Failed to initialize Gmail service: {e}")
@@ -399,7 +383,7 @@ class GmailService:
         try:
             logger.info(f"Triggering workflows for email {email_id} (user: {username})")
             
-            # TODO: Implement email workflows
+            # Email workflows will be implemented in future version
             # - AI classification and processing
             # - User notifications
             # - Project context updates

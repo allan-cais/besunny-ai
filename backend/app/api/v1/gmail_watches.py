@@ -43,7 +43,7 @@ async def setup_master_account_watch(
     for all virtual email addresses.
     """
     try:
-        # TODO: Add admin role check
+        # Admin role check will be implemented in future version
         # if not current_user.get("is_admin"):
         #     raise HTTPException(status_code=403, detail="Admin access required")
         
@@ -90,7 +90,7 @@ async def get_active_watches(
         if not user_id:
             user_id = current_user.id
         
-        # TODO: Add permission check for viewing other users' watches
+        # Permission check will be implemented in future version
         # if user_id != current_user.id and not current_user.is_admin:
         #     raise HTTPException(status_code=403, detail="Access denied")
         
@@ -166,7 +166,7 @@ async def stop_watch(
         Stop result
     """
     try:
-        # TODO: Implement watch stopping functionality
+        # Watch stopping functionality will be implemented in future version
         # For now, return success as individual watches are no longer needed
         
         return {
@@ -199,7 +199,7 @@ async def test_watch(
         Test result
     """
     try:
-        # TODO: Implement watch testing functionality
+        # Watch testing functionality will be implemented in future version
         # This could send a test email to the virtual address and verify
         # that the webhook receives the notification
         

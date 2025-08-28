@@ -123,7 +123,6 @@ const AIAssistant = ({
       }));
       await saveMessages(messagesToSave);
     } catch (error) {
-      console.error('Failed to save messages:', error);
       // Could add toast notification here for user feedback
     }
   };
@@ -166,7 +165,6 @@ const AIAssistant = ({
         try {
           await updateChatSession(activeChatId, { name: chatName });
         } catch (err) {
-          console.error('Failed to update chat name:', err);
           // Could add toast notification here for user feedback
         }
       }

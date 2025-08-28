@@ -288,7 +288,7 @@ class EmailAliasDriveService:
     async def _trigger_revectorization_workflow(self, document_id: str, file_id: str, user_id: str) -> bool:
         """Trigger re-vectorization workflow for updated file."""
         try:
-            # TODO: This will be implemented when the re-vectorization workflow is built
+            # Re-vectorization workflow will be implemented in future version
             # For now, we'll log the event and prepare the payload
             
             # Get document details
@@ -314,7 +314,7 @@ class EmailAliasDriveService:
             # Log the re-vectorization trigger
             await self._log_revectorization_trigger(document_id, file_id, revectorization_payload)
             
-            # TODO: Send to re-vectorization service/workflow
+            # Re-vectorization service integration will be implemented in future version
             # await self._send_to_revectorization_service(revectorization_payload)
             
             logger.info(f"Re-vectorization workflow triggered for document {document_id}")

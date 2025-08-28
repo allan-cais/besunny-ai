@@ -14,7 +14,7 @@ from ...core.database import get_supabase
 from ...core.config import get_settings
 from ...models.schemas.document import DocumentType, ClassificationSource
 from .ai_service import AIService, AIProcessingResult
-from .enhanced_classification_service import EnhancedClassificationService
+# from .enhanced_classification_service import EnhancedClassificationService
 
 logger = logging.getLogger(__name__)
 

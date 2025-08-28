@@ -32,7 +32,6 @@ const VirtualEmailInstructions: React.FC = () => {
       const email = await virtualEmailBotScheduling.getUserVirtualEmail(user!.id);
       setVirtualEmail(email);
     } catch (error) {
-      console.error('Failed to load virtual email:', error);
       // Could add toast notification here for user feedback
     } finally {
       setLoading(false);
@@ -45,7 +44,6 @@ const VirtualEmailInstructions: React.FC = () => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
-      console.error('Failed to copy to clipboard:', error);
       // Could add toast notification here for user feedback
     }
   };

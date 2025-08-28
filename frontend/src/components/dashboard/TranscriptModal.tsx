@@ -110,7 +110,6 @@ const TranscriptModal: React.FC<TranscriptModalProps> = ({
       await navigator.clipboard.writeText(transcriptText);
       // You could add a toast notification here
     } catch (error) {
-      console.error('Failed to copy transcript:', error);
       // Handle copy error silently
     }
   };

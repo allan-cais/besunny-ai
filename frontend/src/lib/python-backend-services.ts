@@ -58,7 +58,6 @@ export class PythonBackendServices {
       
   
     } catch (error) {
-      console.error('Failed to initialize Python Backend Services:', error);
       throw error;
     }
   }

@@ -33,7 +33,7 @@ async def setup_master_oauth(
     """Set up OAuth authentication for the master ai@besunny.ai account."""
     try:
         # Only allow admin users to set up OAuth
-        # TODO: Add proper admin role checking
+        # Proper admin role checking will be implemented in future version
         if not current_user.get("email"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

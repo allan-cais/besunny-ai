@@ -71,7 +71,6 @@ export function usePythonBackend(options: UsePythonBackendOptions = {}): UsePyth
       await pythonBackendServices.initialize();
       isInitializedRef.current = true;
     } catch (err) {
-      console.error('Failed to initialize Python backend services:', err);
       setError(err instanceof Error ? err.message : 'Initialization failed');
     }
   }, [isEnabled]);
@@ -102,7 +101,6 @@ export function usePythonBackend(options: UsePythonBackendOptions = {}): UsePyth
       setError(errorMessage);
       setIsConnected(false);
       setIsHealthy(false);
-      console.error('Python backend connection failed:', err);
     } finally {
       setIsConnecting(false);
     }
@@ -143,7 +141,6 @@ export function usePythonBackend(options: UsePythonBackendOptions = {}): UsePyth
       const errorMessage = err instanceof Error ? err.message : 'Health check failed';
       setError(errorMessage);
       setIsHealthy(false);
-      console.error('Python backend health check failed:', err);
     }
   }, [isEnabled, isConnected]);
 

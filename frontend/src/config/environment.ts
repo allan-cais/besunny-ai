@@ -59,8 +59,6 @@ const validateConfig = (config: AppConfig): void => {
   const missingFields = requiredFields.filter(field => !config[field as keyof AppConfig]);
   
   if (missingFields.length > 0) {
-    console.error('Missing required environment variables:', missingFields);
-    
     if (isProduction) {
       throw new Error(`Missing required environment variables: ${missingFields.join(', ')}`);
     }

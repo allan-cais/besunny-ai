@@ -99,7 +99,6 @@ const ProjectMeetingsCard: React.FC<ProjectMeetingsCardProps> = ({ projectId }) 
       }
       setMeetings(loadedMeetings);
     } catch (err: unknown) {
-      console.error('Failed to load meetings:', err);
       setError((err as Error).message || 'Failed to load meetings');
     } finally {
       setLoading(false);
@@ -118,7 +117,6 @@ const ProjectMeetingsCard: React.FC<ProjectMeetingsCardProps> = ({ projectId }) 
       // Reload meetings after sync
       await loadMeetings();
     } catch (err: unknown) {
-      console.error('Failed to sync calendar events:', err);
       setError((err as Error).message || 'Failed to sync calendar events');
     } finally {
       setSyncing(false);

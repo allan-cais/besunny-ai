@@ -14,7 +14,7 @@ import json
 from ...core.config import get_settings
 from .ai_service import AIService
 from .classification_service import ClassificationService
-from .enhanced_classification_service import EnhancedClassificationService
+# from .enhanced_classification_service import EnhancedClassificationService
 from .meeting_intelligence_service import MeetingIntelligenceService
 from .embedding_service import EmbeddingService
 

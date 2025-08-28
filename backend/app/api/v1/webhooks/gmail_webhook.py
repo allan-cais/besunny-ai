@@ -145,7 +145,7 @@ async def _process_gmail_message(gmail_message_id: str) -> None:
 async def _fetch_gmail_message(message_id: str) -> Optional[Dict[str, Any]]:
     """Fetch a Gmail message using the Gmail API."""
     try:
-        # TODO: Implement Gmail API call to fetch message
+        # Gmail API call to fetch message will be implemented in future version
         # This will be implemented when we add Gmail API integration
         # For now, return a placeholder structure
         

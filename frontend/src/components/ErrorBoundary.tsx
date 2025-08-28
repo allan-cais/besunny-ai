@@ -24,13 +24,11 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
     this.setState({ error, errorInfo });
     
     // Log error to external service in production
     if (process.env.NODE_ENV === 'production') {
       // TODO: Send to error reporting service
-      console.error('Production error:', { error, errorInfo });
     }
   }
 
@@ -121,12 +119,9 @@ export class ErrorBoundary extends Component<Props, State> {
 // Hook for functional components to catch errors
 export const useErrorHandler = () => {
   const handleError = (error: Error, errorInfo?: ErrorInfo) => {
-    console.error('Error caught by useErrorHandler:', error, errorInfo);
-    
     // Log error to external service in production
     if (process.env.NODE_ENV === 'production') {
       // TODO: Send to error reporting service
-      console.error('Production error:', { error, errorInfo });
     }
   };
 

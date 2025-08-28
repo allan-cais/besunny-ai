@@ -108,7 +108,6 @@ const DataFeed = () => {
         }
       }
     } catch (error) {
-      console.error('Failed to load projects:', error);
       // Error loading projects
       // Use a fallback project for demo
       setProjects([{ id: 'fallback-project', name: 'Demo Project' }]);
@@ -132,7 +131,6 @@ const DataFeed = () => {
         .limit(200); // Increased limit to get more documents
 
       if (documentsError) {
-        console.error('Failed to load documents:', documentsError);
         // Error loading documents
         // Fallback to empty arrays when no data available
         setDocuments([]);
@@ -169,7 +167,6 @@ const DataFeed = () => {
         setActivities(documentActivities);
       }
           } catch (error) {
-        console.error('Failed to load documents:', error);
         // Error loading documents
         // Fallback to empty arrays when no data available
         setDocuments([]);

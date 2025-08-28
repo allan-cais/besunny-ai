@@ -46,7 +46,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const { data: { session }, error } = await supabase.auth.refreshSession();
       
       if (error) {
-        console.error('Session refresh error:', error);
         updateState({ 
           user: null, 
           session: null, 
@@ -62,7 +61,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         });
       }
     } catch (err) {
-      console.error('Session refresh failed:', err);
       updateState({ 
         user: null, 
         session: null, 
@@ -80,7 +78,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
-          console.error('Initial session error:', error);
           updateState({ 
             error: handleSupabaseError(error),
             loading: false 
@@ -103,7 +100,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           });
         }
       } catch (err) {
-        console.error('Auth initialization failed:', err);
         updateState({ 
           error: 'Failed to initialize authentication',
           loading: false 
@@ -198,7 +194,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       });
 
       if (error) {
-        console.error('Supabase auth error:', error);
         const errorMessage = handleSupabaseError(error);
         updateState({ error: errorMessage, loading: false });
         return { success: false, error: errorMessage };
@@ -219,7 +214,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       return { success: false, error: 'Sign in failed' };
     } catch (err) {
-      console.error('Sign in exception:', err);
       const errorMessage = 'Sign in failed';
       updateState({ error: errorMessage, loading: false });
       return { success: false, error: errorMessage };
@@ -407,11 +401,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return { hasUsername: false };
       }
 
-      console.log('🔍 Frontend Debug - Checking username status with token:', {
-        tokenLength: session.access_token?.length,
-        tokenPreview: session.access_token?.substring(0, 20) + '...',
-        backendUrl: import.meta.env.VITE_PYTHON_BACKEND_URL
-      });
+
       
       const response = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/user/username/status`, {
         method: 'GET',
@@ -421,9 +411,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       });
 
       if (!response.ok) {
-        console.warn('Username status check failed:', response.status, response.statusText);
-        const errorText = await response.text();
-        console.error('🔍 Frontend Debug - Error response:', errorText);
         return { hasUsername: false };
       }
 
@@ -434,7 +421,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         virtualEmail: result.virtual_email
       };
     } catch (err) {
-      console.error('Error checking username status:', err);
       return { hasUsername: false };
     }
   }, [state.user?.id]);

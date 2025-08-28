@@ -44,7 +44,7 @@ const IntegrationsPage: React.FC = () => {
             setGoogleConnected(true);
           }
         } catch (error) {
-          console.error('Error checking Google connection:', error);
+          // Error checking Google connection
         }
       }
     };
@@ -60,7 +60,6 @@ const IntegrationsPage: React.FC = () => {
     const stateParam = urlParams.get('state');
 
     if (errorParam) {
-      console.error('OAuth error:', errorParam);
       // Clean up URL
       navigate('/integrations', { replace: true });
     } else if (codeParam && stateParam && user?.id && session?.access_token) {
@@ -98,12 +97,10 @@ const IntegrationsPage: React.FC = () => {
       
       if (result.success) {
         setGoogleConnected(true);
-        console.log('Google account connected successfully');
       } else {
         throw new Error(result.error || 'Failed to connect Google account');
       }
     } catch (error) {
-      console.error('Error connecting Google account:', error);
       alert(`Failed to connect Google account: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsProcessingCallback(false);
@@ -160,12 +157,10 @@ const IntegrationsPage: React.FC = () => {
 
       if (response.ok) {
         setGoogleConnected(false);
-        console.log('Google account disconnected successfully');
       } else {
         throw new Error('Failed to disconnect Google account');
       }
     } catch (error) {
-      console.error('Error disconnecting Google account:', error);
       alert('Failed to disconnect Google account');
     }
   };

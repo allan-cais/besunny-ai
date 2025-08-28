@@ -55,7 +55,7 @@ const DashboardLayout: React.FC = () => {
       const userProjects = await getProjectsForUser(user.id);
       setProjects(userProjects);
     } catch (error) {
-      console.error('Error loading user projects:', error);
+      // Error loading user projects
     }
   };
 

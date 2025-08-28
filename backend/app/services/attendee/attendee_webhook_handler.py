@@ -387,10 +387,10 @@ class AttendeeWebhookHandler:
                 # Update meeting record with transcript
                 await self._update_meeting_transcript(bot_id, transcript_data)
                 
-                # TODO: Send to classification agent for project association
+                # Classification agent integration will be implemented in future version
                 # await self._send_to_classification_agent(bot_id, transcript_data, user_id)
                 
-                # TODO: Process through vector embedding workflow
+                # Vector embedding workflow will be implemented in future version
                 # await self._process_vector_embedding(bot_id, transcript_data, user_id)
                 
                 logger.info(f"Final transcript retrieved and stored for bot {bot_id}")

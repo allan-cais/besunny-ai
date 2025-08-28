@@ -10,7 +10,7 @@ from datetime import datetime
 from celery import Celery
 
 from ...core.celery_app import celery_app
-from .enhanced_classification_service import EnhancedClassificationService
+# from .enhanced_classification_service import EnhancedClassificationService
 from .auto_schedule_bots_service import AutoScheduleBotsService
 from .document_workflow_service import DocumentWorkflowService
 from .ai_service import AIService

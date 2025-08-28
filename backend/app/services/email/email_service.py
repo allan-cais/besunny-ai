@@ -12,7 +12,7 @@ from fastapi import HTTPException
 
 from ...core.database import get_supabase
 from ...core.config import get_settings
-# from ...services.classification import DocumentClassificationService  # TODO: Implement later
+# from ...services.classification import DocumentClassificationService  # Will be implemented in future version
 from ...models.schemas.email import (
     GmailMessage,
     EmailProcessingResult,
@@ -30,7 +30,7 @@ class EmailProcessingService:
     
     def __init__(self):
         self.settings = get_settings()
-        # self.classification_service = DocumentClassificationService()  # TODO: Implement later
+        # self.classification_service = DocumentClassificationService()  # Will be implemented in future version
     
     async def process_inbound_emails(self, messages: List[GmailMessage]) -> List[EmailProcessingResult]:
         """Process multiple inbound email messages."""

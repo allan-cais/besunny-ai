@@ -158,7 +158,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({
         description: `Bot will join the meeting 2 minutes before it starts.`,
       });
     } catch (error) {
-      console.error('Failed to deploy bot:', error);
       toast({
         title: "Failed to deploy bot",
         description: "Please try again.",
@@ -205,7 +204,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({
       }
       onMeetingUpdate();
     } catch (error) {
-      console.error('Failed to update meeting project:', error);
       toast({
         title: "Failed to assign meeting",
         description: "Please try again.",

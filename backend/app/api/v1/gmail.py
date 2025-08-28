@@ -4,12 +4,15 @@ Clean Gmail API endpoints for email watching and processing.
 
 from typing import Dict, Any, List
 from fastapi import APIRouter, HTTPException, status, Depends, BackgroundTasks, Header, Request
+from fastapi.responses import JSONResponse
+from typing import Dict, Any, Optional
 import logging
 from datetime import datetime
 
 from ...core.security import get_current_user_from_supabase_token
 from ...services.email.gmail_service import GmailService
 from ...services.email.email_processing_service import EmailProcessingService
+from ...services.webhook.webhook_tracking_service import WebhookTrackingService
 
 logger = logging.getLogger(__name__)
 
@@ -22,10 +25,7 @@ async def setup_gmail_watch(
     x_admin_token: str = Header(None)
 ) -> Dict[str, Any]:
     """Set up Gmail watch for the master account."""
-    logger.info("=" * 50)
-    logger.info("GMAIL WATCH SETUP ENDPOINT CALLED")
-    logger.info(f"Admin token header: {x_admin_token}")
-    logger.info("=" * 50)
+    logger.info("Setting up Gmail watch for master account")
     
     try:
         # Check for admin token
@@ -46,12 +46,10 @@ async def setup_gmail_watch(
             decoded_string = decoded_bytes.decode('utf-8')
             token_data = json.loads(decoded_string)
             
-            logger.info(f"Decoded admin token data: {token_data}")
-            
             if token_data.get("is_admin") and token_data.get("email") in admin_emails:
-                logger.info(f"Admin access granted via token for {token_data.get('email')}")
+                logger.info(f"Admin access granted for {token_data.get('email')}")
             else:
-                logger.warning(f"Admin token validation failed: is_admin={token_data.get('is_admin')}, email={token_data.get('email')}")
+                logger.warning("Admin token validation failed")
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Invalid admin token - insufficient privileges"
@@ -71,7 +69,7 @@ async def setup_gmail_watch(
                 detail="Gmail service not ready - check service account configuration"
             )
         
-        # Now that PubSub is working, set up the actual Gmail watch
+        # Set up the actual Gmail watch
         try:
             # Get topic name from environment or use default
             topic_name = "projects/sunny-ai-468016/topics/gmail-notifications"
@@ -307,10 +305,20 @@ async def gmail_webhook(
     logger.info(f"Request headers: {dict(request.headers)}")
     logger.info("=" * 50)
     
+    # Initialize webhook tracking service
+    webhook_tracker = WebhookTrackingService()
+    
     try:
         # Get the webhook payload from the request
         webhook_data = await request.json()
         logger.info(f"Received Gmail webhook: {webhook_data}")
+        
+        # Track webhook receipt
+        await webhook_tracker.track_webhook_activity(
+            service="gmail",
+            webhook_type="email_notification",
+            success=True
+        )
         
         # Initialize email processing service
         email_processor = EmailProcessingService()
@@ -320,6 +328,14 @@ async def gmail_webhook(
         
         if processing_result.get("status") == "success":
             logger.info(f"Email processing successful: {processing_result.get('message')}")
+            
+            # Track successful processing
+            await webhook_tracker.track_webhook_activity(
+                service="gmail",
+                webhook_type="email_processing_complete",
+                success=True
+            )
+            
             return {
                 "status": "success",
                 "message": processing_result.get("message"),
@@ -329,6 +345,15 @@ async def gmail_webhook(
             }
         else:
             logger.warning(f"Email processing completed with issues: {processing_result.get('message')}")
+            
+            # Track partial success
+            await webhook_tracker.track_webhook_activity(
+                service="gmail",
+                webhook_type="email_processing_partial",
+                success=False,
+                error_message=processing_result.get("message")
+            )
+            
             return {
                 "status": "partial_success",
                 "message": processing_result.get("message"),
@@ -341,6 +366,14 @@ async def gmail_webhook(
         logger.error(f"Error type: {type(e).__name__}")
         import traceback
         logger.error(f"Full traceback: {traceback.format_exc()}")
+        
+        # Track webhook failure
+        await webhook_tracker.track_webhook_activity(
+            service="gmail",
+            webhook_type="email_processing_error",
+            success=False,
+            error_message=str(e)
+        )
         
         return {"status": "error", "error": str(e)}
 

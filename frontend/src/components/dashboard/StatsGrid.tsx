@@ -71,7 +71,6 @@ const StatsGrid = () => {
         activeProjects: projects?.length || 0
       });
     } catch (error) {
-      console.error('Failed to fetch dashboard stats:', error);
       // Set to zero if there's an error
       setDashboardStats({
         totalDocuments: 0,

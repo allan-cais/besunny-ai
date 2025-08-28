@@ -96,7 +96,6 @@ const OAuthLoginCallback: React.FC = () => {
           throw new Error('Invalid response from authentication service');
         }
       } catch (error) {
-        console.error('OAuth callback error:', error);
         setStatus('error');
         setMessage(`Authentication failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
         setTimeout(() => navigate('/auth'), 5000);
