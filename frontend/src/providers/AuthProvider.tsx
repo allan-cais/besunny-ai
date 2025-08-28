@@ -15,6 +15,7 @@ interface AuthContextType extends AuthState {
   clearError: () => void;
   refreshSession: () => Promise<void>;
   checkUsernameStatus: () => Promise<{ hasUsername: boolean; username?: string; virtualEmail?: string }>;
+  clearUsernameStatus: () => void;
 }
 
 // Create auth context
@@ -396,13 +397,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return { hasUsername: false };
       }
 
+      // If we already have username status and it's for the same user, return cached result
+      if (state.usernameStatus && state.usernameStatus.username !== undefined) {
+        return state.usernameStatus;
+      }
+
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) {
         return { hasUsername: false };
       }
 
-
-      
       const response = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/user/username/status`, {
         method: 'GET',
         headers: {
@@ -415,15 +419,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
 
       const result = await response.json();
-      return {
+      const usernameStatus = {
         hasUsername: result.has_username,
         username: result.username,
         virtualEmail: result.virtual_email
       };
+
+      // Store the result in the auth state to avoid repeated API calls
+      updateState({ usernameStatus });
+
+      return usernameStatus;
     } catch (err) {
       return { hasUsername: false };
     }
-  }, [state.user?.id]);
+  }, [state.user?.id, state.usernameStatus, updateState]);
+
+  // Clear username status cache
+  const clearUsernameStatus = useCallback(() => {
+    updateState({ usernameStatus: undefined });
+  }, [updateState]);
 
   // Context value
   const value: AuthContextType = {
@@ -437,6 +451,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     clearError,
     refreshSession,
     checkUsernameStatus,
+    clearUsernameStatus,
   };
 
   return (

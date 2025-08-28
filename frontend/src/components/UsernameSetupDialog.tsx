@@ -23,7 +23,7 @@ const UsernameSetupDialog: React.FC<UsernameSetupDialogProps> = ({ open, onClose
   const [isValid, setIsValid] = useState(false);
   const [copied, setCopied] = useState(false);
   const [setupStep, setSetupStep] = useState<'username' | 'gmail-watch' | 'complete'>('username');
-  const { user } = useAuth();
+  const { user, clearUsernameStatus } = useAuth();
   const { toast } = useToast();
 
   const virtualEmailAddress = username ? `ai+${username}@besunny.ai` : '';
@@ -130,6 +130,9 @@ const UsernameSetupDialog: React.FC<UsernameSetupDialogProps> = ({ open, onClose
         });
       }
 
+      // Clear the username status cache so it will be refreshed
+      clearUsernameStatus();
+      
       // Close dialog after a short delay to show completion
       setTimeout(() => {
         onClose();

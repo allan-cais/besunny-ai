@@ -32,6 +32,11 @@ export interface AuthState {
   loading: boolean;
   error: string | null;
   isAuthenticated: boolean;
+  usernameStatus?: {
+    hasUsername: boolean;
+    username?: string;
+    virtualEmail?: string;
+  };
 }
 
 // Project types

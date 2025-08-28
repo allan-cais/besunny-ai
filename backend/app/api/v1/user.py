@@ -216,24 +216,55 @@ async def generate_username(
 
 
 @router.get("/username/status", response_model=Dict[str, Any])
-async def get_username_status() -> Dict[str, Any]:
+async def get_username_status(
+    current_user: dict = Depends(get_current_user_from_supabase_token)
+) -> Dict[str, Any]:
     """
     Get current username status for the user.
     
     Args:
-        None (simplified for testing)
+        current_user: Current authenticated user
         
     Returns:
         Username status information
     """
     try:
-        # Simplified version for testing - will be replaced with full functionality
-        return {
-            "has_username": False,
-            "username": None,
-            "virtual_email": None,
-            "email": "test@example.com"
-        }
+        # Get the actual user data from the database
+        service = UsernameService()
+        
+        # Check if user has a username in the database
+        user_data = service.supabase.table("users").select("username, email").eq("id", current_user["id"]).execute()
+        
+        if user_data.data and len(user_data.data) > 0:
+            user_record = user_data.data[0]
+            username = user_record.get("username")
+            email = user_record.get("email")
+            
+            if username:
+                # User has a username, generate virtual email
+                virtual_email = service._generate_virtual_email(username)
+                return {
+                    "has_username": True,
+                    "username": username,
+                    "virtual_email": virtual_email,
+                    "email": email
+                }
+            else:
+                # User exists but no username set
+                return {
+                    "has_username": False,
+                    "username": None,
+                    "virtual_email": None,
+                    "email": email
+                }
+        else:
+            # User not found in database
+            return {
+                "has_username": False,
+                "username": None,
+                "virtual_email": None,
+                "email": current_user.get("email")
+            }
         
     except Exception as e:
         raise HTTPException(

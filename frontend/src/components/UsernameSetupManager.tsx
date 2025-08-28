@@ -4,39 +4,30 @@ import UsernameSetupDialog from './UsernameSetupDialog';
 
 const UsernameSetupManager: React.FC = () => {
   const [showDialog, setShowDialog] = useState(false);
-  const [hasChecked, setHasChecked] = useState(false);
-  const { user, checkUsernameStatus } = useAuth();
+  const { user, usernameStatus, checkUsernameStatus } = useAuth();
 
   useEffect(() => {
-    if (user && !hasChecked) {
+    if (user && usernameStatus === undefined) {
+      // Only check if we don't have username status yet
       checkUsernameStatusFromAPI();
+    } else if (usernameStatus && !usernameStatus.hasUsername) {
+      // Show dialog if we know user doesn't have username
+      setShowDialog(true);
     }
-  }, [user, hasChecked, checkUsernameStatus]);
+  }, [user, usernameStatus, checkUsernameStatus]);
 
   const checkUsernameStatusFromAPI = async () => {
     if (!user) return;
 
     try {
-      // Use the new API endpoint to check username status
       const result = await checkUsernameStatus();
       
       if (!result.hasUsername) {
-        // User doesn't have a username, show the dialog immediately
         setShowDialog(true);
       }
-
-      setHasChecked(true);
     } catch (error) {
-      // If there's an error, wait a bit and retry once
-      if (!hasChecked) {
-        setTimeout(() => {
-          checkUsernameStatusFromAPI();
-        }, 2000);
-      } else {
-        // If retry also failed, show the dialog anyway
-        setShowDialog(true);
-        setHasChecked(true);
-      }
+      // If there's an error, show the dialog anyway
+      setShowDialog(true);
     }
   };
 
@@ -44,7 +35,13 @@ const UsernameSetupManager: React.FC = () => {
     setShowDialog(false);
   };
 
-  if (!user || !hasChecked) {
+  // Don't render anything until we have user and username status
+  if (!user || usernameStatus === undefined) {
+    return null;
+  }
+
+  // Don't show dialog if user already has username
+  if (usernameStatus.hasUsername) {
     return null;
   }
 
