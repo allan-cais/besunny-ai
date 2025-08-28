@@ -1,343 +1,252 @@
 """
-Documents API endpoints for BeSunny.ai Python backend.
-Provides REST API for document management operations.
+Documents API endpoints
+Handles document management, manual project assignment, and vector embedding.
 """
 
-from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
-from datetime import datetime
+import logging
+from typing import Dict, Any, List, Optional
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
+from pydantic import BaseModel
 
-from ...core.supabase_config import get_supabase_client
-from ...models.schemas.document import (
-    Document,
-    DocumentCreate,
-    DocumentUpdate,
-    DocumentListResponse,
-    DocumentStatus
-)
+from ...services.ai.vector_embedding_service import VectorEmbeddingService
+from ...core.supabase_config import get_supabase_service_client
 from ...core.security import get_current_user
-from ...models.schemas.user import User
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
+class ProjectAssignmentRequest(BaseModel):
+    """Request model for manually assigning a document to a project."""
+    document_id: str
+    project_id: str
 
-@router.post("/", response_model=Document)
-async def create_document(
-    document: DocumentCreate,
-    current_user: User = Depends(get_current_user)
+class DocumentSearchRequest(BaseModel):
+    """Request model for searching documents using vector similarity."""
+    query: str
+    project_id: Optional[str] = None
+    limit: int = 10
+
+class DocumentResponse(BaseModel):
+    """Response model for document data."""
+    id: str
+    title: str
+    content: str
+    source: str
+    project_id: Optional[str]
+    author: Optional[str]
+    created_at: str
+    updated_at: str
+
+@router.get("/unclassified", response_model=List[DocumentResponse])
+async def get_unclassified_documents(
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    limit: int = 50,
+    offset: int = 0
 ):
-    """Create a new document."""
+    """Get unclassified documents for the current user."""
     try:
-        supabase = get_supabase_client()
+        supabase = get_supabase_service_client()
         
-        # Add user and creation metadata
-        doc_data = document.dict()
-        doc_data['created_by'] = current_user.id
-        doc_data['created_at'] = datetime.now().isoformat()
-        doc_data['updated_at'] = datetime.now().isoformat()
-        
-        # Insert document
-        result = await supabase.table('documents').insert(doc_data).execute()
-        
-        if result.data:
-            return Document(**result.data[0])
-        else:
-            raise HTTPException(status_code=500, detail="Failed to create document")
-            
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to create document: {str(e)}")
-
-
-@router.get("/", response_model=DocumentListResponse)
-async def list_documents(
-    project_id: Optional[str] = Query(None, description="Filter by project ID"),
-    document_type: Optional[str] = Query(None, description="Filter by document type"),
-    status: Optional[str] = Query(None, description="Filter by status"),
-    limit: int = Query(100, description="Number of documents to return"),
-    offset: int = Query(0, description="Number of documents to skip"),
-    current_user: User = Depends(get_current_user)
-):
-    """List documents for the current user."""
-    try:
-        supabase = get_supabase_client()
-        
-        # Start with base query - ALWAYS filter by user first for security
-        query = supabase.table('documents').select('*').eq('created_by', current_user.id)
-        
-        # Apply additional filters
-        if project_id:
-            query = query.eq('project_id', project_id)
-        
-        if document_type:
-            query = query.eq('type', document_type)
-        
-        if status:
-            query = query.eq('status', status)
-        
-        # Apply pagination
-        query = query.range(offset, offset + limit - 1).order('created_at', desc=True)
-        
-        result = await query.execute()
-        
-        return DocumentListResponse(
-            documents=result.data or [],
-            total_count=len(result.data or []),
-            limit=limit,
-            offset=offset
-        )
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to list documents: {str(e)}")
-
-
-@router.get("/{document_id}", response_model=Document)
-async def get_document(
-    document_id: str,
-    current_user: User = Depends(get_current_user)
-):
-    """Get a specific document by ID."""
-    try:
-        supabase = get_supabase_client()
-        
-        # Get document - ALWAYS filter by user first for security
-        result = await supabase.table('documents').select('*').eq('id', document_id).eq('created_by', current_user.id).single().execute()
+        # Get documents without project_id for the current user
+        result = supabase.table('documents').select('*').eq('user_id', current_user['id']).is_('project_id', 'null').order('created_at', desc=True).range(offset, offset + limit - 1).execute()
         
         if not result.data:
-            raise HTTPException(status_code=404, detail="Document not found")
+            return []
         
-        return Document(**result.data)
+        documents = []
+        for doc in result.data:
+            documents.append(DocumentResponse(
+                id=doc['id'],
+                title=doc.get('title', doc.get('subject', 'Untitled')),
+                content=doc.get('content', ''),
+                source=doc.get('source', 'unknown'),
+                project_id=doc.get('project_id'),
+                author=doc.get('author'),
+                created_at=doc['created_at'],
+                updated_at=doc['updated_at']
+            ))
         
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get document: {str(e)}")
-
-
-@router.put("/{document_id}", response_model=Document)
-async def update_document(
-    document_id: str,
-    document_update: DocumentUpdate,
-    current_user: User = Depends(get_current_user)
-):
-    """Update a specific document."""
-    try:
-        supabase = get_supabase_client()
-        
-        # Check if document exists and belongs to user
-        existing_result = await supabase.table('documents').select('id').eq('id', document_id).eq('created_by', current_user.id).single().execute()
-        
-        if not existing_result.data:
-            raise HTTPException(status_code=404, detail="Document not found")
-        
-        # Update document
-        update_data = document_update.dict(exclude_unset=True)
-        update_data['updated_at'] = datetime.now().isoformat()
-        
-        result = await supabase.table('documents').update(update_data).eq('id', document_id).execute()
-        
-        if result.data:
-            return Document(**result.data[0])
-        else:
-            raise HTTPException(status_code=500, detail="Failed to update document")
-            
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to update document: {str(e)}")
-
-
-@router.delete("/{document_id}")
-async def delete_document(
-    document_id: str,
-    current_user: User = Depends(get_current_user)
-):
-    """Delete a specific document."""
-    try:
-        supabase = get_supabase_client()
-        
-        # Check if document exists and belongs to user
-        existing_result = await supabase.table('documents').select('id').eq('id', document_id).eq('created_by', current_user.id).single().execute()
-        
-        if not existing_result.data:
-            raise HTTPException(status_code=404, detail="Document not found")
-        
-        # Delete document
-        await supabase.table('documents').delete().eq('id', document_id).execute()
-        
-        return {"message": "Document deleted successfully"}
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to delete document: {str(e)}")
-
-
-@router.get("/project/{project_id}", response_model=DocumentListResponse)
-async def get_project_documents(
-    project_id: str,
-    limit: int = Query(100, description="Number of documents to return"),
-    offset: int = Query(0, description="Number of documents to skip"),
-    current_user: User = Depends(get_current_user)
-):
-    """Get all documents for a specific project."""
-    try:
-        supabase = get_supabase_client()
-        
-        # Get documents for project - ALWAYS filter by user first for security
-        query = supabase.table('documents').select('*').eq('created_by', current_user.id).eq('project_id', project_id)
-        
-        # Apply pagination
-        query = query.range(offset, offset + limit - 1).order('created_at', desc=True)
-        
-        result = await query.execute()
-        
-        return DocumentListResponse(
-            documents=result.data or [],
-            total_count=len(result.data or []),
-            limit=limit,
-            offset=offset
-        )
+        return documents
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get project documents: {str(e)}")
+        logger.error(f"Error fetching unclassified documents: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch unclassified documents")
 
-
-@router.get("/unclassified", response_model=DocumentListResponse)
-async def get_unclassified_documents(
-    limit: int = Query(100, description="Number of documents to return"),
-    offset: int = Query(0, description="Number of documents to skip"),
-    current_user: User = Depends(get_current_user)
-):
-    """Get unclassified documents (no project assigned)."""
-    try:
-        supabase = get_supabase_client()
-        
-        # Get unclassified documents - ALWAYS filter by user first for security
-        query = supabase.table('documents').select('*').eq('created_by', current_user.id).is_('project_id', None)
-        
-        # Apply pagination
-        query = query.range(offset, offset + limit - 1).order('created_at', desc=True)
-        
-        result = await query.execute()
-        
-        return DocumentListResponse(
-            documents=result.data or [],
-            total_count=len(result.data or []),
-            limit=limit,
-            offset=offset
-        )
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get unclassified documents: {str(e)}")
-
-
-@router.post("/{document_id}/assign-project")
+@router.post("/assign-project")
 async def assign_document_to_project(
-    document_id: str,
-    project_id: str,
-    current_user: User = Depends(get_current_user)
+    request: ProjectAssignmentRequest,
+    background_tasks: BackgroundTasks,
+    current_user: Dict[str, Any] = Depends(get_current_user)
 ):
-    """Assign a document to a project."""
+    """Manually assign a document to a project and trigger vector embedding."""
     try:
-        supabase = get_supabase_client()
+        supabase = get_supabase_service_client()
         
-        # Check if document exists and belongs to user
-        existing_result = await supabase.table('documents').select('id').eq('id', document_id).eq('created_by', current_user.id).single().execute()
+        # Verify document exists and belongs to user
+        doc_result = supabase.table('documents').select('*').eq('id', request.document_id).eq('user_id', current_user['id']).execute()
         
-        if not existing_result.data:
+        if not doc_result.data:
             raise HTTPException(status_code=404, detail="Document not found")
         
-        # Check if project exists and belongs to user
-        project_result = await supabase.table('projects').select('id').eq('id', project_id).eq('user_id', current_user.id).single().execute()
+        document = doc_result.data[0]
+        
+        # Verify project exists and belongs to user
+        project_result = supabase.table('projects').select('*').eq('id', request.project_id).eq('user_id', current_user['id']).execute()
         
         if not project_result.data:
             raise HTTPException(status_code=404, detail="Project not found")
         
-        # Update document with project assignment
-        result = await supabase.table('documents').update({
-            'project_id': project_id,
-            'updated_at': datetime.now().isoformat()
-        }).eq('id', document_id).execute()
+        # Update document with project_id
+        update_result = supabase.table('documents').update({
+            'project_id': request.project_id,
+            'updated_at': 'now()'
+        }).eq('id', request.document_id).execute()
         
-        if result.data:
-            return {"message": "Document assigned to project successfully"}
-        else:
-            raise HTTPException(status_code=500, detail="Failed to assign document to project")
-            
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to assign document to project: {str(e)}")
-
-
-@router.post("/{document_id}/remove-project")
-async def remove_document_from_project(
-    document_id: str,
-    current_user: User = Depends(get_current_user)
-):
-    """Remove a document from its assigned project."""
-    try:
-        supabase = get_supabase_client()
+        if not update_result.data:
+            raise HTTPException(status_code=500, detail="Failed to update document")
         
-        # Check if document exists and belongs to user
-        existing_result = await supabase.table('documents').select('id').eq('id', document_id).eq('created_by', current_user.id).single().execute()
+        # Trigger vector embedding in background
+        background_tasks.add_task(
+            _embed_manually_assigned_document,
+            document,
+            request.project_id,
+            current_user['id']
+        )
         
-        if not existing_result.data:
-            raise HTTPException(status_code=404, detail="Document not found")
-        
-        # Remove project assignment
-        result = await supabase.table('documents').update({
-            'project_id': None,
-            'updated_at': datetime.now().isoformat()
-        }).eq('id', document_id).execute()
-        
-        if result.data:
-            return {"message": "Document removed from project successfully"}
-        else:
-            raise HTTPException(status_code=500, detail="Failed to remove document from project")
-            
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to remove document from project: {str(e)}")
-
-
-@router.get("/stats/summary")
-async def get_document_stats(
-    current_user: User = Depends(get_current_user)
-):
-    """Get document statistics for the current user."""
-    try:
-        supabase = get_supabase_client()
-        
-        # Get total document count
-        total_result = await supabase.table('documents').select('id', count='exact').eq('created_by', current_user.id).execute()
-        total_count = total_result.count or 0
-        
-        # Get documents by type
-        type_result = await supabase.table('documents').select('type').eq('created_by', current_user.id).execute()
-        type_counts = {}
-        for doc in type_result.data or []:
-            doc_type = doc.get('type', 'unknown')
-            type_counts[doc_type] = type_counts.get(doc_type, 0) + 1
-        
-        # Get documents by status
-        status_result = await supabase.table('documents').select('status').eq('created_by', current_user.id).execute()
-        status_counts = {}
-        for doc in status_result.data or []:
-            doc_status = doc.get('status', 'unknown')
-            status_counts[doc_status] = status_counts.get(doc_status, 0) + 1
-        
-        # Get unclassified count
-        unclassified_result = await supabase.table('documents').select('id', count='exact').eq('created_by', current_user.id).is_('project_id', None).execute()
-        unclassified_count = unclassified_result.count or 0
+        logger.info(f"Document {request.document_id} assigned to project {request.project_id} for user {current_user['id']}")
         
         return {
-            "total_documents": total_count,
-            "by_type": type_counts,
-            "by_status": status_counts,
-            "unclassified": unclassified_count
+            "success": True,
+            "message": "Document assigned to project successfully",
+            "document_id": request.document_id,
+            "project_id": request.project_id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error assigning document to project: {e}")
+        raise HTTPException(status_code=500, detail="Failed to assign document to project")
+
+@router.post("/search")
+async def search_documents(
+    request: DocumentSearchRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Search documents using vector similarity."""
+    try:
+        vector_service = VectorEmbeddingService()
+        
+        # Perform vector search
+        search_results = await vector_service.search_similar_content(
+            query=request.query,
+            user_id=current_user['id'],
+            project_id=request.project_id,
+            limit=request.limit
+        )
+        
+        # Format results
+        formatted_results = []
+        for result in search_results:
+            formatted_results.append({
+                'id': result['id'],
+                'score': result['score'],
+                'content_type': result['content_type'],
+                'source_id': result['source_id'],
+                'project_id': result['project_id'],
+                'author': result['author'],
+                'date': result['date'],
+                'subject': result['subject'],
+                'chunk_text': result['chunk_text'],
+                'chunk_index': result['chunk_index'],
+                'total_chunks': result['total_chunks'],
+                'metadata': result['metadata']
+            })
+        
+        return {
+            "query": request.query,
+            "results": formatted_results,
+            "total_results": len(formatted_results)
         }
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get document stats: {str(e)}")
+        logger.error(f"Error searching documents: {e}")
+        raise HTTPException(status_code=500, detail="Failed to search documents")
+
+@router.get("/stats")
+async def get_document_stats(
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Get document statistics for the current user."""
+    try:
+        supabase = get_supabase_service_client()
+        vector_service = VectorEmbeddingService()
+        
+        # Get document counts by source
+        doc_stats = supabase.table('documents').select('source').eq('user_id', current_user['id']).execute()
+        
+        source_counts = {}
+        total_documents = 0
+        classified_documents = 0
+        unclassified_documents = 0
+        
+        for doc in doc_stats.data:
+            source = doc.get('source', 'unknown')
+            source_counts[source] = source_counts.get(source, 0) + 1
+            total_documents += 1
+        
+        # Get classified vs unclassified counts
+        classified_result = supabase.table('documents').select('id').eq('user_id', current_user['id']).not_.is_('project_id', 'null').execute()
+        classified_documents = len(classified_result.data) if classified_result.data else 0
+        unclassified_documents = total_documents - classified_documents
+        
+        # Get vector embedding stats
+        embedding_stats = await vector_service.get_embedding_stats(current_user['id'])
+        
+        return {
+            "total_documents": total_documents,
+            "classified_documents": classified_documents,
+            "unclassified_documents": unclassified_documents,
+            "source_breakdown": source_counts,
+            "vector_embeddings": embedding_stats
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching document stats: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch document statistics")
+
+async def _embed_manually_assigned_document(
+    document: Dict[str, Any],
+    project_id: str,
+    user_id: str
+):
+    """Background task to embed manually assigned document."""
+    try:
+        vector_service = VectorEmbeddingService()
+        
+        # Prepare content for embedding
+        content = {
+            'type': document.get('source', 'unknown'),
+            'source_id': document['id'],
+            'author': document.get('author', ''),
+            'date': document.get('created_at', ''),
+            'subject': document.get('subject', ''),
+            'content_text': document.get('content', ''),
+            'metadata': {
+                'document_id': document['id'],
+                'user_id': user_id,
+                'manually_assigned': True
+            }
+        }
+        
+        # Embed the content
+        embedding_result = await vector_service.embed_manually_assigned_content(
+            content=content,
+            project_id=project_id,
+            user_id=user_id
+        )
+        
+        logger.info(f"Manual assignment embedding completed: {embedding_result}")
+        
+    except Exception as e:
+        logger.error(f"Error in background embedding for manual assignment: {e}")

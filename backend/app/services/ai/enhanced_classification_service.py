@@ -317,10 +317,10 @@ class EnhancedClassificationService:
     
     async def _enhance_classification_result(
         self, 
-        base_result: ClassificationResult, 
+        base_result: EnhancedClassificationResult, 
         request: EnhancedClassificationRequest,
         content: str
-    ) -> ClassificationResult:
+    ) -> EnhancedClassificationResult:
         """Enhance base classification result with additional AI analysis."""
         try:
             # Perform sentiment analysis
@@ -346,9 +346,9 @@ class EnhancedClassificationService:
     
     async def _apply_classification_workflow(
         self, 
-        result: ClassificationResult, 
+        result: EnhancedClassificationResult, 
         workflow_type: str
-    ) -> ClassificationResult:
+    ) -> EnhancedClassificationResult:
         """Apply classification workflow processing."""
         try:
             if workflow_type == "advanced":
@@ -364,7 +364,7 @@ class EnhancedClassificationService:
             logger.error(f"Failed to apply classification workflow: {e}")
             return result
     
-    async def _apply_advanced_workflow(self, result: ClassificationResult) -> ClassificationResult:
+    async def _apply_advanced_workflow(self, result: EnhancedClassificationResult) -> EnhancedClassificationResult:
         """Apply advanced classification workflow."""
         try:
             # Enhance categories with hierarchical classification
@@ -395,7 +395,7 @@ class EnhancedClassificationService:
             logger.error(f"Failed to apply advanced workflow: {e}")
             return result
     
-    async def _apply_custom_workflow(self, result: ClassificationResult) -> ClassificationResult:
+    async def _apply_custom_workflow(self, result: EnhancedClassificationResult) -> EnhancedClassificationResult:
         """Apply custom classification workflow."""
         try:
             # Apply user-defined workflow rules
@@ -408,7 +408,7 @@ class EnhancedClassificationService:
     
     async def _generate_classification_recommendations(
         self, 
-        result: ClassificationResult, 
+        result: EnhancedClassificationResult, 
         request: EnhancedClassificationRequest
     ) -> Dict[str, List[str]]:
         """Generate recommendations and next steps based on classification."""

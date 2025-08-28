@@ -27,13 +27,16 @@ from .calendar import (
 # from ..services.ai.embedding_service import (
 #     EmbeddingResult, VectorSearchResult, DocumentChunk as EmbeddingDocumentChunk
 # )
-# from ..services.ai.classification_service import (
-#     ClassificationRequest, ClassificationResult, BatchClassificationRequest, BatchClassificationResult
-# )
 # from ..services.ai.meeting_intelligence_service import (
 #     MeetingTranscript, MeetingIntelligenceResult, ActionItem, AttendeeBotConfig,
 #     TranscriptSegment, MeetingSummary
 # )
+
+# Classification schemas
+from .classification import (
+    ClassificationRequest, ClassificationResult, BatchClassificationRequest, BatchClassificationResult,
+    ClassificationHistory, ClassificationMetrics, ClassificationPriority, ClassificationWorkflow
+)
 
 # Enterprise schemas - Phase 4
 from .enterprise import (
@@ -94,9 +97,12 @@ __all__ = [
     # Note: These are commented out due to circular import issues
     # "AIServiceResult",
     # "EmbeddingResult", "VectorSearchResult", "EmbeddingDocumentChunk",
-    # "ClassificationRequest", "ClassificationResult", "BatchClassificationRequest", "BatchClassificationResult",
     # "MeetingTranscript", "MeetingIntelligenceResult", "ActionItem", "AttendeeBotConfig",
     # "TranscriptSegment", "MeetingSummary",
+    
+    # Classification schemas
+    "ClassificationRequest", "ClassificationResult", "BatchClassificationRequest", "BatchClassificationResult",
+    "ClassificationHistory", "ClassificationMetrics", "ClassificationPriority", "ClassificationWorkflow",
     
     # Enterprise schemas - Phase 4
     "TenantBase", "TenantCreate", "TenantUpdate", "TenantResponse", "TenantListResponse",

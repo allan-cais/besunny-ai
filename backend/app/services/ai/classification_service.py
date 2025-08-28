@@ -15,6 +15,7 @@ import openai
 
 from ...core.supabase_config import get_supabase_service_client
 from ...core.config import get_settings
+from .vector_embedding_service import VectorEmbeddingService
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,9 @@ class ClassificationService:
             api_key=self.settings.openai_api_key,
             base_url=self.settings.openai_base_url if hasattr(self.settings, 'openai_base_url') else None
         )
+        
+        # Initialize vector embedding service
+        self.vector_service = VectorEmbeddingService()
         
         # Classification Agent system prompt
         self.classification_prompt = """CLASSIFICATION AGENT v4.0
@@ -209,6 +213,17 @@ Cross-project collaboration: Match to primary project based on content focus"""
             # Update document with project_id if classified
             if processed_result.get('project_id') and not processed_result.get('unclassified', True):
                 await self._update_document_project(content, processed_result['project_id'])
+                
+                # Send to vector embedding pipeline for classified content
+                try:
+                    embedding_result = await self.vector_service.embed_classified_content(
+                        content=content,
+                        classification_result=processed_result,
+                        user_id=user_id
+                    )
+                    logger.info(f"Vector embedding completed: {embedding_result.get('chunks_created', 0)} chunks created")
+                except Exception as e:
+                    logger.error(f"Vector embedding failed: {e}")
             
             logger.info(f"Classification completed: {processed_result.get('project_id', 'unclassified')} (confidence: {processed_result.get('confidence', 0)})")
             return processed_result
