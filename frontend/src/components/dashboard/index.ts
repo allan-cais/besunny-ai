@@ -5,4 +5,5 @@ export { default as StatsGrid } from './StatsGrid';
 export { default as QuickActions } from './QuickActions';
 export { default as DataFeed } from './DataFeed';
 export { default as FeedItemDetail } from './FeedItemDetail';
+export { ProjectRAGAgent } from './ProjectRAGAgent';
 export * from './types'; 

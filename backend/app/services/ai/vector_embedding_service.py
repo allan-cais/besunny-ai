@@ -26,13 +26,13 @@ class VectorEmbeddingService:
         
         # Initialize OpenAI client for embeddings
         self.openai_client = openai.AsyncOpenAI(
-            api_key=self.settings.openai_api_key,
-            base_url=self.settings.openai_base_url if hasattr(self.settings, 'openai_base_url') else None
+            api_key=self.settings.embedding_api_key or self.settings.openai_api_key,
+            base_url=self.settings.embedding_base_url
         )
         
         # Initialize Pinecone client
         self.pinecone = Pinecone(api_key=self.settings.pinecone_api_key)
-        self.index_name = self.settings.pinecone_index_name
+        self.index_name = self.settings.pinecone_vector_store
         
         # Get or create Pinecone index
         self.index = self._get_or_create_index()
@@ -54,7 +54,7 @@ class VectorEmbeddingService:
                 # Create index with serverless spec
                 self.pinecone.create_index(
                     name=self.index_name,
-                    dimension=1536,  # OpenAI text-embedding-3-small dimension
+                    dimension=1536,  # OpenAI embedding model dimension
                     metric="cosine",
                     spec=ServerlessSpec(
                         cloud="aws",
@@ -123,7 +123,7 @@ class VectorEmbeddingService:
                 try:
                     # Generate embedding
                     embedding_response = await self.openai_client.embeddings.create(
-                        model="text-embedding-3-small",
+                        model=self.settings.embedding_model_choice,
                         input=chunk['text'],
                         encoding_format="float"
                     )
@@ -325,7 +325,7 @@ class VectorEmbeddingService:
         try:
             # Generate embedding for the query
             query_embedding = await self.openai_client.embeddings.create(
-                model="text-embedding-3-small",
+                model=self.settings.embedding_model_choice,
                 input=query,
                 encoding_format="float"
             )

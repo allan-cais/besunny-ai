@@ -223,10 +223,16 @@ async def search_similar_content(query, user_id, project_id=None, limit=10):
 ```bash
 # Pinecone Configuration
 PINECONE_API_KEY=your_pinecone_api_key
-PINECONE_INDEX_NAME=besunny_ai_vectors
+PINECONE_VECTOR_STORE=sunny
+PINECONE_HOST_URL=https://sunny-wws6cxq.svc.aped-4627-b74a.pinecone.io
 PINECONE_ENVIRONMENT=us-east-1
 
-# OpenAI Configuration (for embeddings)
+# Embedding Configuration
+EMBEDDING_API_KEY=your_openai_api_key
+EMBEDDING_BASE_URL=https://api.openai.com/v1
+EMBEDDING_MODEL_CHOICE=text-embedding-3-small
+
+# Fallback OpenAI Configuration
 OPENAI_API_KEY=your_openai_api_key
 ```
 
@@ -243,7 +249,9 @@ openai>=1.0.0
 ```
 
 ### **Pinecone Index Configuration**
-- **Dimension:** 1536 (OpenAI text-embedding-3-small)
+- **Index Name:** `sunny` (from PINECONE_VECTOR_STORE)
+- **Host URL:** `https://sunny-wws6cxq.svc.aped-4627-b74a.pinecone.io`
+- **Dimension:** 1536 (OpenAI embedding model)
 - **Metric:** Cosine similarity
 - **Spec:** Serverless (AWS, us-east-1)
 - **Auto-creation:** Index created automatically if not exists

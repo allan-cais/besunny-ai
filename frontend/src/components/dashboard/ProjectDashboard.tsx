@@ -9,6 +9,7 @@ import { useSupabase } from '@/hooks/use-supabase';
 import type { Project, Meeting, Document } from '@/types';
 import ProjectMeetingsCard from '@/components/dashboard/ProjectMeetingsCard';
 import PageHeader from '@/components/dashboard/PageHeader';
+import { ProjectRAGAgent } from '@/components/dashboard/ProjectRAGAgent';
 import { Loader2, Brain, Tag, Users, MapPin, Calendar, FileText, Building, Clock, Database } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/providers/AuthProvider';
@@ -96,6 +97,7 @@ const ProjectDashboard: React.FC<ProjectDashboardProps> = ({ projectId }) => {
   const [selectedDocument, setSelectedDocument] = useState<ProjectData | null>(null);
   const [selectedMeeting, setSelectedMeeting] = useState<ProjectMeeting | null>(null);
   const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([]);
+  const [ragAgentCollapsed, setRagAgentCollapsed] = useState(false);
   const { toast } = useToast();
 
   // Load project-specific meetings
@@ -477,6 +479,14 @@ const ProjectDashboard: React.FC<ProjectDashboardProps> = ({ projectId }) => {
         onClose={() => setSelectedDocument(null)}
         projects={projects}
         onProjectChange={() => {}} // No-op since we're already in a project context
+      />
+
+      {/* RAG Agent - Right Side Panel */}
+      <ProjectRAGAgent
+        projectId={projectId}
+        projectName={project?.name || 'Unknown Project'}
+        isCollapsed={ragAgentCollapsed}
+        onToggle={() => setRagAgentCollapsed(!ragAgentCollapsed)}
       />
 
       {/* Meeting Modal */}

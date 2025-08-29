@@ -69,8 +69,15 @@ class Settings(BaseSettings):
     
     # Pinecone - vector database
     pinecone_api_key: Optional[str] = Field(default=None, env="PINECONE_API_KEY")
+    pinecone_vector_store: str = Field(default="sunny", env="PINECONE_VECTOR_STORE")
+    pinecone_host_url: str = Field(default="https://sunny-wws6cxq.svc.aped-4627-b74a.pinecone.io", env="PINECONE_HOST_URL")
     pinecone_environment: Optional[str] = Field(default=None, env="PINECONE_ENVIRONMENT")
     pinecone_index_name: Optional[str] = Field(default=None, env="PINECONE_INDEX_NAME")
+    
+    # Embedding settings
+    embedding_base_url: str = Field(default="https://api.openai.com/v1", env="EMBEDDING_BASE_URL")
+    embedding_api_key: Optional[str] = Field(default=None, env="EMBEDDING_API_KEY")
+    embedding_model_choice: str = Field(default="text-embedding-3-small", env="EMBEDDING_MODEL_CHOICE")
     
     # Webhook settings
     webhook_base_url: str = Field(default="http://localhost:8000", env="WEBHOOK_BASE_URL")
