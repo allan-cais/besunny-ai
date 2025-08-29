@@ -388,7 +388,7 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
             {/* Chat Header */}
             <div className="p-3 border-b border-[#4a5565] dark:border-zinc-700 flex-shrink-0">
               <div className="text-sm font-bold font-mono uppercase tracking-wide">
-                PROJECT ASSISTANT
+                Project Assistant
               </div>
               <div className="text-xs text-gray-500 font-mono">
                 {projectName || 'Project'} Chat
