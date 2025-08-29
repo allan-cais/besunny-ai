@@ -247,7 +247,7 @@ const DashboardLayout: React.FC = () => {
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
           <div className="flex-1 flex overflow-hidden min-w-0">
             <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-              <div className={`h-full flex flex-col ${isProjectPage ? 'w-full' : 'w-[70%] max-w-[90rem] mx-auto'}`}>
+              <div className="w-[70%] max-w-[90rem] mx-auto h-full flex flex-col">
                 {/* Outlet for nested routes */}
                 <Outlet />
               </div>

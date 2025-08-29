@@ -19,10 +19,8 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
   const [chatMessage, setChatMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(false); // Start expanded
+  const [isCollapsed, setIsCollapsed] = useState(true);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
-  const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
-  const [streamingText, setStreamingText] = useState("");
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -382,7 +380,7 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
       {/* Right Sidebar - Project Chat */}
       <div
         ref={assistantContainerRef}
-        className={`flex-shrink-0 transition-all duration-300 ease-in-out ${
+        className={`relative transition-all duration-300 ease-in-out ${
         isCollapsed ? 'w-0' : 'w-[25rem]'
       }`}>
         {!isCollapsed && (

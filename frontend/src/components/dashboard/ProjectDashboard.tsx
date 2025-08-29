@@ -9,7 +9,7 @@ import { useSupabase } from '@/hooks/use-supabase';
 import type { Project, Meeting, Document } from '@/types';
 import ProjectMeetingsCard from '@/components/dashboard/ProjectMeetingsCard';
 import PageHeader from '@/components/dashboard/PageHeader';
-import ProjectChat from '@/components/ProjectChat';
+
 import { Loader2, Brain, Tag, Users, MapPin, Calendar, FileText, Building, Clock, Database } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/providers/AuthProvider';
@@ -252,11 +252,9 @@ const ProjectDashboard: React.FC<ProjectDashboardProps> = ({ projectId }) => {
   }
 
   return (
-    <div className="flex h-full">
-      {/* Main Content */}
-      <div className="flex-1 px-4 pt-12 pb-8 font-sans flex flex-col overflow-hidden min-w-0">
-        {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto scrollbar-hide">
+    <div className="px-4 pt-12 pb-8 font-sans h-full flex flex-col">
+      {/* Scrollable Content */}
+      <div className="flex-1 overflow-y-auto scrollbar-hide">
         <div className="space-y-8">
           <div className="text-center space-y-4 mb-8">
             <h1 className="text-2xl font-bold font-mono uppercase tracking-wide mb-6">PROJECT {project.name?.toUpperCase()}: DIGEST</h1>
@@ -456,14 +454,6 @@ const ProjectDashboard: React.FC<ProjectDashboardProps> = ({ projectId }) => {
           </div>
         </div>
       </div>
-
-      {/* Project Chat - Right Side Panel */}
-      <ProjectChat 
-        projectId={projectId}
-        userId={user?.id || ''}
-        projectName={project?.name}
-      />
-    </div>
 
       {/* Transcript Modal */}
       <TranscriptModal 
