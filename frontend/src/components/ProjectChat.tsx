@@ -436,11 +436,8 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
                         ? 'border border-[#4a5565] bg-[#4a5565] text-stone-100 ml-8' 
                         : 'text-[#4a5565] dark:text-zinc-50 mr-8'
                     }`}>
-                      {streamingMessageId === message.id ? streamingText : message.message}
-                      {streamingMessageId === message.id && (
-                        <span className="inline-block w-0.5 h-4 bg-[#4a5565] dark:bg-zinc-50 ml-0.5 animate-pulse"></span>
-                      )}
-                      {message.role === 'assistant' && isLoading && (!message.message || message.message === "") && (
+                      {message.content}
+                      {message.role === 'assistant' && isLoading && (!message.content || message.content === "") && (
                         <span className="inline-flex items-center">
                           <span className="animate-pulse">.</span>
                           <span className="animate-pulse" style={{ animationDelay: '0.2s' }}>.</span>
