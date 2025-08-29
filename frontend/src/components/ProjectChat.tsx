@@ -19,8 +19,10 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
   const [chatMessage, setChatMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(true);
+  const [isCollapsed, setIsCollapsed] = useState(false); // Start expanded
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
+  const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
+  const [streamingText, setStreamingText] = useState("");
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -48,7 +50,6 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
         if (existingChat) {
           setActiveChatId(existingChat.id);
           await loadMessagesForChat(existingChat.id);
-          setIsCollapsed(false);
         }
       } catch (error) {
         // Error loading existing chat
@@ -138,7 +139,6 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
       const newSession = await createChatSession(session);
       setActiveChatId(newSession.id);
       await loadMessagesForChat(newSession.id);
-      setIsCollapsed(false);
     } catch (error) {
       // Error creating chat session
     }
@@ -343,6 +343,16 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
         }`}>
           {!isCollapsed && (
             <div className="h-full border-l border-[#4a5565] dark:border-zinc-700 bg-stone-100 dark:bg-zinc-800 flex flex-col">
+              {/* Chat Header */}
+              <div className="p-3 border-b border-[#4a5565] dark:border-zinc-700 flex-shrink-0">
+                <div className="text-sm font-bold font-mono uppercase tracking-wide">
+                  PROJECT ASSISTANT
+                </div>
+                <div className="text-xs text-gray-500 font-mono">
+                  {projectName || 'Project'} Chat
+                </div>
+              </div>
+              
               <div className="flex-1 flex items-center justify-center">
                 <div className="text-center text-gray-500 dark:text-gray-400">
                   <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
@@ -380,10 +390,10 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
             {/* Chat Header */}
             <div className="p-3 border-b border-[#4a5565] dark:border-zinc-700 flex-shrink-0">
               <div className="text-sm font-bold font-mono uppercase tracking-wide">
-                Sunny AI - Project Assistant
+                PROJECT ASSISTANT
               </div>
               <div className="text-xs text-gray-500 font-mono">
-                {projectName || 'Project'} Intelligence
+                {projectName || 'Project'} Chat
               </div>
             </div>
 
