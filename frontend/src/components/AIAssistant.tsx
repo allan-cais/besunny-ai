@@ -68,22 +68,30 @@ const AIAssistant = ({
       let loadedMessages: ChatMessage[] = supabaseMessages;
       // If no messages found, initialize with welcome message
       if (loadedMessages.length === 0) {
+        let welcomeMessage = "Hello! How can I help you today?";
+        
+
+        
         loadedMessages = [{
           id: crypto.randomUUID(),
           session_id: chatId,
           role: "assistant",
-          message: "Hello! How can I help you today?",
+          message: welcomeMessage,
           created_at: new Date().toISOString()
         }];
       }
       setMessages(loadedMessages);
     } catch (error) {
       // Error loading messages
+      let welcomeMessage = "Hello! How can I help you today?";
+      
+
+      
       setMessages([{
         id: crypto.randomUUID(),
         session_id: chatId,
         role: "assistant",
-        message: "Hello! How can I help you today?",
+        message: welcomeMessage,
         created_at: new Date().toISOString()
       }]);
     }
@@ -217,8 +225,8 @@ const AIAssistant = ({
         }
         
       } catch (error) {
+        console.error('Error processing message:', error);
         // Error processing message
-        // Add error message to chat
         const errorMessage: ChatMessage = {
           id: crypto.randomUUID(),
           session_id: activeChatId,

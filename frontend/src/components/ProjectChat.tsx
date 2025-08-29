@@ -19,8 +19,7 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
   const [isLoading, setIsLoading] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
-  const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
-  const [streamingText, setStreamingText] = useState("");
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const assistantContainerRef = useRef<HTMLDivElement>(null);
@@ -34,8 +33,8 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
     getMostRecentProjectChat
   } = useSupabase();
 
-  // Get n8n webhook URL from environment or use default
-  const N8N_WEBHOOK_URL = import.meta.env.VITE_N8N_WEBHOOK_URL || 'https://n8n.customaistudio.io/webhook/kirit-rag-webhook';
+  // RAG Agent API endpoint
+  const RAG_AGENT_API_URL = '/api/v1/rag-agent/query';
 
   // Load existing chat session for this project on mount
   useEffect(() => {
@@ -105,7 +104,7 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
           id: crypto.randomUUID(),
           session_id: chatId,
           role: "assistant",
-          message: `Hello! I'm here to help you with your project "${projectName || 'this project'}". How can I assist you today?`,
+          message: `Hi! I'm Sunny AI, your intelligent assistant for Project "${projectName || 'this project'}". I can answer questions about your project data, emails, documents, and meetings. What would you like to know?`,
           created_at: new Date().toISOString()
         }];
       }
@@ -116,7 +115,7 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
         id: crypto.randomUUID(),
         session_id: chatId,
         role: "assistant",
-        message: `Hello! I'm here to help you with your project "${projectName || 'this project'}". How can I assist you today?`,
+        message: `Hi! I'm Sunny AI, your intelligent assistant for Project "${projectName || 'this project'}". I can answer questions about your project data, emails, documents, and meetings. What would you like to know?`,
         created_at: new Date().toISOString()
       }]);
     }
@@ -204,73 +203,88 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
         // Save user message to database
         await saveMessagesForChat(activeChatId, [userMessage]);
         
-        // Send message to n8n webhook for AI processing
-        const webhookPayload = {
-          session_id: activeChatId,
-          user_id: userId,
-          project_id: projectId,
-          message: userMessageText,
-          message_id: userMessage.id,
-          timestamp: new Date().toISOString()
+        // Send message to RAG Agent API for AI processing
+        const ragPayload = {
+          question: userMessageText,
+          project_id: projectId
         };
         
-        const webhookResponse = await fetch(N8N_WEBHOOK_URL, {
+        const ragResponse = await fetch(RAG_AGENT_API_URL, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('access_token')}` // Get token from localStorage
           },
-          body: JSON.stringify(webhookPayload),
+          body: JSON.stringify(ragPayload),
         });
         
-        if (!webhookResponse.ok) {
-          const errorText = await webhookResponse.text();
-          // N8N webhook error
-          throw new Error('Failed to get AI response');
-        } else {
-          const responseText = await webhookResponse.text();
-          // Parse the assistant's reply from n8n
-          let assistantReply = '';
-          try {
-            const webhookResult = JSON.parse(responseText);
-            assistantReply = webhookResult.output || webhookResult.message || responseText;
-          } catch (e) {
-            assistantReply = responseText;
-          }
-          
-          // Create assistant message with empty content initially
-          const assistantMessage: ChatMessage = {
-            id: crypto.randomUUID(),
-            session_id: activeChatId,
-            role: "assistant",
-            message: "",
-            created_at: new Date().toISOString()
-          };
-          
-          // Remove typing indicator and add empty assistant message
-          setMessages(prev => {
-            const withoutTyping = prev.filter(msg => !(msg.role === 'assistant' && (!msg.message || msg.message === "")));
-            return [...withoutTyping, assistantMessage];
-          });
-          
-          // Start streaming the response
-          streamResponse(assistantReply, assistantMessage.id);
-          
-          // Save the complete message to Supabase after streaming completes
-          setTimeout(async () => {
-            const completeMessage: ChatMessage = {
-              ...assistantMessage,
-              message: assistantReply
-            };
-            await saveMessagesForChat(activeChatId, [completeMessage]);
-            
-            // Update the message with the complete text
-            setMessages(prev => prev.map(msg => 
-              msg.id === assistantMessage.id 
-                ? { ...msg, message: assistantReply }
-                : msg
-            ));
-          }, assistantReply.length * 17.5 + 100); // Wait for streaming to complete (avg 17.5ms per char)
+        if (!ragResponse.ok) {
+          throw new Error(`RAG Agent API error: ${ragResponse.status}`);
         }
+        
+        // Create assistant message with empty content initially
+        const assistantMessage: ChatMessage = {
+          id: crypto.randomUUID(),
+          session_id: activeChatId,
+          role: "assistant",
+          message: "",
+          created_at: new Date().toISOString()
+        };
+        
+        // Remove typing indicator and add empty assistant message
+        setMessages(prev => {
+          const withoutTyping = prev.filter(msg => !(msg.role === 'assistant' && (!msg.message || msg.message === "")));
+          return [...withoutTyping, assistantMessage];
+        });
+        
+        // Handle streaming response from RAG agent
+        const reader = ragResponse.body?.getReader();
+        if (!reader) {
+          throw new Error('No response body reader available');
+        }
+        
+        let responseText = '';
+        
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          
+          const chunk = new TextDecoder().decode(value);
+          const lines = chunk.split('\n');
+          
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6);
+              if (data === '[DONE]') {
+                // Response complete
+                break;
+              } else {
+                // Add to current response
+                responseText += data;
+                // Update the assistant message with streaming text
+                setMessages(prev => prev.map(msg => 
+                  msg.id === assistantMessage.id 
+                    ? { ...msg, message: responseText }
+                    : msg
+                ));
+              }
+            }
+          }
+        }
+        
+        // Save the complete assistant message to Supabase
+        const completeMessage: ChatMessage = {
+          ...assistantMessage,
+          message: responseText
+        };
+        await saveMessagesForChat(activeChatId, [completeMessage]);
+        
+        // Update the message with the complete text
+        setMessages(prev => prev.map(msg => 
+          msg.id === assistantMessage.id 
+            ? { ...msg, message: responseText }
+            : msg
+        ));
       } catch (error) {
         // Error sending message
         // Remove typing indicator and add error message
@@ -303,29 +317,7 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
     e.target.style.height = `${e.target.scrollHeight}px`;
   };
 
-  // Simulate streaming by gradually revealing text
-  const streamResponse = (fullText: string, messageId: string) => {
-    setStreamingMessageId(messageId);
-    setStreamingText("");
-    
-    let currentIndex = 0;
-    const streamNextChar = () => {
-      if (currentIndex < fullText.length) {
-        setStreamingText(prev => prev + fullText[currentIndex]);
-        currentIndex++;
-        
-        // Random delay between 10-25ms for natural typing feel
-        const delay = 10 + Math.random() * 15;
-        setTimeout(streamNextChar, delay);
-      } else {
-        setStreamingMessageId(null);
-        setStreamingText("");
-      }
-    };
-    
-    // Start streaming
-    streamNextChar();
-  };
+
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -352,7 +344,7 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
               <div className="flex-1 flex items-center justify-center">
                 <div className="text-center text-gray-500 dark:text-gray-400">
                   <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p className="text-sm">Start a conversation about your project</p>
+                  <p className="text-sm">Start a conversation with Sunny AI about your project</p>
                 </div>
               </div>
             </div>
@@ -364,7 +356,7 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
           <button
             onClick={toggleChat}
             className="fixed right-4 bottom-4 w-12 h-12 bg-[#4a5565] dark:bg-zinc-50 text-stone-100 dark:text-zinc-900 border border-[#4a5565] dark:border-zinc-700 rounded-full flex items-center justify-center hover:bg-stone-300 dark:hover:bg-zinc-700 transition-colors z-20 shadow-lg"
-            title="Open Project Assistant"
+            title="Open Sunny AI - Project Assistant"
           >
             <MessageSquare className="w-6 h-6" />
           </button>
@@ -386,10 +378,10 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
             {/* Chat Header */}
             <div className="p-3 border-b border-[#4a5565] dark:border-zinc-700 flex-shrink-0">
               <div className="text-sm font-bold font-mono uppercase tracking-wide">
-                Project Assistant
+                Sunny AI - Project Assistant
               </div>
               <div className="text-xs text-gray-500 font-mono">
-                {projectName || 'Project'} Chat
+                {projectName || 'Project'} Intelligence
               </div>
             </div>
 
