@@ -26,36 +26,29 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const assistantContainerRef = useRef<HTMLDivElement>(null);
 
-  // Supabase hooks
-  const { 
-    saveMessages, 
-    getMessagesBySession, 
-    createChatSession,
-    updateChatSession,
-    getMostRecentProjectChat
-  } = useSupabase();
+  // For now, we'll use a simple approach without complex chat sessions
+  // TODO: Implement proper chat session management
 
   // RAG Agent API endpoint
   const RAG_AGENT_API_URL = '/api/v1/rag-agent/query';
 
-  // Load existing chat session for this project on mount
+  // Initialize chat automatically when component mounts
   useEffect(() => {
-    const loadExistingChat = async () => {
-      if (!userId || !projectId) return;
+    if (userId && projectId) {
+      // Set a default chat ID and show welcome message
+      const defaultChatId = `chat_${projectId}_${userId}`;
+      setActiveChatId(defaultChatId);
       
-      try {
-        const existingChat = await getMostRecentProjectChat(userId, projectId);
-        if (existingChat) {
-          setActiveChatId(existingChat.id);
-          await loadMessagesForChat(existingChat.id);
-        }
-      } catch (error) {
-        // Error loading existing chat
-      }
-    };
-
-    loadExistingChat();
-  }, [userId, projectId, getMostRecentProjectChat, session]);
+      // Add welcome message
+      const welcomeMessage: ChatMessage = {
+        id: crypto.randomUUID(),
+        content: `Hi! I'm Sunny AI, your intelligent assistant for Project "${projectName || 'this project'}". I can answer questions about your project data, emails, documents, and meetings. What would you like to know?`,
+        role: "assistant",
+        timestamp: new Date().toISOString()
+      };
+      setMessages([welcomeMessage]);
+    }
+  }, [userId, projectId, projectName]);
 
   // Real-time subscription for messages
   useEffect(() => {
@@ -351,10 +344,43 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
                 </div>
               </div>
               
-              <div className="flex-1 flex items-center justify-center">
-                <div className="text-center text-gray-500 dark:text-gray-400">
-                  <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p className="text-sm">Start a conversation with Sunny AI about your project</p>
+              {/* Chat Messages */}
+              <ScrollArea className="flex-1 p-2" ref={scrollAreaRef}>
+                <div className="space-y-4">
+                  {/* Welcome message */}
+                  <div className="space-y-2">
+                    <div className="text-xs font-bold font-mono uppercase tracking-wide text-left">
+                      ASSISTANT
+                    </div>
+                    <div className="p-2 text-xs font-mono whitespace-pre-wrap break-words text-[#4a5565] dark:text-zinc-50 mr-8">
+                      Hi! I'm Sunny AI, your intelligent assistant for Project "{projectName || 'this project'}". I can answer questions about your project data, emails, documents, and meetings. What would you like to know?
+                    </div>
+                  </div>
+                </div>
+              </ScrollArea>
+
+              {/* Chat Input */}
+              <div className="p-2 border-t border-[#4a5565] dark:border-zinc-700 flex-shrink-0">
+                <div className="flex items-end space-x-2">
+                  <div className="flex-1">
+                    <textarea
+                      ref={textareaRef}
+                      value={chatMessage}
+                      onChange={handleTextareaChange}
+                      onKeyPress={handleKeyPress}
+                      className="w-full resize-none border border-[#4a5565] dark:border-zinc-700 rounded-md bg-white dark:bg-zinc-900 px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#4a5565] dark:focus:ring-zinc-700"
+                      rows={1}
+                      placeholder="Type your message..."
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={handleSendMessage}
+                    disabled={isLoading || !chatMessage.trim()}
+                    className="p-2 h-8 w-8 flex items-center justify-center border border-[#4a5565] dark:border-zinc-700 bg-[#4a5565] dark:bg-zinc-700 text-stone-100 dark:text-zinc-50 rounded-md hover:bg-[#3a4555] dark:hover:bg-zinc-600 transition-colors font-mono text-xs"
+                  >
+                    <Send className="w-6 h-6" />
+                  </Button>
                 </div>
               </div>
             </div>
