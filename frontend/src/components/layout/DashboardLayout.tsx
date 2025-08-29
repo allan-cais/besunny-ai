@@ -270,6 +270,14 @@ const DashboardLayout: React.FC = () => {
               currentProjectId={activeProjectId}
             /> */}
             
+            {/* Project Chat - Show only on project pages */}
+            {isProjectPage && projectId && (
+              <ProjectChat 
+                projectId={projectId}
+                userId={user?.id || ''}
+                projectName={projects.find(p => p.id === projectId)?.name}
+              />
+            )}
 
           </div>
         </div>
