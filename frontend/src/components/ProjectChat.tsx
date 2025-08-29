@@ -26,8 +26,7 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const assistantContainerRef = useRef<HTMLDivElement>(null);
 
-  // For now, we'll use a simple approach without complex chat sessions
-  // TODO: Implement proper chat session management
+  // Simple chat state management - no complex database operations for now
 
   // RAG Agent API endpoint
   const RAG_AGENT_API_URL = '/api/v1/rag-agent/query';
@@ -89,65 +88,27 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
   }, [activeChatId]);
 
   const loadMessagesForChat = async (chatId: string) => {
-    try {
-      const supabaseMessages = await getMessagesBySession(chatId, 100);
-      let loadedMessages: ChatMessage[] = supabaseMessages;
-      // If no messages found, initialize with welcome message
-      if (loadedMessages.length === 0) {
-        loadedMessages = [{
-          id: crypto.randomUUID(),
-          session_id: chatId,
-          role: "assistant",
-          message: `Hi! I'm Sunny AI, your intelligent assistant for Project "${projectName || 'this project'}". I can answer questions about your project data, emails, documents, and meetings. What would you like to know?`,
-          created_at: new Date().toISOString()
-        }];
-      }
-      setMessages(loadedMessages);
-    } catch (error) {
-      // Error loading messages
-      setMessages([{
-        id: crypto.randomUUID(),
-        session_id: chatId,
-        role: "assistant",
-        message: `Hi! I'm Sunny AI, your intelligent assistant for Project "${projectName || 'this project'}". I can answer questions about your project data, emails, documents, and meetings. What would you like to know?`,
-        created_at: new Date().toISOString()
-      }]);
-    }
+    // Simple local message loading - no database calls for now
+    const welcomeMessage: ChatMessage = {
+      id: crypto.randomUUID(),
+      content: `Hi! I'm Sunny AI, your intelligent assistant for Project "${projectName || 'this project'}". I can answer questions about your project data, emails, documents, and meetings. What would you like to know?`,
+      role: "assistant",
+      timestamp: new Date().toISOString()
+    };
+    setMessages([welcomeMessage]);
   };
 
   const createNewChat = async () => {
     if (!userId) return;
     
-    const newId = uuidv4();
-    const session = {
-      id: newId,
-      user_id: userId,
-      project_id: projectId,
-      name: `Chat for ${projectName || 'Project'}`
-    };
-    
-    try {
-      const newSession = await createChatSession(session);
-      setActiveChatId(newSession.id);
-      await loadMessagesForChat(newSession.id);
-    } catch (error) {
-      // Error creating chat session
-    }
+    const newId = `chat_${projectId}_${userId}_${Date.now()}`;
+    setActiveChatId(newId);
+    await loadMessagesForChat(newId);
   };
 
   const saveMessagesForChat = async (chatId: string, messages: ChatMessage[]) => {
-    try {
-      const messagesToSave = messages.map(msg => ({
-        id: msg.id,
-        session_id: msg.session_id,
-        role: msg.role,
-        message: msg.message,
-        used_chunks: msg.used_chunks || []
-      }));
-      await saveMessages(messagesToSave);
-    } catch (error) {
-      // Error saving messages
-    }
+    // Simple local message saving - no database calls for now
+    console.log('Messages saved locally:', messages);
   };
 
   const handleSendMessage = async () => {
@@ -169,10 +130,9 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
 
       const userMessage: ChatMessage = {
         id: crypto.randomUUID(),
-        session_id: activeChatId,
+        content: userMessageText,
         role: "user",
-        message: userMessageText,
-        created_at: new Date().toISOString()
+        timestamp: new Date().toISOString()
       };
       
       // Add user message immediately
@@ -182,10 +142,9 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
       setTimeout(() => {
         const typingMessage: ChatMessage = {
           id: crypto.randomUUID(),
-          session_id: activeChatId,
+          content: "",
           role: "assistant",
-          message: "",
-          created_at: new Date().toISOString()
+          timestamp: new Date().toISOString()
         };
         setMessages(prev => [...prev, typingMessage]);
       }, 500); // 500ms delay
@@ -218,15 +177,14 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
         // Create assistant message with empty content initially
         const assistantMessage: ChatMessage = {
           id: crypto.randomUUID(),
-          session_id: activeChatId,
+          content: "",
           role: "assistant",
-          message: "",
-          created_at: new Date().toISOString()
+          timestamp: new Date().toISOString()
         };
         
         // Remove typing indicator and add empty assistant message
         setMessages(prev => {
-          const withoutTyping = prev.filter(msg => !(msg.role === 'assistant' && (!msg.message || msg.message === "")));
+          const withoutTyping = prev.filter(msg => !(msg.role === 'assistant' && (!msg.content || msg.content === "")));
           return [...withoutTyping, assistantMessage];
         });
         
@@ -257,7 +215,7 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
                 // Update the assistant message with streaming text
                 setMessages(prev => prev.map(msg => 
                   msg.id === assistantMessage.id 
-                    ? { ...msg, message: responseText }
+                    ? { ...msg, content: responseText }
                     : msg
                 ));
               }
@@ -268,28 +226,27 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
         // Save the complete assistant message to Supabase
         const completeMessage: ChatMessage = {
           ...assistantMessage,
-          message: responseText
+          content: responseText
         };
         await saveMessagesForChat(activeChatId, [completeMessage]);
         
         // Update the message with the complete text
         setMessages(prev => prev.map(msg => 
           msg.id === assistantMessage.id 
-            ? { ...msg, message: responseText }
+            ? { ...msg, content: responseText }
             : msg
         ));
       } catch (error) {
         // Error sending message
         // Remove typing indicator and add error message
         setMessages(prev => {
-          const withoutTyping = prev.filter(msg => !(msg.role === 'assistant' && (!msg.message || msg.message === "")));
-          return [...withoutTyping, {
-            id: crypto.randomUUID(),
-            session_id: activeChatId,
-            role: "assistant",
-            message: "Sorry, I encountered an error. Please try again.",
-            created_at: new Date().toISOString()
-          }];
+          const withoutTyping = prev.filter(msg => !(msg.role === 'assistant' && (!msg.content || msg.content === "")));
+                  return [...withoutTyping, {
+          id: crypto.randomUUID(),
+          content: "Sorry, I encountered an error. Please try again.",
+          role: "assistant",
+          timestamp: new Date().toISOString()
+        }];
         });
       } finally {
         setIsLoading(false);
@@ -411,15 +368,7 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
       }`}>
         {!isCollapsed && (
           <div className="h-full border-l border-[#4a5565] dark:border-zinc-700 bg-stone-100 dark:bg-zinc-800 flex flex-col">
-            {/* Chat Header */}
-            <div className="p-3 border-b border-[#4a5565] dark:border-zinc-700 flex-shrink-0">
-              <div className="text-sm font-bold font-mono uppercase tracking-wide">
-                Project Assistant
-              </div>
-              <div className="text-xs text-gray-500 font-mono">
-                {projectName || 'Project'} Chat
-              </div>
-            </div>
+
 
             {/* Chat Messages */}
             <ScrollArea className="flex-1 p-2" ref={scrollAreaRef}>
@@ -429,7 +378,7 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
                     <div className={`text-xs font-bold font-mono uppercase tracking-wide ${
                       message.role === 'user' ? 'text-right' : 'text-left'
                     }`}>
-                      {message.role === 'user' ? 'USER' : 'ASSISTANT'}
+                      {message.role === 'user' ? 'USER' : 'Sunny AI Assistant'}
                     </div>
                     <div className={`p-2 text-xs font-mono whitespace-pre-wrap break-words ${
                       message.role === 'user' 
@@ -470,7 +419,7 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
                   disabled={isLoading || !chatMessage.trim()}
                   className="p-2 h-8 w-8 flex items-center justify-center border border-[#4a5565] dark:border-zinc-700 bg-[#4a5565] dark:bg-zinc-700 text-stone-100 dark:text-zinc-50 rounded-md hover:bg-[#3a4555] dark:hover:bg-zinc-600 transition-colors font-mono text-xs"
                 >
-                  <Send className="w-4 h-4" />
+                  <Send className="w-4 h-4 flex-shrink-0" />
                 </Button>
               </div>
             </div>
