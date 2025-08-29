@@ -463,6 +463,7 @@ const ProjectDashboard: React.FC<ProjectDashboardProps> = ({ projectId }) => {
         userId={user?.id || ''}
         projectName={project?.name}
       />
+    </div>
 
       {/* Transcript Modal */}
       <TranscriptModal 
