@@ -382,7 +382,7 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
       {/* Right Sidebar - Project Chat */}
       <div
         ref={assistantContainerRef}
-        className={`relative transition-all duration-300 ease-in-out ${
+        className={`flex-shrink-0 transition-all duration-300 ease-in-out ${
         isCollapsed ? 'w-0' : 'w-[25rem]'
       }`}>
         {!isCollapsed && (

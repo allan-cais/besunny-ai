@@ -254,7 +254,7 @@ const ProjectDashboard: React.FC<ProjectDashboardProps> = ({ projectId }) => {
   return (
     <div className="flex h-full">
       {/* Main Content */}
-      <div className="flex-1 px-4 pt-12 pb-8 font-sans flex flex-col">
+      <div className="flex-1 px-4 pt-12 pb-8 font-sans flex flex-col overflow-hidden min-w-0">
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto scrollbar-hide">
         <div className="space-y-8">
