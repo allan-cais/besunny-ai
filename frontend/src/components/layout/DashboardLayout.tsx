@@ -15,7 +15,6 @@ import { useSupabase } from '@/hooks/use-supabase';
 import type { Project, Meeting, Document, ChatSession } from '@/types';
 import CreateProjectDialog from '@/components/CreateProjectDialog';
 import AIAssistant from '@/components/AIAssistant';
-import ProjectChat from '@/components/ProjectChat';
 import UsernameSetupManager from '@/components/UsernameSetupManager';
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -270,14 +269,7 @@ const DashboardLayout: React.FC = () => {
               currentProjectId={activeProjectId}
             /> */}
             
-            {/* Project Chat - Show only on project pages */}
-            {isProjectPage && projectId && (
-              <ProjectChat 
-                projectId={projectId}
-                userId={user?.id || ''}
-                projectName={projects.find(p => p.id === projectId)?.name}
-              />
-            )}
+
           </div>
         </div>
       </div>

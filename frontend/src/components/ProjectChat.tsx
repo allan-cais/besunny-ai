@@ -4,6 +4,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Send, ChevronRight, MessageSquare } from 'lucide-react';
 import { useSupabase } from '@/hooks/use-supabase';
+import { useAuth } from '@/providers/AuthProvider';
 import { ChatMessage } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -14,6 +15,7 @@ interface ProjectChatProps {
 }
 
 const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectName }) => {
+  const { session } = useAuth();
   const [chatMessage, setChatMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -54,7 +56,7 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
     };
 
     loadExistingChat();
-  }, [userId, projectId, getMostRecentProjectChat]);
+  }, [userId, projectId, getMostRecentProjectChat, session]);
 
   // Real-time subscription for messages
   useEffect(() => {
@@ -213,7 +215,7 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('access_token')}` // Get token from localStorage
+            'Authorization': `Bearer ${session?.access_token}` // Get token from session
           },
           body: JSON.stringify(ragPayload),
         });
