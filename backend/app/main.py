@@ -48,8 +48,6 @@ _health_status = {
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager - lightweight and efficient."""
-    print("=== LIFESPAN FUNCTION CALLED (PRINT) ===")
-    logger.info("=== LIFESPAN FUNCTION CALLED - STARTING UP ===")
     logger.info("Starting BeSunny.ai Python Backend")
     
     try:
@@ -68,22 +66,14 @@ async def lifespan(app: FastAPI):
             _health_status["services"]["supabase"] = "error"
         
         # Start simple background token refresh
-        print("=== LIFESPAN: Attempting to start token refresh background task ===")
-        logger.info("Attempting to start token refresh background task...")
+        logger.info("Starting token refresh background task...")
         try:
             # Create a simple background task
-            print("=== LIFESPAN: Creating background task ===")
-            logger.info("Creating background task...")
             task = asyncio.create_task(_simple_token_refresh_loop())
-            print(f"=== LIFESPAN: Background task created: {task} ===")
-            logger.info(f"Background task created: {task}")
-            logger.info("Simple token refresh background task started successfully")
+            logger.info("Token refresh background task started successfully")
             _health_status["services"]["token_refresh"] = "started"
         except Exception as e:
             logger.error(f"Token refresh background task failed: {e}")
-            logger.error(f"Error type: {type(e)}")
-            import traceback
-            logger.error(f"Traceback: {traceback.format_exc()}")
             _health_status["services"]["token_refresh"] = "failed"
         
         # Mark startup as successful
@@ -109,9 +99,6 @@ async def lifespan(app: FastAPI):
 def create_app() -> FastAPI:
     """Create and configure FastAPI application."""
     settings = get_settings()
-    
-    print(f"=== CREATE_APP: About to create FastAPI with lifespan: {lifespan} ===")
-    print(f"=== CREATE_APP: Lifespan type: {type(lifespan)} ===")
     
     app = FastAPI(
         title=settings.app_name,
@@ -310,87 +297,18 @@ def create_app() -> FastAPI:
             "timestamp": time.time()
         }
     
-    # Manual background task trigger for testing
-    @app.post("/api/test/trigger-background-task")
-    async def trigger_background_task():
-        """Manually trigger the background task for testing."""
-        try:
-            logger.info("Manual trigger of background task requested")
-            task = asyncio.create_task(_simple_token_refresh_loop())
-            return {
-                "status": "success",
-                "message": "Background task manually triggered",
-                "task_id": str(task),
-                "timestamp": time.time()
-            }
-        except Exception as e:
-            logger.error(f"Failed to trigger background task: {e}")
-            return {
-                "status": "error",
-                "message": f"Failed to trigger background task: {str(e)}",
-                "timestamp": time.time()
-            }
-    
-    # Test lifespan function directly
-    @app.get("/api/test/lifespan-info")
-    async def lifespan_info():
-        """Test endpoint to verify lifespan function exists."""
-        return {
-            "status": "success",
-            "lifespan_function": str(lifespan),
-            "lifespan_type": str(type(lifespan)),
-            "lifespan_module": str(lifespan.__module__),
-            "timestamp": time.time()
-        }
-    
-    # Background task status check
-    @app.get("/api/test/background-task-status")
-    async def background_task_status():
-        """Check the status of background tasks."""
-        try:
-            # Get all running tasks
-            all_tasks = asyncio.all_tasks()
-            background_tasks = [t for t in all_tasks if t is not asyncio.current_task()]
-            
-            return {
-                "status": "success",
-                "total_background_tasks": len(background_tasks),
-                "task_details": [
-                    {
-                        "task_id": str(task),
-                        "name": getattr(task, '_name', 'unnamed'),
-                        "done": task.done(),
-                        "cancelled": task.cancelled()
-                    }
-                    for task in background_tasks
-                ],
-                "health_status": _health_status,
-                "timestamp": time.time()
-            }
-        except Exception as e:
-            logger.error(f"Failed to get background task status: {e}")
-            return {
-                "status": "error",
-                "message": f"Failed to get status: {str(e)}",
-                "timestamp": time.time()
-            }
+
     
     logger.info("FastAPI application configured successfully")
     return app
 
 async def _simple_token_refresh_loop():
     """Simple background loop that refreshes tokens every 5 minutes."""
-    logger.info("Token refresh background loop function called")
     try:
-        logger.info("Starting token refresh background loop...")
         while True:
             try:
-                logger.info("Running token refresh check...")
-                
                 # Import and call the refresh function
-                logger.info("Importing refresh function...")
                 from app.services.auth.simple_token_refresh import refresh_expiring_tokens
-                logger.info("Calling refresh function...")
                 result = await refresh_expiring_tokens()
                 
                 if result.get('success'):
@@ -399,7 +317,6 @@ async def _simple_token_refresh_loop():
                     logger.warning(f"Token refresh failed: {result.get('message', 'Unknown error')}")
                 
                 # Wait 5 minutes
-                logger.info("Waiting 5 minutes before next refresh...")
                 await asyncio.sleep(300)
                 
             except Exception as e:
@@ -411,8 +328,6 @@ async def _simple_token_refresh_loop():
         logger.info("Token refresh loop cancelled")
     except Exception as e:
         logger.error(f"Token refresh loop failed: {e}")
-        import traceback
-        logger.error(f"Traceback: {traceback.format_exc()}")
 
 
 # Create the application instance
