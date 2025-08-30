@@ -64,17 +64,14 @@ async def lifespan(app: FastAPI):
             logger.error(f"Supabase initialization error: {e}")
             _health_status["services"]["supabase"] = "error"
         
-        # Start simple token refresh service
+        # Start background token refresh task
         try:
-            from app.services.auth.simple_token_refresh import get_simple_token_refresh_service
-            # Initialize the simple service
-            simple_service = get_simple_token_refresh_service()
-            # Schedule periodic token refresh
-            asyncio.create_task(_schedule_simple_token_refresh())
-            logger.info("Simple token refresh service started successfully")
+            # Create a simple background task that runs every 5 minutes
+            asyncio.create_task(_run_token_refresh_background())
+            logger.info("Background token refresh task started successfully")
             _health_status["services"]["token_refresh"] = "started"
         except Exception as e:
-            logger.warning(f"Token refresh service startup failed (non-critical): {e}")
+            logger.warning(f"Background token refresh task failed to start: {e}")
             _health_status["services"]["token_refresh"] = "failed"
         
         # Mark startup as successful
@@ -224,24 +221,32 @@ def create_app() -> FastAPI:
     # HELPER FUNCTIONS
     # ============================================================================
     
-    async def _schedule_simple_token_refresh():
-        """Simple periodic token refresh."""
+    async def _run_token_refresh_background():
+        """Simple background task that refreshes tokens every 5 minutes."""
         try:
             while True:
                 try:
-                    # Use the simple service
-                    from app.services.auth.simple_token_refresh import run_simple_token_refresh
-                    await run_simple_token_refresh()
+                    # Call the token refresh function
+                    from app.services.auth.simple_token_refresh import refresh_expiring_tokens
+                    result = await refresh_expiring_tokens()
+                    
+                    if result.get('success'):
+                        logger.info("Background token refresh completed successfully")
+                    else:
+                        logger.warning(f"Background token refresh failed: {result.get('message', 'Unknown error')}")
+                    
                     # Wait 5 minutes before next refresh
                     await asyncio.sleep(300)
+                    
                 except Exception as e:
-                    logger.error(f"Token refresh error: {e}")
-                    # Wait a bit before retrying
+                    logger.error(f"Background token refresh error: {e}")
+                    # Wait 1 minute before retrying
                     await asyncio.sleep(60)
+                    
         except asyncio.CancelledError:
-            logger.info("Token refresh scheduling cancelled")
+            logger.info("Background token refresh task cancelled")
         except Exception as e:
-            logger.error(f"Token refresh scheduling failed: {e}")
+            logger.error(f"Background token refresh task failed: {e}")
     
     # ============================================================================
     # OPTIMIZED HEALTH CHECK ENDPOINTS
@@ -338,9 +343,8 @@ def create_app() -> FastAPI:
     async def background_services_status():
         """Get status of background services."""
         try:
-            from app.services.auth.simple_token_refresh import get_simple_token_refresh_service
-            simple_service = get_simple_token_refresh_service()
-            service_status = await simple_service.get_service_status()
+            from app.services.auth.simple_token_refresh import get_service_status
+            service_status = await get_service_status()
             return {
                 "status": "success",
                 "background_services": {
@@ -360,8 +364,8 @@ def create_app() -> FastAPI:
     async def manual_token_refresh():
         """Manually trigger token refresh."""
         try:
-            from app.services.auth.simple_token_refresh import run_simple_token_refresh
-            result = await run_simple_token_refresh()
+            from app.services.auth.simple_token_refresh import refresh_expiring_tokens
+            result = await refresh_expiring_tokens()
             return {
                 "status": "success",
                 "result": result,

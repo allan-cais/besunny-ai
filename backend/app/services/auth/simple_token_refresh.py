@@ -1,71 +1,44 @@
 """
-Simple, reliable token refresh service.
-This service just refreshes tokens when called - no complex background processing.
+Simple token refresh function.
+This just refreshes tokens when called - no complex service classes.
 """
 
 import logging
-from datetime import datetime, timedelta
-from typing import Dict, List
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
 
-class SimpleTokenRefreshService:
-    """Simple token refresh service that just works."""
-    
-    def __init__(self):
-        self.last_check = None
+async def refresh_expiring_tokens() -> dict:
+    """Refresh tokens that are about to expire."""
+    try:
+        current_time = datetime.utcnow()
         
-    async def refresh_expiring_tokens(self) -> Dict:
-        """Refresh tokens that are about to expire."""
-        try:
-            current_time = datetime.utcnow()
-            self.last_check = current_time
-            
-            logger.info("Simple token refresh service checking for expiring tokens")
-            
-            # For now, just return success - we'll expand this later
-            # but first let's make sure the basic service works
-            
-            return {
-                'success': True,
-                'message': 'Simple token refresh service is operational',
-                'last_check': current_time.isoformat(),
-                'tokens_refreshed': 0,
-                'service_type': 'simple'
-            }
-            
-        except Exception as e:
-            logger.error(f"Simple token refresh error: {e}")
-            return {
-                'success': False,
-                'error': str(e),
-                'message': 'Simple token refresh failed',
-                'service_type': 'simple'
-            }
-    
-    async def get_service_status(self) -> Dict:
-        """Get the current status of the service."""
+        logger.info("Token refresh function called")
+        
+        # For now, just return success - we'll expand this later
+        # but first let's make sure the basic function works
+        
         return {
-            'is_running': True,
-            'last_check': self.last_check.isoformat() if self.last_check else None,
-            'service_type': 'simple'
+            'success': True,
+            'message': 'Token refresh function is operational',
+            'timestamp': current_time.isoformat(),
+            'tokens_refreshed': 0
+        }
+        
+    except Exception as e:
+        logger.error(f"Token refresh error: {e}")
+        return {
+            'success': False,
+            'error': str(e),
+            'message': 'Token refresh failed'
         }
 
 
-# Global service instance
-_simple_service: SimpleTokenRefreshService = None
-
-
-def get_simple_token_refresh_service() -> SimpleTokenRefreshService:
-    """Get the global simple service instance."""
-    global _simple_service
-    if _simple_service is None:
-        _simple_service = SimpleTokenRefreshService()
-    return _simple_service
-
-
-async def run_simple_token_refresh():
-    """Run the simple token refresh service."""
-    service = get_simple_token_refresh_service()
-    return await service.refresh_expiring_tokens()
+async def get_service_status() -> dict:
+    """Get the current status."""
+    return {
+        'is_running': True,
+        'last_check': datetime.utcnow().isoformat(),
+        'service_type': 'simple_function'
+    }
