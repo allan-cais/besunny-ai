@@ -100,12 +100,8 @@ class GoogleTokenService:
                     # Check for specific error types
                     if error_json.get('error') == 'invalid_grant':
                         logger.error("Refresh token is expired or revoked - user needs to re-authenticate")
-                        # Return a special error code for expired/revoked tokens
-                        return {
-                            'error': 'TOKEN_EXPIRED_OR_REVOKED',
-                            'error_description': error_json.get('error_description', 'Token has been expired or revoked'),
-                            'needs_reauth': True
-                        }
+                        # Return None to indicate failure - the calling method will handle the specific error
+                        return None
                     
                 except:
                     logger.error(f"Google OAuth error text: {error_text}")
@@ -164,15 +160,7 @@ class GoogleTokenService:
             new_tokens = await self.exchange_token(refresh_token)
             if not new_tokens:
                 logger.error(f"Failed to exchange refresh token for user {user_id}")
-                return {
-                    'success': False,
-                    'error': 'Failed to exchange refresh token',
-                    'error_code': 'TOKEN_EXCHANGE_FAILED'
-                }
-            
-            # Check if the exchange returned an error (like expired token)
-            if 'error' in new_tokens and new_tokens.get('needs_reauth'):
-                logger.error(f"Refresh token expired/revoked for user {user_id} - needs re-authentication")
+                # Check if this was due to an expired/revoked token
                 return {
                     'success': False,
                     'error': 'Refresh token expired or revoked',
