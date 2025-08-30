@@ -67,7 +67,7 @@ class GoogleDisconnectService:
             if credentials.get('refresh_token'):
                 refresh_token_revoked = await self._revoke_token_at_google(credentials['refresh_token'])
             
-            # Remove credentials from database
+            # Soft delete credentials and maintain audit trail
             credentials_removed = await self._remove_google_credentials(user_id)
             
             # Remove all related webhooks and watches
@@ -76,7 +76,7 @@ class GoogleDisconnectService:
             logger.info(f"Google account disconnected successfully for user {user_id}")
             return {
                 'success': True,
-                'message': 'Google account disconnected successfully',
+                'message': 'Google account disconnected successfully - credentials deactivated and audit trail maintained',
                 'tokens_revoked': access_token_revoked or refresh_token_revoked,
                 'credentials_removed': credentials_removed
             }
@@ -129,20 +129,56 @@ class GoogleDisconnectService:
             return False
     
     async def _remove_google_credentials(self, user_id: str) -> bool:
-        """Remove Google credentials from database."""
+        """Soft delete Google credentials and maintain audit trail."""
         try:
+            # Get current credentials for audit trail
+            current_credentials = self.supabase.table("google_credentials") \
+                .select("*") \
+                .eq("user_id", user_id) \
+                .single() \
+                .execute()
+            
+            if not current_credentials.data:
+                logger.info(f"No Google credentials found for user {user_id}")
+                return True
+            
+            # Create audit record before soft delete
+            audit_data = {
+                "user_id": user_id,
+                "action": "disconnect",
+                "previous_status": "connected",
+                "disconnected_at": datetime.now().isoformat(),
+                "had_access_token": bool(current_credentials.data.get('access_token')),
+                "had_refresh_token": bool(current_credentials.data.get('refresh_token')),
+                "scope": current_credentials.data.get('scope'),
+                "metadata": current_credentials.data
+            }
+            
+            # Insert audit record
+            self.supabase.table("google_credentials_audit") \
+                .insert(audit_data) \
+                .execute()
+            
+            # Soft delete: mark as inactive instead of hard delete
             result = self.supabase.table("google_credentials") \
-                .delete() \
+                .update({
+                    "status": "disconnected",
+                    "disconnected_at": datetime.now().isoformat(),
+                    "access_token": None,
+                    "refresh_token": None,
+                    "expires_at": None,
+                    "updated_at": datetime.now().isoformat()
+                }) \
                 .eq("user_id", user_id) \
                 .execute()
             
             if result.data:
-                logger.info(f"Google credentials removed for user {user_id}")
+                logger.info(f"Google credentials soft deleted for user {user_id}")
                 return True
             return False
             
         except Exception as e:
-            logger.error(f"Error removing Google credentials: {str(e)}")
+            logger.error(f"Error soft deleting Google credentials: {str(e)}")
             return False
     
     async def _cleanup_google_integrations(self, user_id: str) -> None:

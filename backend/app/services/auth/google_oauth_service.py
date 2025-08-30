@@ -362,7 +362,9 @@ class GoogleOAuthService:
                 'expires_in': tokens.expires_in,
                 'token_uri': 'https://oauth2.googleapis.com/token',
                 'client_id': self.client_id,
-                'client_secret': self.client_secret
+                'client_secret': self.client_secret,
+                'status': 'connected',  # New column: mark as connected
+                'updated_at': datetime.now().isoformat()  # New column: update timestamp
             }
             
             logger.info(f"🔍 OAuth Debug - Prepared credentials data: {list(credentials_data.keys())}")
@@ -435,7 +437,9 @@ class GoogleOAuthService:
                 'expires_in': tokens.expires_in,
                 'token_uri': 'https://oauth2.googleapis.com/token',
                 'client_id': self.client_id,
-                'client_secret': self.client_secret
+                'client_secret': self.client_secret,
+                'status': 'connected',  # New column: mark as connected
+                'updated_at': datetime.now().isoformat()  # New column: update timestamp
             }
             
             logger.info(f"🔍 OAuth Debug - Credential Storage: Prepared data - user_id: {credentials_data['user_id']}, email: {credentials_data['google_email']}, scope: {credentials_data['scope']}")
