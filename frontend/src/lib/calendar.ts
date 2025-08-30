@@ -49,23 +49,37 @@ function stripHtml(html: string): string {
 
 // Get Google credentials from database
 async function getGoogleCredentials(userId: string): Promise<GoogleCredentials> {
-  const { data, error } = await supabase
-    .from('google_credentials')
-    .select('*')
-    .eq('user_id', userId)
-    .maybeSingle();
-  
-  if (error || !data) {
-    throw new Error('Google credentials not found');
-  }
-  
-  // Check if token is expired and refresh if needed
-  if (new Date(data.expires_at) <= new Date()) {
-    if (!data.refresh_token) {
-      throw new Error('Token expired and no refresh token available');
+  try {
+    console.log(`[GoogleCredentials] Getting credentials for user ${userId}`);
+    
+    const { data, error } = await supabase
+      .from('google_credentials')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+    
+    console.log(`[GoogleCredentials] Database query result:`, {
+      hasData: !!data,
+      hasError: !!error,
+      error: error?.message,
+      hasAccessToken: !!data?.access_token,
+      hasRefreshToken: !!data?.refresh_token,
+      expiresAt: data?.expires_at
+    });
+    
+    if (error || !data) {
+      throw new Error('Google credentials not found');
     }
     
+    // Always attempt to refresh the token to ensure it's valid
+    // This handles cases where the token appears valid but is actually revoked
+    console.log(`[GoogleCredentials] Always attempting token refresh for user ${userId}...`);
     
+    if (!data.refresh_token) {
+      throw new Error('No refresh token available');
+    }
+    
+    console.log(`[GoogleCredentials] Making token refresh request...`);
     
     // Refresh the token
     const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
@@ -81,14 +95,29 @@ async function getGoogleCredentials(userId: string): Promise<GoogleCredentials> 
       }),
     });
     
+    console.log(`[GoogleCredentials] Token refresh response:`, {
+      status: refreshResponse.status,
+      ok: refreshResponse.ok,
+      statusText: refreshResponse.statusText
+    });
+    
     if (!refreshResponse.ok) {
       const errorText = await refreshResponse.text();
+      console.error(`[GoogleCredentials] Token refresh failed:`, {
+        status: refreshResponse.status,
+        errorText,
+        clientId: import.meta.env.VITE_GOOGLE_CLIENT_ID ? 'present' : 'missing',
+        clientSecret: import.meta.env.VITE_GOOGLE_CLIENT_SECRET ? 'present' : 'missing'
+      });
       // Token refresh failed
       throw new Error(`Failed to refresh Google token: ${refreshResponse.status} - ${errorText}`);
     }
     
     const refreshData = await refreshResponse.json();
-    
+    console.log(`[GoogleCredentials] Token refresh successful, new expiry:`, {
+      expiresIn: refreshData.expires_in,
+      newExpiry: new Date(Date.now() + refreshData.expires_in * 1000).toISOString()
+    });
     
     // Update the credentials in the database
     const { error: updateError } = await supabase
@@ -100,19 +129,22 @@ async function getGoogleCredentials(userId: string): Promise<GoogleCredentials> 
       .eq('user_id', userId);
     
     if (updateError) {
+      console.error(`[GoogleCredentials] Failed to update refreshed token in database:`, updateError);
       // Failed to update token in database
       throw new Error('Failed to update refreshed token');
     }
+    
+    console.log(`[GoogleCredentials] Successfully updated token in database`);
     
     return {
       ...data,
       access_token: refreshData.access_token,
       expires_at: new Date(Date.now() + refreshData.expires_in * 1000).toISOString(),
     };
+  } catch (error) {
+    console.error(`[GoogleCredentials] Error in getGoogleCredentials for user ${userId}:`, error);
+    throw error;
   }
-  
-  
-  return data;
 }
 
 export interface Meeting {
