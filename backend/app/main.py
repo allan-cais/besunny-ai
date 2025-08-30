@@ -368,6 +368,19 @@ def create_app() -> FastAPI:
                 "timestamp": time.time()
             }
     
+    # Auth headers test endpoint
+    @app.get("/api/test/auth-headers")
+    async def test_auth_headers(request: Request):
+        """Test endpoint to see what auth headers are being sent."""
+        auth_header = request.headers.get('authorization', 'None')
+        return {
+            "status": "success",
+            "auth_header": auth_header,
+            "auth_header_length": len(auth_header) if auth_header != 'None' else 0,
+            "all_headers": dict(request.headers),
+            "timestamp": time.time()
+        }
+    
     logger.info("FastAPI application configured successfully")
     return app
 
