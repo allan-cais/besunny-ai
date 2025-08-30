@@ -82,6 +82,9 @@ async function getGoogleCredentials(userId: string): Promise<GoogleCredentials> 
             }
         });
 
+        console.log('[GoogleCredentials] Debug - Response status:', response.status);
+        console.log('[GoogleCredentials] Debug - Response ok:', response.ok);
+        
         if (response.ok) {
             const result = await response.json();
 
