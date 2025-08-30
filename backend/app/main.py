@@ -48,6 +48,7 @@ _health_status = {
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager - lightweight and efficient."""
+    logger.info("=== LIFESPAN FUNCTION CALLED - STARTING UP ===")
     logger.info("Starting BeSunny.ai Python Backend")
     
     try:
