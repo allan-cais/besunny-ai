@@ -531,7 +531,7 @@ async def revoke_google_tokens(
 
 @router.post("/google/disconnect")
 async def disconnect_google_account(
-    current_user: User = Depends(get_current_user)
+    current_user: Dict[str, Any] = Depends(get_current_user_from_supabase_token)
 ) -> Dict[str, Any]:
     """
     Disconnect user's Google account and revoke all tokens.
@@ -547,7 +547,7 @@ async def disconnect_google_account(
         
         service = GoogleDisconnectService()
         
-        result = await service.disconnect_google_account(current_user.id)
+        result = await service.disconnect_google_account(current_user.get('id'))
         
         if result.get('success'):
             return {

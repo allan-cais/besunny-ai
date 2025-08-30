@@ -167,10 +167,7 @@ const IntegrationsPage: React.FC = () => {
       return;
     }
     
-    // Debug: Log session details
-    console.log('Disconnect - Session object:', session);
-    console.log('Disconnect - Session access_token:', session.access_token);
-    console.log('Disconnect - Session access_token length:', session.access_token?.length);
+
     
     try {
       // Call backend to disconnect Google account
