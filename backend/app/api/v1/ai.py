@@ -31,6 +31,7 @@ from ...services.ai.document_workflow_service import (
     DocumentWorkflow,
     WorkflowExecution
 )
+from ...services.ai.project_onboarding_service import ProjectOnboardingAIService
 from ...core.security import get_current_user
 
 logger = logging.getLogger(__name__)
@@ -705,3 +706,42 @@ async def resume_workflow_execution(
     except Exception as e:
         logger.error(f"Failed to resume workflow: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to resume workflow: {str(e)}")
+
+
+@router.post("/project-onboarding")
+async def process_project_onboarding(
+    payload: Dict[str, Any],
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Process project onboarding using AI.
+    
+    This endpoint processes project onboarding data and generates
+    AI-powered project metadata including categories, tags, and recommendations.
+    """
+    try:
+        onboarding_service = ProjectOnboardingAIService()
+        
+        # Extract data from payload
+        project_id = payload.get('project_id')
+        user_id = payload.get('user_id')
+        summary = payload.get('summary', {})
+        
+        if not project_id or not user_id:
+            raise HTTPException(status_code=400, detail="Missing required fields: project_id and user_id")
+        
+        # Process project onboarding
+        result = await onboarding_service.process_project_onboarding(
+            project_id=project_id,
+            user_id=user_id,
+            summary=summary
+        )
+        
+        if not result.get('success'):
+            raise HTTPException(status_code=500, detail=result.get('error', 'Project onboarding failed'))
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Project onboarding failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Project onboarding failed: {str(e)}")

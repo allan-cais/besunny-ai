@@ -12,7 +12,7 @@ import {
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Send, CheckCircle, Edit3, ArrowRight } from 'lucide-react';
 import { usePythonBackend } from '@/hooks/use-python-backend';
-import { Project } from '@/lib/supabase';
+import { Project } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 
 interface ProjectOnboardingData {
@@ -345,22 +345,55 @@ const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
   };
 
   const handleConfirm = async () => {
+    console.log('handleConfirm called');
     setSubmitting(true);
     setError(null);
 
     try {
-      // First create the project in Supabase
-      const newProject = await createProject({
-        id: crypto.randomUUID(),
+      console.log('Creating project with data:', {
         name: onboardingData.project_name || '',
         description: onboardingData.overview || '',
         status: 'active',
+        updated_at: new Date().toISOString(),
         created_by: currentUserId
       });
+      
+      // First create the project in Python backend
+      const projectResponse = await createProject({
+        name: onboardingData.project_name || '',
+        description: onboardingData.overview || '',
+        status: 'active',
+        owner_id: currentUserId
+      });
 
-      if (!newProject) {
-        throw new Error('Failed to create project');
+      console.log('Project creation response:', projectResponse);
+
+      if (!projectResponse.success || !projectResponse.data) {
+        throw new Error(projectResponse.error || 'Failed to create project');
       }
+
+      const backendProject = projectResponse.data;
+
+      // Convert backend project type to frontend project type
+      const newProject: Project = {
+        id: backendProject.id,
+        name: backendProject.name,
+        description: backendProject.description || '',
+        status: backendProject.status === 'deleted' ? 'in_progress' : backendProject.status,
+        created_at: backendProject.created_at,
+        updated_at: backendProject.updated_at,
+        created_by: backendProject.owner_id,
+        members: [],
+        settings: {
+          ai_enabled: true,
+          auto_classification: true,
+          notification_preferences: {
+            email: true,
+            push: false,
+            slack: false
+          }
+        }
+      };
 
 
 

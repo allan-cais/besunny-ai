@@ -309,6 +309,34 @@ export class PythonBackendServices {
     }
   }
 
+  async processProjectOnboarding(payload: {
+    project_id: string;
+    user_id: string;
+    summary: {
+      project_name: string;
+      overview: string;
+      keywords: string[];
+      deliverables: string;
+      contacts: {
+        internal_lead: string;
+        agency_lead: string;
+        client_lead: string;
+      };
+      shoot_date: string;
+      location: string;
+      references: string;
+    };
+  }): Promise<ApiResponse<any>> {
+    try {
+      const response = await this.api.processProjectOnboarding(payload);
+      this.updateMetrics(response.success, 0);
+      return response;
+    } catch (error) {
+      this.updateMetrics(false, 0);
+      throw error;
+    }
+  }
+
   // ============================================================================
   // DOCUMENT MANAGEMENT
   // ============================================================================

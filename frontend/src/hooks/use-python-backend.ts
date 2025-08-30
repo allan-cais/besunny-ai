@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { pythonBackendServices, BackendHealthStatus, BackendMetrics } from '../lib/python-backend-services';
 import { config } from '../config';
+import { ApiResponse, Project } from '../lib/python-backend-api';
 
 export interface UsePythonBackendOptions {
   autoConnect?: boolean;
@@ -35,6 +36,29 @@ export interface UsePythonBackendReturn {
   // Utility
   baseUrl: string;
   isEnabled: boolean;
+  
+  // Project Services
+  createProject: (data: Omit<Project, 'id' | 'created_at' | 'updated_at'>) => Promise<ApiResponse<Project>>;
+  
+  // AI Services
+  processProjectOnboarding: (payload: {
+    project_id: string;
+    user_id: string;
+    summary: {
+      project_name: string;
+      overview: string;
+      keywords: string[];
+      deliverables: string;
+      contacts: {
+        internal_lead: string;
+        agency_lead: string;
+        client_lead: string;
+      };
+      shoot_date: string;
+      location: string;
+      references: string;
+    };
+  }) => Promise<ApiResponse<any>>;
 }
 
 export function usePythonBackend(options: UsePythonBackendOptions = {}): UsePythonBackendReturn {
@@ -233,5 +257,11 @@ export function usePythonBackend(options: UsePythonBackendOptions = {}): UsePyth
     // Utility
     baseUrl,
     isEnabled,
+    
+    // Project Services
+    createProject: pythonBackendServices.createProject.bind(pythonBackendServices),
+    
+    // AI Services
+    processProjectOnboarding: pythonBackendServices.processProjectOnboarding.bind(pythonBackendServices),
   };
 }

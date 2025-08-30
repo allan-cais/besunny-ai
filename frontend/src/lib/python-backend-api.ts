@@ -260,6 +260,30 @@ export class PythonBackendAPI {
     return this.makeRequestWithRetry(`/api/v1/ai/history?user_id=${userId}&limit=${limit}`);
   }
 
+  async processProjectOnboarding(payload: {
+    project_id: string;
+    user_id: string;
+    summary: {
+      project_name: string;
+      overview: string;
+      keywords: string[];
+      deliverables: string;
+      contacts: {
+        internal_lead: string;
+        agency_lead: string;
+        client_lead: string;
+      };
+      shoot_date: string;
+      location: string;
+      references: string;
+    };
+  }): Promise<ApiResponse<any>> {
+    return this.makeRequestWithRetry('/api/v1/ai/project-onboarding', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
   // ============================================================================
   // DOCUMENT MANAGEMENT
   // ============================================================================
