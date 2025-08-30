@@ -886,9 +886,13 @@ export const calendarService = {
       if (!response.ok) {
         const errorText = await response.text();
         
+        console.log('[Calendar] Debug - First Google Calendar API request failed:');
+        console.log('[Calendar] Debug - Response status:', response.status);
+        console.log('[Calendar] Debug - Error text:', errorText);
+        
         // If we get a 401, the token might be invalid even if it's not expired
         if (response.status === 401) {
-
+          console.log('[Calendar] Debug - Got 401, attempting token refresh...');
           
           // Force a token refresh
           const refreshedCredentials = await getGoogleCredentials(userId);
@@ -975,7 +979,7 @@ export const calendarService = {
                 `singleEvents=true&syncToken=`,
                 {
                   headers: {
-                    'Authorization': `Bearer ${refreshedCredentials.accessToken}`,
+                    'Authorization': `Bearer ${refreshedCredentials.access_token}`,
                   },
                 }
               );
