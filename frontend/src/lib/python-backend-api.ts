@@ -3,7 +3,7 @@
  * Optimized for maximum efficiency and reliability
  */
 
-import { productionConfig, healthCheckConfig } from '../config/production-config';
+import { config } from '../config';
 
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -58,10 +58,11 @@ export class PythonBackendAPI {
   private retryDelay: number;
 
   constructor() {
-    this.baseUrl = productionConfig.backend.baseUrl;
-    this.timeout = productionConfig.backend.timeout;
-    this.retries = productionConfig.backend.retries;
-    this.retryDelay = productionConfig.backend.retryDelay;
+    // Use dynamic configuration instead of hardcoded production config
+    this.baseUrl = config.pythonBackend.url;
+    this.timeout = config.pythonBackend.timeout;
+    this.retries = config.pythonBackend.retries;
+    this.retryDelay = config.pythonBackend.retryDelay;
   }
 
   private async makeRequest<T>(
