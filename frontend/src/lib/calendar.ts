@@ -115,6 +115,16 @@ async function getGoogleCredentials(userId: string): Promise<GoogleCredentials> 
     const refreshData = await refreshResponse.json();
     console.log(`[GoogleCredentials] Backend token refresh successful:`, refreshData);
     
+    // Debug: Log the exact structure of the response
+    console.log(`[GoogleCredentials] Response structure:`, {
+      success: refreshData.success,
+      hasTokens: !!refreshData.tokens,
+      tokensKeys: refreshData.tokens ? Object.keys(refreshData.tokens) : 'no tokens',
+      tokensValue: refreshData.tokens,
+      expiresIn: refreshData.tokens?.expires_in,
+      expiresInType: typeof refreshData.tokens?.expires_in
+    });
+    
     // Use the fresh tokens returned from the backend instead of querying the database again
     if (refreshData.success && refreshData.tokens) {
       console.log(`[GoogleCredentials] Using fresh tokens from backend response`);

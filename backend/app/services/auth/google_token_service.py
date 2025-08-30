@@ -107,21 +107,31 @@ class GoogleTokenService:
             Token refresh result or None if failed
         """
         try:
+            logger.info(f"Starting token refresh for user {user_id}")
+            
             # Get user's refresh token
             refresh_token = await self._get_user_refresh_token(user_id)
             if not refresh_token:
+                logger.error(f"No refresh token found for user {user_id}")
                 return {
                     'success': False,
                     'error': 'No refresh token found for user'
                 }
             
+            logger.info(f"Got refresh token for user {user_id}, length: {len(refresh_token) if refresh_token else 0}")
+            
             # Exchange refresh token
+            logger.info(f"Exchanging refresh token for user {user_id}")
             new_tokens = await self.exchange_token(refresh_token)
             if not new_tokens:
+                logger.error(f"Failed to exchange refresh token for user {user_id}")
                 return {
                     'success': False,
                     'error': 'Failed to exchange refresh token'
                 }
+            
+            logger.info(f"Token exchange successful for user {user_id}, new_tokens keys: {list(new_tokens.keys()) if new_tokens else 'None'}")
+            logger.info(f"New tokens for user {user_id}: expires_in={new_tokens.get('expires_in')}, token_type={new_tokens.get('token_type')}")
             
             # Update user's tokens in database
             update_success = await self._update_user_tokens(
@@ -132,6 +142,7 @@ class GoogleTokenService:
             )
             
             if not update_success:
+                logger.error(f"Failed to update user tokens in database for user {user_id}")
                 return {
                     'success': False,
                     'error': 'Failed to update user tokens'
@@ -142,13 +153,16 @@ class GoogleTokenService:
             
             logger.info(f"Successfully refreshed tokens for user {user_id}")
             
-            return {
+            result = {
                 'success': True,
                 'user_id': user_id,
                 'access_token': new_tokens['access_token'],
                 'expires_in': new_tokens['expires_in'],
                 'token_type': new_tokens['token_type']
             }
+            
+            logger.info(f"Returning result for user {user_id}: {result}")
+            return result
             
         except Exception as e:
             logger.error(f"Failed to refresh user tokens: {e}")
