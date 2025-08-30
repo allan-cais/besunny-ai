@@ -113,10 +113,17 @@ def create_app() -> FastAPI:
     # Add CORS middleware
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"] if settings.cors_origins == "*" else settings.cors_origins.split(","),
+        allow_origins=[
+            "http://localhost:3000",  # Local development
+            "http://localhost:5173",  # Vite dev server
+            "https://besunny-ai-staging.up.railway.app",  # Staging frontend
+            "https://besunny-ai.up.railway.app",  # Production frontend
+            "*" if settings.cors_origins == "*" else settings.cors_origins.split(",")
+        ] if settings.cors_origins == "*" else settings.cors_origins.split(","),
         allow_credentials=settings.cors_allow_credentials,
-        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
         allow_headers=["*"],
+        expose_headers=["X-Process-Time", "X-Total-Count"],
     )
     
     # Add trusted host middleware for production

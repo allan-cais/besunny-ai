@@ -87,50 +87,20 @@ export const config: Config = {
       const envUrl = getOptionalEnvVar('VITE_PYTHON_BACKEND_URL', '');
       const runtimeUrl = runtimeConfig.pythonBackend.url;
       
-      // Check if we're in Railway environment and should use internal networking
+      // Check if we're in Railway environment
       const isRailwayEnv = isRailwayEnvironment();
       
-      // Try to get environment variables with fallbacks
-      let useInternalNetworking = getOptionalEnvVar('VITE_USE_INTERNAL_NETWORKING', 'true') === 'true';
-      let internalBackendUrl = getOptionalEnvVar('VITE_INTERNAL_BACKEND_URL', '');
-      
-      // Runtime fallback for Railway environment variables
-      if (isRailwayEnv && !internalBackendUrl) {
-        // Try to detect if we're in Railway and set sensible defaults
-        internalBackendUrl = 'http://easygoing-dedication.railway.internal:8000';
-        console.log('🔄 Runtime fallback: Using default internal Railway URL');
-      }
-      
-      const shouldUseInternal = isRailwayEnv && useInternalNetworking && envUrl.includes('railway.app');
-      
-      let finalUrl;
-      if (shouldUseInternal && envUrl && internalBackendUrl) {
-        // Convert public Railway URL to internal URL for frontend communication
-        finalUrl = internalBackendUrl;
-        console.log('🔄 Using internal Railway networking for frontend communication');
-        console.log('⚠️  Note: If this causes issues, set VITE_USE_INTERNAL_NETWORKING=false');
-      } else {
-        finalUrl = envUrl || runtimeUrl;
-        if (isRailwayEnv && envUrl.includes('railway.app')) {
-          console.log('⚠️  Using public Railway URL - may cause mixed content errors');
-          console.log('💡 To use internal networking, set VITE_USE_INTERNAL_NETWORKING=true');
-          console.log('💡 If internal networking fails, you may need to accept mixed content in your browser');
-        }
-      }
+      // Use the environment variable URL (should be HTTPS) or fallback to runtime config
+      const finalUrl = envUrl || runtimeUrl;
       
       // Debug logging
       console.log('🔧 Python Backend URL Configuration:');
       console.log('  Environment Variable (VITE_PYTHON_BACKEND_URL):', envUrl);
       console.log('  Runtime Config URL:', runtimeUrl);
       console.log('  Is Railway Environment:', isRailwayEnv);
-      console.log('  Use Internal Networking:', useInternalNetworking);
-      console.log('  Internal Backend URL:', internalBackendUrl);
-      console.log('  Using Internal Networking:', shouldUseInternal);
       console.log('  Final URL:', finalUrl);
       console.log('  Environment Variables:', {
         VITE_PYTHON_BACKEND_URL: import.meta.env.VITE_PYTHON_BACKEND_URL,
-        VITE_USE_INTERNAL_NETWORKING: import.meta.env.VITE_USE_INTERNAL_NETWORKING,
-        VITE_INTERNAL_BACKEND_URL: import.meta.env.VITE_INTERNAL_BACKEND_URL,
         NODE_ENV: import.meta.env.NODE_ENV,
         MODE: import.meta.env.MODE,
         DEV: import.meta.env.DEV,
