@@ -27,6 +27,7 @@ const IntegrationsPage: React.FC = () => {
   const [googleConnected, setGoogleConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isProcessingCallback, setIsProcessingCallback] = useState(false);
+  const [showReauthMessage, setShowReauthMessage] = useState(false);
 
   // Check if user has Google credentials on component mount
   useEffect(() => {
@@ -51,6 +52,23 @@ const IntegrationsPage: React.FC = () => {
 
     checkGoogleConnection();
   }, [user?.id]);
+
+  // Check if re-authentication is required
+  useEffect(() => {
+    const reauthRequired = localStorage.getItem('google_reauth_required');
+    if (reauthRequired === 'true') {
+      // Clear the flag
+      localStorage.removeItem('google_reauth_required');
+      // Show a notification that re-authentication was required
+      setShowReauthMessage(true);
+      console.log('Google re-authentication was required and completed');
+      
+      // Auto-hide the message after 10 seconds
+      setTimeout(() => {
+        setShowReauthMessage(false);
+      }, 10000);
+    }
+  }, []);
 
   // Handle OAuth callback parameters
   useEffect(() => {
@@ -220,6 +238,18 @@ const IntegrationsPage: React.FC = () => {
               </div>
             </div>
           </CardHeader>
+
+          {/* Show re-authentication message if needed */}
+          {showReauthMessage && (
+            <div className="px-6 py-3 bg-yellow-50 dark:bg-yellow-900/20 border-b border-yellow-200 dark:border-yellow-800">
+              <div className="flex items-center space-x-2">
+                <MessageSquare className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
+                <span className="text-sm text-yellow-800 dark:text-yellow-200 font-medium">
+                  Your Google access has been refreshed. All services are now reconnected.
+                </span>
+              </div>
+            </div>
+          )}
 
           <CardContent>
             {isConnecting || isProcessingCallback ? (

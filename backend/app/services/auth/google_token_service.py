@@ -96,6 +96,17 @@ class GoogleTokenService:
                 try:
                     error_json = response.json()
                     logger.error(f"Google OAuth error JSON: {error_json}")
+                    
+                    # Check for specific error types
+                    if error_json.get('error') == 'invalid_grant':
+                        logger.error("Refresh token is expired or revoked - user needs to re-authenticate")
+                        # Return a special error code for expired/revoked tokens
+                        return {
+                            'error': 'TOKEN_EXPIRED_OR_REVOKED',
+                            'error_description': error_json.get('error_description', 'Token has been expired or revoked'),
+                            'needs_reauth': True
+                        }
+                    
                 except:
                     logger.error(f"Google OAuth error text: {error_text}")
                 
@@ -142,7 +153,8 @@ class GoogleTokenService:
                 logger.error(f"No refresh token found for user {user_id}")
                 return {
                     'success': False,
-                    'error': 'No refresh token found for user'
+                    'error': 'No refresh token found for user',
+                    'error_code': 'NO_REFRESH_TOKEN'
                 }
             
             logger.info(f"Got refresh token for user {user_id}, length: {len(refresh_token) if refresh_token else 0}")
@@ -154,7 +166,18 @@ class GoogleTokenService:
                 logger.error(f"Failed to exchange refresh token for user {user_id}")
                 return {
                     'success': False,
-                    'error': 'Failed to exchange refresh token'
+                    'error': 'Failed to exchange refresh token',
+                    'error_code': 'TOKEN_EXCHANGE_FAILED'
+                }
+            
+            # Check if the exchange returned an error (like expired token)
+            if 'error' in new_tokens and new_tokens.get('needs_reauth'):
+                logger.error(f"Refresh token expired/revoked for user {user_id} - needs re-authentication")
+                return {
+                    'success': False,
+                    'error': 'Refresh token expired or revoked',
+                    'error_code': 'TOKEN_EXPIRED_OR_REVOKED',
+                    'needs_reauth': True
                 }
             
             logger.info(f"Token exchange successful for user {user_id}, new_tokens keys: {list(new_tokens.keys()) if new_tokens else 'None'}")
@@ -172,7 +195,8 @@ class GoogleTokenService:
                 logger.error(f"Failed to update user tokens in database for user {user_id}")
                 return {
                     'success': False,
-                    'error': 'Failed to update user tokens'
+                    'error': 'Failed to update user tokens',
+                    'error_code': 'DATABASE_UPDATE_FAILED'
                 }
             
             # Update user sessions
@@ -195,7 +219,8 @@ class GoogleTokenService:
             logger.error(f"Failed to refresh user tokens: {e}")
             return {
                 'success': False,
-                'error': str(e)
+                'error': str(e),
+                'error_code': 'UNKNOWN_ERROR'
             }
     
     async def validate_token(self, access_token: str) -> Optional[Dict[str, Any]]:

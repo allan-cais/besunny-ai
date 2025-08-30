@@ -71,155 +71,130 @@ async function getGoogleCredentials(userId: string): Promise<GoogleCredentials> 
       throw new Error('Google credentials not found');
     }
     
-    // Always attempt to refresh the token via backend to ensure it's valid
-    // This handles cases where the token appears valid but is actually revoked
+    // Always attempt token refresh via backend
     console.log(`[GoogleCredentials] Always attempting token refresh via backend for user ${userId}...`);
     
-    if (!data.refresh_token) {
-      throw new Error('No refresh token available');
-    }
-    
-    console.log(`[GoogleCredentials] Making backend token refresh request...`);
-    
-    // Get current Supabase session for authentication
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError || !session) {
-      throw new Error('No valid Supabase session for backend authentication');
-    }
-    
-    // Call backend to refresh the token
-    const refreshResponse = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/auth/google/oauth/refresh?user_id=${userId}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.access_token}`,
-      },
-      // Remove the body since user_id is now in the query parameter
-    });
-    
-    console.log(`[GoogleCredentials] Backend token refresh response:`, {
-      status: refreshResponse.status,
-      ok: refreshResponse.ok,
-      statusText: refreshResponse.statusText
-    });
-    
-    if (!refreshResponse.ok) {
-      const errorText = await refreshResponse.text();
-      console.error(`[GoogleCredentials] Backend token refresh failed:`, {
-        status: refreshResponse.status,
-        errorText
-      });
-      throw new Error(`Backend token refresh failed: ${refreshResponse.status} - ${errorText}`);
-    }
-    
-    const refreshData = await refreshResponse.json();
-    console.log(`[GoogleCredentials] Backend token refresh successful:`, refreshData);
-    
-    // Debug: Log the exact structure of the response
-    console.log(`[GoogleCredentials] Response structure:`, {
-      success: refreshData.success,
-      hasTokens: !!refreshData.tokens,
-      tokensKeys: refreshData.tokens ? Object.keys(refreshData.tokens) : 'no tokens',
-      tokensValue: refreshData.tokens,
-      expiresIn: refreshData.tokens?.expires_in,
-      expiresInType: typeof refreshData.tokens?.expires_in
-    });
-    
-    // Additional debugging: Log the complete backend response
-    console.log(`[GoogleCredentials] Complete backend response:`, JSON.stringify(refreshData, null, 2));
-    console.log(`[GoogleCredentials] Tokens object details:`, {
-      tokens: refreshData.tokens,
-      tokensType: typeof refreshData.tokens,
-      tokensKeys: refreshData.tokens ? Object.keys(refreshData.tokens) : 'no tokens',
-      accessToken: refreshData.tokens?.access_token ? `${refreshData.tokens.access_token.substring(0, 20)}...` : 'missing',
-      expiresIn: refreshData.tokens?.expires_in,
-      tokenType: refreshData.tokens?.token_type
-    });
-    
-    // Use the fresh tokens returned from the backend instead of querying the database again
-    if (refreshData.success && refreshData.tokens) {
-      console.log(`[GoogleCredentials] Using fresh tokens from backend response`);
-      
-      // Validate the expires_in value
-      const expiresIn = refreshData.tokens.expires_in;
-      if (!expiresIn || typeof expiresIn !== 'number' || expiresIn <= 0) {
-        console.warn(`[GoogleCredentials] Missing or invalid expires_in from backend:`, expiresIn);
-        console.log(`[GoogleCredentials] Falling back to database query for updated credentials`);
-        
-        // Fallback: Query the database for updated credentials
-        const { data: updatedData, error: updateError } = await supabase
-          .from('google_credentials')
-          .select('*')
-          .eq('user_id', userId)
-          .maybeSingle();
-        
-        if (updateError || !updatedData) {
-          console.error(`[GoogleCredentials] Failed to fetch updated credentials from database:`, updateError);
-          throw new Error('Failed to fetch updated credentials after refresh');
-        }
-        
-        console.log(`[GoogleCredentials] Successfully retrieved updated credentials from database`);
-        
-        // Add detailed logging of the actual token values
-        console.log(`[GoogleCredentials] Token details:`, {
-          accessTokenLength: updatedData.access_token?.length || 0,
-          accessTokenStart: updatedData.access_token?.substring(0, 20) + '...',
-          expiresAt: updatedData.expires_at,
-          hasRefreshToken: !!updatedData.refresh_token,
-          scope: updatedData.scope || 'not set'
+    try {
+        const response = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/auth/google/oauth/refresh?user_id=${userId}`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${session?.access_token}`,
+                'Content-Type': 'application/json'
+            }
         });
-        
-        return updatedData;
-      }
-      
-      // Create a credentials object with the fresh data from the backend
-      const freshCredentials = {
-        ...data, // Keep existing fields like user_id, refresh_token, scope, etc.
-        access_token: refreshData.tokens.access_token,
-        expires_at: new Date(Date.now() + (expiresIn * 1000)).toISOString(),
-        expires_in: expiresIn
-      };
-      
-      console.log(`[GoogleCredentials] Fresh credentials created:`, {
-        accessTokenLength: freshCredentials.access_token?.length || 0,
-        accessTokenStart: freshCredentials.access_token?.substring(0, 20) + '...',
-        expiresAt: freshCredentials.expires_at,
-        hasRefreshToken: !!freshCredentials.refresh_token,
-        scope: freshCredentials.scope || 'not set'
-      });
-      
-      return freshCredentials;
+
+        console.log(`[GoogleCredentials] Backend token refresh response:`, { status: response.status, ok: response.ok, statusText: response.statusText });
+
+        if (response.ok) {
+            const result = await response.json();
+            console.log(`[GoogleCredentials] Backend token refresh successful:`, result);
+
+            // Check if the backend returned an error that requires re-authentication
+            if (result.error_code === 'TOKEN_EXPIRED_OR_REVOKED') {
+                console.log(`[GoogleCredentials] Token expired/revoked - redirecting to re-authentication`);
+                
+                // Redirect user to Google OAuth for re-authentication
+                const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+                const redirectUri = `${window.location.origin}/integrations`;
+                
+                if (clientId) {
+                    const scopes = [
+                        'https://www.googleapis.com/auth/gmail.modify',
+                        'https://www.googleapis.com/auth/drive',
+                        'https://www.googleapis.com/auth/userinfo.email',
+                        'https://www.googleapis.com/auth/calendar'
+                    ].join(' ');
+
+                    const params = new URLSearchParams({
+                        client_id: clientId,
+                        redirect_uri: redirectUri,
+                        response_type: 'code',
+                        scope: scopes,
+                        access_type: 'offline',
+                        prompt: 'consent',
+                        state: userId
+                    });
+
+                    // Store a flag in localStorage to show a message after re-authentication
+                    localStorage.setItem('google_reauth_required', 'true');
+                    
+                    // Redirect to Google OAuth
+                    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+                    return null; // Exit early since we're redirecting
+                } else {
+                    throw new Error('Google OAuth not configured');
+                }
+            }
+
+            // Check if we have fresh tokens from the backend response
+            if (result.tokens && result.expires_in) {
+                console.log(`[GoogleCredentials] Using fresh tokens from backend response`);
+                
+                // Calculate expires_at from expires_in
+                const expiresAt = new Date(Date.now() + (result.expires_in * 1000)).toISOString();
+                
+                return {
+                    accessToken: result.tokens.access_token,
+                    expiresAt: expiresAt,
+                    hasRefreshToken: true,
+                    scope: result.tokens.scope || ''
+                };
+            } else {
+                console.log(`[GoogleCredentials] Missing or invalid expires_in from backend: ${result.expires_in}`);
+                console.log(`[GoogleCredentials] Falling back to database query for updated credentials`);
+            }
+        } else {
+            const errorText = await response.text();
+            console.log(`[GoogleCredentials] Backend token refresh failed:`, { status: response.status, errorText });
+            
+            // Check if the error indicates expired/revoked token
+            try {
+                const errorJson = JSON.parse(errorText);
+                if (errorJson.detail && errorJson.detail.includes('expired or revoked')) {
+                    console.log(`[GoogleCredentials] Token expired/revoked detected in error - redirecting to re-authentication`);
+                    
+                    // Redirect user to Google OAuth for re-authentication
+                    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+                    const redirectUri = `${window.location.origin}/integrations`;
+                    
+                    if (clientId) {
+                        const scopes = [
+                            'https://www.googleapis.com/auth/gmail.modify',
+                            'https://www.googleapis.com/auth/drive',
+                            'https://www.googleapis.com/auth/userinfo.email',
+                            'https://www.googleapis.com/auth/calendar'
+                        ].join(' ');
+
+                        const params = new URLSearchParams({
+                            client_id: clientId,
+                            redirect_uri: redirectUri,
+                            response_type: 'code',
+                            scope: scopes,
+                            access_type: 'offline',
+                            prompt: 'consent',
+                            state: userId
+                        });
+
+                        // Store a flag in localStorage to show a message after re-authentication
+                        localStorage.setItem('google_reauth_required', 'true');
+                        
+                        // Redirect to Google OAuth
+                        window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+                        return null; // Exit early since we're redirecting
+                    } else {
+                        throw new Error('Google OAuth not configured');
+                    }
+                }
+            } catch (parseError) {
+                // If we can't parse the error, continue with normal flow
+            }
+            
+            throw new Error(`Backend token refresh failed: ${response.status} - ${errorText}`);
+        }
+    } catch (error) {
+        console.log(`[GoogleCredentials] Error in getGoogleCredentials for user ${userId}:`, error);
+        throw error;
     }
-    
-    // Fallback: The backend should have updated the database, so fetch the updated credentials
-    console.log(`[GoogleCredentials] Fallback: fetching updated credentials from database`);
-    const { data: updatedData, error: updateError } = await supabase
-      .from('google_credentials')
-      .select('*')
-      .eq('user_id', userId)
-      .maybeSingle();
-    
-    if (updateError || !updatedData) {
-      console.error(`[GoogleCredentials] Failed to fetch updated credentials from database:`, updateError);
-      throw new Error('Failed to fetch updated credentials after refresh');
-    }
-    
-    console.log(`[GoogleCredentials] Successfully retrieved updated credentials from database`);
-    
-    // Add detailed logging of the actual token values
-    console.log(`[GoogleCredentials] Token details:`, {
-      accessTokenLength: updatedData.access_token?.length || 0,
-      accessTokenStart: updatedData.access_token?.substring(0, 20) + '...',
-      expiresAt: updatedData.expires_at,
-      hasRefreshToken: !!updatedData.refresh_token,
-      scope: updatedData.scope || 'not set'
-    });
-    
-    return updatedData;
-  } catch (error) {
-    console.error(`[GoogleCredentials] Error in getGoogleCredentials for user ${userId}:`, error);
-    throw error;
-  }
 }
 
 export interface Meeting {
