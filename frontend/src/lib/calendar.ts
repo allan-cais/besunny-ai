@@ -863,9 +863,9 @@ export const calendarService = {
       const credentials = await getGoogleCredentials(userId);
       console.log(`[Calendar] Got Google credentials:`, { 
         hasCredentials: !!credentials, 
-        hasAccessToken: !!credentials?.access_token,
-        hasRefreshToken: !!credentials?.refresh_token,
-        expiresAt: credentials?.expires_at 
+        hasAccessToken: !!credentials?.accessToken,
+        hasRefreshToken: !!credentials?.hasRefreshToken,
+        expiresAt: credentials?.expiresAt 
       });
       
       if (!credentials) {
@@ -879,7 +879,7 @@ export const calendarService = {
       const timeMax = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString();
       
       console.log(`[Calendar] Making Google Calendar API request with token:`, {
-        tokenLength: credentials.access_token?.length || 0,
+        tokenLength: credentials.accessToken?.length || 0,
         timeMin,
         timeMax
       });
@@ -889,7 +889,7 @@ export const calendarService = {
         `timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&orderBy=startTime`,
         {
           headers: {
-            'Authorization': `Bearer ${credentials.access_token}`,
+            'Authorization': `Bearer ${credentials.accessToken}`,
           },
         }
       );
@@ -921,7 +921,7 @@ export const calendarService = {
             `timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&orderBy=startTime`,
             {
               headers: {
-                'Authorization': `Bearer ${refreshedCredentials.access_token}`,
+                'Authorization': `Bearer ${refreshedCredentials.accessToken}`,
               },
             }
           );
