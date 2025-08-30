@@ -139,6 +139,15 @@ async def refresh_google_oauth_tokens(
                 detail="Failed to refresh tokens"
             )
         
+        # Check if the token refresh actually succeeded
+        if not result.get('success', False):
+            error_message = result.get('error', 'Unknown error during token refresh')
+            logger.error(f"Token refresh failed for user {user_id}: {error_message}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Token refresh failed: {error_message}"
+            )
+        
         logger.info(f"Successfully refreshed tokens for user {user_id}")
         return {
             'success': True,
