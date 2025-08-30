@@ -417,9 +417,14 @@ class GoogleTokenService:
                                 refresh_token: str, expires_in: int) -> bool:
         """Update user's tokens in database."""
         try:
+            # Calculate the actual expiration timestamp
+            from datetime import datetime, timedelta
+            expires_at = (datetime.now() + timedelta(seconds=expires_in)).isoformat()
+            
             update_data = {
                 'access_token': access_token,
                 'expires_in': expires_in,
+                'expires_at': expires_at,  # Add the missing expires_at field
                 'updated_at': datetime.now().isoformat()
             }
             
@@ -428,6 +433,7 @@ class GoogleTokenService:
                 .eq("user_id", user_id) \
                 .execute()
             
+            logger.info(f"Updated tokens for user {user_id}, expires_at: {expires_at}")
             return result.data is not None
             
         except Exception as e:
