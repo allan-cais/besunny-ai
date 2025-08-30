@@ -387,8 +387,41 @@ class EnhancedAdaptiveSyncStrategy {
     const state = this.userStates.get(userId);
     if (!state) return;
 
-
     try {
+      // First, validate that the session is still valid before running background sync
+      console.log(`[EnhancedSync] Background sync: Starting session validation for user ${userId}`);
+      
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      console.log(`[EnhancedSync] Background sync: Session check result:`, { 
+        hasSession: !!session, 
+        hasError: !!sessionError, 
+        error: sessionError 
+      });
+      
+      if (sessionError || !session) {
+        console.error('Background sync: Session validation failed:', sessionError);
+        // Try to refresh the session
+        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+        
+        console.log(`[EnhancedSync] Background sync: Session refresh result:`, { 
+          hasSession: !!refreshData.session, 
+          hasError: !!refreshError, 
+          error: refreshError 
+        });
+        
+        if (refreshError || !refreshData.session) {
+          console.error('Background sync: Session refresh failed:', refreshError);
+          // Session refresh failed, don't run background sync
+          console.log(`[EnhancedSync] Background sync: NOT running due to session failure`);
+          return;
+        }
+        
+        console.log('Background sync: Session refreshed successfully');
+      }
+      
+      console.log(`[EnhancedSync] Background sync: Session validation passed, proceeding with sync`);
+      
       // Sync all services
       const results = await Promise.allSettled([
         this.syncCalendar(userId),
@@ -411,7 +444,8 @@ class EnhancedAdaptiveSyncStrategy {
       await this.updateVirtualEmailActivity(userId);
 
     } catch (error) {
-              // Background sync failed for user
+      console.error('Background sync failed for user:', error);
+      // Background sync failed for user
     }
   }
 

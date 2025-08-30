@@ -762,17 +762,31 @@ export const calendarService = {
   // Perform initial sync to get baseline state and sync token
   async performInitialSync(userId: string): Promise<{ success: boolean; error?: string; sync_token?: string }> {
     try {
+      console.log(`[Calendar] Starting performInitialSync for user ${userId}`);
       
       const credentials = await getGoogleCredentials(userId);
+      console.log(`[Calendar] Got Google credentials:`, { 
+        hasCredentials: !!credentials, 
+        hasAccessToken: !!credentials?.access_token,
+        hasRefreshToken: !!credentials?.refresh_token,
+        expiresAt: credentials?.expires_at 
+      });
+      
       if (!credentials) {
         // No Google credentials found for user
+        console.log(`[Calendar] No Google credentials found for user ${userId}`);
         return { success: false, error: 'No Google credentials found' };
       }
-      
 
       // Get events from the past 7 days to future 60 days
       const timeMin = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
       const timeMax = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString();
+      
+      console.log(`[Calendar] Making Google Calendar API request with token:`, {
+        tokenLength: credentials.access_token?.length || 0,
+        timeMin,
+        timeMax
+      });
       
       const response = await fetch(
         `https://www.googleapis.com/calendar/v3/calendars/primary/events?` +
@@ -784,8 +798,19 @@ export const calendarService = {
         }
       );
 
+      console.log(`[Calendar] Google Calendar API response:`, {
+        status: response.status,
+        ok: response.ok,
+        statusText: response.statusText
+      });
+
       if (!response.ok) {
         const errorText = await response.text();
+        console.error(`[Calendar] Google Calendar API error:`, {
+          status: response.status,
+          errorText,
+          userId
+        });
         
         // If we get a 401, the token might be invalid even if it's not expired
         if (response.status === 401) {
