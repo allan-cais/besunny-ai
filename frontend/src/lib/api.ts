@@ -1,10 +1,10 @@
 import { supabase } from './supabase';
 import { ApiResponse, PaginatedResponse } from '@/types';
-import config from '@/config/environment';
+import { config } from '@/config';  // Updated to use the main config
 
 // API base configuration
 const API_CONFIG = {
-  baseUrl: config.apiUrl,
+  baseUrl: config.pythonBackend.url,  // Use the same backend URL
   timeout: 30000,
   retries: 3,
 };
