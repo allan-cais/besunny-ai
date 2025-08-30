@@ -1,6 +1,9 @@
 import { useQuery, useMutation, useQueryClient, UseQueryOptions, UseMutationOptions } from '@tanstack/react-query';
-import { api, ApiError } from '@/lib/api';
+import { PythonBackendAPI } from '@/lib/python-backend-api';  // Updated to use Python backend API
 import { toast } from 'sonner';
+
+// Create a single instance of the Python backend API
+const pythonBackendAPI = new PythonBackendAPI();
 
 // Query keys for React Query
 export const queryKeys = {
@@ -17,31 +20,17 @@ export const queryKeys = {
   documentsByProject: (projectId: string) => ['documents', 'project', projectId] as const,
   document: (id: string) => ['documents', id] as const,
   
-  // Meetings
-  meetings: ['meetings'] as const,
-  meetingsByProject: (projectId: string) => ['meetings', 'project', projectId] as const,
-  meeting: (id: string) => ['meetings', id] as const,
-  transcript: (meetingId: string) => ['meetings', meetingId, 'transcript'] as const,
-  
-  // Emails
-  emails: ['emails'] as const,
-  emailsByProject: (projectId: string) => ['emails', 'project', projectId] as const,
-  email: (id: string) => ['emails', id] as const,
-  
   // AI
   aiClassifications: ['ai', 'classifications'] as const,
   aiClassification: (id: string) => ['ai', 'classifications', id] as const,
-  
-  // Integrations
-  integrations: ['integrations'] as const,
-  googleIntegrations: ['integrations', 'google'] as const,
 };
 
 // Error handler for API calls
 const handleApiError = (error: unknown, defaultMessage = 'An error occurred') => {
-  if (error instanceof ApiError) {
-    toast.error(error.message || defaultMessage);
-    return error.message;
+  if (error && typeof error === 'object' && 'error' in error) {
+    const apiError = error as { error?: string };
+    toast.error(apiError.error || defaultMessage);
+    return apiError.error;
   }
   
   const message = error instanceof Error ? error.message : defaultMessage;
@@ -58,7 +47,7 @@ const handleApiSuccess = (message: string) => {
 export const useProjects = (options?: UseQueryOptions) => {
   return useQuery({
     queryKey: queryKeys.projects,
-    queryFn: () => api.projects.getProjects(),
+    queryFn: () => pythonBackendAPI.getProjects(''), // TODO: Get actual user ID
     staleTime: 5 * 60 * 1000, // 5 minutes
     ...options,
   });
@@ -67,7 +56,7 @@ export const useProjects = (options?: UseQueryOptions) => {
 export const useProject = (id: string, options?: UseQueryOptions) => {
   return useQuery({
     queryKey: queryKeys.project(id),
-    queryFn: () => api.projects.getProject(id),
+    queryFn: () => pythonBackendAPI.getProject(id),
     enabled: !!id,
     staleTime: 5 * 60 * 1000,
     ...options,
@@ -78,7 +67,7 @@ export const useCreateProject = (options?: UseMutationOptions) => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: (project: any) => api.projects.createProject(project),
+    mutationFn: (project: any) => pythonBackendAPI.createProject(project),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.projects });
       handleApiSuccess('Project created successfully');
@@ -95,7 +84,7 @@ export const useUpdateProject = (options?: UseMutationOptions) => {
   
   return useMutation({
     mutationFn: ({ id, updates }: { id: string; updates: any }) => 
-      api.projects.updateProject(id, updates),
+      pythonBackendAPI.updateProject(id, updates),
     onSuccess: (data, { id }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.projects });
       queryClient.invalidateQueries({ queryKey: queryKeys.project(id) });
@@ -112,7 +101,7 @@ export const useDeleteProject = (options?: UseMutationOptions) => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: (id: string) => api.projects.deleteProject(id),
+    mutationFn: (id: string) => pythonBackendAPI.deleteProject(id),
     onSuccess: (data, id) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.projects });
       queryClient.removeQueries({ queryKey: queryKeys.project(id) });
@@ -131,19 +120,9 @@ export const useDocuments = (projectId?: string, options?: UseQueryOptions) => {
   
   return useQuery({
     queryKey,
-    queryFn: () => api.documents.getDocuments(projectId),
+    queryFn: () => pythonBackendAPI.getDocuments('', projectId), // TODO: Get actual user ID
     enabled: !projectId || !!projectId,
     staleTime: 2 * 60 * 1000, // 2 minutes
-    ...options,
-  });
-};
-
-export const useDocument = (id: string, options?: UseQueryOptions) => {
-  return useQuery({
-    queryKey: queryKeys.document(id),
-    queryFn: () => api.documents.getDocument(id),
-    enabled: !!id,
-    staleTime: 2 * 60 * 1000,
     ...options,
   });
 };
@@ -153,7 +132,7 @@ export const useUploadDocument = (options?: UseMutationOptions) => {
   
   return useMutation({
     mutationFn: ({ file, projectId }: { file: File; projectId?: string }) => 
-      api.documents.uploadDocument(file, projectId),
+      pythonBackendAPI.uploadDocument(file, '', projectId), // TODO: Get actual user ID
     onSuccess: (data, { projectId }) => {
       if (projectId) {
         queryClient.invalidateQueries({ queryKey: queryKeys.documentsByProject(projectId) });
@@ -168,289 +147,33 @@ export const useUploadDocument = (options?: UseMutationOptions) => {
   });
 };
 
-export const useUpdateDocument = (options?: UseMutationOptions) => {
-  const queryClient = useQueryClient();
-  
+// AI hooks
+export const useGenerateAIResponse = (options?: UseMutationOptions) => {
   return useMutation({
-    mutationFn: ({ id, updates }: { id: string; updates: any }) => 
-      api.documents.updateDocument(id, updates),
-    onSuccess: (data, { id }) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.documents });
-      queryClient.invalidateQueries({ queryKey: queryKeys.document(id) });
-      handleApiSuccess('Document updated successfully');
-    },
+    mutationFn: ({ prompt, userId, model }: { prompt: string; userId: string; model?: string }) => 
+      pythonBackendAPI.generateAIResponse(prompt, userId, model),
     onError: (error) => {
-      handleApiError(error, 'Failed to update document');
+      handleApiError(error, 'Failed to generate AI response');
     },
     ...options,
   });
 };
 
-export const useDeleteDocument = (options?: UseMutationOptions) => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: (id: string) => api.documents.deleteDocument(id),
-    onSuccess: (data, id) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.documents });
-      queryClient.removeQueries({ queryKey: queryKeys.document(id) });
-      handleApiSuccess('Document deleted successfully');
-    },
-    onError: (error) => {
-      handleApiError(error, 'Failed to delete document');
-    },
-    ...options,
-  });
-};
-
-// Meetings hooks
-export const useMeetings = (projectId?: string, options?: UseQueryOptions) => {
-  const queryKey = projectId ? queryKeys.meetingsByProject(projectId) : queryKeys.meetings;
-  
+export const useAIHistory = (userId: string, limit = 50, options?: UseQueryOptions) => {
   return useQuery({
-    queryKey,
-    queryFn: () => api.meetings.getMeetings(projectId),
-    enabled: !projectId || !!projectId,
-    staleTime: 2 * 60 * 1000,
-    ...options,
-  });
-};
-
-export const useMeeting = (id: string, options?: UseQueryOptions) => {
-  return useQuery({
-    queryKey: queryKeys.meeting(id),
-    queryFn: () => api.meetings.getMeeting(id),
-    enabled: !!id,
-    staleTime: 2 * 60 * 1000,
-    ...options,
-  });
-};
-
-export const useTranscript = (meetingId: string, options?: UseQueryOptions) => {
-  return useQuery({
-    queryKey: queryKeys.transcript(meetingId),
-    queryFn: () => api.meetings.getTranscript(meetingId),
-    enabled: !!meetingId,
+    queryKey: ['ai', 'history', userId, limit],
+    queryFn: () => pythonBackendAPI.getAIHistory(userId, limit),
+    enabled: !!userId,
     staleTime: 5 * 60 * 1000,
     ...options,
   });
 };
 
-export const useCreateMeeting = (options?: UseMutationOptions) => {
-  const queryClient = useQueryClient();
-  
+export const useProcessProjectOnboarding = (options?: UseMutationOptions) => {
   return useMutation({
-    mutationFn: (meeting: any) => api.meetings.createMeeting(meeting),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.meetings });
-      handleApiSuccess('Meeting created successfully');
-    },
+    mutationFn: (payload: any) => pythonBackendAPI.processProjectOnboarding(payload),
     onError: (error) => {
-      handleApiError(error, 'Failed to create meeting');
-    },
-    ...options,
-  });
-};
-
-export const useUpdateMeeting = (options?: UseMutationOptions) => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: ({ id, updates }: { id: string; updates: any }) => 
-      api.meetings.updateMeeting(id, updates),
-    onSuccess: (data, { id }) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.meetings });
-      queryClient.invalidateQueries({ queryKey: queryKeys.meeting(id) });
-      handleApiSuccess('Meeting updated successfully');
-    },
-    onError: (error) => {
-      handleApiError(error, 'Failed to update meeting');
-    },
-    ...options,
-  });
-};
-
-export const useDeleteMeeting = (options?: UseMutationOptions) => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: (id: string) => api.meetings.deleteMeeting(id),
-    onSuccess: (data, id) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.meetings });
-      queryClient.removeQueries({ queryKey: queryKeys.meeting(id) });
-      handleApiSuccess('Meeting deleted successfully');
-    },
-    onError: (error) => {
-      handleApiError(error, 'Failed to delete meeting');
-    },
-    ...options,
-  });
-};
-
-// Emails hooks
-export const useEmails = (projectId?: string, options?: UseQueryOptions) => {
-  const queryKey = projectId ? queryKeys.emailsByProject(projectId) : queryKeys.emails;
-  
-  return useQuery({
-    queryKey,
-    queryFn: () => api.emails.getEmails(projectId),
-    enabled: !projectId || !!projectId,
-    staleTime: 1 * 60 * 1000, // 1 minute
-    ...options,
-  });
-};
-
-export const useEmail = (id: string, options?: UseQueryOptions) => {
-  return useQuery({
-    queryKey: queryKeys.email(id),
-    queryFn: () => api.emails.getEmail(id),
-    enabled: !!id,
-    staleTime: 1 * 60 * 1000,
-    ...options,
-  });
-};
-
-export const useMarkEmailAsRead = (options?: UseMutationOptions) => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: (id: string) => api.emails.markAsRead(id),
-    onSuccess: (data, id) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.emails });
-      queryClient.invalidateQueries({ queryKey: queryKeys.email(id) });
-      handleApiSuccess('Email marked as read');
-    },
-    onError: (error) => {
-      handleApiError(error, 'Failed to mark email as read');
-    },
-    ...options,
-  });
-};
-
-export const useDeleteEmail = (options?: UseMutationOptions) => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: (id: string) => api.emails.deleteEmail(id),
-    onSuccess: (data, id) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.emails });
-      queryClient.removeQueries({ queryKey: queryKeys.email(id) });
-      handleApiSuccess('Email deleted successfully');
-    },
-    onError: (error) => {
-      handleApiError(error, 'Failed to delete email');
-    },
-    ...options,
-  });
-};
-
-// AI hooks
-export const useClassifyDocument = (options?: UseMutationOptions) => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: (documentId: string) => api.ai.classifyDocument(documentId),
-    onSuccess: (data, documentId) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.documents });
-      queryClient.invalidateQueries({ queryKey: queryKeys.document(documentId) });
-      handleApiSuccess('Document classified successfully');
-    },
-    onError: (error) => {
-      handleApiError(error, 'Failed to classify document');
-    },
-    ...options,
-  });
-};
-
-export const useProcessDocument = (options?: UseMutationOptions) => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: (documentId: string) => api.ai.processDocument(documentId),
-    onSuccess: (data, documentId) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.documents });
-      queryClient.invalidateQueries({ queryKey: queryKeys.document(documentId) });
-      handleApiSuccess('Document processed successfully');
-    },
-    onError: (error) => {
-      handleApiError(error, 'Failed to process document');
-    },
-    ...options,
-  });
-};
-
-export const useAIChat = (options?: UseMutationOptions) => {
-  return useMutation({
-    mutationFn: ({ message, context }: { message: string; context?: any }) => 
-      api.ai.chat(message, context),
-    onError: (error) => {
-      handleApiError(error, 'Failed to send message');
-    },
-    ...options,
-  });
-};
-
-// Integration hooks
-export const useGoogleIntegrations = (options?: UseQueryOptions) => {
-  return useQuery({
-    queryKey: queryKeys.googleIntegrations,
-    queryFn: () => api.integrations.getGoogleIntegrations(),
-    staleTime: 10 * 60 * 1000, // 10 minutes
-    ...options,
-  });
-};
-
-export const useConnectGoogle = (options?: UseMutationOptions) => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: ({ service, code }: { service: string; code: string }) => 
-      api.integrations.connectGoogle(service, code),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.googleIntegrations });
-      handleApiSuccess('Google service connected successfully');
-    },
-    onError: (error) => {
-      handleApiError(error, 'Failed to connect Google service');
-    },
-    ...options,
-  });
-};
-
-export const useDisconnectGoogle = (options?: UseMutationOptions) => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: (service: string) => api.integrations.disconnectGoogle(service),
-    onSuccess: (data, service) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.googleIntegrations });
-      handleApiSuccess(`${service} disconnected successfully`);
-    },
-    onError: (error) => {
-      handleApiError(error, 'Failed to disconnect Google service');
-    },
-    ...options,
-  });
-};
-
-export const useSyncGoogleData = (options?: UseMutationOptions) => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: (service: string) => api.integrations.syncGoogleData(service),
-    onSuccess: (data, service) => {
-      // Invalidate relevant queries based on service
-      if (service === 'gmail') {
-        queryClient.invalidateQueries({ queryKey: queryKeys.emails });
-      } else if (service === 'calendar') {
-        queryClient.invalidateQueries({ queryKey: queryKeys.meetings });
-      } else if (service === 'drive') {
-        queryClient.invalidateQueries({ queryKey: queryKeys.documents });
-      }
-      handleApiSuccess(`${service} data synced successfully`);
-    },
-    onError: (error) => {
-      handleApiError(error, 'Failed to sync Google data');
+      handleApiError(error, 'Failed to process project onboarding');
     },
     ...options,
   });

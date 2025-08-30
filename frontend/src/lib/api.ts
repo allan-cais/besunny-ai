@@ -48,6 +48,15 @@ class ApiClient {
       retries = API_CONFIG.retries,
     } = options;
 
+    // Debug logging for API client
+    console.log('🔧 ApiClient request:', {
+      method,
+      endpoint,
+      baseUrl: API_CONFIG.baseUrl,
+      fullUrl: `${API_CONFIG.baseUrl}${endpoint}`,
+      isHttps: API_CONFIG.baseUrl.startsWith('https://')
+    });
+
     // Get current session for authentication
     const { data: { session } } = await supabase.auth.getSession();
     
