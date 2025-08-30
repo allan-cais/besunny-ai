@@ -860,6 +860,10 @@ export const calendarService = {
         return { success: false, error: 'No Google credentials found' };
       }
 
+      console.log('[Calendar] Debug - Got fresh credentials from getGoogleCredentials:');
+      console.log('[Calendar] Debug - Fresh access token length:', credentials.accessToken ? credentials.accessToken.length : 0);
+      console.log('[Calendar] Debug - Fresh access token start:', credentials.accessToken ? credentials.accessToken.substring(0, 20) + '...' : 'None');
+
       // Get events from the past 7 days to future 60 days
       const timeMin = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
       const timeMax = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString();
@@ -875,7 +879,7 @@ export const calendarService = {
       );
 
       console.log('[Calendar] Debug - Using credentials for Google Calendar API call:');
-      console.log('[Calendar] Debug - Credentials source:', credentials.accessToken ? 'Database' : 'None');
+      console.log('[Calendar] Debug - Credentials source:', 'Fresh from getGoogleCredentials');
       console.log('[Calendar] Debug - Access token length:', credentials.accessToken ? credentials.accessToken.length : 0);
       console.log('[Calendar] Debug - Access token start:', credentials.accessToken ? credentials.accessToken.substring(0, 20) + '...' : 'None');
 
