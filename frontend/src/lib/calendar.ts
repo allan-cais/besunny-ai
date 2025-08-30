@@ -119,12 +119,19 @@ async function getGoogleCredentials(userId: string): Promise<GoogleCredentials> 
     if (refreshData.success && refreshData.tokens) {
       console.log(`[GoogleCredentials] Using fresh tokens from backend response`);
       
+      // Validate the expires_in value
+      const expiresIn = refreshData.tokens.expires_in;
+      if (!expiresIn || typeof expiresIn !== 'number' || expiresIn <= 0) {
+        console.error(`[GoogleCredentials] Invalid expires_in value from backend:`, expiresIn);
+        throw new Error(`Invalid expires_in value from backend: ${expiresIn}`);
+      }
+      
       // Create a credentials object with the fresh data from the backend
       const freshCredentials = {
         ...data, // Keep existing fields like user_id, refresh_token, scope, etc.
         access_token: refreshData.tokens.access_token,
-        expires_at: new Date(Date.now() + (refreshData.tokens.expires_in * 1000)).toISOString(),
-        expires_in: refreshData.tokens.expires_in
+        expires_at: new Date(Date.now() + (expiresIn * 1000)).toISOString(),
+        expires_in: expiresIn
       };
       
       console.log(`[GoogleCredentials] Fresh credentials created:`, {
