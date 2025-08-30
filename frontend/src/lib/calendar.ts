@@ -77,12 +77,12 @@ async function getGoogleCredentials(userId: string): Promise<GoogleCredentials> 
         
         console.log('[GoogleCredentials] Debug - Backend URL:', backendUrl);
         console.log('[GoogleCredentials] Debug - Full URL:', fullUrl);
-        console.log('[GoogleCredentials] Debug - Session token length:', session.accessToken ? session.accessToken.length : 0);
+        console.log('[GoogleCredentials] Debug - Session token length:', session.access_token ? session.access_token.length : 0);
         
         const response = await fetch(fullUrl, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${session.accessToken}`,
+                'Authorization': `Bearer ${session.access_token}`,
                 'Content-Type': 'application/json'
             }
         });
