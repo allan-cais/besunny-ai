@@ -83,7 +83,14 @@ async def lifespan(app: FastAPI):
                 _health_status["services"]["token_refresh"] = "fallback"
             except Exception as fallback_error:
                 logger.warning(f"Fallback token refresh also failed: {fallback_error}")
-                _health_status["services"]["token_refresh"] = "failed"
+                # Final fallback to ultra-simple service
+                try:
+                    asyncio.create_task(_schedule_ultra_simple_token_refresh())
+                    logger.info("Ultra-simple token refresh service started as final fallback")
+                    _health_status["services"]["token_refresh"] = "ultra_simple_fallback"
+                except Exception as ultra_fallback_error:
+                    logger.warning(f"Ultra-simple fallback also failed: {ultra_fallback_error}")
+                    _health_status["services"]["token_refresh"] = "failed"
         
         # Mark startup as successful
         _health_status["startup_time"] = time.time()
@@ -269,6 +276,25 @@ def create_app() -> FastAPI:
         except Exception as e:
             logger.error(f"Simple token refresh scheduling failed: {e}")
     
+    async def _schedule_ultra_simple_token_refresh():
+        """Ultra-simple periodic token refresh with minimal dependencies."""
+        try:
+            while True:
+                try:
+                    # Use the ultra-simple service
+                    from app.services.auth.simple_token_refresh import run_simple_token_refresh
+                    await run_simple_token_refresh()
+                    # Wait 5 minutes before next refresh
+                    await asyncio.sleep(300)
+                except Exception as e:
+                    logger.error(f"Ultra-simple token refresh error: {e}")
+                    # Wait a bit before retrying
+                    await asyncio.sleep(60)
+        except asyncio.CancelledError:
+            logger.info("Ultra-simple token refresh scheduling cancelled")
+        except Exception as e:
+            logger.error(f"Ultra-simple token refresh scheduling failed: {e}")
+    
     # ============================================================================
     # OPTIMIZED HEALTH CHECK ENDPOINTS
     # ============================================================================
@@ -411,6 +437,25 @@ def create_app() -> FastAPI:
             return {
                 "status": "success" if success else "error",
                 "message": "Token refresh completed" if success else "Token refresh failed",
+                "timestamp": time.time()
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "error": str(e),
+                "timestamp": time.time()
+            }
+    
+    # Ultra-simple token refresh endpoint
+    @app.post("/api/background-services/refresh-tokens-ultra-simple")
+    async def ultra_simple_token_refresh():
+        """Ultra-simple token refresh using minimal service."""
+        try:
+            from app.services.auth.simple_token_refresh import run_simple_token_refresh
+            result = await run_simple_token_refresh()
+            return {
+                "status": "success" if result.get('success') else "error",
+                "result": result,
                 "timestamp": time.time()
             }
         except Exception as e:

@@ -17,12 +17,28 @@ class TokenRefreshCronService:
     """Cron-based service for refreshing Google OAuth tokens."""
     
     def __init__(self):
-        self.supabase = get_supabase()
-        self.token_service = GoogleTokenService()
+        self.supabase = None
+        self.token_service = None
+        self._initialized = False
+    
+    async def _ensure_initialized(self):
+        """Ensure the service is properly initialized."""
+        if self._initialized:
+            return
+            
+        try:
+            self.supabase = get_supabase()
+            self.token_service = GoogleTokenService()
+            self._initialized = True
+            logger.info("Cron token refresh service initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize cron token refresh service: {e}")
+            raise
         
     async def refresh_expiring_tokens(self):
         """Refresh tokens that are about to expire (called by cron)."""
         try:
+            await self._ensure_initialized()
             logger.info("Starting scheduled token refresh")
             
             # Get tokens that will expire within the next 15 minutes
@@ -73,6 +89,8 @@ class TokenRefreshCronService:
     async def _get_expiring_tokens(self) -> List[Dict]:
         """Get tokens that will expire within the next 15 minutes."""
         try:
+            await self._ensure_initialized()
+            
             # Calculate the threshold time (15 minutes from now)
             threshold_time = datetime.utcnow() + timedelta(minutes=15)
             
@@ -99,6 +117,8 @@ class TokenRefreshCronService:
     async def _refresh_single_token(self, token_info: Dict) -> bool:
         """Refresh a single user's token."""
         try:
+            await self._ensure_initialized()
+            
             user_id = token_info['user_id']
             logger.info(f"Refreshing token for user {user_id}")
             
@@ -120,6 +140,8 @@ class TokenRefreshCronService:
     async def get_service_stats(self) -> Dict:
         """Get statistics about the token refresh service."""
         try:
+            await self._ensure_initialized()
+            
             # Get total tokens
             result = self.supabase.table("google_credentials").select("user_id, expires_at").execute()
             total_tokens = len(result.data) if result.data else 0
