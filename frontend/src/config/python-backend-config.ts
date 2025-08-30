@@ -37,7 +37,7 @@ const baseConfig: PythonBackendConfig = {
 // Development configuration
 const developmentConfig: PythonBackendConfig = {
   ...baseConfig,
-  baseUrl: getEnvVar('VITE_PYTHON_BACKEND_URL', 'http://localhost:8000'),
+  baseUrl: getEnvVar('VITE_PYTHON_BACKEND_URL', 'https://backend-staging-6085.up.railway.app'),
   timeout: 60000, // Longer timeout for development
   retryAttempts: 5,
   healthCheckInterval: 30000, // More frequent health checks in development
@@ -88,10 +88,8 @@ if (!config.baseUrl) {
   if (isCloudEnvironment) {
     // In cloud environment, use the runtime config default
     config.baseUrl = 'https://besunny-ai.railway.app';
-
   } else {
-
-    config.baseUrl = 'http://localhost:8000';
+    config.baseUrl = 'https://backend-staging-6085.up.railway.app';
   }
 }
 
@@ -164,7 +162,7 @@ export const resetConfig = (): void => {
 
 // Log configuration (only in development)
 if (isDevelopment) {
-  
+  console.log('Python Backend Config:', {
     ...config,
     environment: environmentInfo,
   });

@@ -142,6 +142,42 @@ document.querySelectorAll('*').forEach(element => {
   });
 });
 
+// Image interceptor
+const originalImage = window.Image;
+(window as any).Image = function(...args: any[]) {
+  const img = new originalImage(...args);
+  const originalSrc = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src');
+  Object.defineProperty(img, 'src', {
+    set: function(value) {
+      if (typeof value === 'string' && value.includes('backend-staging-6085.up.railway.app') && value.startsWith('http://')) {
+        console.log('🚨 IMAGE HTTP URL:', {
+          url: value,
+          stack: new Error().stack
+        });
+      }
+      return originalSrc.set.call(this, value);
+    },
+    get: function() {
+      return originalSrc.get.call(this);
+    }
+  });
+  return img;
+};
+
+// EventSource interceptor
+const originalEventSource = window.EventSource;
+(window as any).EventSource = function(url: string, ...args: any[]) {
+  if (typeof url === 'string' && url.includes('backend-staging-6085.up.railway.app')) {
+    console.log('🚨 EVENTSOURCE INTERCEPTOR:', {
+      url,
+      isHttps: url.startsWith('https://'),
+      isHttp: url.startsWith('http://'),
+      stack: new Error().stack
+    });
+  }
+  return new originalEventSource(url, ...args);
+};
+
 export class PythonBackendAPI {
   private baseUrl: string;
   private timeout: number;

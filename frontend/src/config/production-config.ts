@@ -11,7 +11,7 @@ export const productionConfig = {
 
   // Backend configuration
   backend: {
-    baseUrl: import.meta.env.VITE_PYTHON_BACKEND_URL || 'http://localhost:8000',
+    baseUrl: import.meta.env.VITE_PYTHON_BACKEND_URL || 'https://backend-staging-6085.up.railway.app',
     timeout: 30000,
     retries: 3,
     retryDelay: 1000

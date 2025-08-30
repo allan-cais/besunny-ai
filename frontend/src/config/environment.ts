@@ -15,8 +15,8 @@ const getEnvironment = (): AppConfig['environment'] => {
 // Environment-specific configurations
 const configs = {
   development: {
-    apiUrl: import.meta.env.VITE_API_URL || 'http://localhost:8000',
-    supabaseUrl: import.meta.env.VITE_SUPABASE_URL || 'http://localhost:54321',
+    apiUrl: import.meta.env.VITE_API_URL || 'https://backend-staging-6085.up.railway.app',
+    supabaseUrl: import.meta.env.VITE_SUPABASE_URL || 'https://localhost:54321',
     supabaseAnonKey: import.meta.env.VITE_SUPABASE_ANON_KEY || 'development-key',
     googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID || 'development-client-id',
     openaiApiKey: import.meta.env.VITE_OPENAI_API_KEY,
