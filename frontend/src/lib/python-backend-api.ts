@@ -51,6 +51,36 @@ export interface AIResponse {
   created_at: string;
 }
 
+// Global fetch interceptor to catch all HTTP requests
+const originalFetch = window.fetch;
+window.fetch = function(...args) {
+  const url = args[0];
+  if (typeof url === 'string' && url.includes('backend-staging-6085.up.railway.app')) {
+    console.log('🚨 GLOBAL FETCH INTERCEPTOR:', {
+      url,
+      isHttps: url.startsWith('https://'),
+      isHttp: url.startsWith('http://'),
+      stack: new Error().stack
+    });
+  }
+  return originalFetch.apply(this, args);
+};
+
+// Global XMLHttpRequest interceptor to catch any other HTTP requests
+const originalXHROpen = XMLHttpRequest.prototype.open;
+XMLHttpRequest.prototype.open = function(method, url, ...args) {
+  if (typeof url === 'string' && url.includes('backend-staging-6085.up.railway.app')) {
+    console.log('🚨 GLOBAL XMLHttpRequest INTERCEPTOR:', {
+      method,
+      url,
+      isHttps: url.startsWith('https://'),
+      isHttp: url.startsWith('http://'),
+      stack: new Error().stack
+    });
+  }
+  return originalXHROpen.call(this, method, url, ...args);
+};
+
 export class PythonBackendAPI {
   private baseUrl: string;
   private timeout: number;
