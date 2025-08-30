@@ -206,7 +206,7 @@ export class SupabaseApiWrapper extends ApiWrapper {
   // Legacy method - now redirects to Python backend
   async callFunctionWithAuth<T = any>(
     functionName: string,
-    accessToken: string,
+    access_token: string,
     data?: any,
     options?: Omit<ApiCallOptions, 'method' | 'body' | 'headers'>
   ): Promise<ApiResponse<T>> {
@@ -223,7 +223,7 @@ export class GoogleApiWrapper extends ApiWrapper {
   // Call Google Calendar API
   async callCalendarApi<T = any>(
     endpoint: string,
-    accessToken: string,
+    access_token: string,
     options?: Omit<ApiCallOptions, 'method' | 'headers'>
   ): Promise<ApiResponse<T>> {
     const url = `${apiEndpoints.google.calendar}${endpoint}`;
@@ -239,7 +239,7 @@ export class GoogleApiWrapper extends ApiWrapper {
   // Call Google Gmail API
   async callGmailApi<T = any>(
     endpoint: string,
-    accessToken: string,
+    access_token: string,
     options?: Omit<ApiCallOptions, 'method' | 'headers'>
   ): Promise<ApiResponse<T>> {
     const url = `${apiEndpoints.google.gmail}${endpoint}`;
@@ -255,7 +255,7 @@ export class GoogleApiWrapper extends ApiWrapper {
   // Call Google Drive API
   async callDriveApi<T = any>(
     endpoint: string,
-    accessToken: string,
+    access_token: string,
     options?: Omit<ApiCallOptions, 'method' | 'headers'>
   ): Promise<ApiResponse<T>> {
     const url = `${apiEndpoints.google.drive}${endpoint}`;

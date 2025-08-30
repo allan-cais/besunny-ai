@@ -144,7 +144,7 @@ export interface GoogleCalendarAttendee {
 }
 
 export interface GoogleCredentials {
-  accessToken: string;
+  access_token: string;
   expiresAt: string;
   hasRefreshToken: boolean;
   scope?: string;

@@ -95,7 +95,7 @@ async function getGoogleCredentials(userId: string): Promise<GoogleCredentials> 
             
             console.log('[GoogleCredentials] Debug - Full response:', result);
             console.log('[GoogleCredentials] Debug - Response keys:', Object.keys(result));
-            console.log('[GoogleCredentials] Debug - Access token in result:', result.accessToken ? 'YES' : 'NO');
+            console.log('[GoogleCredentials] Debug - Access token in result:', result.access_token ? 'YES' : 'NO');
             console.log('[GoogleCredentials] Debug - Expires in result:', result.expires_in ? 'YES' : 'NO');
 
             // Check if the backend returned an error that requires re-authentication
@@ -134,16 +134,16 @@ async function getGoogleCredentials(userId: string): Promise<GoogleCredentials> 
             }
 
             // Check if we have fresh tokens from the backend response
-            if (result.accessToken && result.expires_in) {
+            if (result.access_token && result.expires_in) {
                 // Calculate expires_at from expires_in
                 const expiresAt = new Date(Date.now() + (result.expires_in * 1000)).toISOString();
                 
                 console.log('[GoogleCredentials] Debug - Using fresh tokens from backend');
-                console.log('[GoogleCredentials] Debug - Fresh access token length:', result.accessToken.length);
+                console.log('[GoogleCredentials] Debug - Fresh access token length:', result.access_token.length);
                 console.log('[GoogleCredentials] Debug - Fresh expires at:', expiresAt);
                 
                 return {
-                    accessToken: result.accessToken,
+                    access_token: result.access_token,
                     expiresAt: expiresAt,
                     hasRefreshToken: true,
                     scope: result.tokens?.scope || ''
@@ -203,7 +203,7 @@ async function getGoogleCredentials(userId: string): Promise<GoogleCredentials> 
     
     // If we get here, use the original credentials from the database
     return {
-      accessToken: data.accessToken,
+      access_token: data.accessToken,
       expiresAt: data.expiresAt,
       hasRefreshToken: !!data.refreshToken,
       scope: data.scope || ''
@@ -281,7 +281,7 @@ export const calendarService = {
     const response = await fetch(url.toString(), {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${session.accessToken}`,
+        'Authorization': `Bearer ${session.access_token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -321,7 +321,7 @@ export const calendarService = {
     const response = await fetch(url.toString(), {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${session.accessToken}`,
+        'Authorization': `Bearer ${session.access_token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -354,7 +354,7 @@ export const calendarService = {
     const response = await fetch(url.toString(), {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${session.accessToken}`,
+        'Authorization': `Bearer ${session.access_token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ 
@@ -488,7 +488,7 @@ export const calendarService = {
     const response = await fetch(url.toString(), {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${session.accessToken}`,
+        'Authorization': `Bearer ${session.access_token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ user_id: session.user.id }),
@@ -515,7 +515,7 @@ export const calendarService = {
     const response = await fetch(url.toString(), {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${session.accessToken}`,
+        'Authorization': `Bearer ${session.access_token}`,
       },
     });
     
@@ -675,7 +675,7 @@ export const calendarService = {
     const response = await fetch(url.toString(), {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${session.accessToken}`,
+        'Authorization': `Bearer ${session.access_token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -714,7 +714,7 @@ export const calendarService = {
     const response = await fetch(url.toString(), {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${session.accessToken}`,
+        'Authorization': `Bearer ${session.access_token}`,
       },
     });
     
@@ -743,7 +743,7 @@ export const calendarService = {
     const response = await fetch(url.toString(), {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${session.accessToken}`,
+        'Authorization': `Bearer ${session.access_token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
