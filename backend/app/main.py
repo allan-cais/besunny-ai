@@ -48,6 +48,7 @@ _health_status = {
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager - lightweight and efficient."""
+    print("=== LIFESPAN FUNCTION CALLED (PRINT) ===")
     logger.info("=== LIFESPAN FUNCTION CALLED - STARTING UP ===")
     logger.info("Starting BeSunny.ai Python Backend")
     
@@ -67,11 +68,14 @@ async def lifespan(app: FastAPI):
             _health_status["services"]["supabase"] = "error"
         
         # Start simple background token refresh
+        print("=== LIFESPAN: Attempting to start token refresh background task ===")
         logger.info("Attempting to start token refresh background task...")
         try:
             # Create a simple background task
+            print("=== LIFESPAN: Creating background task ===")
             logger.info("Creating background task...")
             task = asyncio.create_task(_simple_token_refresh_loop())
+            print(f"=== LIFESPAN: Background task created: {task} ===")
             logger.info(f"Background task created: {task}")
             logger.info("Simple token refresh background task started successfully")
             _health_status["services"]["token_refresh"] = "started"
@@ -105,6 +109,9 @@ async def lifespan(app: FastAPI):
 def create_app() -> FastAPI:
     """Create and configure FastAPI application."""
     settings = get_settings()
+    
+    print(f"=== CREATE_APP: About to create FastAPI with lifespan: {lifespan} ===")
+    print(f"=== CREATE_APP: Lifespan type: {type(lifespan)} ===")
     
     app = FastAPI(
         title=settings.app_name,
@@ -323,6 +330,18 @@ def create_app() -> FastAPI:
                 "message": f"Failed to trigger background task: {str(e)}",
                 "timestamp": time.time()
             }
+    
+    # Test lifespan function directly
+    @app.get("/api/test/lifespan-info")
+    async def lifespan_info():
+        """Test endpoint to verify lifespan function exists."""
+        return {
+            "status": "success",
+            "lifespan_function": str(lifespan),
+            "lifespan_type": str(type(lifespan)),
+            "lifespan_module": str(lifespan.__module__),
+            "timestamp": time.time()
+        }
     
     # Background task status check
     @app.get("/api/test/background-task-status")
