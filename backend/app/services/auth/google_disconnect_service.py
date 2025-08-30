@@ -45,7 +45,9 @@ class GoogleDisconnectService:
             Disconnect result
         """
         try:
-            logger.info(f"Disconnecting Google account for user {user_id}")
+            logger.info(f"🔍 Disconnect Debug - Starting disconnect for user_id: {user_id}")
+            logger.info(f"🔍 Disconnect Debug - User ID type: {type(user_id)}")
+            logger.info(f"🔍 Disconnect Debug - User ID value: {user_id}")
             
             # Get user's Google credentials
             credentials = await self._get_user_credentials(user_id)
@@ -94,6 +96,15 @@ class GoogleDisconnectService:
     async def _get_user_credentials(self, user_id: str) -> Optional[Dict[str, Any]]:
         """Get user's Google credentials."""
         try:
+            logger.info(f"🔍 Disconnect Debug - Looking for credentials for user_id: {user_id}")
+            
+            # First, let's see what's in the table
+            all_credentials = self.supabase.table("google_credentials") \
+                .select("user_id, status, google_email") \
+                .execute()
+            logger.info(f"🔍 Disconnect Debug - All credentials in table: {all_credentials.data}")
+            
+            # Now try to get the specific user's credentials
             result = self.supabase.table("google_credentials") \
                 .select("*") \
                 .eq("user_id", user_id) \
@@ -101,6 +112,7 @@ class GoogleDisconnectService:
                 .execute()
             
             if result.data:
+                logger.info(f"🔍 Disconnect Debug - Found credentials: {result.data}")
                 return result.data
             return None
             
