@@ -81,6 +81,67 @@ XMLHttpRequest.prototype.open = function(method, url, ...args) {
   return originalXHROpen.call(this, method, url, ...args);
 };
 
+// DOM observer to catch any HTTP URLs in the page
+const observer = new MutationObserver((mutations) => {
+  mutations.forEach((mutation) => {
+    mutation.addedNodes.forEach((node) => {
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        const element = node as Element;
+        
+        // Check for HTTP URLs in various attributes
+        const attributes = ['src', 'href', 'data-src', 'data-href'];
+        attributes.forEach(attr => {
+          const value = element.getAttribute(attr);
+          if (value && value.includes('backend-staging-6085.up.railway.app') && value.startsWith('http://')) {
+            console.log('🚨 DOM HTTP URL DETECTED:', {
+              tagName: element.tagName,
+              attribute: attr,
+              value,
+              element: element.outerHTML,
+              stack: new Error().stack
+            });
+          }
+        });
+        
+        // Check for inline styles with HTTP URLs
+        const style = element.getAttribute('style');
+        if (style && style.includes('backend-staging-6085.up.railway.app') && style.includes('http://')) {
+          console.log('🚨 DOM HTTP URL IN STYLE:', {
+            tagName: element.tagName,
+            style,
+            element: element.outerHTML,
+            stack: new Error().stack
+          });
+        }
+      }
+    });
+  });
+});
+
+// Start observing
+observer.observe(document.body, {
+  childList: true,
+  subtree: true,
+  attributes: true,
+  attributeFilter: ['src', 'href', 'style']
+});
+
+// Also check existing elements
+document.querySelectorAll('*').forEach(element => {
+  const attributes = ['src', 'href', 'data-src', 'data-href'];
+  attributes.forEach(attr => {
+    const value = element.getAttribute(attr);
+    if (value && value.includes('backend-staging-6085.up.railway.app') && value.startsWith('http://')) {
+      console.log('🚨 EXISTING DOM HTTP URL:', {
+        tagName: element.tagName,
+        attribute: attr,
+        value,
+        element: element.outerHTML
+      });
+    }
+  });
+});
+
 export class PythonBackendAPI {
   private baseUrl: string;
   private timeout: number;
