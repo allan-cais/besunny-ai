@@ -114,6 +114,7 @@ export const config: Config = {
         if (isRailwayEnv && envUrl.includes('railway.app')) {
           console.log('⚠️  Using public Railway URL - may cause mixed content errors');
           console.log('💡 To use internal networking, set VITE_USE_INTERNAL_NETWORKING=true');
+          console.log('💡 If internal networking fails, you may need to accept mixed content in your browser');
         }
       }
       

@@ -236,6 +236,33 @@ export function usePythonBackend(options: UsePythonBackendOptions = {}): UsePyth
     };
   }, []);
 
+  // Check if backend is ready
+  const isBackendReady = isInitializedRef.current && isEnabled && !!baseUrl;
+  
+  // Test internal networking connectivity
+  useEffect(() => {
+    if (isBackendReady && baseUrl.includes('railway.internal')) {
+      console.log('🧪 Testing internal Railway networking connectivity...');
+      
+      // Simple health check to test if internal URL is reachable
+      fetch(`${baseUrl}/health`, { 
+        method: 'GET',
+        signal: AbortSignal.timeout(5000) // 5 second timeout
+      })
+      .then(response => {
+        if (response.ok) {
+          console.log('✅ Internal Railway networking is working!');
+        } else {
+          console.log('⚠️  Internal Railway networking responded with status:', response.status);
+        }
+      })
+      .catch(error => {
+        console.error('❌ Internal Railway networking failed:', error.message);
+        console.log('💡 This suggests the internal URL is not reachable from the frontend service');
+      });
+    }
+  }, [isBackendReady, baseUrl]);
+
   return {
     // Connection state
     isConnected,
