@@ -64,15 +64,9 @@ async def lifespan(app: FastAPI):
             logger.error(f"Supabase initialization error: {e}")
             _health_status["services"]["supabase"] = "error"
         
-        # Start background token refresh task
-        try:
-            # Create a simple background task that runs every 5 minutes
-            asyncio.create_task(_run_token_refresh_background())
-            logger.info("Background token refresh task started successfully")
-            _health_status["services"]["token_refresh"] = "started"
-        except Exception as e:
-            logger.warning(f"Background token refresh task failed to start: {e}")
-            _health_status["services"]["token_refresh"] = "failed"
+        # Token refresh service status
+        _health_status["services"]["token_refresh"] = "manual_only"
+        logger.info("Token refresh service configured for manual operation only")
         
         # Mark startup as successful
         _health_status["startup_time"] = time.time()
@@ -90,19 +84,8 @@ async def lifespan(app: FastAPI):
     finally:
         logger.info("Shutting down BeSunny.ai Python Backend")
         
-        # Stop background services
-        try:
-            # Cancel any running background tasks
-            for task in asyncio.all_tasks():
-                if not task.done():
-                    task.cancel()
-                    try:
-                        await task
-                    except asyncio.CancelledError:
-                        pass
-            logger.info("Background tasks cancelled")
-        except Exception as e:
-            logger.error(f"Error stopping background tasks: {e}")
+        # Shutdown complete
+        logger.info("Application shutdown completed")
         
         _health_status["services"]["shutdown"] = "completed"
 
@@ -216,37 +199,6 @@ def create_app() -> FastAPI:
     if static_dir.exists():
         from fastapi.staticfiles import StaticFiles
         app.mount("/static", StaticFiles(directory=static_dir), name="static")
-    
-    # ============================================================================
-    # HELPER FUNCTIONS
-    # ============================================================================
-    
-    async def _run_token_refresh_background():
-        """Simple background task that refreshes tokens every 5 minutes."""
-        try:
-            while True:
-                try:
-                    # Call the token refresh function
-                    from app.services.auth.simple_token_refresh import refresh_expiring_tokens
-                    result = await refresh_expiring_tokens()
-                    
-                    if result.get('success'):
-                        logger.info("Background token refresh completed successfully")
-                    else:
-                        logger.warning(f"Background token refresh failed: {result.get('message', 'Unknown error')}")
-                    
-                    # Wait 5 minutes before next refresh
-                    await asyncio.sleep(300)
-                    
-                except Exception as e:
-                    logger.error(f"Background token refresh error: {e}")
-                    # Wait 1 minute before retrying
-                    await asyncio.sleep(60)
-                    
-        except asyncio.CancelledError:
-            logger.info("Background token refresh task cancelled")
-        except Exception as e:
-            logger.error(f"Background token refresh task failed: {e}")
     
     # ============================================================================
     # OPTIMIZED HEALTH CHECK ENDPOINTS
