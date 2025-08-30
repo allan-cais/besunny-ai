@@ -211,18 +211,46 @@ const Dashboard = () => {
   // Load data when session is ready
   useEffect(() => {
     if (!authLoading && user?.id && session) {
-      // Load projects
-      loadUserProjects();
+      // First, validate and refresh the session if needed
+      const validateAndLoadData = async () => {
+        try {
+          const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
+          
+          if (sessionError || !currentSession) {
+            console.error('Session validation failed in main effect:', sessionError);
+            // Try to refresh the session
+            const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+            
+            if (refreshError || !refreshData.session) {
+              console.error('Session refresh failed:', refreshError);
+              // Session refresh failed, redirect to login
+              window.location.href = '/auth';
+              return;
+            }
+            
+            console.log('Session refreshed successfully');
+          }
+          
+          // Load projects
+          loadUserProjects();
+          
+          // Load dashboard data
+          loadCurrentWeekMeetings();
+          loadUnclassifiedData();
+          
+          // Setup calendar sync
+          setupCalendarSyncIfNeeded();
+          
+          // Record activity
+          recordActivity('calendar_view');
+        } catch (error) {
+          console.error('Error in validateAndLoadData:', error);
+          // If there's an error, redirect to login
+          window.location.href = '/auth';
+        }
+      };
       
-      // Load dashboard data
-      loadCurrentWeekMeetings();
-      loadUnclassifiedData();
-      
-      // Setup calendar sync
-      setupCalendarSyncIfNeeded();
-      
-      // Record activity
-      recordActivity('calendar_view');
+      validateAndLoadData();
     }
   }, [authLoading, user?.id, session, loadUserProjects, loadCurrentWeekMeetings, loadUnclassifiedData, setupCalendarSyncIfNeeded, recordActivity]);
 
