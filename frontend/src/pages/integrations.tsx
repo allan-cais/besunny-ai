@@ -167,6 +167,11 @@ const IntegrationsPage: React.FC = () => {
       return;
     }
     
+    // Debug: Log session details
+    console.log('Disconnect - Session object:', session);
+    console.log('Disconnect - Session access_token:', session.access_token);
+    console.log('Disconnect - Session access_token length:', session.access_token?.length);
+    
     try {
       // Call backend to disconnect Google account
       const response = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/auth/google/disconnect?user_id=${user.id}`, {
