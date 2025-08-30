@@ -8,7 +8,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Dict, Any, Optional
 import logging
 
-from ...core.security import get_current_user, security_manager, get_current_user_hybrid
+from ...core.security import get_current_user, get_current_user_from_supabase_token, security_manager, get_current_user_hybrid
 from ...services.auth.google_oauth_service import GoogleOAuthService
 from ...services.auth.google_token_service import GoogleTokenService
 from ...models.schemas.user import UserResponse, Token, TokenData
@@ -109,7 +109,7 @@ async def handle_google_oauth_callback(request: Request):
 @router.post("/google/oauth/refresh", response_model=Dict[str, Any])
 async def refresh_google_oauth_tokens(
     user_id: str,
-    current_user: Dict[str, Any] = Depends(get_current_user)
+    current_user: Dict[str, Any] = Depends(get_current_user_from_supabase_token)
 ):
     """
     Refresh Google OAuth tokens for a user.
