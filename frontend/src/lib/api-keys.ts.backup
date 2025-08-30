@@ -44,7 +44,7 @@ export const apiKeyService = {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.accessToken}`,
+        'Authorization': `Bearer ${session.access_token}`,
       },
       body: JSON.stringify(payload)
     });
@@ -86,7 +86,7 @@ export const apiKeyService = {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.accessToken}`,
+        'Authorization': `Bearer ${session.access_token}`,
       }
     });
     const result = await response.json();
@@ -144,7 +144,7 @@ export const apiKeyService = {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.accessToken}`,
+        'Authorization': `Bearer ${session.access_token}`,
       }
     });
     const result = await response.json();
@@ -177,7 +177,7 @@ export const apiKeyService = {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.accessToken}`,
+        'Authorization': `Bearer ${session.access_token}`,
       }
     });
     const result = await response.json();
@@ -197,7 +197,7 @@ export const apiKeyService = {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.accessToken}`,
+        'Authorization': `Bearer ${session.access_token}`,
       },
       body: JSON.stringify({
         bot_id: botId,
@@ -303,7 +303,7 @@ export const apiKeyService = {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.accessToken}`,
+        'Authorization': `Bearer ${session.access_token}`,
       }
     });
     const result = await response.json();
@@ -323,7 +323,7 @@ export const apiKeyService = {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.accessToken}`,
+        'Authorization': `Bearer ${session.access_token}`,
       }
     });
     const result = await response.json();
@@ -343,7 +343,7 @@ export const apiKeyService = {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.accessToken}`,
+        'Authorization': `Bearer ${session.access_token}`,
       }
     });
     const result = await response.json();

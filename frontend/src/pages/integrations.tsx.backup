@@ -97,12 +97,12 @@ const IntegrationsPage: React.FC = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.accessToken}`,
+          'Authorization': `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
           code,
           redirect_uri: `${window.location.origin}/integrations`,
-          supabase_access_token: session.accessToken,
+          supabase_access_token: session.access_token,
         }),
       });
 

@@ -43,7 +43,7 @@ class AttendeeServiceImpl implements AttendeeService {
 
     const response = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/attendee${endpoint}`, {
       headers: {
-        'Authorization': `Bearer ${session.accessToken}`,
+        'Authorization': `Bearer ${session.access_token}`,
         'Content-Type': 'application/json',
         ...options.headers,
       },

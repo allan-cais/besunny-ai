@@ -72,12 +72,12 @@ async function getGoogleCredentials(userId: string): Promise<GoogleCredentials> 
         
         console.log('[GoogleCredentials] Debug - Backend URL:', backendUrl);
         console.log('[GoogleCredentials] Debug - Full URL:', fullUrl);
-        console.log('[GoogleCredentials] Debug - Session token length:', session.accessToken ? session.accessToken.length : 0);
+        console.log('[GoogleCredentials] Debug - Session token length:', session.access_token ? session.access_token.length : 0);
         
         const response = await fetch(fullUrl, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${session.accessToken}`,
+                'Authorization': `Bearer ${session.access_token}`,
                 'Content-Type': 'application/json'
             }
         });
@@ -90,7 +90,7 @@ async function getGoogleCredentials(userId: string): Promise<GoogleCredentials> 
             
             console.log('[GoogleCredentials] Debug - Full response:', result);
             console.log('[GoogleCredentials] Debug - Response keys:', Object.keys(result));
-            console.log('[GoogleCredentials] Debug - Access token in result:', result.accessToken ? 'YES' : 'NO');
+            console.log('[GoogleCredentials] Debug - Access token in result:', result.access_token ? 'YES' : 'NO');
             console.log('[GoogleCredentials] Debug - Expires in result:', result.expires_in ? 'YES' : 'NO');
 
             // Check if the backend returned an error that requires re-authentication
@@ -129,16 +129,16 @@ async function getGoogleCredentials(userId: string): Promise<GoogleCredentials> 
             }
 
             // Check if we have fresh tokens from the backend response
-            if (result.accessToken && result.expires_in) {
+            if (result.access_token && result.expires_in) {
                 // Calculate expires_at from expires_in
                 const expiresAt = new Date(Date.now() + (result.expires_in * 1000)).toISOString();
                 
                 console.log('[GoogleCredentials] Debug - Using fresh tokens from backend');
-                console.log('[GoogleCredentials] Debug - Fresh access token length:', result.accessToken.length);
+                console.log('[GoogleCredentials] Debug - Fresh access token length:', result.access_token.length);
                 console.log('[GoogleCredentials] Debug - Fresh expires at:', expiresAt);
                 
                 return {
-                    accessToken: result.accessToken,
+                    accessToken: result.access_token,
                     expiresAt: expiresAt,
                     hasRefreshToken: true,
                     scope: result.tokens?.scope || ''
@@ -198,9 +198,9 @@ async function getGoogleCredentials(userId: string): Promise<GoogleCredentials> 
     
     // If we get here, use the original credentials from the database
     return {
-      accessToken: data.accessToken,
-      expiresAt: data.expiresAt,
-      hasRefreshToken: !!data.refreshToken,
+      accessToken: data.access_token,
+      expiresAt: data.expires_at,
+      hasRefreshToken: !!data.refresh_token,
       scope: data.scope || ''
     };
       } catch (error) {
@@ -276,7 +276,7 @@ export const calendarService = {
     const response = await fetch(url.toString(), {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${session.accessToken}`,
+        'Authorization': `Bearer ${session.access_token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -316,7 +316,7 @@ export const calendarService = {
     const response = await fetch(url.toString(), {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${session.accessToken}`,
+        'Authorization': `Bearer ${session.access_token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -349,7 +349,7 @@ export const calendarService = {
     const response = await fetch(url.toString(), {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${session.accessToken}`,
+        'Authorization': `Bearer ${session.access_token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ 
@@ -483,7 +483,7 @@ export const calendarService = {
     const response = await fetch(url.toString(), {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${session.accessToken}`,
+        'Authorization': `Bearer ${session.access_token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ user_id: session.user.id }),
@@ -510,7 +510,7 @@ export const calendarService = {
     const response = await fetch(url.toString(), {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${session.accessToken}`,
+        'Authorization': `Bearer ${session.access_token}`,
       },
     });
     
@@ -670,7 +670,7 @@ export const calendarService = {
     const response = await fetch(url.toString(), {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${session.accessToken}`,
+        'Authorization': `Bearer ${session.access_token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -709,7 +709,7 @@ export const calendarService = {
     const response = await fetch(url.toString(), {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${session.accessToken}`,
+        'Authorization': `Bearer ${session.access_token}`,
       },
     });
     
@@ -738,7 +738,7 @@ export const calendarService = {
     const response = await fetch(url.toString(), {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${session.accessToken}`,
+        'Authorization': `Bearer ${session.access_token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -1076,7 +1076,7 @@ export const calendarService = {
           `singleEvents=true&syncToken=`,
           {
             headers: {
-              'Authorization': `Bearer ${credentials.accessToken}`,
+              'Authorization': `Bearer ${credentials.access_token}`,
             },
           }
         );
@@ -1096,7 +1096,7 @@ export const calendarService = {
           `timeMin=${encodeURIComponent(new Date().toISOString())}&timeMax=${encodeURIComponent(new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString())}&singleEvents=true`,
           {
             headers: {
-              'Authorization': `Bearer ${credentials.accessToken}`,
+              'Authorization': `Bearer ${credentials.access_token}`,
             },
           }
         );
@@ -1170,7 +1170,7 @@ export const calendarService = {
         {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${credentials.accessToken}`,
+            'Authorization': `Bearer ${credentials.access_token}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(watchRequest),
@@ -1282,7 +1282,7 @@ export const calendarService = {
         {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${credentials.accessToken}`,
+            'Authorization': `Bearer ${credentials.access_token}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
@@ -1342,7 +1342,7 @@ export const calendarService = {
         `syncToken=${syncToken}&singleEvents=true&showDeleted=true`,
         {
           headers: {
-            'Authorization': `Bearer ${credentials.accessToken}`,
+            'Authorization': `Bearer ${credentials.access_token}`,
           },
         }
       );
@@ -1444,7 +1444,7 @@ export const calendarService = {
       if (selfAttendee && selfAttendee.responseStatus) {
         attendeeStatus = selfAttendee.responseStatus;
       }
-    } else if (event.creator && event.creator.email === credentials.googleEmail) {
+    } else if (event.creator && event.creator.email === credentials.google_email) {
       attendeeStatus = 'accepted';
     }
     
@@ -1684,7 +1684,7 @@ export const calendarService = {
         `timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&orderBy=startTime`,
         {
           headers: {
-            'Authorization': `Bearer ${credentials.accessToken}`,
+            'Authorization': `Bearer ${credentials.access_token}`,
           },
         }
       );
@@ -1988,7 +1988,7 @@ export const calendarService = {
         {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${credentials.accessToken}`,
+            'Authorization': `Bearer ${credentials.access_token}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
@@ -2019,7 +2019,7 @@ export const calendarService = {
           {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${credentials.accessToken}`,
+              'Authorization': `Bearer ${credentials.access_token}`,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify(watchRequest),

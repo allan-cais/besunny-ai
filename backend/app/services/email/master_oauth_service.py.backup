@@ -50,7 +50,7 @@ class MasterOAuthService:
             )
             
             # Check if credentials need refresh
-            if credentials.expired and credentials.refreshToken:
+            if credentials.expired and credentials.refresh_token:
                 logger.info("Refreshing expired OAuth credentials...")
                 try:
                     credentials.refresh(Request())
@@ -161,7 +161,7 @@ class MasterOAuthService:
             cred_data = {
                 'email': self.master_email,
                 'access_token': credentials.token,
-                'refresh_token': credentials.refreshToken,
+                'refresh_token': credentials.refresh_token,
                 'token_expiry': credentials.expiry.isoformat() if credentials.expiry else None,
                 'scopes': json.dumps(credentials.scopes),
                 'created_at': datetime.now().isoformat(),

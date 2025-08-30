@@ -58,7 +58,7 @@ class ApiClient {
 
     // Add authorization header if session exists
     if (session?.access_token) {
-      requestHeaders['Authorization'] = `Bearer ${session.accessToken}`;
+      requestHeaders['Authorization'] = `Bearer ${session.access_token}`;
     }
 
     const requestOptions: RequestInit = {
@@ -165,8 +165,8 @@ export class AuthService {
     if (!data.session) throw new Error('No session data');
     
     return {
-      access_token: data.session.accessToken,
-      refresh_token: data.session.refreshToken,
+      access_token: data.session.access_token,
+      refresh_token: data.session.refresh_token,
     };
   }
 

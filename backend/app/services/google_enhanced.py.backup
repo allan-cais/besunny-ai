@@ -30,7 +30,7 @@ class EnhancedGoogleDriveService:
         try:
             creds = Credentials.from_authorized_user_info(credentials_dict)
             
-            if creds.expired and creds.refreshToken:
+            if creds.expired and creds.refresh_token:
                 creds.refresh(Request())
             
             self._service = build('drive', 'v3', credentials=creds)
@@ -131,7 +131,7 @@ class EnhancedGoogleCalendarService:
         try:
             creds = Credentials.from_authorized_user_info(credentials_dict)
             
-            if creds.expired and creds.refreshToken:
+            if creds.expired and creds.refresh_token:
                 creds.refresh(Request())
             
             self._service = build('calendar', 'v3', credentials=creds)
@@ -266,13 +266,13 @@ class GoogleOAuthManager:
         try:
             creds = Credentials.from_authorized_user_info(credentials_dict)
             
-            if creds.expired and creds.refreshToken:
+            if creds.expired and creds.refresh_token:
                 creds.refresh(Request())
                 
                 # Update stored credentials
                 new_credentials = {
                     'token': creds.token,
-                    'refresh_token': creds.refreshToken,
+                    'refresh_token': creds.refresh_token,
                     'token_uri': creds.token_uri,
                     'client_id': creds.client_id,
                     'client_secret': creds.client_secret,
