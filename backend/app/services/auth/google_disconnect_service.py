@@ -94,8 +94,7 @@ class GoogleDisconnectService:
     async def _get_user_credentials(self, user_id: str) -> Optional[Dict[str, Any]]:
         """Get user's Google credentials."""
         try:
-            supabase = await self.supabase
-            result = supabase.table("google_credentials") \
+            result = self.supabase.table("google_credentials") \
                 .select("*") \
                 .eq("user_id", user_id) \
                 .single() \
@@ -132,8 +131,7 @@ class GoogleDisconnectService:
     async def _remove_google_credentials(self, user_id: str) -> bool:
         """Remove Google credentials from database."""
         try:
-            supabase = await self.supabase
-            result = supabase.table("google_credentials") \
+            result = self.supabase.table("google_credentials") \
                 .delete() \
                 .eq("user_id", user_id) \
                 .execute()
@@ -167,8 +165,7 @@ class GoogleDisconnectService:
     async def _remove_calendar_webhooks(self, user_id: str) -> None:
         """Remove calendar webhooks for a user."""
         try:
-            supabase = await self.supabase
-            supabase.table("calendar_webhooks") \
+            self.supabase.table("calendar_webhooks") \
                 .delete() \
                 .eq("user_id", user_id) \
                 .execute()
@@ -186,8 +183,7 @@ class GoogleDisconnectService:
             
             for doc in documents:
                 if doc.get('file_id'):
-                    supabase = await self.supabase
-                    supabase.table("drive_file_watches") \
+                    self.supabase.table("drive_file_watches") \
                         .delete() \
                         .eq("file_id", doc['file_id']) \
                         .execute()
@@ -200,8 +196,7 @@ class GoogleDisconnectService:
     async def _remove_gmail_watches(self, user_id: str) -> None:
         """Remove Gmail watches for a user."""
         try:
-            supabase = await self.supabase
-            supabase.table("gmail_watches") \
+            self.supabase.table("gmail_watches") \
                 .delete() \
                 .eq("user_id", user_id) \
                 .execute()
@@ -214,8 +209,7 @@ class GoogleDisconnectService:
     async def _get_user_documents(self, user_id: str) -> list:
         """Get user's documents."""
         try:
-            supabase = await self.supabase
-            result = supabase.table("documents") \
+            result = self.supabase.table("documents") \
                 .select("id, file_id") \
                 .eq("created_by", user_id) \
                 .not_.is_("file_id", None) \
