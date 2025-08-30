@@ -417,22 +417,33 @@ class GoogleTokenService:
         try:
             logger.info(f"Looking for refresh token for user {user_id}")
             
-            result = self.supabase.table("google_credentials") \
-                .select("refresh_token") \
+            # First, let's see what's actually in the database for this user
+            logger.info(f"Querying all fields for user {user_id} to debug the issue")
+            all_fields_result = self.supabase.table("google_credentials") \
+                .select("*") \
                 .eq("user_id", user_id) \
-                .single() \
                 .execute()
             
-            logger.info(f"Database query result for user {user_id}: {result}")
-            logger.info(f"Result data: {result.data}")
-            logger.info(f"Result error: {result.error}")
+            logger.info(f"All fields query result for user {user_id}: {all_fields_result}")
+            logger.info(f"All fields data: {all_fields_result.data}")
+            logger.info(f"All fields error: {all_fields_result.error}")
             
-            if result.data:
-                refresh_token = result.data.get('refresh_token')
-                logger.info(f"Found refresh token for user {user_id}: length={len(refresh_token) if refresh_token else 0}")
-                return refresh_token
+            if all_fields_result.data and len(all_fields_result.data) > 0:
+                user_data = all_fields_result.data[0]
+                logger.info(f"Found user data: {user_data}")
+                logger.info(f"Available fields: {list(user_data.keys())}")
+                logger.info(f"Refresh token present: {'refresh_token' in user_data}")
+                logger.info(f"Refresh token value: {user_data.get('refresh_token', 'NOT_FOUND')}")
+                
+                refresh_token = user_data.get('refresh_token')
+                if refresh_token:
+                    logger.info(f"Successfully found refresh token for user {user_id}: length={len(refresh_token)}")
+                    return refresh_token
+                else:
+                    logger.warning(f"Refresh token field is None or empty for user {user_id}")
+                    return None
             else:
-                logger.warning(f"No data returned for user {user_id}")
+                logger.warning(f"No user data found for user {user_id}")
                 return None
             
         except Exception as e:
