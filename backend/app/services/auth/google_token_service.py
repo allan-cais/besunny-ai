@@ -415,16 +415,30 @@ class GoogleTokenService:
     async def _get_user_refresh_token(self, user_id: str) -> Optional[str]:
         """Get user's refresh token."""
         try:
+            logger.info(f"Looking for refresh token for user {user_id}")
+            
             result = self.supabase.table("google_credentials") \
                 .select("refresh_token") \
                 .eq("user_id", user_id) \
                 .single() \
                 .execute()
             
-            return result.data.get('refresh_token') if result.data else None
+            logger.info(f"Database query result for user {user_id}: {result}")
+            logger.info(f"Result data: {result.data}")
+            logger.info(f"Result error: {result.error}")
+            
+            if result.data:
+                refresh_token = result.data.get('refresh_token')
+                logger.info(f"Found refresh token for user {user_id}: length={len(refresh_token) if refresh_token else 0}")
+                return refresh_token
+            else:
+                logger.warning(f"No data returned for user {user_id}")
+                return None
             
         except Exception as e:
-            logger.error(f"Failed to get user refresh token: {e}")
+            logger.error(f"Failed to get user refresh token for user {user_id}: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return None
     
     async def _update_user_tokens(self, user_id: str, access_token: str, 
