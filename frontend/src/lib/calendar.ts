@@ -115,7 +115,31 @@ async function getGoogleCredentials(userId: string): Promise<GoogleCredentials> 
     const refreshData = await refreshResponse.json();
     console.log(`[GoogleCredentials] Backend token refresh successful:`, refreshData);
     
-    // The backend should have updated the database, so fetch the updated credentials
+    // Use the fresh tokens returned from the backend instead of querying the database again
+    if (refreshData.success && refreshData.tokens) {
+      console.log(`[GoogleCredentials] Using fresh tokens from backend response`);
+      
+      // Create a credentials object with the fresh data from the backend
+      const freshCredentials = {
+        ...data, // Keep existing fields like user_id, refresh_token, scope, etc.
+        access_token: refreshData.tokens.access_token,
+        expires_at: new Date(Date.now() + (refreshData.tokens.expires_in * 1000)).toISOString(),
+        expires_in: refreshData.tokens.expires_in
+      };
+      
+      console.log(`[GoogleCredentials] Fresh credentials created:`, {
+        accessTokenLength: freshCredentials.access_token?.length || 0,
+        accessTokenStart: freshCredentials.access_token?.substring(0, 20) + '...',
+        expiresAt: freshCredentials.expires_at,
+        hasRefreshToken: !!freshCredentials.refresh_token,
+        scope: freshCredentials.scope || 'not set'
+      });
+      
+      return freshCredentials;
+    }
+    
+    // Fallback: The backend should have updated the database, so fetch the updated credentials
+    console.log(`[GoogleCredentials] Fallback: fetching updated credentials from database`);
     const { data: updatedData, error: updateError } = await supabase
       .from('google_credentials')
       .select('*')
