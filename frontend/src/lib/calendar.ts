@@ -906,6 +906,25 @@ export const calendarService = {
           
           if (!retryResponse.ok) {
             const retryErrorText = await retryResponse.text();
+            
+            console.log('[Calendar] Debug - Even fresh tokens failed with Google Calendar API:');
+            console.log('[Calendar] Debug - Retry response status:', retryResponse.status);
+            console.log('[Calendar] Debug - Retry error text:', retryErrorText);
+            
+            // Try to parse the error response
+            try {
+              const errorJson = JSON.parse(retryErrorText);
+              console.log('[Calendar] Debug - Parsed error response:', errorJson);
+              
+              // Check if this is a token revocation error
+              if (errorJson.error && errorJson.error.code === 401) {
+                console.log('[Calendar] Debug - Google token appears to be revoked - user needs to re-authenticate');
+                // This should trigger the re-authentication flow
+              }
+            } catch (parseError) {
+              console.log('[Calendar] Debug - Could not parse error response:', parseError);
+            }
+            
             throw new Error(`Calendar API error after token refresh: ${retryResponse.status} - ${retryErrorText}`);
           }
           
