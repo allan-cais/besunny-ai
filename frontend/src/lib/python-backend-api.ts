@@ -56,6 +56,7 @@ export class PythonBackendAPI {
   private timeout: number;
   private retries: number;
   private retryDelay: number;
+  private instanceId: number; // Added for instance tracking
 
   constructor() {
     // Use dynamic configuration instead of hardcoded production config
@@ -63,6 +64,7 @@ export class PythonBackendAPI {
     this.timeout = config.pythonBackend.timeout;
     this.retries = config.pythonBackend.retries;
     this.retryDelay = config.pythonBackend.retryDelay;
+    this.instanceId = Math.floor(Math.random() * 1000); // Simple instance ID
     
     // Debug logging
     console.log('🚀 PythonBackendAPI Constructor:');
@@ -80,7 +82,7 @@ export class PythonBackendAPI {
     const url = `${this.baseUrl}${endpoint}`;
     
     // Debug: Log the exact URL being used
-    console.log('🌐 PythonBackendAPI makeRequest:');
+    console.log(`🌐 PythonBackendAPI makeRequest (Instance #${this.instanceId}):`);
     console.log('  Base URL:', this.baseUrl);
     console.log('  Endpoint:', endpoint);
     console.log('  Full URL:', url);
