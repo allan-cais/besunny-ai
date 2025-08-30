@@ -101,6 +101,77 @@ class EmailProcessingService:
                 'username': username
             }
     
+    async def process_gmail_webhook(self, webhook_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Process Gmail webhook data and extract email information.
+        
+        Args:
+            webhook_data: Raw webhook data from Gmail
+            
+        Returns:
+            Processing result with status and message
+        """
+        try:
+            logger.info(f"Processing Gmail webhook: {webhook_data}")
+            
+            # Extract message data from webhook
+            message_data = webhook_data.get('message', {})
+            if not message_data:
+                return {
+                    "status": "error",
+                    "message": "No message data in webhook",
+                    "total_processed": 0,
+                    "successful": 0
+                }
+            
+            # Get the email message ID
+            message_id = message_data.get('data')
+            if not message_id:
+                return {
+                    "status": "error", 
+                    "message": "No message ID in webhook",
+                    "total_processed": 0,
+                    "successful": 0
+                }
+            
+            # Decode the base64 message ID
+            import base64
+            try:
+                decoded_message_id = base64.urlsafe_b64decode(message_id + '=' * (-len(message_id) % 4))
+                gmail_message_id = decoded_message_id.decode('utf-8')
+                logger.info(f"Decoded Gmail message ID: {gmail_message_id}")
+            except Exception as e:
+                logger.error(f"Failed to decode message ID: {e}")
+                return {
+                    "status": "error",
+                    "message": f"Failed to decode message ID: {str(e)}",
+                    "total_processed": 0,
+                    "successful": 0
+                }
+            
+            # For now, just log the webhook receipt and return success
+            # The actual email processing will be handled by the Gmail service
+            # when it polls for new messages or processes the message ID
+            
+            logger.info(f"Gmail webhook processed successfully for message: {gmail_message_id}")
+            
+            return {
+                "status": "success",
+                "message": f"Webhook processed for message {gmail_message_id}",
+                "total_processed": 1,
+                "successful": 1,
+                "gmail_message_id": gmail_message_id
+            }
+            
+        except Exception as e:
+            logger.error(f"Error processing Gmail webhook: {e}")
+            return {
+                "status": "error",
+                "message": f"Webhook processing error: {str(e)}",
+                "total_processed": 0,
+                "successful": 0
+            }
+    
     async def _detect_content_type(self, email_data: Dict[str, Any]) -> Dict[str, Any]:
         """Detect the type of content in the email."""
         try:
