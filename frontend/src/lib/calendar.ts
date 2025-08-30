@@ -132,8 +132,33 @@ async function getGoogleCredentials(userId: string): Promise<GoogleCredentials> 
       // Validate the expires_in value
       const expiresIn = refreshData.tokens.expires_in;
       if (!expiresIn || typeof expiresIn !== 'number' || expiresIn <= 0) {
-        console.error(`[GoogleCredentials] Invalid expires_in value from backend:`, expiresIn);
-        throw new Error(`Invalid expires_in value from backend: ${expiresIn}`);
+        console.warn(`[GoogleCredentials] Missing or invalid expires_in from backend:`, expiresIn);
+        console.log(`[GoogleCredentials] Falling back to database query for updated credentials`);
+        
+        // Fallback: Query the database for updated credentials
+        const { data: updatedData, error: updateError } = await supabase
+          .from('google_credentials')
+          .select('*')
+          .eq('user_id', userId)
+          .maybeSingle();
+        
+        if (updateError || !updatedData) {
+          console.error(`[GoogleCredentials] Failed to fetch updated credentials from database:`, updateError);
+          throw new Error('Failed to fetch updated credentials after refresh');
+        }
+        
+        console.log(`[GoogleCredentials] Successfully retrieved updated credentials from database`);
+        
+        // Add detailed logging of the actual token values
+        console.log(`[GoogleCredentials] Token details:`, {
+          accessTokenLength: updatedData.access_token?.length || 0,
+          accessTokenStart: updatedData.access_token?.substring(0, 20) + '...',
+          expiresAt: updatedData.expires_at,
+          hasRefreshToken: !!updatedData.refresh_token,
+          scope: updatedData.scope || 'not set'
+        });
+        
+        return updatedData;
       }
       
       // Create a credentials object with the fresh data from the backend
