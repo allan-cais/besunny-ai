@@ -66,13 +66,19 @@ async def lifespan(app: FastAPI):
             _health_status["services"]["supabase"] = "error"
         
         # Start simple background token refresh
+        logger.info("Attempting to start token refresh background task...")
         try:
             # Create a simple background task
-            asyncio.create_task(_simple_token_refresh_loop())
-            logger.info("Simple token refresh background task started")
+            logger.info("Creating background task...")
+            task = asyncio.create_task(_simple_token_refresh_loop())
+            logger.info(f"Background task created: {task}")
+            logger.info("Simple token refresh background task started successfully")
             _health_status["services"]["token_refresh"] = "started"
         except Exception as e:
-            logger.warning(f"Token refresh background task failed: {e}")
+            logger.error(f"Token refresh background task failed: {e}")
+            logger.error(f"Error type: {type(e)}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             _health_status["services"]["token_refresh"] = "failed"
         
         # Mark startup as successful
@@ -301,13 +307,17 @@ def create_app() -> FastAPI:
 
 async def _simple_token_refresh_loop():
     """Simple background loop that refreshes tokens every 5 minutes."""
+    logger.info("Token refresh background loop function called")
     try:
+        logger.info("Starting token refresh background loop...")
         while True:
             try:
                 logger.info("Running token refresh check...")
                 
                 # Import and call the refresh function
+                logger.info("Importing refresh function...")
                 from app.services.auth.simple_token_refresh import refresh_expiring_tokens
+                logger.info("Calling refresh function...")
                 result = await refresh_expiring_tokens()
                 
                 if result.get('success'):
@@ -316,6 +326,7 @@ async def _simple_token_refresh_loop():
                     logger.warning(f"Token refresh failed: {result.get('message', 'Unknown error')}")
                 
                 # Wait 5 minutes
+                logger.info("Waiting 5 minutes before next refresh...")
                 await asyncio.sleep(300)
                 
             except Exception as e:
@@ -327,6 +338,8 @@ async def _simple_token_refresh_loop():
         logger.info("Token refresh loop cancelled")
     except Exception as e:
         logger.error(f"Token refresh loop failed: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
 
 
 # Create the application instance
