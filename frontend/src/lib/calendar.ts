@@ -866,8 +866,8 @@ export const calendarService = {
       }
 
       console.log('[Calendar] Debug - Got fresh credentials from getGoogleCredentials:');
-      console.log('[Calendar] Debug - Fresh access token length:', credentials.accessToken ? credentials.accessToken.length : 0);
-      console.log('[Calendar] Debug - Fresh access token start:', credentials.accessToken ? credentials.accessToken.substring(0, 20) + '...' : 'None');
+      console.log('[Calendar] Debug - Fresh access token length:', credentials.access_token ? credentials.access_token.length : 0);
+      console.log('[Calendar] Debug - Fresh access token start:', credentials.access_token ? credentials.access_token.substring(0, 20) + '...' : 'None');
 
       // Get events from the past 7 days to future 60 days
       const timeMin = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -878,7 +878,7 @@ export const calendarService = {
         `timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&orderBy=startTime`,
         {
           headers: {
-            'Authorization': `Bearer ${credentials.accessToken}`,
+            'Authorization': `Bearer ${credentials.access_token}`,
           },
         }
       );
@@ -889,8 +889,8 @@ export const calendarService = {
 
       console.log('[Calendar] Debug - Using credentials for Google Calendar API call:');
       console.log('[Calendar] Debug - Credentials source:', 'Fresh from getGoogleCredentials');
-      console.log('[Calendar] Debug - Access token length:', credentials.accessToken ? credentials.accessToken.length : 0);
-      console.log('[Calendar] Debug - Access token start:', credentials.accessToken ? credentials.accessToken.substring(0, 20) + '...' : 'None');
+      console.log('[Calendar] Debug - Access token length:', credentials.access_token ? credentials.access_token.length : 0);
+      console.log('[Calendar] Debug - Access token start:', credentials.access_token ? credentials.access_token.substring(0, 20) + '...' : 'None');
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -912,7 +912,7 @@ export const calendarService = {
             `timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&orderBy=startTime`,
             {
               headers: {
-                'Authorization': `Bearer ${refreshedCredentials.accessToken}`,
+                'Authorization': `Bearer ${refreshedCredentials.access_token}`,
               },
             }
           );
@@ -988,7 +988,7 @@ export const calendarService = {
                 `singleEvents=true&syncToken=`,
                 {
                   headers: {
-                    'Authorization': `Bearer ${refreshedCredentials.accessToken}`,
+                    'Authorization': `Bearer ${refreshedCredentials.access_token}`,
                   },
                 }
               );
@@ -1009,7 +1009,7 @@ export const calendarService = {
               `timeMin=${encodeURIComponent(new Date().toISOString())}&timeMax=${encodeURIComponent(new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString())}&singleEvents=true`,
               {
                 headers: {
-                  'Authorization': `Bearer ${refreshedCredentials.accessToken}`,
+                  'Authorization': `Bearer ${refreshedCredentials.access_token}`,
                 },
               }
             );
@@ -1081,7 +1081,7 @@ export const calendarService = {
           `singleEvents=true&syncToken=`,
           {
             headers: {
-              'Authorization': `Bearer ${credentials.accessToken}`,
+              'Authorization': `Bearer ${credentials.access_token}`,
             },
           }
         );
@@ -1101,7 +1101,7 @@ export const calendarService = {
           `timeMin=${encodeURIComponent(new Date().toISOString())}&timeMax=${encodeURIComponent(new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString())}&singleEvents=true`,
           {
             headers: {
-              'Authorization': `Bearer ${credentials.accessToken}`,
+              'Authorization': `Bearer ${credentials.access_token}`,
             },
           }
         );
@@ -1175,7 +1175,7 @@ export const calendarService = {
         {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${credentials.accessToken}`,
+            'Authorization': `Bearer ${credentials.access_token}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(watchRequest),
@@ -1287,7 +1287,7 @@ export const calendarService = {
         {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${credentials.accessToken}`,
+            'Authorization': `Bearer ${credentials.access_token}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
@@ -1347,7 +1347,7 @@ export const calendarService = {
         `syncToken=${syncToken}&singleEvents=true&showDeleted=true`,
         {
           headers: {
-            'Authorization': `Bearer ${credentials.accessToken}`,
+            'Authorization': `Bearer ${credentials.access_token}`,
           },
         }
       );
@@ -1689,7 +1689,7 @@ export const calendarService = {
         `timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&orderBy=startTime`,
         {
           headers: {
-            'Authorization': `Bearer ${credentials.accessToken}`,
+            'Authorization': `Bearer ${credentials.access_token}`,
           },
         }
       );
@@ -1993,7 +1993,7 @@ export const calendarService = {
         {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${credentials.accessToken}`,
+            'Authorization': `Bearer ${credentials.access_token}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
@@ -2024,7 +2024,7 @@ export const calendarService = {
           {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${credentials.accessToken}`,
+              'Authorization': `Bearer ${credentials.access_token}`,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify(watchRequest),
