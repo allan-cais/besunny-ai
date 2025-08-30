@@ -50,33 +50,21 @@ function stripHtml(html: string): string {
 // Get Google credentials from database
 async function getGoogleCredentials(userId: string): Promise<GoogleCredentials> {
   try {
-    console.log(`[GoogleCredentials] Getting credentials for user ${userId}`);
-    
-    // Get the current session
-    const session = (await supabase.auth.getSession()).data.session;
-    if (!session) throw new Error('Not authenticated');
-    
-    const { data, error } = await supabase
-      .from('google_credentials')
-      .select('*')
-      .eq('user_id', userId)
-      .maybeSingle();
-    
-    console.log(`[GoogleCredentials] Database query result:`, {
-      hasData: !!data,
-      hasError: !!error,
-      error: error?.message,
-      hasAccessToken: !!data?.access_token,
-      hasRefreshToken: !!data?.refresh_token,
-      expiresAt: data?.expires_at
-    });
-    
-    if (error || !data) {
-      throw new Error('Google credentials not found');
-    }
-    
-    // Always attempt token refresh via backend
-    console.log(`[GoogleCredentials] Always attempting token refresh via backend for user ${userId}...`);
+          // Get the current session
+      const session = (await supabase.auth.getSession()).data.session;
+      if (!session) throw new Error('Not authenticated');
+      
+      const { data, error } = await supabase
+        .from('google_credentials')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+      
+      if (error || !data) {
+        throw new Error('Google credentials not found');
+      }
+      
+      // Always attempt token refresh via backend
     
     try {
         const response = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/auth/google/oauth/refresh?user_id=${userId}`, {
@@ -87,16 +75,11 @@ async function getGoogleCredentials(userId: string): Promise<GoogleCredentials> 
             }
         });
 
-        console.log(`[GoogleCredentials] Backend token refresh response:`, { status: response.status, ok: response.ok, statusText: response.statusText });
-
         if (response.ok) {
             const result = await response.json();
-            console.log(`[GoogleCredentials] Backend token refresh successful:`, result);
 
             // Check if the backend returned an error that requires re-authentication
             if (result.error_code === 'TOKEN_EXPIRED_OR_REVOKED') {
-                console.log(`[GoogleCredentials] Token expired/revoked - redirecting to re-authentication`);
-                
                 // Redirect user to Google OAuth for re-authentication
                 const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
                 const redirectUri = `${window.location.origin}/integrations`;
@@ -132,8 +115,6 @@ async function getGoogleCredentials(userId: string): Promise<GoogleCredentials> 
 
             // Check if we have fresh tokens from the backend response
             if (result.access_token && result.expires_in) {
-                console.log(`[GoogleCredentials] Using fresh tokens from backend response`);
-                
                 // Calculate expires_at from expires_in
                 const expiresAt = new Date(Date.now() + (result.expires_in * 1000)).toISOString();
                 
@@ -144,19 +125,15 @@ async function getGoogleCredentials(userId: string): Promise<GoogleCredentials> 
                     scope: result.tokens?.scope || ''
                 };
             } else {
-                console.log(`[GoogleCredentials] Missing or invalid access_token/expires_in from backend: access_token=${!!result.access_token}, expires_in=${result.expires_in}`);
-                console.log(`[GoogleCredentials] Falling back to database query for updated credentials`);
+                // Fall back to database query for updated credentials
             }
         } else {
             const errorText = await response.text();
-            console.log(`[GoogleCredentials] Backend token refresh failed:`, { status: response.status, errorText });
             
             // Check if the error indicates expired/revoked token
             try {
                 const errorJson = JSON.parse(errorText);
                 if (errorJson.detail && errorJson.detail.includes('expired or revoked')) {
-                    console.log(`[GoogleCredentials] Token expired/revoked detected in error - redirecting to re-authentication`);
-                    
                     // Redirect user to Google OAuth for re-authentication
                     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
                     const redirectUri = `${window.location.origin}/integrations`;
@@ -196,7 +173,6 @@ async function getGoogleCredentials(userId: string): Promise<GoogleCredentials> 
             throw new Error(`Backend token refresh failed: ${response.status} - ${errorText}`);
         }
     } catch (error) {
-        console.log(`[GoogleCredentials] Error in getGoogleCredentials for user ${userId}:`, error);
         throw error;
     }
     
@@ -207,10 +183,9 @@ async function getGoogleCredentials(userId: string): Promise<GoogleCredentials> 
       hasRefreshToken: !!data.refresh_token,
       scope: data.scope || ''
     };
-  } catch (error) {
-    console.log(`[GoogleCredentials] Error in getGoogleCredentials for user ${userId}:`, error);
-    throw error;
-  }
+      } catch (error) {
+        throw error;
+    }
 }
 
 export interface Meeting {
@@ -858,31 +833,16 @@ export const calendarService = {
   // Perform initial sync to get baseline state and sync token
   async performInitialSync(userId: string): Promise<{ success: boolean; error?: string; sync_token?: string }> {
     try {
-      console.log(`[Calendar] Starting performInitialSync for user ${userId}`);
-      
       const credentials = await getGoogleCredentials(userId);
-      console.log(`[Calendar] Got Google credentials:`, { 
-        hasCredentials: !!credentials, 
-        hasAccessToken: !!credentials?.accessToken,
-        hasRefreshToken: !!credentials?.hasRefreshToken,
-        expiresAt: credentials?.expiresAt 
-      });
       
       if (!credentials) {
         // No Google credentials found for user
-        console.log(`[Calendar] No Google credentials found for user ${userId}`);
         return { success: false, error: 'No Google credentials found' };
       }
 
       // Get events from the past 7 days to future 60 days
       const timeMin = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
       const timeMax = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString();
-      
-      console.log(`[Calendar] Making Google Calendar API request with token:`, {
-        tokenLength: credentials.accessToken?.length || 0,
-        timeMin,
-        timeMax
-      });
       
       const response = await fetch(
         `https://www.googleapis.com/calendar/v3/calendars/primary/events?` +
@@ -894,19 +854,8 @@ export const calendarService = {
         }
       );
 
-      console.log(`[Calendar] Google Calendar API response:`, {
-        status: response.status,
-        ok: response.ok,
-        statusText: response.statusText
-      });
-
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`[Calendar] Google Calendar API error:`, {
-          status: response.status,
-          errorText,
-          userId
-        });
         
         // If we get a 401, the token might be invalid even if it's not expired
         if (response.status === 401) {
@@ -1309,26 +1258,16 @@ export const calendarService = {
   // Perform incremental sync using sync token
   async performIncrementalSync(userId: string, syncToken?: string): Promise<{ success: boolean; error?: string; next_sync_token?: string }> {
     try {
-      console.log(`[Calendar] Starting performIncrementalSync for user ${userId}`);
-      
       // First, validate that the Supabase session is still valid before proceeding
-      console.log(`[Calendar] Validating Supabase session before getting Google credentials...`);
-      
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
       if (sessionError || !session) {
-        console.error(`[Calendar] Session validation failed:`, sessionError);
         // Try to refresh the session
         const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
         
         if (refreshError || !refreshData.session) {
-          console.error(`[Calendar] Session refresh failed:`, refreshError);
           throw new Error('Supabase session expired and refresh failed');
         }
-        
-        console.log(`[Calendar] Supabase session refreshed successfully`);
-      } else {
-        console.log(`[Calendar] Supabase session is valid`);
       }
       
       const credentials = await getGoogleCredentials(userId);
