@@ -242,7 +242,7 @@ const Dashboard = () => {
           setupCalendarSyncIfNeeded();
           
           // Record activity
-          recordActivity('calendar_view');
+          await recordActivity('calendar_view');
         } catch (error) {
           console.error('Error in validateAndLoadData:', error);
           // If there's an error, redirect to login

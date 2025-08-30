@@ -164,7 +164,7 @@ class EnhancedAdaptiveSyncStrategy {
   /**
    * Record user activity and adjust sync strategy
    */
-  recordActivity(userId: string, activityType: 'app_load' | 'calendar_view' | 'meeting_create' | 'general' | 'virtual_email_detected'): void {
+  async recordActivity(userId: string, activityType: 'app_load' | 'calendar_view' | 'meeting_create' | 'general' | 'virtual_email_detected'): Promise<void> {
     const state = this.userStates.get(userId);
     if (!state) {
       return;
@@ -197,30 +197,52 @@ class EnhancedAdaptiveSyncStrategy {
       this.setUserInactive(userId);
     }, this.ACTIVITY_TIMEOUT));
 
-    // Handle immediate sync triggers
-    switch (activityType) {
-      case 'app_load':
-        this.triggerImmediateSync(userId, 'calendar');
-        this.triggerImmediateSync(userId, 'gmail');
-        break;
-      case 'calendar_view':
-        this.triggerImmediateSync(userId, 'calendar');
-        break;
-      case 'meeting_create':
-        // Delay sync by 2 seconds for meeting creation
-        setTimeout(() => {
+    // Handle immediate sync triggers - but only if session is valid
+    try {
+      // Check session validity before triggering sync
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session) {
+        console.error('Session validation failed in recordActivity:', sessionError);
+        // Try to refresh the session
+        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+        
+        if (refreshError || !refreshData.session) {
+          console.error('Session refresh failed in recordActivity:', refreshError);
+          // Session refresh failed, don't trigger sync
+          return;
+        }
+        
+        console.log('Session refreshed successfully in recordActivity');
+      }
+      
+      // Now proceed with sync triggers
+      switch (activityType) {
+        case 'app_load':
           this.triggerImmediateSync(userId, 'calendar');
-        }, 2000);
-        break;
-      case 'virtual_email_detected':
-        this.triggerImmediateSync(userId, 'gmail');
-        this.triggerImmediateSync(userId, 'calendar');
-        break;
-      case 'general':
-        this.adjustSyncStrategy(userId);
-        break;
+          this.triggerImmediateSync(userId, 'gmail');
+          break;
+        case 'calendar_view':
+          this.triggerImmediateSync(userId, 'calendar');
+          break;
+        case 'meeting_create':
+          // Delay sync by 2 seconds for meeting creation
+          setTimeout(() => {
+            this.triggerImmediateSync(userId, 'calendar');
+          }, 2000);
+          break;
+        case 'virtual_email_detected':
+          this.triggerImmediateSync(userId, 'gmail');
+          this.triggerImmediateSync(userId, 'calendar');
+          break;
+        case 'general':
+          this.adjustSyncStrategy(userId);
+          break;
+      }
+    } catch (error) {
+      console.error('Error in recordActivity session validation:', error);
+      // Don't trigger sync if there's an error
     }
-
   }
 
   /**

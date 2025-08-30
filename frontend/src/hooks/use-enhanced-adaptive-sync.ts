@@ -156,12 +156,12 @@ export function useEnhancedAdaptiveSync(options: UseEnhancedAdaptiveSyncOptions 
   }, [enabled, user?.id, trackVirtualEmailActivity]);
 
   // Record activity manually
-  const recordActivity = useCallback((activityType: 'app_load' | 'calendar_view' | 'meeting_create' | 'general' | 'virtual_email_detected') => {
+  const recordActivity = useCallback(async (activityType: 'app_load' | 'calendar_view' | 'meeting_create' | 'general' | 'virtual_email_detected') => {
     if (!user?.id || !isInitialized.current) {
       return;
     }
 
-    enhancedAdaptiveSyncStrategy.recordActivity(user.id, activityType);
+    await enhancedAdaptiveSyncStrategy.recordActivity(user.id, activityType);
   }, [user?.id]);
 
   // Trigger sync manually
