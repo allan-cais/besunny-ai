@@ -20,12 +20,28 @@ class BackgroundTokenRefreshService:
     """Service for automatically refreshing Google OAuth tokens in the background."""
     
     def __init__(self):
-        self.supabase = get_supabase()
-        self.token_service = GoogleTokenService()
-        self.settings = get_settings()
+        self.supabase = None
+        self.token_service = None
+        self.settings = None
         self.is_running = False
         self.refresh_interval = 300  # Check every 5 minutes
         self.early_refresh_threshold = 600  # Refresh tokens 10 minutes before expiry
+        self._initialized = False
+    
+    async def _ensure_initialized(self):
+        """Ensure the service is properly initialized."""
+        if self._initialized:
+            return
+            
+        try:
+            self.supabase = get_supabase()
+            self.token_service = GoogleTokenService()
+            self.settings = get_settings()
+            self._initialized = True
+            logger.info("Background token refresh service initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize background token refresh service: {e}")
+            raise
         
     async def start(self):
         """Start the background token refresh service."""
@@ -56,6 +72,7 @@ class BackgroundTokenRefreshService:
     async def run_once(self):
         """Run token refresh once without blocking."""
         try:
+            await self._ensure_initialized()
             await self._refresh_expiring_tokens()
             return True
         except Exception as e:
@@ -85,6 +102,8 @@ class BackgroundTokenRefreshService:
     async def _get_expiring_tokens(self) -> List[Dict]:
         """Get tokens that will expire within the threshold time."""
         try:
+            await self._ensure_initialized()
+            
             # Calculate the threshold time
             threshold_time = datetime.utcnow() + timedelta(seconds=self.early_refresh_threshold)
             
@@ -115,6 +134,8 @@ class BackgroundTokenRefreshService:
     async def _refresh_single_token(self, token_info: Dict):
         """Refresh a single user's token."""
         try:
+            await self._ensure_initialized()
+            
             user_id = token_info['user_id']
             logger.info(f"Refreshing token for user {user_id}")
             
@@ -134,6 +155,7 @@ class BackgroundTokenRefreshService:
         """Get the current status of the background service."""
         return {
             'is_running': self.is_running,
+            'is_initialized': self._initialized,
             'refresh_interval': self.refresh_interval,
             'early_refresh_threshold': self.early_refresh_threshold,
             'last_check': datetime.utcnow().isoformat()

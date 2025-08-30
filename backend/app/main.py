@@ -64,7 +64,7 @@ async def lifespan(app: FastAPI):
             logger.error(f"Supabase initialization error: {e}")
             _health_status["services"]["supabase"] = "error"
         
-        # Start background token refresh service
+        # Start background token refresh service (optional - won't block startup)
         try:
             from app.services.auth.background_token_refresh_service import get_background_token_refresh_service
             # Initialize the service without starting the blocking loop
@@ -74,8 +74,16 @@ async def lifespan(app: FastAPI):
             logger.info("Background token refresh service initialized successfully")
             _health_status["services"]["token_refresh"] = "initialized"
         except Exception as e:
-            logger.error(f"Background token refresh service startup error: {e}")
-            _health_status["services"]["token_refresh"] = "error"
+            logger.warning(f"Background token refresh service startup failed (non-critical): {e}")
+            _health_status["services"]["token_refresh"] = "failed"
+            # Fallback to simple token refresh
+            try:
+                asyncio.create_task(_schedule_simple_token_refresh())
+                logger.info("Simple token refresh service started as fallback")
+                _health_status["services"]["token_refresh"] = "fallback"
+            except Exception as fallback_error:
+                logger.warning(f"Fallback token refresh also failed: {fallback_error}")
+                _health_status["services"]["token_refresh"] = "failed"
         
         # Mark startup as successful
         _health_status["startup_time"] = time.time()
@@ -241,6 +249,25 @@ def create_app() -> FastAPI:
             logger.info("Token refresh scheduling cancelled")
         except Exception as e:
             logger.error(f"Token refresh scheduling failed: {e}")
+    
+    async def _schedule_simple_token_refresh():
+        """Simple periodic token refresh using cron service."""
+        try:
+            while True:
+                try:
+                    # Use the simple cron service
+                    from app.services.auth.token_refresh_cron import run_token_refresh_cron
+                    await run_token_refresh_cron()
+                    # Wait 5 minutes before next refresh
+                    await asyncio.sleep(300)
+                except Exception as e:
+                    logger.error(f"Simple token refresh error: {e}")
+                    # Wait a bit before retrying
+                    await asyncio.sleep(60)
+        except asyncio.CancelledError:
+            logger.info("Simple token refresh scheduling cancelled")
+        except Exception as e:
+            logger.error(f"Simple token refresh scheduling failed: {e}")
     
     # ============================================================================
     # OPTIMIZED HEALTH CHECK ENDPOINTS
