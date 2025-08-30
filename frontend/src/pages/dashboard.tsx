@@ -190,13 +190,23 @@ const Dashboard = () => {
         try {
           await calendarService.initializeCalendarSync(user.id);
         } catch (error) {
-          // Silent error handling
+          // Log calendar sync errors for debugging
+          console.error('Calendar sync setup failed:', error);
+          // Optionally show a toast notification
+          if (error instanceof Error) {
+            toast({
+              title: "Calendar Sync Warning",
+              description: `Failed to set up automatic calendar sync: ${error.message}`,
+              variant: "destructive",
+            });
+          }
         }
       }
     } catch (error) {
-      // Silent error handling
+      // Log credential check errors
+      console.error('Failed to check Google credentials:', error);
     }
-  }, [user?.id, session]);
+  }, [user?.id, session, toast]);
 
   // Load data when session is ready
   useEffect(() => {

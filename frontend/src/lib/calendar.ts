@@ -674,7 +674,7 @@ export const calendarService = {
   // Test webhook connectivity function removed for production
 
   // Enhanced calendar service with watch functionality
-  async initializeCalendarSync(userId: string): Promise<{ success: boolean; error?: string; webhook_id?: string }> {
+  async initializeCalendarSync(userId: string): Promise<{ success: boolean; error?: string; webhook_id?: string; resource_id?: string }> {
     try {
   
       
