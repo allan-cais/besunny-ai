@@ -983,7 +983,7 @@ export const calendarService = {
                 `singleEvents=true&syncToken=`,
                 {
                   headers: {
-                    'Authorization': `Bearer ${refreshedCredentials.access_token}`,
+                    'Authorization': `Bearer ${refreshedCredentials.accessToken}`,
                   },
                 }
               );
@@ -999,12 +999,12 @@ export const calendarService = {
             
             // If first approach didn't work, try second approach: make a small change and get sync token
   
-            const alternativeResponse = await fetch(
+                          const alternativeResponse = await fetch(
               `https://www.googleapis.com/calendar/v3/calendars/primary/events?` +
               `timeMin=${encodeURIComponent(new Date().toISOString())}&timeMax=${encodeURIComponent(new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString())}&singleEvents=true`,
               {
                 headers: {
-                  'Authorization': `Bearer ${refreshedCredentials.access_token}`,
+                  'Authorization': `Bearer ${refreshedCredentials.accessToken}`,
                 },
               }
             );
