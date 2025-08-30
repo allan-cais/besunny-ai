@@ -129,6 +129,15 @@ async function getGoogleCredentials(userId: string): Promise<GoogleCredentials> 
     
     console.log(`[GoogleCredentials] Successfully retrieved updated credentials from database`);
     
+    // Add detailed logging of the actual token values
+    console.log(`[GoogleCredentials] Token details:`, {
+      accessTokenLength: updatedData.access_token?.length || 0,
+      accessTokenStart: updatedData.access_token?.substring(0, 20) + '...',
+      expiresAt: updatedData.expires_at,
+      hasRefreshToken: !!updatedData.refresh_token,
+      scope: updatedData.scope || 'not set'
+    });
+    
     return updatedData;
   } catch (error) {
     console.error(`[GoogleCredentials] Error in getGoogleCredentials for user ${userId}:`, error);
