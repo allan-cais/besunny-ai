@@ -303,6 +303,59 @@ def create_app() -> FastAPI:
             "timestamp": time.time()
         }
     
+    # Manual background task trigger for testing
+    @app.post("/api/test/trigger-background-task")
+    async def trigger_background_task():
+        """Manually trigger the background task for testing."""
+        try:
+            logger.info("Manual trigger of background task requested")
+            task = asyncio.create_task(_simple_token_refresh_loop())
+            return {
+                "status": "success",
+                "message": "Background task manually triggered",
+                "task_id": str(task),
+                "timestamp": time.time()
+            }
+        except Exception as e:
+            logger.error(f"Failed to trigger background task: {e}")
+            return {
+                "status": "error",
+                "message": f"Failed to trigger background task: {str(e)}",
+                "timestamp": time.time()
+            }
+    
+    # Background task status check
+    @app.get("/api/test/background-task-status")
+    async def background_task_status():
+        """Check the status of background tasks."""
+        try:
+            # Get all running tasks
+            all_tasks = asyncio.all_tasks()
+            background_tasks = [t for t in all_tasks if t is not asyncio.current_task()]
+            
+            return {
+                "status": "success",
+                "total_background_tasks": len(background_tasks),
+                "task_details": [
+                    {
+                        "task_id": str(task),
+                        "name": getattr(task, '_name', 'unnamed'),
+                        "done": task.done(),
+                        "cancelled": task.cancelled()
+                    }
+                    for task in background_tasks
+                ],
+                "health_status": _health_status,
+                "timestamp": time.time()
+            }
+        except Exception as e:
+            logger.error(f"Failed to get background task status: {e}")
+            return {
+                "status": "error",
+                "message": f"Failed to get status: {str(e)}",
+                "timestamp": time.time()
+            }
+    
     logger.info("FastAPI application configured successfully")
     return app
 
