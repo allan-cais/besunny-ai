@@ -160,9 +160,20 @@ async def refresh_google_oauth_tokens(
             )
         
         print(f"🔍 PRINT: Successfully refreshed tokens for user {user_id}")
+        
+        # Extract the key fields that the frontend expects
+        access_token = result.get('access_token')
+        expires_in = result.get('expires_in')
+        token_type = result.get('token_type')
+        
+        print(f"🔍 PRINT: Extracted - access_token: {len(access_token) if access_token else 0}, expires_in: {expires_in}, token_type: {token_type}")
+        
         return {
             'success': True,
-            'tokens': result
+            'access_token': access_token,
+            'expires_in': expires_in,
+            'token_type': token_type,
+            'tokens': result  # Keep the full result for debugging
         }
         
     except HTTPException:
