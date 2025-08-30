@@ -53,9 +53,7 @@ async function getGoogleCredentials(userId: string): Promise<GoogleCredentials> 
           // Get the current session
       const session = (await supabase.auth.getSession()).data.session;
       
-      console.log('[GoogleCredentials] Debug - Supabase auth.getSession() result:', session);
-      console.log('[GoogleCredentials] Debug - Session exists:', !!session);
-      console.log('[GoogleCredentials] Debug - Session access_token length:', session?.access_token ? session.access_token.length : 0);
+      
       
       if (!session) throw new Error('Not authenticated');
       
@@ -75,9 +73,7 @@ async function getGoogleCredentials(userId: string): Promise<GoogleCredentials> 
         const backendUrl = import.meta.env.VITE_PYTHON_BACKEND_URL;
         const fullUrl = `${backendUrl}/api/v1/auth/google/oauth/refresh?user_id=${userId}`;
         
-        console.log('[GoogleCredentials] Debug - Backend URL:', backendUrl);
-        console.log('[GoogleCredentials] Debug - Full URL:', fullUrl);
-        console.log('[GoogleCredentials] Debug - Session token length:', session.access_token ? session.access_token.length : 0);
+
         
         const response = await fetch(fullUrl, {
             method: 'POST',
@@ -87,16 +83,12 @@ async function getGoogleCredentials(userId: string): Promise<GoogleCredentials> 
             }
         });
 
-        console.log('[GoogleCredentials] Debug - Response status:', response.status);
-        console.log('[GoogleCredentials] Debug - Response ok:', response.ok);
+
         
         if (response.ok) {
             const result = await response.json();
             
-            console.log('[GoogleCredentials] Debug - Full response:', result);
-            console.log('[GoogleCredentials] Debug - Response keys:', Object.keys(result));
-            console.log('[GoogleCredentials] Debug - Access token in result:', result.access_token ? 'YES' : 'NO');
-            console.log('[GoogleCredentials] Debug - Expires in result:', result.expires_in ? 'YES' : 'NO');
+
 
             // Check if the backend returned an error that requires re-authentication
             if (result.error_code === 'TOKEN_EXPIRED_OR_REVOKED') {
@@ -138,9 +130,7 @@ async function getGoogleCredentials(userId: string): Promise<GoogleCredentials> 
                 // Calculate expires_at from expires_in
                 const expiresAt = new Date(Date.now() + (result.expires_in * 1000)).toISOString();
                 
-                console.log('[GoogleCredentials] Debug - Using fresh tokens from backend');
-                console.log('[GoogleCredentials] Debug - Fresh access token length:', result.access_token.length);
-                console.log('[GoogleCredentials] Debug - Fresh expires at:', expiresAt);
+
                 
                 return {
                     access_token: result.access_token,
@@ -150,7 +140,6 @@ async function getGoogleCredentials(userId: string): Promise<GoogleCredentials> 
                 };
             } else {
                 // Fall back to database query for updated credentials
-                console.log('[GoogleCredentials] Debug - Falling back to database credentials');
             }
         } else {
             const errorText = await response.text();
@@ -865,9 +854,7 @@ export const calendarService = {
         return { success: false, error: 'No Google credentials found' };
       }
 
-      console.log('[Calendar] Debug - Got fresh credentials from getGoogleCredentials:');
-      console.log('[Calendar] Debug - Fresh access token length:', credentials.access_token ? credentials.access_token.length : 0);
-      console.log('[Calendar] Debug - Fresh access token start:', credentials.access_token ? credentials.access_token.substring(0, 20) + '...' : 'None');
+
 
       // Get events from the past 7 days to future 60 days
       const timeMin = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -883,25 +870,16 @@ export const calendarService = {
         }
       );
 
-      console.log('[Calendar] Debug - Fetch completed, checking response...');
-      console.log('[Calendar] Debug - Response status:', response.status);
-      console.log('[Calendar] Debug - Response ok:', response.ok);
 
-      console.log('[Calendar] Debug - Using credentials for Google Calendar API call:');
-      console.log('[Calendar] Debug - Credentials source:', 'Fresh from getGoogleCredentials');
-      console.log('[Calendar] Debug - Access token length:', credentials.access_token ? credentials.access_token.length : 0);
-      console.log('[Calendar] Debug - Access token start:', credentials.access_token ? credentials.access_token.substring(0, 20) + '...' : 'None');
 
       if (!response.ok) {
         const errorText = await response.text();
         
-        console.log('[Calendar] Debug - First Google Calendar API request failed:');
-        console.log('[Calendar] Debug - Response status:', response.status);
-        console.log('[Calendar] Debug - Error text:', errorText);
+
         
         // If we get a 401, the token might be invalid even if it's not expired
         if (response.status === 401) {
-          console.log('[Calendar] Debug - Got 401, attempting token refresh...');
+
           
           // Force a token refresh
           const refreshedCredentials = await getGoogleCredentials(userId);
@@ -920,22 +898,17 @@ export const calendarService = {
           if (!retryResponse.ok) {
             const retryErrorText = await retryResponse.text();
             
-            console.log('[Calendar] Debug - Even fresh tokens failed with Google Calendar API:');
-            console.log('[Calendar] Debug - Retry response status:', retryResponse.status);
-            console.log('[Calendar] Debug - Retry error text:', retryErrorText);
+
             
             // Try to parse the error response
             try {
               const errorJson = JSON.parse(retryErrorText);
-              console.log('[Calendar] Debug - Parsed error response:', errorJson);
-              
               // Check if this is a token revocation error
               if (errorJson.error && errorJson.error.code === 401) {
-                console.log('[Calendar] Debug - Google token appears to be revoked - user needs to re-authenticate');
                 // This should trigger the re-authentication flow
               }
             } catch (parseError) {
-              console.log('[Calendar] Debug - Could not parse error response:', parseError);
+              // Could not parse error response
             }
             
             throw new Error(`Calendar API error after token refresh: ${retryResponse.status} - ${retryErrorText}`);

@@ -162,23 +162,32 @@ const IntegrationsPage: React.FC = () => {
   };
 
   const handleGoogleDisconnect = async () => {
-    if (!user?.id) return;
+    if (!user?.id || !session?.access_token) {
+      alert('You must be logged in to disconnect Google');
+      return;
+    }
     
     try {
       // Call backend to disconnect Google account
       const response = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/auth/google/disconnect`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify({ user_id: user.id }),
       });
 
       if (response.ok) {
         setGoogleConnected(false);
+        alert('Google account disconnected successfully');
       } else {
-        throw new Error('Failed to disconnect Google account');
+        const errorText = await response.text();
+        console.error('Disconnect failed:', response.status, errorText);
+        throw new Error(`Failed to disconnect Google account: ${response.status}`);
       }
     } catch (error) {
+      console.error('Disconnect error:', error);
       alert('Failed to disconnect Google account');
     }
   };
