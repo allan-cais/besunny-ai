@@ -300,6 +300,8 @@ def create_app() -> FastAPI:
 
 async def _simple_token_refresh_loop():
     """Simple background loop that refreshes tokens every 5 minutes."""
+    import asyncio  # Import asyncio here
+    
     try:
         while True:
             try:
