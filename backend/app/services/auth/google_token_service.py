@@ -425,8 +425,10 @@ class GoogleTokenService:
                 'access_token': access_token,
                 'expires_in': expires_in,
                 'expires_at': expires_at,  # Add the missing expires_at field
-                'updated_at': datetime.now().isoformat()
             }
+            
+            logger.info(f"Attempting to update tokens for user {user_id}")
+            logger.info(f"Update data: {update_data}")
             
             result = self.supabase.table("google_credentials") \
                 .update(update_data) \
