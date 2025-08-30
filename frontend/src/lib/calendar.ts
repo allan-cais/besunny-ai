@@ -88,15 +88,13 @@ async function getGoogleCredentials(userId: string): Promise<GoogleCredentials> 
     }
     
     // Call backend to refresh the token
-    const refreshResponse = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/auth/google/oauth/refresh`, {
+    const refreshResponse = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/auth/google/oauth/refresh?user_id=${userId}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${session.access_token}`,
       },
-      body: JSON.stringify({
-        user_id: userId
-      }),
+      // Remove the body since user_id is now in the query parameter
     });
     
     console.log(`[GoogleCredentials] Backend token refresh response:`, {
