@@ -111,25 +111,9 @@ async def refresh_google_oauth_tokens(
     user_id: str,
     current_user: Dict[str, Any] = Depends(get_current_user_from_supabase_token)
 ):
-    logger.info(f"🚨 ALERT: refresh_google_oauth_tokens endpoint called with user_id: {user_id}")
-    logger.info(f"🚨 ALERT: current_user: {current_user}")
-    
-    # Add a simple test response to see if this endpoint is working
-    import datetime
-    test_timestamp = datetime.datetime.now().isoformat()
-    
-    # Also try to force a log message that might be more visible
-    print(f"🚨 PRINT STATEMENT: Endpoint called at {test_timestamp} for user {user_id}")
-    
-    return {
-        'success': False,
-        'error': f'TEST RESPONSE - This endpoint is working at {test_timestamp}!',
-        'error_code': 'TEST_ENDPOINT_WORKING',
-        'user_id': user_id,
-        'current_user_id': current_user.get('id') if current_user else None,
-        'timestamp': test_timestamp,
-        'debug_info': 'This response proves our endpoint is being called'
-    }
+    # Use print statements for Railway debugging since logger.info() is filtered
+    print(f"🚨 PRINT: refresh_google_oauth_tokens endpoint called with user_id: {user_id}")
+    print(f"🚨 PRINT: current_user: {current_user}")
     
     """
     Refresh Google OAuth tokens for a user.
@@ -141,25 +125,25 @@ async def refresh_google_oauth_tokens(
     4. Returns the new token information
     """
     try:
-        logger.info(f"🚨 ALERT: Inside try block for user {user_id}")
+        print(f"🚨 PRINT: Inside try block for user {user_id}")
         
         # Verify the user is requesting their own tokens
         if current_user.get('id') != user_id:
-            logger.error(f"🔍 DEBUG: User ID mismatch - current_user: {current_user.get('id')}, requested: {user_id}")
+            print(f"🔍 PRINT: User ID mismatch - current_user: {current_user.get('id')}, requested: {user_id}")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Cannot refresh tokens for another user"
             )
         
-        logger.info(f"🔍 DEBUG: Starting token refresh for user {user_id}")
+        print(f"🔍 PRINT: Starting token refresh for user {user_id}")
         
         # Refresh the user's tokens
         result = await token_service.refresh_user_tokens(user_id)
         
-        logger.info(f"🔍 DEBUG: token_service.refresh_user_tokens returned: {result}")
+        print(f"🔍 PRINT: token_service.refresh_user_tokens returned: {result}")
         
         if not result:
-            logger.error(f"🔍 DEBUG: token_service.refresh_user_tokens returned None")
+            print(f"🔍 PRINT: token_service.refresh_user_tokens returned None")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Failed to refresh tokens"
@@ -169,13 +153,13 @@ async def refresh_google_oauth_tokens(
         if not result.get('success', False):
             error_message = result.get('error', 'Unknown error during token refresh')
             error_code = result.get('error_code', 'UNKNOWN')
-            logger.error(f"🔍 DEBUG: Token refresh failed for user {user_id}: {error_message} (code: {error_code})")
+            print(f"🔍 PRINT: Token refresh failed for user {user_id}: {error_message} (code: {error_code})")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Token refresh failed: {error_message}"
             )
         
-        logger.info(f"🔍 DEBUG: Successfully refreshed tokens for user {user_id}")
+        print(f"🔍 PRINT: Successfully refreshed tokens for user {user_id}")
         return {
             'success': True,
             'tokens': result
@@ -184,9 +168,9 @@ async def refresh_google_oauth_tokens(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"🔍 DEBUG: Unexpected error in refresh_google_oauth_tokens: {e}")
+        print(f"🔍 PRINT: Unexpected error in refresh_google_oauth_tokens: {e}")
         import traceback
-        logger.error(f"🔍 DEBUG: Traceback: {traceback.format_exc()}")
+        print(f"🔍 PRINT: Traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error during token refresh"
