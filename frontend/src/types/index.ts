@@ -98,6 +98,85 @@ export interface DocumentMetadata {
 
 export interface DocumentClassification {
   category: string;
+}
+
+// Google Calendar types
+export interface GoogleCalendarEvent {
+  id: string;
+  summary?: string;
+  description?: string;
+  start?: {
+    dateTime?: string;
+    date?: string;
+    timeZone?: string;
+  };
+  end?: {
+    dateTime?: string;
+    date?: string;
+    timeZone?: string;
+  };
+  conferenceData?: {
+    entryPoints?: GoogleCalendarEntryPoint[];
+  };
+  attendees?: GoogleCalendarAttendee[];
+  organizer?: {
+    email?: string;
+    displayName?: string;
+  };
+  htmlLink?: string;
+  status?: string;
+  created?: string;
+  updated?: string;
+}
+
+export interface GoogleCalendarEntryPoint {
+  entryPointType: string;
+  uri?: string;
+  label?: string;
+}
+
+export interface GoogleCalendarAttendee {
+  email: string;
+  displayName?: string;
+  responseStatus?: string;
+  organizer?: boolean;
+  self?: boolean;
+}
+
+export interface GoogleCredentials {
+  accessToken: string;
+  expiresAt: string;
+  hasRefreshToken: boolean;
+  scope?: string;
+}
+
+export interface TranscriptMetadata {
+  duration_seconds?: number;
+  participants?: string[];
+  speakers?: string[];
+  segments?: string[];
+  audio_url?: string;
+  recording_url?: string;
+}
+
+export interface BotConfiguration {
+  name?: string;
+  role?: string;
+  instructions?: string;
+  model?: string;
+  temperature?: number;
+}
+
+export interface Bot {
+  id: string;
+  name: string;
+  role: string;
+  instructions: string;
+  model: string;
+  temperature: number;
+  created_at: string;
+  updated_at: string;
+}
   confidence: number;
   tags: string[];
   summary?: string;

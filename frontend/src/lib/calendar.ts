@@ -52,6 +52,10 @@ async function getGoogleCredentials(userId: string): Promise<GoogleCredentials> 
   try {
     console.log(`[GoogleCredentials] Getting credentials for user ${userId}`);
     
+    // Get the current session
+    const session = (await supabase.auth.getSession()).data.session;
+    if (!session) throw new Error('Not authenticated');
+    
     const { data, error } = await supabase
       .from('google_credentials')
       .select('*')
@@ -78,7 +82,7 @@ async function getGoogleCredentials(userId: string): Promise<GoogleCredentials> 
         const response = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/auth/google/oauth/refresh?user_id=${userId}`, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${session?.access_token}`,
+                'Authorization': `Bearer ${session.access_token}`,
                 'Content-Type': 'application/json'
             }
         });
@@ -195,6 +199,18 @@ async function getGoogleCredentials(userId: string): Promise<GoogleCredentials> 
         console.log(`[GoogleCredentials] Error in getGoogleCredentials for user ${userId}:`, error);
         throw error;
     }
+    
+    // If we get here, use the original credentials from the database
+    return {
+      accessToken: data.access_token,
+      expiresAt: data.expires_at,
+      hasRefreshToken: !!data.refresh_token,
+      scope: data.scope || ''
+    };
+  } catch (error) {
+    console.log(`[GoogleCredentials] Error in getGoogleCredentials for user ${userId}:`, error);
+    throw error;
+  }
 }
 
 export interface Meeting {
@@ -351,7 +367,6 @@ export const calendarService = {
     return {
       ok: result.success,
       webhook_id: result.webhook_id,
-      resource_id: result.webhook_id,
       expiration: result.expiration,
       error: result.message
     };
@@ -483,7 +498,6 @@ export const calendarService = {
     return {
       ok: result.success,
       webhook_id: result.webhook_id,
-      resource_id: result.webhook_id,
       expiration: result.expiration,
       error: result.message
     };
