@@ -71,31 +71,35 @@ async function getGoogleCredentials(userId: string): Promise<GoogleCredentials> 
       throw new Error('Google credentials not found');
     }
     
-    // Always attempt to refresh the token to ensure it's valid
+    // Always attempt to refresh the token via backend to ensure it's valid
     // This handles cases where the token appears valid but is actually revoked
-    console.log(`[GoogleCredentials] Always attempting token refresh for user ${userId}...`);
+    console.log(`[GoogleCredentials] Always attempting token refresh via backend for user ${userId}...`);
     
     if (!data.refresh_token) {
       throw new Error('No refresh token available');
     }
     
-    console.log(`[GoogleCredentials] Making token refresh request...`);
+    console.log(`[GoogleCredentials] Making backend token refresh request...`);
     
-    // Refresh the token
-    const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
+    // Get current Supabase session for authentication
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !session) {
+      throw new Error('No valid Supabase session for backend authentication');
+    }
+    
+    // Call backend to refresh the token
+    const refreshResponse = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/auth/google/oauth/refresh`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
       },
-      body: new URLSearchParams({
-        client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID!,
-        client_secret: import.meta.env.VITE_GOOGLE_CLIENT_SECRET!,
-        refresh_token: data.refresh_token,
-        grant_type: 'refresh_token',
+      body: JSON.stringify({
+        user_id: userId
       }),
     });
     
-    console.log(`[GoogleCredentials] Token refresh response:`, {
+    console.log(`[GoogleCredentials] Backend token refresh response:`, {
       status: refreshResponse.status,
       ok: refreshResponse.ok,
       statusText: refreshResponse.statusText
@@ -103,44 +107,31 @@ async function getGoogleCredentials(userId: string): Promise<GoogleCredentials> 
     
     if (!refreshResponse.ok) {
       const errorText = await refreshResponse.text();
-      console.error(`[GoogleCredentials] Token refresh failed:`, {
+      console.error(`[GoogleCredentials] Backend token refresh failed:`, {
         status: refreshResponse.status,
-        errorText,
-        clientId: import.meta.env.VITE_GOOGLE_CLIENT_ID ? 'present' : 'missing',
-        clientSecret: import.meta.env.VITE_GOOGLE_CLIENT_SECRET ? 'present' : 'missing'
+        errorText
       });
-      // Token refresh failed
-      throw new Error(`Failed to refresh Google token: ${refreshResponse.status} - ${errorText}`);
+      throw new Error(`Backend token refresh failed: ${refreshResponse.status} - ${errorText}`);
     }
     
     const refreshData = await refreshResponse.json();
-    console.log(`[GoogleCredentials] Token refresh successful, new expiry:`, {
-      expiresIn: refreshData.expires_in,
-      newExpiry: new Date(Date.now() + refreshData.expires_in * 1000).toISOString()
-    });
+    console.log(`[GoogleCredentials] Backend token refresh successful:`, refreshData);
     
-    // Update the credentials in the database
-    const { error: updateError } = await supabase
+    // The backend should have updated the database, so fetch the updated credentials
+    const { data: updatedData, error: updateError } = await supabase
       .from('google_credentials')
-      .update({
-        access_token: refreshData.access_token,
-        expires_at: new Date(Date.now() + refreshData.expires_in * 1000).toISOString(),
-      })
-      .eq('user_id', userId);
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
     
-    if (updateError) {
-      console.error(`[GoogleCredentials] Failed to update refreshed token in database:`, updateError);
-      // Failed to update token in database
-      throw new Error('Failed to update refreshed token');
+    if (updateError || !updatedData) {
+      console.error(`[GoogleCredentials] Failed to fetch updated credentials from database:`, updateError);
+      throw new Error('Failed to fetch updated credentials after refresh');
     }
     
-    console.log(`[GoogleCredentials] Successfully updated token in database`);
+    console.log(`[GoogleCredentials] Successfully retrieved updated credentials from database`);
     
-    return {
-      ...data,
-      access_token: refreshData.access_token,
-      expires_at: new Date(Date.now() + refreshData.expires_in * 1000).toISOString(),
-    };
+    return updatedData;
   } catch (error) {
     console.error(`[GoogleCredentials] Error in getGoogleCredentials for user ${userId}:`, error);
     throw error;
