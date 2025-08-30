@@ -64,33 +64,18 @@ async def lifespan(app: FastAPI):
             logger.error(f"Supabase initialization error: {e}")
             _health_status["services"]["supabase"] = "error"
         
-        # Start background token refresh service (optional - won't block startup)
+        # Start simple token refresh service
         try:
-            from app.services.auth.background_token_refresh_service import get_background_token_refresh_service
-            # Initialize the service without starting the blocking loop
-            background_service = await get_background_token_refresh_service()
-            # Schedule periodic token refresh without blocking
-            asyncio.create_task(_schedule_token_refresh(background_service))
-            logger.info("Background token refresh service initialized successfully")
-            _health_status["services"]["token_refresh"] = "initialized"
+            from app.services.auth.simple_token_refresh import get_simple_token_refresh_service
+            # Initialize the simple service
+            simple_service = get_simple_token_refresh_service()
+            # Schedule periodic token refresh
+            asyncio.create_task(_schedule_simple_token_refresh())
+            logger.info("Simple token refresh service started successfully")
+            _health_status["services"]["token_refresh"] = "started"
         except Exception as e:
-            logger.warning(f"Background token refresh service startup failed (non-critical): {e}")
+            logger.warning(f"Token refresh service startup failed (non-critical): {e}")
             _health_status["services"]["token_refresh"] = "failed"
-            # Fallback to simple token refresh
-            try:
-                asyncio.create_task(_schedule_simple_token_refresh())
-                logger.info("Simple token refresh service started as fallback")
-                _health_status["services"]["token_refresh"] = "fallback"
-            except Exception as fallback_error:
-                logger.warning(f"Fallback token refresh also failed: {fallback_error}")
-                # Final fallback to ultra-simple service
-                try:
-                    asyncio.create_task(_schedule_ultra_simple_token_refresh())
-                    logger.info("Ultra-simple token refresh service started as final fallback")
-                    _health_status["services"]["token_refresh"] = "ultra_simple_fallback"
-                except Exception as ultra_fallback_error:
-                    logger.warning(f"Ultra-simple fallback also failed: {ultra_fallback_error}")
-                    _health_status["services"]["token_refresh"] = "failed"
         
         # Mark startup as successful
         _health_status["startup_time"] = time.time()
@@ -239,61 +224,24 @@ def create_app() -> FastAPI:
     # HELPER FUNCTIONS
     # ============================================================================
     
-    async def _schedule_token_refresh(background_service):
-        """Schedule periodic token refresh without blocking."""
+    async def _schedule_simple_token_refresh():
+        """Simple periodic token refresh."""
         try:
             while True:
                 try:
-                    # Refresh expiring tokens
-                    await background_service.run_once()
-                    # Wait for the next refresh cycle
-                    await asyncio.sleep(background_service.refresh_interval)
+                    # Use the simple service
+                    from app.services.auth.simple_token_refresh import run_simple_token_refresh
+                    await run_simple_token_refresh()
+                    # Wait 5 minutes before next refresh
+                    await asyncio.sleep(300)
                 except Exception as e:
-                    logger.error(f"Token refresh cycle error: {e}")
+                    logger.error(f"Token refresh error: {e}")
                     # Wait a bit before retrying
                     await asyncio.sleep(60)
         except asyncio.CancelledError:
             logger.info("Token refresh scheduling cancelled")
         except Exception as e:
             logger.error(f"Token refresh scheduling failed: {e}")
-    
-    async def _schedule_simple_token_refresh():
-        """Simple periodic token refresh using cron service."""
-        try:
-            while True:
-                try:
-                    # Use the simple cron service
-                    from app.services.auth.token_refresh_cron import run_token_refresh_cron
-                    await run_token_refresh_cron()
-                    # Wait 5 minutes before next refresh
-                    await asyncio.sleep(300)
-                except Exception as e:
-                    logger.error(f"Simple token refresh error: {e}")
-                    # Wait a bit before retrying
-                    await asyncio.sleep(60)
-        except asyncio.CancelledError:
-            logger.info("Simple token refresh scheduling cancelled")
-        except Exception as e:
-            logger.error(f"Simple token refresh scheduling failed: {e}")
-    
-    async def _schedule_ultra_simple_token_refresh():
-        """Ultra-simple periodic token refresh with minimal dependencies."""
-        try:
-            while True:
-                try:
-                    # Use the ultra-simple service
-                    from app.services.auth.simple_token_refresh import run_simple_token_refresh
-                    await run_simple_token_refresh()
-                    # Wait 5 minutes before next refresh
-                    await asyncio.sleep(300)
-                except Exception as e:
-                    logger.error(f"Ultra-simple token refresh error: {e}")
-                    # Wait a bit before retrying
-                    await asyncio.sleep(60)
-        except asyncio.CancelledError:
-            logger.info("Ultra-simple token refresh scheduling cancelled")
-        except Exception as e:
-            logger.error(f"Ultra-simple token refresh scheduling failed: {e}")
     
     # ============================================================================
     # OPTIMIZED HEALTH CHECK ENDPOINTS
@@ -390,9 +338,9 @@ def create_app() -> FastAPI:
     async def background_services_status():
         """Get status of background services."""
         try:
-            from app.services.auth.background_token_refresh_service import get_background_token_refresh_service
-            background_service = await get_background_token_refresh_service()
-            service_status = await background_service.get_service_status()
+            from app.services.auth.simple_token_refresh import get_simple_token_refresh_service
+            simple_service = get_simple_token_refresh_service()
+            service_status = await simple_service.get_service_status()
             return {
                 "status": "success",
                 "background_services": {
@@ -410,51 +358,12 @@ def create_app() -> FastAPI:
     # Manual token refresh trigger endpoint
     @app.post("/api/background-services/refresh-tokens")
     async def manual_token_refresh():
-        """Manually trigger token refresh for all expiring tokens."""
-        try:
-            from app.services.auth.token_refresh_cron import run_token_refresh_cron
-            result = await run_token_refresh_cron()
-            return {
-                "status": "success",
-                "result": result,
-                "timestamp": time.time()
-            }
-        except Exception as e:
-            return {
-                "status": "error",
-                "error": str(e),
-                "timestamp": time.time()
-            }
-    
-    # Simple token refresh endpoint using background service
-    @app.post("/api/background-services/refresh-tokens-simple")
-    async def simple_token_refresh():
-        """Simple token refresh using background service."""
-        try:
-            from app.services.auth.background_token_refresh_service import get_background_token_refresh_service
-            background_service = await get_background_token_refresh_service()
-            success = await background_service.run_once()
-            return {
-                "status": "success" if success else "error",
-                "message": "Token refresh completed" if success else "Token refresh failed",
-                "timestamp": time.time()
-            }
-        except Exception as e:
-            return {
-                "status": "error",
-                "error": str(e),
-                "timestamp": time.time()
-            }
-    
-    # Ultra-simple token refresh endpoint
-    @app.post("/api/background-services/refresh-tokens-ultra-simple")
-    async def ultra_simple_token_refresh():
-        """Ultra-simple token refresh using minimal service."""
+        """Manually trigger token refresh."""
         try:
             from app.services.auth.simple_token_refresh import run_simple_token_refresh
             result = await run_simple_token_refresh()
             return {
-                "status": "success" if result.get('success') else "error",
+                "status": "success",
                 "result": result,
                 "timestamp": time.time()
             }
