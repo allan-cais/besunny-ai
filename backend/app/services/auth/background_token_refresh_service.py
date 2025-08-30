@@ -53,6 +53,15 @@ class BackgroundTokenRefreshService:
         self.is_running = False
         logger.info("Stopping background token refresh service")
     
+    async def run_once(self):
+        """Run token refresh once without blocking."""
+        try:
+            await self._refresh_expiring_tokens()
+            return True
+        except Exception as e:
+            logger.error(f"Single token refresh run failed: {e}")
+            return False
+    
     async def _refresh_expiring_tokens(self):
         """Refresh tokens that are about to expire."""
         try:
@@ -146,7 +155,16 @@ async def get_background_token_refresh_service() -> BackgroundTokenRefreshServic
 async def start_background_token_refresh():
     """Start the background token refresh service."""
     service = await get_background_token_refresh_service()
-    await service.start()
+    
+    # Start the service as a background task
+    async def run_service():
+        try:
+            await service.start()
+        except Exception as e:
+            logger.error(f"Background token refresh service error: {e}")
+    
+    # Return the task so it can be managed by the caller
+    return asyncio.create_task(run_service())
 
 
 async def stop_background_token_refresh():

@@ -66,10 +66,13 @@ async def lifespan(app: FastAPI):
         
         # Start background token refresh service
         try:
-            from app.services.auth.background_token_refresh_service import start_background_token_refresh
-            asyncio.create_task(start_background_token_refresh())
-            logger.info("Background token refresh service started successfully")
-            _health_status["services"]["token_refresh"] = "started"
+            from app.services.auth.background_token_refresh_service import get_background_token_refresh_service
+            # Initialize the service without starting the blocking loop
+            background_service = await get_background_token_refresh_service()
+            # Schedule periodic token refresh without blocking
+            asyncio.create_task(_schedule_token_refresh(background_service))
+            logger.info("Background token refresh service initialized successfully")
+            _health_status["services"]["token_refresh"] = "initialized"
         except Exception as e:
             logger.error(f"Background token refresh service startup error: {e}")
             _health_status["services"]["token_refresh"] = "error"
@@ -89,6 +92,21 @@ async def lifespan(app: FastAPI):
     
     finally:
         logger.info("Shutting down BeSunny.ai Python Backend")
+        
+        # Stop background services
+        try:
+            # Cancel any running background tasks
+            for task in asyncio.all_tasks():
+                if not task.done():
+                    task.cancel()
+                    try:
+                        await task
+                    except asyncio.CancelledError:
+                        pass
+            logger.info("Background tasks cancelled")
+        except Exception as e:
+            logger.error(f"Error stopping background tasks: {e}")
+        
         _health_status["services"]["shutdown"] = "completed"
 
 def create_app() -> FastAPI:
@@ -201,6 +219,28 @@ def create_app() -> FastAPI:
     if static_dir.exists():
         from fastapi.staticfiles import StaticFiles
         app.mount("/static", StaticFiles(directory=static_dir), name="static")
+    
+    # ============================================================================
+    # HELPER FUNCTIONS
+    # ============================================================================
+    
+    async def _schedule_token_refresh(background_service):
+        """Schedule periodic token refresh without blocking."""
+        try:
+            while True:
+                try:
+                    # Refresh expiring tokens
+                    await background_service.run_once()
+                    # Wait for the next refresh cycle
+                    await asyncio.sleep(background_service.refresh_interval)
+                except Exception as e:
+                    logger.error(f"Token refresh cycle error: {e}")
+                    # Wait a bit before retrying
+                    await asyncio.sleep(60)
+        except asyncio.CancelledError:
+            logger.info("Token refresh scheduling cancelled")
+        except Exception as e:
+            logger.error(f"Token refresh scheduling failed: {e}")
     
     # ============================================================================
     # OPTIMIZED HEALTH CHECK ENDPOINTS
@@ -324,6 +364,26 @@ def create_app() -> FastAPI:
             return {
                 "status": "success",
                 "result": result,
+                "timestamp": time.time()
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "error": str(e),
+                "timestamp": time.time()
+            }
+    
+    # Simple token refresh endpoint using background service
+    @app.post("/api/background-services/refresh-tokens-simple")
+    async def simple_token_refresh():
+        """Simple token refresh using background service."""
+        try:
+            from app.services.auth.background_token_refresh_service import get_background_token_refresh_service
+            background_service = await get_background_token_refresh_service()
+            success = await background_service.run_once()
+            return {
+                "status": "success" if success else "error",
+                "message": "Token refresh completed" if success else "Token refresh failed",
                 "timestamp": time.time()
             }
         except Exception as e:
