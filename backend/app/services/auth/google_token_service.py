@@ -426,7 +426,9 @@ class GoogleTokenService:
             
             logger.info(f"All fields query result for user {user_id}: {all_fields_result}")
             logger.info(f"All fields data: {all_fields_result.data}")
-            logger.info(f"All fields error: {all_fields_result.error}")
+            logger.info(f"All fields status: {getattr(all_fields_result, 'status_code', 'unknown')}")
+            logger.info(f"Response object type: {type(all_fields_result)}")
+            logger.info(f"Response object attributes: {dir(all_fields_result)}")
             
             if all_fields_result.data and len(all_fields_result.data) > 0:
                 user_data = all_fields_result.data[0]
