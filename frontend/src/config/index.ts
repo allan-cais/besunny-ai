@@ -89,15 +89,24 @@ export const config: Config = {
       
       // Check if we're in Railway environment and should use internal networking
       const isRailwayEnv = isRailwayEnvironment();
-      const useInternalNetworking = getOptionalEnvVar('VITE_USE_INTERNAL_NETWORKING', 'true') === 'true';
+      
+      // Try to get environment variables with fallbacks
+      let useInternalNetworking = getOptionalEnvVar('VITE_USE_INTERNAL_NETWORKING', 'true') === 'true';
+      let internalBackendUrl = getOptionalEnvVar('VITE_INTERNAL_BACKEND_URL', '');
+      
+      // Runtime fallback for Railway environment variables
+      if (isRailwayEnv && !internalBackendUrl) {
+        // Try to detect if we're in Railway and set sensible defaults
+        internalBackendUrl = 'http://easygoing-dedication.railway.internal:8000';
+        console.log('🔄 Runtime fallback: Using default internal Railway URL');
+      }
+      
       const shouldUseInternal = isRailwayEnv && useInternalNetworking && envUrl.includes('railway.app');
       
       let finalUrl;
-      if (shouldUseInternal && envUrl) {
+      if (shouldUseInternal && envUrl && internalBackendUrl) {
         // Convert public Railway URL to internal URL for frontend communication
-        // Use environment variable for internal URL, or fallback to default
-        const internalUrl = getOptionalEnvVar('VITE_INTERNAL_BACKEND_URL', 'http://easygoing-dedication.railway.internal:8000');
-        finalUrl = internalUrl;
+        finalUrl = internalBackendUrl;
         console.log('🔄 Using internal Railway networking for frontend communication');
         console.log('⚠️  Note: If this causes issues, set VITE_USE_INTERNAL_NETWORKING=false');
       } else {
@@ -114,6 +123,7 @@ export const config: Config = {
       console.log('  Runtime Config URL:', runtimeUrl);
       console.log('  Is Railway Environment:', isRailwayEnv);
       console.log('  Use Internal Networking:', useInternalNetworking);
+      console.log('  Internal Backend URL:', internalBackendUrl);
       console.log('  Using Internal Networking:', shouldUseInternal);
       console.log('  Final URL:', finalUrl);
       console.log('  Environment Variables:', {

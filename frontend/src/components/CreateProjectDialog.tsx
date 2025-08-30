@@ -780,13 +780,18 @@ const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
             <div className="flex-shrink-0 p-4 border-t border-[#4a5565] dark:border-zinc-700">
               <Button
                 onClick={handleConfirm}
-                disabled={submitting || editingField !== null}
+                disabled={submitting || editingField !== null || !isEnabled}
                 className="w-full font-mono text-xs bg-[#4a5565] dark:bg-zinc-50 text-stone-100 dark:text-zinc-900 hover:bg-[#3a4555] dark:hover:bg-zinc-200 disabled:opacity-50"
               >
                 {submitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Creating Project...
+                  </>
+                ) : !isEnabled ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Initializing Backend...
                   </>
                 ) : (
                   <>

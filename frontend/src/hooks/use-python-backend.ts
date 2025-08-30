@@ -36,6 +36,7 @@ export interface UsePythonBackendReturn {
   // Utility
   baseUrl: string;
   isEnabled: boolean;
+  isBackendReady: boolean;
   
   // Project Services
   createProject: (data: Omit<Project, 'id' | 'created_at' | 'updated_at'>) => Promise<ApiResponse<Project>>;
@@ -257,6 +258,7 @@ export function usePythonBackend(options: UsePythonBackendOptions = {}): UsePyth
     // Utility
     baseUrl,
     isEnabled,
+    isBackendReady: isInitializedRef.current && isEnabled && !!baseUrl,
     
     // Project Services
     createProject: pythonBackendServices.createProject.bind(pythonBackendServices),
