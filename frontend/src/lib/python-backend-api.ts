@@ -78,6 +78,14 @@ export class PythonBackendAPI {
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
     const url = `${this.baseUrl}${endpoint}`;
+    
+    // Debug: Log the exact URL being used
+    console.log('🌐 PythonBackendAPI makeRequest:');
+    console.log('  Base URL:', this.baseUrl);
+    console.log('  Endpoint:', endpoint);
+    console.log('  Full URL:', url);
+    console.log('  Is HTTPS:', url.startsWith('https://'));
+    
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
