@@ -878,6 +878,10 @@ export const calendarService = {
         }
       );
 
+      console.log('[Calendar] Debug - Fetch completed, checking response...');
+      console.log('[Calendar] Debug - Response status:', response.status);
+      console.log('[Calendar] Debug - Response ok:', response.ok);
+
       console.log('[Calendar] Debug - Using credentials for Google Calendar API call:');
       console.log('[Calendar] Debug - Credentials source:', 'Fresh from getGoogleCredentials');
       console.log('[Calendar] Debug - Access token length:', credentials.accessToken ? credentials.accessToken.length : 0);
