@@ -1236,6 +1236,27 @@ export const calendarService = {
   // Perform incremental sync using sync token
   async performIncrementalSync(userId: string, syncToken?: string): Promise<{ success: boolean; error?: string; next_sync_token?: string }> {
     try {
+      console.log(`[Calendar] Starting performIncrementalSync for user ${userId}`);
+      
+      // First, validate that the Supabase session is still valid before proceeding
+      console.log(`[Calendar] Validating Supabase session before getting Google credentials...`);
+      
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session) {
+        console.error(`[Calendar] Session validation failed:`, sessionError);
+        // Try to refresh the session
+        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+        
+        if (refreshError || !refreshData.session) {
+          console.error(`[Calendar] Session refresh failed:`, refreshError);
+          throw new Error('Supabase session expired and refresh failed');
+        }
+        
+        console.log(`[Calendar] Supabase session refreshed successfully`);
+      } else {
+        console.log(`[Calendar] Supabase session is valid`);
+      }
       
       const credentials = await getGoogleCredentials(userId);
       if (!credentials) {
