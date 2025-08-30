@@ -111,6 +111,8 @@ async def refresh_google_oauth_tokens(
     user_id: str,
     current_user: Dict[str, Any] = Depends(get_current_user_from_supabase_token)
 ):
+    logger.info(f"🚨 ALERT: refresh_google_oauth_tokens endpoint called with user_id: {user_id}")
+    logger.info(f"🚨 ALERT: current_user: {current_user}")
     """
     Refresh Google OAuth tokens for a user.
     
@@ -121,7 +123,7 @@ async def refresh_google_oauth_tokens(
     4. Returns the new token information
     """
     try:
-        logger.info(f"🔍 DEBUG: refresh_google_oauth_tokens endpoint called for user {user_id}")
+        logger.info(f"🚨 ALERT: Inside try block for user {user_id}")
         
         # Verify the user is requesting their own tokens
         if current_user.get('id') != user_id:
