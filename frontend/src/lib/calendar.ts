@@ -87,6 +87,11 @@ async function getGoogleCredentials(userId: string): Promise<GoogleCredentials> 
         
         if (response.ok) {
             const result = await response.json();
+            
+            console.log('[GoogleCredentials] Debug - Full response:', result);
+            console.log('[GoogleCredentials] Debug - Response keys:', Object.keys(result));
+            console.log('[GoogleCredentials] Debug - Access token in result:', result.access_token ? 'YES' : 'NO');
+            console.log('[GoogleCredentials] Debug - Expires in result:', result.expires_in ? 'YES' : 'NO');
 
             // Check if the backend returned an error that requires re-authentication
             if (result.error_code === 'TOKEN_EXPIRED_OR_REVOKED') {
