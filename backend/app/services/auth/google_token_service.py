@@ -430,6 +430,33 @@ class GoogleTokenService:
             logger.info(f"Response object type: {type(all_fields_result)}")
             logger.info(f"Response object attributes: {dir(all_fields_result)}")
             
+            # If no data found, let's try a different approach - maybe RLS is blocking us
+            if not all_fields_result.data or len(all_fields_result.data) == 0:
+                logger.warning(f"No user data found for user {user_id}, trying alternative query...")
+                
+                # Try to get any data from the table to see if RLS is the issue
+                try:
+                    any_data_result = self.supabase.table("google_credentials") \
+                        .select("user_id, access_token, refresh_token") \
+                        .limit(5) \
+                        .execute()
+                    
+                    logger.info(f"Alternative query result: {any_data_result}")
+                    logger.info(f"Alternative query data: {any_data_result.data}")
+                    
+                    if any_data_result.data and len(any_data_result.data) > 0:
+                        logger.info(f"Found {len(any_data_result.data)} records in table")
+                        logger.info(f"Sample record: {any_data_result.data[0]}")
+                        
+                        # Check if our user is in the sample
+                        user_found = any([record.get('user_id') == user_id for record in any_data_result.data])
+                        logger.info(f"Our user {user_id} found in sample: {user_found}")
+                    else:
+                        logger.warning("Alternative query also returned no data - RLS might be blocking all access")
+                        
+                except Exception as alt_error:
+                    logger.error(f"Alternative query failed: {alt_error}")
+            
             if all_fields_result.data and len(all_fields_result.data) > 0:
                 user_data = all_fields_result.data[0]
                 logger.info(f"Found user data: {user_data}")
