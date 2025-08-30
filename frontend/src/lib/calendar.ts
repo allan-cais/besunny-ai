@@ -52,6 +52,11 @@ async function getGoogleCredentials(userId: string): Promise<GoogleCredentials> 
   try {
           // Get the current session
       const session = (await supabase.auth.getSession()).data.session;
+      
+      console.log('[GoogleCredentials] Debug - Supabase auth.getSession() result:', session);
+      console.log('[GoogleCredentials] Debug - Session exists:', !!session);
+      console.log('[GoogleCredentials] Debug - Session access_token length:', session?.access_token ? session.access_token.length : 0);
+      
       if (!session) throw new Error('Not authenticated');
       
       const { data, error } = await supabase
