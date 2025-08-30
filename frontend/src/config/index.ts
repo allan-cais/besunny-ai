@@ -99,8 +99,13 @@ export const config: Config = {
         const internalUrl = getOptionalEnvVar('VITE_INTERNAL_BACKEND_URL', 'http://easygoing-dedication.railway.internal:8000');
         finalUrl = internalUrl;
         console.log('🔄 Using internal Railway networking for frontend communication');
+        console.log('⚠️  Note: If this causes issues, set VITE_USE_INTERNAL_NETWORKING=false');
       } else {
         finalUrl = envUrl || runtimeUrl;
+        if (isRailwayEnv && envUrl.includes('railway.app')) {
+          console.log('⚠️  Using public Railway URL - may cause mixed content errors');
+          console.log('💡 To use internal networking, set VITE_USE_INTERNAL_NETWORKING=true');
+        }
       }
       
       // Debug logging

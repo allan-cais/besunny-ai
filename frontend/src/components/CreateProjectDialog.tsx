@@ -135,7 +135,7 @@ const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
   const editInputRef = useRef<HTMLInputElement>(null);
   const editTextareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const { createProject, processProjectOnboarding } = usePythonBackend();
+  const { createProject, processProjectOnboarding, baseUrl, isEnabled } = usePythonBackend();
 
   // Debug: Log configuration
   useEffect(() => {
@@ -147,10 +147,10 @@ const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
       MODE: import.meta.env.MODE
     });
     console.log('  Config from usePythonBackend:', {
-      baseUrl: usePythonBackend().baseUrl,
-      isEnabled: usePythonBackend().isEnabled
+      baseUrl,
+      isEnabled
     });
-  }, []);
+  }, [baseUrl, isEnabled]);
 
   // Initialize chat when dialog opens
   useEffect(() => {
