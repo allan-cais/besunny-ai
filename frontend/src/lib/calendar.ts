@@ -67,7 +67,14 @@ async function getGoogleCredentials(userId: string): Promise<GoogleCredentials> 
       // Always attempt token refresh via backend
     
     try {
-        const response = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/auth/google/oauth/refresh?user_id=${userId}`, {
+        const backendUrl = import.meta.env.VITE_PYTHON_BACKEND_URL;
+        const fullUrl = `${backendUrl}/api/v1/auth/google/oauth/refresh?user_id=${userId}`;
+        
+        console.log('[GoogleCredentials] Debug - Backend URL:', backendUrl);
+        console.log('[GoogleCredentials] Debug - Full URL:', fullUrl);
+        console.log('[GoogleCredentials] Debug - Session token length:', session.access_token ? session.access_token.length : 0);
+        
+        const response = await fetch(fullUrl, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${session.access_token}`,
@@ -922,15 +929,15 @@ export const calendarService = {
           // If no nextSyncToken was returned, we need to get one by making a sync token request
           if (!nextSyncToken) {
             // Try first approach: empty sync token request
-            const syncTokenResponse = await fetch(
-              `https://www.googleapis.com/calendar/v3/calendars/primary/events?` +
-              `singleEvents=true&syncToken=`,
-              {
-                headers: {
-                  'Authorization': `Bearer ${refreshedCredentials.access_token}`,
-                },
-              }
-            );
+                          const syncTokenResponse = await fetch(
+                `https://www.googleapis.com/calendar/v3/calendars/primary/events?` +
+                `singleEvents=true&syncToken=`,
+                {
+                  headers: {
+                    'Authorization': `Bearer ${refreshedCredentials.accessToken}`,
+                  },
+                }
+              );
             
             if (syncTokenResponse.ok) {
               const syncTokenData = await syncTokenResponse.json();
