@@ -113,6 +113,16 @@ async def refresh_google_oauth_tokens(
 ):
     logger.info(f"🚨 ALERT: refresh_google_oauth_tokens endpoint called with user_id: {user_id}")
     logger.info(f"🚨 ALERT: current_user: {current_user}")
+    
+    # Add a simple test response to see if this endpoint is working
+    return {
+        'success': False,
+        'error': 'TEST RESPONSE - This endpoint is working!',
+        'error_code': 'TEST_ENDPOINT_WORKING',
+        'user_id': user_id,
+        'current_user_id': current_user.get('id') if current_user else None
+    }
+    
     """
     Refresh Google OAuth tokens for a user.
     
