@@ -63,6 +63,11 @@ class GoogleTokenService:
             New token information or None if failed
         """
         try:
+            logger.info(f"Starting token exchange with Google...")
+            logger.info(f"Client ID: {self.client_id[:10]}..." if self.client_id else "Client ID: None")
+            logger.info(f"Client Secret: {'***' if self.client_secret else 'None'}")
+            logger.info(f"Refresh Token: {refresh_token[:20]}..." if refresh_token else "Refresh Token: None")
+            
             # Prepare token exchange request
             token_data = {
                 'refresh_token': refresh_token,
@@ -71,14 +76,33 @@ class GoogleTokenService:
                 'grant_type': 'refresh_token'
             }
             
+            logger.info(f"Token exchange request data: {token_data}")
+            
             # Exchange refresh token for new access token
             response = await self.http_client.post(
                 'https://oauth2.googleapis.com/token',
                 data=token_data
             )
-            response.raise_for_status()
+            
+            logger.info(f"Google OAuth response status: {response.status_code}")
+            logger.info(f"Google OAuth response headers: {dict(response.headers)}")
+            
+            if response.status_code != 200:
+                error_text = response.text
+                logger.error(f"Google OAuth error response: {error_text}")
+                logger.error(f"Google OAuth error status: {response.status_code}")
+                
+                # Try to parse error response
+                try:
+                    error_json = response.json()
+                    logger.error(f"Google OAuth error JSON: {error_json}")
+                except:
+                    logger.error(f"Google OAuth error text: {error_text}")
+                
+                response.raise_for_status()
             
             token_response = response.json()
+            logger.info(f"Google OAuth success response: {token_response}")
             
             logger.info("Successfully exchanged refresh token for new access token")
             
@@ -91,9 +115,12 @@ class GoogleTokenService:
             
         except httpx.HTTPStatusError as e:
             logger.error(f"HTTP error exchanging token: {e.response.status_code}")
+            logger.error(f"HTTP error response: {e.response.text}")
             return None
         except Exception as e:
             logger.error(f"Failed to exchange token: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return None
     
     async def refresh_user_tokens(self, user_id: str) -> Optional[Dict[str, Any]]:
