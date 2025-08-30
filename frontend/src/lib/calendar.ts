@@ -874,6 +874,11 @@ export const calendarService = {
         }
       );
 
+      console.log('[Calendar] Debug - Using credentials for Google Calendar API call:');
+      console.log('[Calendar] Debug - Credentials source:', credentials.accessToken ? 'Database' : 'None');
+      console.log('[Calendar] Debug - Access token length:', credentials.accessToken ? credentials.accessToken.length : 0);
+      console.log('[Calendar] Debug - Access token start:', credentials.accessToken ? credentials.accessToken.substring(0, 20) + '...' : 'None');
+
       if (!response.ok) {
         const errorText = await response.text();
         
