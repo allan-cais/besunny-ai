@@ -36,13 +36,16 @@ const IntegrationsPage: React.FC = () => {
         try {
           const { data, error } = await supabase
             .from('google_credentials')
-            .select('user_id')
+            .select('user_id, status')
             .eq('user_id', user.id)
             .eq('login_provider', false)
+            .eq('status', 'connected')
             .maybeSingle();
           
-          if (!error && data) {
+          if (!error && data && data.status === 'connected') {
             setGoogleConnected(true);
+          } else {
+            setGoogleConnected(false);
           }
         } catch (error) {
           // Error checking Google connection
