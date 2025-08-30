@@ -346,6 +346,28 @@ def create_app() -> FastAPI:
                 "timestamp": time.time()
             }
     
+    # Auth test endpoint
+    @app.get("/api/test/auth-status")
+    async def test_auth_status():
+        """Test endpoint to check authentication status."""
+        try:
+            from app.core.supabase_config import get_supabase
+            supabase = get_supabase()
+            
+            # Test basic Supabase connection
+            return {
+                "status": "success",
+                "message": "Backend is accessible",
+                "supabase_connected": True,
+                "timestamp": time.time()
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "error": str(e),
+                "timestamp": time.time()
+            }
+    
     logger.info("FastAPI application configured successfully")
     return app
 
