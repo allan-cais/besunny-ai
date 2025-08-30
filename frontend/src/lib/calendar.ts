@@ -131,20 +131,20 @@ async function getGoogleCredentials(userId: string): Promise<GoogleCredentials> 
             }
 
             // Check if we have fresh tokens from the backend response
-            if (result.tokens && result.expires_in) {
+            if (result.access_token && result.expires_in) {
                 console.log(`[GoogleCredentials] Using fresh tokens from backend response`);
                 
                 // Calculate expires_at from expires_in
                 const expiresAt = new Date(Date.now() + (result.expires_in * 1000)).toISOString();
                 
                 return {
-                    accessToken: result.tokens.access_token,
+                    accessToken: result.access_token,
                     expiresAt: expiresAt,
                     hasRefreshToken: true,
-                    scope: result.tokens.scope || ''
+                    scope: result.tokens?.scope || ''
                 };
             } else {
-                console.log(`[GoogleCredentials] Missing or invalid expires_in from backend: ${result.expires_in}`);
+                console.log(`[GoogleCredentials] Missing or invalid access_token/expires_in from backend: access_token=${!!result.access_token}, expires_in=${result.expires_in}`);
                 console.log(`[GoogleCredentials] Falling back to database query for updated credentials`);
             }
         } else {
