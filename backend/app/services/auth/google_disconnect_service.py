@@ -31,7 +31,7 @@ class GoogleDisconnectService:
     def __init__(self):
         self.settings = get_settings()
         # Use service role client to bypass RLS policies
-        from ...core.database import get_supabase_service_client
+        from ...core.supabase_config import get_supabase_service_client
         self.supabase = get_supabase_service_client()
         
         print(f"🔍 Disconnect Debug - Service initialized with settings: {self.settings}")
