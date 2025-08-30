@@ -282,44 +282,18 @@ const ProjectDashboard: React.FC<ProjectDashboardProps> = ({ projectId }) => {
           )}
 
           {/* AI-Generated Project Summary */}
-          {project && (project.normalized_tags || project.categories || project.notes) && (
+          {project && project.notes && (
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardHeader className="pb-2">
                 <CardTitle className="text-base font-mono uppercase tracking-wide flex items-center">
                   <Brain className="w-4 h-4 mr-2" />
                   AI PROJECT SUMMARY
                 </CardTitle>
-                <Badge variant="outline" className="text-xs font-mono">AI Generated</Badge>
               </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Project Overview */}
-                {project.notes && (
-                  <div>
-                    <h4 className="text-sm font-semibold font-mono mb-3 text-[#4a5565] dark:text-zinc-200">
-                      PROJECT OVERVIEW
-                    </h4>
-                    <p className="text-sm text-gray-700 dark:text-gray-300 font-mono leading-relaxed">
-                      {project.notes}
-                    </p>
-                  </div>
-                )}
-
-                {/* Categories */}
-                {project.categories && project.categories.length > 0 && (
-                  <div>
-                    <h4 className="text-sm font-semibold font-mono mb-3 text-[#4a5565] dark:text-zinc-200 flex items-center">
-                      <Tag className="w-3 h-3 mr-2" />
-                      PROJECT CATEGORIES
-                    </h4>
-                    <div className="flex flex-wrap gap-2">
-                      {project.categories.map((category, index) => (
-                        <Badge key={index} variant="secondary" className="text-xs font-mono bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                          {category}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
+              <CardContent>
+                <p className="text-sm text-gray-700 dark:text-gray-300 font-mono leading-relaxed">
+                  {project.notes}
+                </p>
               </CardContent>
             </Card>
           )}
