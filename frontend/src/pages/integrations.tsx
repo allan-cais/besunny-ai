@@ -174,16 +174,16 @@ const IntegrationsPage: React.FC = () => {
     
     try {
       // Call backend to disconnect Google account
-      // Try the same format that works for OAuth refresh
+      // Try different authentication formats since the standard one isn't working
       const response = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/auth/google/disconnect`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
+          'X-User-ID': user.id,
         },
         body: JSON.stringify({
           user_id: user.id,
-          supabase_access_token: session.access_token,
         }),
       });
 
