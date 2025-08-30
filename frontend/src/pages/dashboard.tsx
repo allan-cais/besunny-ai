@@ -45,10 +45,48 @@ const Dashboard = () => {
   const [updatingProject, setUpdatingProject] = useState<string | null>(null);
 
   // Modal states for data
-  const [selectedTranscript, setSelectedTranscript] = useState<Meeting | null>(null);
-  const [selectedEmail, setSelectedEmail] = useState<Document | null>(null);
+  const [selectedTranscript, setSelectedTranscript] = useState<{
+    id: string;
+    title: string;
+    transcript?: string;
+    transcript_summary?: string;
+    transcript_metadata?: Record<string, unknown>;
+    transcript_duration_seconds?: number;
+    transcript_retrieved_at?: string;
+    created_at: string;
+    project_id?: string;
+    source?: string;
+  } | null>(null);
+  const [selectedEmail, setSelectedEmail] = useState<{
+    id: string;
+    title: string;
+    summary?: string;
+    sender?: string;
+    created_at: string;
+    source: string;
+    project_id?: string;
+    subject?: string;
+    body?: string;
+    recipients?: string[];
+    cc?: string[];
+    bcc?: string[];
+    attachments?: Array<{
+      name: string;
+      size: string;
+      type: string;
+    }>;
+  } | null>(null);
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
-  const [classificationActivity, setClassificationActivity] = useState<VirtualEmailActivity | null>(null);
+  const [classificationActivity, setClassificationActivity] = useState<{
+    id: string;
+    type: string;
+    title: string;
+    summary?: string;
+    source: string;
+    sender?: string;
+    created_at: string;
+    project_id?: string;
+  } | null>(null);
 
   const { toast } = useToast();
 
@@ -447,8 +485,7 @@ const Dashboard = () => {
         return <Database className="w-4 h-4" />;
       case 'image':
         return <Database className="w-4 h-4" />;
-      case 'folder':
-        return <Database className="w-4 h-4" />;
+
       case 'meeting_transcript':
         return <Database className="w-4 h-4" />;
       default:
@@ -468,8 +505,7 @@ const Dashboard = () => {
         return 'Presentation';
       case 'image':
         return 'Image';
-      case 'folder':
-        return 'Folder';
+
       case 'meeting_transcript':
         return 'Transcript';
       default:
@@ -659,55 +695,54 @@ const Dashboard = () => {
                       onClick={() => {
                         if (activity.type === 'meeting_transcript') {
                           // Transform RawTranscript to Meeting format for TranscriptModal
-                          const meetingData: Meeting = {
+                          const transcriptData = {
                             id: activity.rawTranscript?.id || activity.id,
                             title: activity.title,
-                            description: activity.summary,
-                            start_time: new Date().toISOString(), // Default value
-                            end_time: new Date().toISOString(), // Default value
-                            meeting_url: '',
-                            user_id: user?.id || '',
-                            project_id: activity.project_id,
-                            bot_status: 'completed',
                             transcript: activity.rawTranscript?.transcript || '',
-                            transcript_retrieved_at: activity.rawTranscript?.transcript_retrieved_at || activity.created_at,
-                            transcript_duration_seconds: activity.rawTranscript?.transcript_duration_seconds || activity.transcript_duration_seconds,
+                            transcript_summary: activity.summary,
                             transcript_metadata: activity.rawTranscript?.transcript_metadata || activity.transcript_metadata,
+                            transcript_duration_seconds: activity.rawTranscript?.transcript_duration_seconds || activity.transcript_duration_seconds,
+                            transcript_retrieved_at: activity.rawTranscript?.transcript_retrieved_at || activity.created_at,
                             created_at: activity.created_at,
-                            updated_at: activity.created_at,
-                            event_status: 'accepted'
-                          };
-                          setSelectedTranscript(meetingData);
-                        } else if (activity.type === 'email') {
-                          // Transform VirtualEmailActivity to Document format for EmailModal
-                          const documentData: Document = {
-                            id: activity.id,
-                            title: activity.title,
-                            summary: activity.summary,
-                            source: activity.source,
-                            type: activity.type,
-                            author: activity.sender,
-                            file_size: activity.file_size,
                             project_id: activity.project_id,
-                            created_at: activity.created_at,
-                            updated_at: activity.created_at, // Use created_at as fallback
-                            received_at: activity.created_at
+                            source: 'meeting_transcript'
                           };
-                          setSelectedEmail(documentData);
+                          setSelectedTranscript(transcriptData);
+                        } else if (activity.type === 'email') {
+                          // Transform VirtualEmailActivity to EmailModal format
+                          const emailData = {
+                            id: activity.id,
+                            title: activity.title || 'Untitled',
+                            summary: activity.summary,
+                            sender: activity.sender,
+                            created_at: activity.created_at,
+                            source: activity.source || 'unknown',
+                            project_id: activity.project_id,
+                            subject: activity.title,
+                            body: activity.summary,
+                            recipients: [],
+                            cc: [],
+                            bcc: [],
+                            attachments: []
+                          };
+                          setSelectedEmail(emailData);
                         } else {
                           // Transform VirtualEmailActivity to Document format for DocumentModal
                           const documentData: Document = {
                             id: activity.id,
-                            title: activity.title,
+                            name: activity.title || 'Untitled',
+                            title: activity.title || 'Untitled',
                             summary: activity.summary,
-                            source: activity.source,
-                            type: activity.type,
+                            source: activity.source || 'unknown',
+                            document_type: 'pdf',
                             author: activity.sender,
                             file_size: activity.file_size,
                             project_id: activity.project_id,
                             created_at: activity.created_at,
                             updated_at: activity.created_at, // Use created_at as fallback
-                            received_at: activity.created_at
+                            received_at: activity.created_at,
+                            metadata: { size: activity.file_size || 0, mime_type: 'text/plain', source: 'gmail', tags: [], extracted_text: '' },
+                            status: 'completed'
                           };
                           setSelectedDocument(documentData);
                         }
@@ -731,7 +766,18 @@ const Dashboard = () => {
                           variant="outline"
                           onClick={e => {
                             e.stopPropagation();
-                            setClassificationActivity(activity);
+                            // Transform to match ClassificationModal expectations
+                            const classificationData = {
+                              id: activity.id,
+                              type: activity.type,
+                              title: activity.title || 'Untitled',
+                              summary: activity.summary,
+                              source: activity.source || 'unknown',
+                              sender: activity.sender,
+                              created_at: activity.created_at,
+                              project_id: activity.project_id
+                            };
+                            setClassificationActivity(classificationData);
                           }}
                           className="text-xs font-mono"
                         >

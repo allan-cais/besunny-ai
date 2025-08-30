@@ -467,6 +467,7 @@ export const calendarService = {
   async renewWebhook(): Promise<{
     ok: boolean;
     webhook_id?: string;
+    expiration?: number;
     error?: string;
   }> {
     const session = (await supabase.auth.getSession()).data.session;

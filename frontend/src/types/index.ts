@@ -26,6 +26,13 @@ export interface Session {
   user: User;
 }
 
+export interface AuthSession {
+  access_token: string;
+  refresh_token: string;
+  expires_at?: number;
+  user: User;
+}
+
 export interface AuthState {
   user: User | null;
   session: Session | null;
@@ -77,7 +84,12 @@ export interface NotificationPreferences {
 export interface Document {
   id: string;
   name: string;
-  type: 'pdf' | 'docx' | 'txt' | 'email' | 'meeting';
+  title?: string;
+  summary?: string;
+  sender?: string;
+  author?: string;
+  file_id?: string;
+  document_type: 'pdf' | 'docx' | 'txt' | 'email' | 'meeting' | 'spreadsheet' | 'presentation' | 'image';
   content?: string;
   metadata: DocumentMetadata;
   project_id: string;
@@ -85,6 +97,9 @@ export interface Document {
   updated_at: string;
   status: 'processing' | 'completed' | 'error';
   classification?: DocumentClassification;
+  source?: string;
+  file_size?: number;
+  received_at?: string;
 }
 
 export interface DocumentMetadata {
@@ -123,6 +138,10 @@ export interface GoogleCalendarEvent {
     email?: string;
     displayName?: string;
   };
+  creator?: {
+    email?: string;
+    displayName?: string;
+  };
   htmlLink?: string;
   status?: string;
   created?: string;
@@ -148,6 +167,7 @@ export interface GoogleCredentials {
   expiresAt: string;
   hasRefreshToken: boolean;
   scope?: string;
+  googleEmail?: string;
 }
 
 export interface TranscriptMetadata {
@@ -165,6 +185,7 @@ export interface BotConfiguration {
   instructions?: string;
   model?: string;
   temperature?: number;
+  transcription_settings?: Record<string, any>;
 }
 
 export interface Bot {
@@ -199,9 +220,21 @@ export interface Meeting {
   end_time: string;
   attendees: MeetingAttendee[];
   project_id?: string;
-  transcript?: MeetingTranscript;
+  transcript?: MeetingTranscript | string;
+  bot_status?: string;
+  bot_deployment_method?: string;
+  auto_scheduled_via_email?: boolean;
+  event_status?: string;
+  meeting_url?: string;
+  bot_name?: string;
+  attendee_bot_id?: string;
+  user_id?: string;
   created_at: string;
   updated_at: string;
+  // Transcript specific properties
+  transcript_retrieved_at?: string;
+  transcript_duration_seconds?: number;
+  transcript_metadata?: Record<string, any>;
 }
 
 export interface MeetingAttendee {
@@ -456,6 +489,30 @@ export interface ActivityItem {
   timestamp: string;
   project_id?: string;
   metadata?: Record<string, any>;
+}
+
+export interface VirtualEmailActivity {
+  id: string;
+  type: 'email_received' | 'email_sent' | 'email_replied' | 'email' | 'document' | 'meeting_transcript' | 'spreadsheet' | 'presentation' | 'image';
+  title: string;
+  description?: string;
+  summary?: string;
+  source?: string;
+  sender?: string;
+  file_size?: number;
+  created_at: string;
+  project_id?: string;
+  metadata?: Record<string, any>;
+  // Meeting transcript specific properties
+  rawTranscript?: {
+    id: string;
+    transcript: string;
+    transcript_retrieved_at: string;
+    transcript_duration_seconds: number;
+    transcript_metadata: Record<string, any>;
+  };
+  transcript_duration_seconds?: number;
+  transcript_metadata?: Record<string, any>;
 }
 
 // Error types

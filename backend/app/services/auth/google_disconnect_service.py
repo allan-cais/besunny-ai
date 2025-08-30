@@ -34,10 +34,7 @@ class GoogleDisconnectService:
         from ...core.supabase_config import get_supabase_service_client
         self.supabase = get_supabase_service_client()
         
-        print(f"🔍 Disconnect Debug - Service initialized with settings: {self.settings}")
-        print(f"🔍 Disconnect Debug - Supabase client type: {type(self.supabase)}")
-        print(f"🔍 Disconnect Debug - Supabase client: {self.supabase}")
-        print(f"🔍 Disconnect Debug - Using service role client: {self.supabase is not None}")
+
         
         logger.info("Google Disconnect Service initialized")
     
@@ -52,17 +49,10 @@ class GoogleDisconnectService:
             Disconnect result
         """
         try:
-            print(f"🔍 Disconnect Debug - Starting disconnect for user_id: {user_id}")
-            print(f"🔍 Disconnect Debug - User ID type: {type(user_id)}")
-            print(f"🔍 Disconnect Debug - User ID value: {user_id}")
-            
             # Get user's Google credentials
-            print(f"🔍 Disconnect Debug - About to call _get_user_credentials")
             credentials = await self._get_user_credentials(user_id)
-            print(f"🔍 Disconnect Debug - _get_user_credentials returned: {credentials}")
             
             if not credentials:
-                print(f"🔍 Disconnect Debug - No credentials found, returning early")
                 return {
                     'success': True,
                     'message': 'No Google credentials found to disconnect',
@@ -107,46 +97,7 @@ class GoogleDisconnectService:
     async def _get_user_credentials(self, user_id: str) -> Optional[Dict[str, Any]]:
         """Get user's Google credentials."""
         try:
-            print(f"🔍 Disconnect Debug - Looking for credentials for user_id: {user_id}")
-            
-            # Check database connection details
-            print(f"🔍 Disconnect Debug - Supabase URL: {self.supabase.supabase_url}")
-            print(f"🔍 Disconnect Debug - Supabase project ID: {self.supabase.supabase_url.split('//')[1].split('.')[0] if self.supabase.supabase_url else 'Unknown'}")
-            
-            # Check if table exists and get its structure
-            try:
-                # Try to get table info
-                table_info = self.supabase.table("google_credentials").select("count").limit(1).execute()
-                print(f"🔍 Disconnect Debug - Table exists and accessible: {table_info is not None}")
-                
-                # Try to get a sample row to see the structure
-                sample_row = self.supabase.table("google_credentials").select("*").limit(1).execute()
-                if sample_row.data:
-                    print(f"🔍 Disconnect Debug - Sample row keys: {list(sample_row.data[0].keys())}")
-                    print(f"🔍 Disconnect Debug - Sample row: {sample_row.data[0]}")
-                else:
-                    print(f"🔍 Disconnect Debug - No sample rows found")
-                    
-            except Exception as e:
-                print(f"🔍 Disconnect Debug - Table access error: {e}")
-                return None
-            
-            # First, let's see what's in the table
-            all_credentials = self.supabase.table("google_credentials") \
-                .select("user_id, status, google_email") \
-                .execute()
-            print(f"🔍 Disconnect Debug - All credentials in table: {all_credentials.data}")
-            print(f"🔍 Disconnect Debug - Credentials count: {len(all_credentials.data) if all_credentials.data else 0}")
-            
-            # Let's also try to see what happens if we query without any filters
-            try:
-                raw_query = self.supabase.table("google_credentials").select("*").execute()
-                print(f"🔍 Disconnect Debug - Raw query result: {raw_query.data}")
-                print(f"🔍 Disconnect Debug - Raw query count: {len(raw_query.data) if raw_query.data else 0}")
-            except Exception as e:
-                print(f"🔍 Disconnect Debug - Raw query error: {e}")
-            
-            # Now try to get the specific user's credentials
+            # Get the specific user's credentials
             result = self.supabase.table("google_credentials") \
                 .select("*") \
                 .eq("user_id", user_id) \
@@ -154,14 +105,11 @@ class GoogleDisconnectService:
                 .execute()
             
             if result.data:
-                print(f"🔍 Disconnect Debug - Found credentials: {result.data}")
                 return result.data
             return None
             
         except Exception as e:
-            print(f"🔍 Disconnect Debug - Error getting user credentials: {str(e)}")
-            print(f"🔍 Disconnect Debug - Error type: {type(e)}")
-            print(f"🔍 Disconnect Debug - Error details: {e}")
+            logger.error(f"Error getting user credentials: {str(e)}")
             return None
     
     async def _revoke_token_at_google(self, token: str) -> bool:
