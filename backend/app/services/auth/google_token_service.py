@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 import httpx
 from pydantic import BaseModel
 
-from ...core.database import get_supabase
+from ...core.supabase_config import get_supabase_service_client
 from ...core.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -43,7 +43,7 @@ class GoogleTokenService:
     
     def __init__(self):
         self.settings = get_settings()
-        self.supabase = get_supabase()
+        self.supabase = get_supabase_service_client()
         self.client_id = self.settings.google_client_id
         self.client_secret = self.settings.google_client_secret
         
