@@ -48,7 +48,7 @@ const defaultConfig: RuntimeEnvConfig = {
     serviceRoleKey: '',
   },
   pythonBackend: {
-    url: 'https://besunny-1.railway.app',
+    url: 'https://backend-staging-6085.up.railway.app',  // Updated to use staging backend
     timeout: 30000,
     retries: 3,
     retryDelay: 1000,

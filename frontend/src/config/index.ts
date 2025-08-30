@@ -83,7 +83,46 @@ export const config: Config = {
     serviceRoleKey: getOptionalEnvVar('VITE_SUPABASE_SERVICE_ROLE_KEY') || runtimeConfig.supabase.serviceRoleKey,
   },
   pythonBackend: {
-    url: getOptionalEnvVar('VITE_PYTHON_BACKEND_URL', runtimeConfig.pythonBackend.url),
+    url: (() => {
+      const envUrl = getOptionalEnvVar('VITE_PYTHON_BACKEND_URL', '');
+      const runtimeUrl = runtimeConfig.pythonBackend.url;
+      
+      // Check if we're in Railway environment and should use internal networking
+      const isRailwayEnv = isRailwayEnvironment();
+      const useInternalNetworking = getOptionalEnvVar('VITE_USE_INTERNAL_NETWORKING', 'true') === 'true';
+      const shouldUseInternal = isRailwayEnv && useInternalNetworking && envUrl.includes('railway.app');
+      
+      let finalUrl;
+      if (shouldUseInternal && envUrl) {
+        // Convert public Railway URL to internal URL for frontend communication
+        // Use environment variable for internal URL, or fallback to default
+        const internalUrl = getOptionalEnvVar('VITE_INTERNAL_BACKEND_URL', 'http://easygoing-dedication.railway.internal:8000');
+        finalUrl = internalUrl;
+        console.log('🔄 Using internal Railway networking for frontend communication');
+      } else {
+        finalUrl = envUrl || runtimeUrl;
+      }
+      
+      // Debug logging
+      console.log('🔧 Python Backend URL Configuration:');
+      console.log('  Environment Variable (VITE_PYTHON_BACKEND_URL):', envUrl);
+      console.log('  Runtime Config URL:', runtimeUrl);
+      console.log('  Is Railway Environment:', isRailwayEnv);
+      console.log('  Use Internal Networking:', useInternalNetworking);
+      console.log('  Using Internal Networking:', shouldUseInternal);
+      console.log('  Final URL:', finalUrl);
+      console.log('  Environment Variables:', {
+        VITE_PYTHON_BACKEND_URL: import.meta.env.VITE_PYTHON_BACKEND_URL,
+        VITE_USE_INTERNAL_NETWORKING: import.meta.env.VITE_USE_INTERNAL_NETWORKING,
+        VITE_INTERNAL_BACKEND_URL: import.meta.env.VITE_INTERNAL_BACKEND_URL,
+        NODE_ENV: import.meta.env.NODE_ENV,
+        MODE: import.meta.env.MODE,
+        DEV: import.meta.env.DEV,
+        PROD: import.meta.env.PROD
+      });
+      
+      return finalUrl;
+    })(),
     timeout: getOptionalNumberEnvVar('VITE_PYTHON_BACKEND_TIMEOUT', runtimeConfig.pythonBackend.timeout),
     retries: getOptionalNumberEnvVar('VITE_PYTHON_BACKEND_RETRIES', runtimeConfig.pythonBackend.retries),
     retryDelay: getOptionalNumberEnvVar('VITE_PYTHON_BACKEND_RETRY_DELAY', runtimeConfig.pythonBackend.retryDelay),

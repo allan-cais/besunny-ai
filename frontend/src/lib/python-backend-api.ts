@@ -63,6 +63,14 @@ export class PythonBackendAPI {
     this.timeout = config.pythonBackend.timeout;
     this.retries = config.pythonBackend.retries;
     this.retryDelay = config.pythonBackend.retryDelay;
+    
+    // Debug logging
+    console.log('🚀 PythonBackendAPI Constructor:');
+    console.log('  Config URL:', config.pythonBackend.url);
+    console.log('  Final Base URL:', this.baseUrl);
+    console.log('  Timeout:', this.timeout);
+    console.log('  Retries:', this.retries);
+    console.log('  Retry Delay:', this.retryDelay);
   }
 
   private async makeRequest<T>(
