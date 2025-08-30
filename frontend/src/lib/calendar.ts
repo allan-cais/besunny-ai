@@ -133,6 +133,10 @@ async function getGoogleCredentials(userId: string): Promise<GoogleCredentials> 
                 // Calculate expires_at from expires_in
                 const expiresAt = new Date(Date.now() + (result.expires_in * 1000)).toISOString();
                 
+                console.log('[GoogleCredentials] Debug - Using fresh tokens from backend');
+                console.log('[GoogleCredentials] Debug - Fresh access token length:', result.access_token.length);
+                console.log('[GoogleCredentials] Debug - Fresh expires at:', expiresAt);
+                
                 return {
                     accessToken: result.access_token,
                     expiresAt: expiresAt,
@@ -141,6 +145,7 @@ async function getGoogleCredentials(userId: string): Promise<GoogleCredentials> 
                 };
             } else {
                 // Fall back to database query for updated credentials
+                console.log('[GoogleCredentials] Debug - Falling back to database credentials');
             }
         } else {
             const errorText = await response.text();
