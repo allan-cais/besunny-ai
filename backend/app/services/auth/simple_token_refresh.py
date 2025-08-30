@@ -58,7 +58,7 @@ async def refresh_expiring_tokens() -> dict:
         refreshed_count = 0
         failed_count = 0
         
-        for token_info in expiring_tokens:
+        for token_info in tokens_to_refresh:
             try:
                 user_id = token_info['user_id']
                 logger.info(f"Refreshing token for user {user_id}")
@@ -86,7 +86,7 @@ async def refresh_expiring_tokens() -> dict:
             'timestamp': current_time.isoformat(),
             'tokens_refreshed': refreshed_count,
             'tokens_failed': failed_count,
-            'total_processed': len(expiring_tokens)
+            'total_processed': len(tokens_to_refresh)
         }
         
     except Exception as e:
