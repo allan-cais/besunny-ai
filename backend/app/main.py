@@ -64,14 +64,14 @@ async def lifespan(app: FastAPI):
             logger.error(f"Supabase initialization error: {e}")
             _health_status["services"]["supabase"] = "error"
         
-        # Start background token refresh task
+        # Start simple background token refresh
         try:
-            # Create a simple background task that runs every 5 minutes
-            asyncio.create_task(_run_token_refresh_background())
-            logger.info("Background token refresh task started successfully")
+            # Create a simple background task
+            asyncio.create_task(_simple_token_refresh_loop())
+            logger.info("Simple token refresh background task started")
             _health_status["services"]["token_refresh"] = "started"
         except Exception as e:
-            logger.warning(f"Background token refresh task failed to start: {e}")
+            logger.warning(f"Token refresh background task failed: {e}")
             _health_status["services"]["token_refresh"] = "failed"
         
         # Mark startup as successful
@@ -89,20 +89,6 @@ async def lifespan(app: FastAPI):
     
     finally:
         logger.info("Shutting down BeSunny.ai Python Backend")
-        
-        # Cancel background tasks
-        try:
-            # Cancel any running background tasks
-            for task in asyncio.all_tasks():
-                if not task.done():
-                    task.cancel()
-                    try:
-                        await task
-                    except asyncio.CancelledError:
-                        pass
-            logger.info("Background tasks cancelled")
-        except Exception as e:
-            logger.error(f"Error stopping background tasks: {e}")
         
         logger.info("Application shutdown completed")
         
@@ -309,75 +295,37 @@ def create_app() -> FastAPI:
             "timestamp": time.time()
         }
     
-    # Background service status endpoint
-    @app.get("/api/background-services/status")
-    async def background_services_status():
-        """Get status of background services."""
-        try:
-            from app.services.auth.simple_token_refresh import get_service_status
-            service_status = await get_service_status()
-            return {
-                "status": "success",
-                "background_services": {
-                    "token_refresh": service_status
-                },
-                "timestamp": time.time()
-            }
-        except Exception as e:
-            return {
-                "status": "error",
-                "error": str(e),
-                "timestamp": time.time()
-            }
-    
-    # Manual token refresh trigger endpoint
-    @app.post("/api/background-services/refresh-tokens")
-    async def manual_token_refresh():
-        """Manually trigger token refresh."""
-        try:
-            from app.services.auth.simple_token_refresh import refresh_expiring_tokens
-            result = await refresh_expiring_tokens()
-            return {
-                "status": "success",
-                "result": result,
-                "timestamp": time.time()
-            }
-        except Exception as e:
-            return {
-                "status": "error",
-                "error": str(e),
-                "timestamp": time.time()
-            }
-    
     logger.info("FastAPI application configured successfully")
     return app
 
-async def _run_token_refresh_background():
-    """Simple background task that refreshes tokens every 5 minutes."""
+async def _simple_token_refresh_loop():
+    """Simple background loop that refreshes tokens every 5 minutes."""
     try:
         while True:
             try:
-                # Call the token refresh function
+                logger.info("Running token refresh check...")
+                
+                # Import and call the refresh function
                 from app.services.auth.simple_token_refresh import refresh_expiring_tokens
                 result = await refresh_expiring_tokens()
                 
                 if result.get('success'):
-                    logger.info("Background token refresh completed successfully")
+                    logger.info(f"Token refresh successful: {result.get('message', 'OK')}")
                 else:
-                    logger.warning(f"Background token refresh failed: {result.get('message', 'Unknown error')}")
+                    logger.warning(f"Token refresh failed: {result.get('message', 'Unknown error')}")
                 
-                # Wait 5 minutes before next refresh
+                # Wait 5 minutes
                 await asyncio.sleep(300)
                 
             except Exception as e:
-                logger.error(f"Background token refresh error: {e}")
+                logger.error(f"Token refresh error: {e}")
                 # Wait 1 minute before retrying
                 await asyncio.sleep(60)
                 
     except asyncio.CancelledError:
-        logger.info("Background token refresh task cancelled")
+        logger.info("Token refresh loop cancelled")
     except Exception as e:
-        logger.error(f"Background token refresh task failed: {e}")
+        logger.error(f"Token refresh loop failed: {e}")
 
 
 # Create the application instance
