@@ -302,8 +302,8 @@ def create_app() -> FastAPI:
     async def check_token_status(user_id: str):
         """Check the actual token status for a user."""
         try:
-            from app.core.supabase_config import get_supabase
-            supabase = get_supabase()
+            from app.core.supabase_config import get_supabase_service_client
+            supabase = get_supabase_service_client()
             
             result = supabase.table("google_credentials").select("*").eq("user_id", user_id).single().execute()
             
