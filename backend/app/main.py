@@ -297,7 +297,54 @@ def create_app() -> FastAPI:
             "timestamp": time.time()
         }
     
-
+    # Simple token status check
+    @app.get("/api/test/token-status/{user_id}")
+    async def check_token_status(user_id: str):
+        """Check the actual token status for a user."""
+        try:
+            from app.core.supabase_config import get_supabase
+            supabase = get_supabase()
+            
+            result = supabase.table("google_credentials").select("*").eq("user_id", user_id).single().execute()
+            
+            if not result.data:
+                return {"error": "No credentials found"}
+            
+            creds = result.data
+            return {
+                "user_id": user_id,
+                "has_access_token": bool(creds.get('access_token')),
+                "has_refresh_token": bool(creds.get('refresh_token')),
+                "expires_at": creds.get('expires_at'),
+                "last_updated": creds.get('updated_at'),
+                "token_length": len(creds.get('access_token', '')) if creds.get('access_token') else 0
+            }
+        except Exception as e:
+            return {"error": str(e)}
+    
+    # Manual token refresh test
+    @app.post("/api/test/refresh-token/{user_id}")
+    async def manual_refresh_token(user_id: str):
+        """Manually refresh a user's token to test the process."""
+        try:
+            from app.services.auth.simple_token_refresh import refresh_expiring_tokens
+            from app.services.auth.google_token_service import GoogleTokenService
+            
+            # Try direct refresh first
+            token_service = GoogleTokenService()
+            result = await token_service.refresh_user_tokens(user_id)
+            
+            return {
+                "status": "success",
+                "result": result,
+                "timestamp": time.time()
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "error": str(e),
+                "timestamp": time.time()
+            }
     
     logger.info("FastAPI application configured successfully")
     return app

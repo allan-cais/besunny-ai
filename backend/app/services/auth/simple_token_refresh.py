@@ -23,10 +23,7 @@ async def refresh_expiring_tokens() -> dict:
         # Get Supabase client
         supabase = get_supabase()
         
-        # Get tokens that will expire within the next 15 minutes
-        threshold_time = current_time + timedelta(minutes=15)
-        
-        # Query for tokens that will expire soon
+        # Get ALL tokens that have refresh tokens (refresh them all to be safe)
         result = supabase.table("google_credentials").select("*").execute()
         
         if not result.data:
@@ -38,27 +35,22 @@ async def refresh_expiring_tokens() -> dict:
                 'tokens_refreshed': 0
             }
         
-        expiring_tokens = []
+        # Get all tokens that have refresh tokens
+        tokens_to_refresh = []
         for row in result.data:
-            if row.get('expires_at') and row.get('refresh_token'):
-                try:
-                    expires_at = datetime.fromisoformat(row['expires_at'].replace('Z', '+00:00'))
-                    if expires_at <= threshold_time:
-                        expiring_tokens.append(row)
-                except (ValueError, TypeError):
-                    # Skip rows with invalid date format
-                    continue
+            if row.get('refresh_token'):
+                tokens_to_refresh.append(row)
         
-        if not expiring_tokens:
-            logger.info("No tokens need refresh at this time")
+        if not tokens_to_refresh:
+            logger.info("No tokens with refresh tokens found")
             return {
                 'success': True,
-                'message': 'No tokens need refresh',
+                'message': 'No tokens with refresh tokens found',
                 'timestamp': current_time.isoformat(),
                 'tokens_refreshed': 0
             }
         
-        logger.info(f"Found {len(expiring_tokens)} tokens that need refresh")
+        logger.info(f"Found {len(tokens_to_refresh)} tokens to refresh")
         
         # Initialize token service
         token_service = GoogleTokenService()
