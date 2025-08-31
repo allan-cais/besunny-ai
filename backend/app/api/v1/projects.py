@@ -15,7 +15,7 @@ from ...models.schemas.project import (
     ProjectListResponse,
     ProjectStats
 )
-from ...core.security import get_current_user_from_supabase_token, security
+from ...core.security import get_current_user, security
 from ...models.schemas.user import User
 
 router = APIRouter()
@@ -29,7 +29,7 @@ async def test_endpoint():
 
 @router.get("/test-user")
 async def test_user_endpoint(
-    current_user: dict = Depends(get_current_user_from_supabase_token)
+    current_user: dict = Depends(get_current_user)
 ):
     """Test endpoint to verify user authentication and show user data."""
     return {
@@ -43,7 +43,7 @@ async def test_user_endpoint(
 
 @router.get("/test-auth")
 async def test_auth(
-    current_user: dict = Depends(get_current_user_from_supabase_token)
+    current_user: dict = Depends(get_current_user)
 ):
     """Test endpoint to verify authentication is working."""
     return {
@@ -100,7 +100,7 @@ async def test_token(
 @router.post("/", response_model=Project)
 async def create_project(
     project: ProjectCreate,
-    current_user: dict = Depends(get_current_user_from_supabase_token)
+    current_user: dict = Depends(get_current_user)
 ):
     """Create a new project."""
     try:
@@ -166,7 +166,7 @@ async def create_project(
 async def list_projects(
     limit: int = Query(100, description="Number of projects to return"),
     offset: int = Query(0, description="Number of projects to skip"),
-    current_user: dict = Depends(get_current_user_from_supabase_token)
+    current_user: dict = Depends(get_current_user)
 ):
     """List projects for the current user."""
     try:
@@ -198,7 +198,7 @@ async def list_projects(
 @router.get("/{project_id}", response_model=Project)
 async def get_project(
     project_id: str,
-    current_user: dict = Depends(get_current_user_from_supabase_token)
+    current_user: dict = Depends(get_current_user)
 ):
     """Get a specific project by ID."""
     try:
@@ -226,7 +226,7 @@ async def get_project(
 async def update_project(
     project_id: str,
     project_update: ProjectUpdate,
-    current_user: dict = Depends(get_current_user_from_supabase_token)
+    current_user: dict = Depends(get_current_user)
 ):
     """Update a specific project."""
     try:
@@ -262,7 +262,7 @@ async def update_project(
 @router.delete("/{project_id}")
 async def delete_project(
     project_id: str,
-    current_user: dict = Depends(get_current_user_from_supabase_token)
+    current_user: dict = Depends(get_current_user)
 ):
     """Delete a specific project."""
     try:
@@ -292,7 +292,7 @@ async def delete_project(
 @router.get("/{project_id}/stats", response_model=ProjectStats)
 async def get_project_stats(
     project_id: str,
-    current_user: dict = Depends(get_current_user_from_supabase_token)
+    current_user: dict = Depends(get_current_user)
 ):
     """Get statistics for a specific project."""
     try:
@@ -349,7 +349,7 @@ async def get_project_documents(
     project_id: str,
     limit: int = Query(100, description="Number of documents to return"),
     offset: int = Query(0, description="Number of documents to skip"),
-    current_user: dict = Depends(get_current_user_from_supabase_token)
+    current_user: dict = Depends(get_current_user)
 ):
     """Get all documents for a specific project."""
     try:
@@ -385,7 +385,7 @@ async def get_project_meetings(
     project_id: str,
     limit: int = Query(100, description="Number of meetings to return"),
     offset: int = Query(0, description="Number of meetings to skip"),
-    current_user: dict = Depends(get_current_user_from_supabase_token)
+    current_user: dict = Depends(get_current_user)
 ):
     """Get all meetings for a specific project."""
     try:
@@ -418,7 +418,7 @@ async def get_project_meetings(
 
 @router.get("/stats/overview")
 async def get_projects_overview(
-    current_user: dict = Depends(get_current_user_from_supabase_token)
+    current_user: dict = Depends(get_current_user)
 ):
     """Get overview statistics for all user projects."""
     try:

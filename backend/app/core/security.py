@@ -93,44 +93,9 @@ security_manager = SecurityManager()
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ) -> dict:
-    """Dependency to get current authenticated user from JWT token."""
-    try:
-        token = credentials.credentials
-        payload = security_manager.verify_token(token)
-        
-        if payload is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Could not validate credentials",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-        
-        user_id: str = payload.get("sub")
-        if user_id is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token payload",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-        
-        # In a real implementation, you would fetch user from database here
-        # For now, we'll return the payload
-        return {
-            "id": user_id,
-            "email": payload.get("email"),
-            "username": payload.get("username"),
-            "permissions": payload.get("permissions", []),
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Authentication error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication failed",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    """Dependency to get current authenticated user from Supabase token."""
+    # Now uses Supabase authentication by default instead of custom JWT
+    return await get_current_user_from_supabase_token(credentials)
 
 
 async def get_current_user_from_supabase_token(
