@@ -136,6 +136,10 @@ async def create_project(
         project_data['created_at'] = datetime.now().isoformat()
         project_data['updated_at'] = datetime.now().isoformat()
         
+        # Generate UUID for the project ID
+        import uuid
+        project_data['id'] = str(uuid.uuid4())
+        
         logger.info(f"🔍 Project Creation Debug - project_data: {project_data}")
         
         # Insert project
