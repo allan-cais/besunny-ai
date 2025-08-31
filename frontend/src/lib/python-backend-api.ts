@@ -441,6 +441,22 @@ export class PythonBackendAPI {
     });
   }
 
+  async getProjectStats(projectId: string): Promise<ApiResponse<any>> {
+    return this.makeRequestWithRetry(`/api/v1/projects/${projectId}/stats`);
+  }
+
+  async getProjectDocuments(projectId: string): Promise<ApiResponse<any[]>> {
+    return this.makeRequestWithRetry(`/api/v1/projects/${projectId}/documents`);
+  }
+
+  async getProjectMeetings(projectId: string): Promise<ApiResponse<any[]>> {
+    return this.makeRequestWithRetry(`/api/v1/projects/${projectId}/meetings`);
+  }
+
+  async getProjectsOverview(): Promise<ApiResponse<any>> {
+    return this.makeRequestWithRetry('/api/v1/projects/stats/overview');
+  }
+
   // ============================================================================
   // AI SERVICES
   // ============================================================================

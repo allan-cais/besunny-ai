@@ -40,6 +40,10 @@ export interface UsePythonBackendReturn {
   
   // Project Services
   createProject: (data: Omit<Project, 'id' | 'created_at' | 'updated_at'>) => Promise<ApiResponse<Project>>;
+  getProjectStats: (projectId: string) => Promise<ApiResponse<any>>;
+  getProjectDocuments: (projectId: string) => Promise<ApiResponse<any[]>>;
+  getProjectMeetings: (projectId: string) => Promise<ApiResponse<any[]>>;
+  getProjectsOverview: () => Promise<ApiResponse<any>>;
   
   // AI Services
   processProjectOnboarding: (payload: {
@@ -268,6 +272,10 @@ export function usePythonBackend(options: UsePythonBackendOptions = {}): UsePyth
     
     // Project Services
     createProject: pythonBackendServices.createProject.bind(pythonBackendServices),
+    getProjectStats: pythonBackendServices.getProjectStats.bind(pythonBackendServices),
+    getProjectDocuments: pythonBackendServices.getProjectDocuments.bind(pythonBackendServices),
+    getProjectMeetings: pythonBackendServices.getProjectMeetings.bind(pythonBackendServices),
+    getProjectsOverview: pythonBackendServices.getProjectsOverview.bind(pythonBackendServices),
     
     // AI Services
     processProjectOnboarding: pythonBackendServices.processProjectOnboarding.bind(pythonBackendServices),

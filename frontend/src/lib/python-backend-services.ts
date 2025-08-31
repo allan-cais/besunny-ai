@@ -283,6 +283,50 @@ export class PythonBackendServices {
     }
   }
 
+  async getProjectStats(projectId: string): Promise<ApiResponse<any>> {
+    try {
+      const response = await this.api.getProjectStats(projectId);
+      this.updateMetrics(response.success, 0);
+      return response;
+    } catch (error) {
+      this.updateMetrics(false, 0);
+      throw error;
+    }
+  }
+
+  async getProjectDocuments(projectId: string): Promise<ApiResponse<any[]>> {
+    try {
+      const response = await this.api.getProjectDocuments(projectId);
+      this.updateMetrics(response.success, 0);
+      return response;
+    } catch (error) {
+      this.updateMetrics(false, 0);
+      throw error;
+    }
+  }
+
+  async getProjectMeetings(projectId: string): Promise<ApiResponse<any[]>> {
+    try {
+      const response = await this.api.getProjectMeetings(projectId);
+      this.updateMetrics(response.success, 0);
+      return response;
+    } catch (error) {
+      this.updateMetrics(false, 0);
+      throw error;
+    }
+  }
+
+  async getProjectsOverview(): Promise<ApiResponse<any>> {
+    try {
+      const response = await this.api.getProjectsOverview();
+      this.updateMetrics(response.success, 0);
+      return response;
+    } catch (error) {
+      this.updateMetrics(false, 0);
+      throw error;
+    }
+  }
+
   // ============================================================================
   // AI SERVICES
   // ============================================================================
