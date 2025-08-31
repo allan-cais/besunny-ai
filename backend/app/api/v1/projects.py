@@ -21,6 +21,12 @@ from ...models.schemas.user import User
 router = APIRouter()
 
 
+@router.get("/test")
+async def test_endpoint():
+    """Test endpoint to verify the backend is accessible."""
+    return {"message": "Projects API is working!", "timestamp": datetime.now().isoformat()}
+
+
 @router.get("/test-auth")
 async def test_auth(
     current_user: dict = Depends(get_current_user_from_supabase_token)
@@ -41,6 +47,13 @@ async def create_project(
 ):
     """Create a new project."""
     try:
+        # Debug logging
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"🔍 Project Creation Debug - current_user: {current_user}")
+        logger.info(f"🔍 Project Creation Debug - current_user type: {type(current_user)}")
+        logger.info(f"🔍 Project Creation Debug - current_user keys: {list(current_user.keys()) if isinstance(current_user, dict) else 'Not a dict'}")
+        
         supabase = get_supabase()
         
         # Add user and creation metadata
@@ -48,6 +61,8 @@ async def create_project(
         project_data['user_id'] = current_user.get("id")
         project_data['created_at'] = datetime.now().isoformat()
         project_data['updated_at'] = datetime.now().isoformat()
+        
+        logger.info(f"🔍 Project Creation Debug - project_data: {project_data}")
         
         # Insert project
         result = await supabase.table('projects').insert(project_data).execute()
@@ -58,6 +73,7 @@ async def create_project(
             raise HTTPException(status_code=500, detail="Failed to create project")
             
     except Exception as e:
+        logger.error(f"🔍 Project Creation Debug - Exception: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to create project: {str(e)}")
 
 
