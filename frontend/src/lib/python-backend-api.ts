@@ -269,6 +269,25 @@ export class PythonBackendAPI {
     console.log('  Full URL:', url);
     console.log('  Is HTTPS:', url.startsWith('https://'));
     
+    // Get the current Supabase session token
+    let authHeader = '';
+    try {
+      const supabaseSession = localStorage.getItem('sb-gkkmaeobxwvramtsjabu-auth-token');
+      if (supabaseSession) {
+        const sessionData = JSON.parse(supabaseSession);
+        if (sessionData.access_token) {
+          authHeader = `Bearer ${sessionData.access_token}`;
+          console.log('🔐 Auth Debug - Authorization header set:', authHeader.substring(0, 50) + '...');
+        } else {
+          console.log('⚠️ Auth Debug - No access_token in session data');
+        }
+      } else {
+        console.log('⚠️ Auth Debug - No Supabase session found');
+      }
+    } catch (error) {
+      console.error('❌ Auth Debug - Error getting auth token:', error);
+    }
+    
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
@@ -278,6 +297,7 @@ export class PythonBackendAPI {
         signal: controller.signal,
         headers: {
           'Content-Type': 'application/json',
+          ...(authHeader && { 'Authorization': authHeader }),
           ...options.headers,
         },
       });
