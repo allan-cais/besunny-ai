@@ -21,6 +21,19 @@ from ...models.schemas.user import User
 router = APIRouter()
 
 
+@router.get("/test-auth")
+async def test_auth(
+    current_user: dict = Depends(get_current_user_from_supabase_token)
+):
+    """Test endpoint to verify authentication is working."""
+    return {
+        "message": "Authentication successful!",
+        "user_id": current_user.get("id"),
+        "email": current_user.get("email"),
+        "username": current_user.get("username")
+    }
+
+
 @router.post("/", response_model=Project)
 async def create_project(
     project: ProjectCreate,
