@@ -9,6 +9,7 @@ import { Copy, CheckCircle, AlertCircle, Mail, FileText, Users } from 'lucide-re
 import { useAuth } from '@/providers/AuthProvider';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
+import { config } from '@/config';
 
 interface UsernameSetupDialogProps {
   open: boolean;
@@ -97,7 +98,7 @@ const UsernameSetupDialog: React.FC<UsernameSetupDialogProps> = ({ open, onClose
 
 
       // Use Python backend instead of Supabase edge function
-      const response = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/user/username/set`, {
+      const response = await fetch(`${config.pythonBackend.url}/api/v1/user/username/set`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

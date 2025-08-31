@@ -56,10 +56,21 @@ const originalFetch = window.fetch;
 window.fetch = function(...args) {
   const url = args[0];
   if (typeof url === 'string' && url.includes('backend-staging-6085.up.railway.app')) {
+    // Convert HTTP to HTTPS if needed
+    if (url.startsWith('http://')) {
+      const httpsUrl = url.replace('http://', 'https://');
+      console.log('🚨 HTTP TO HTTPS CONVERSION:', {
+        originalUrl: url,
+        convertedUrl: httpsUrl,
+        stack: new Error().stack
+      });
+      args[0] = httpsUrl;
+    }
+    
     console.log('🚨 GLOBAL FETCH INTERCEPTOR:', {
-      url,
-      isHttps: url.startsWith('https://'),
-      isHttp: url.startsWith('http://'),
+      url: args[0],
+      isHttps: args[0].toString().startsWith('https://'),
+      isHttp: args[0].toString().startsWith('http://'),
       stack: new Error().stack
     });
   }

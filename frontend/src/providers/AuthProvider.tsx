@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase, handleSupabaseError } from '@/lib/supabase';
-import config from '@/config/environment';
+import { config } from '@/config';
 import { AuthState, LoginFormData, SignUpFormData } from '@/types';
 
 // Auth context interface
@@ -407,7 +407,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return { hasUsername: false };
       }
 
-      const response = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/user/username/status`, {
+      const response = await fetch(`${config.pythonBackend.url}/api/v1/user/username/status`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
