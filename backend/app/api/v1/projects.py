@@ -123,9 +123,11 @@ async def create_project(
         
         logger.info(f"🔍 Project Creation Debug - User ID: {user_id}")
         
-        supabase = get_supabase()
+        # Use service role client to bypass RLS policies
+        from ...core.supabase_config import get_supabase_service_client
+        supabase = get_supabase_service_client()
         if not supabase:
-            logger.error("🔍 Project Creation Debug - Supabase client not available")
+            logger.error("🔍 Project Creation Debug - Supabase service client not available")
             raise HTTPException(status_code=500, detail="Database connection failed")
         
         # Add user and creation metadata
@@ -164,7 +166,11 @@ async def list_projects(
 ):
     """List projects for the current user."""
     try:
-        supabase = get_supabase()
+        # Use service role client to bypass RLS policies
+        from ...core.supabase_config import get_supabase_service_client
+        supabase = get_supabase_service_client()
+        if not supabase:
+            raise HTTPException(status_code=500, detail="Database connection failed")
         
         # Get projects - ALWAYS filter by user first for security
         query = supabase.table('projects').select('*').eq('created_by', current_user.get('id'))
@@ -192,7 +198,11 @@ async def get_project(
 ):
     """Get a specific project by ID."""
     try:
-        supabase = get_supabase()
+        # Use service role client to bypass RLS policies
+        from ...core.supabase_config import get_supabase_service_client
+        supabase = get_supabase_service_client()
+        if not supabase:
+            raise HTTPException(status_code=500, detail="Database connection failed")
         
         # Get project - ALWAYS filter by user first for security
         result = await supabase.table('projects').select('*').eq('id', project_id).eq('created_by', current_user.get("id")).single().execute()
@@ -216,10 +226,14 @@ async def update_project(
 ):
     """Update a specific project."""
     try:
-        supabase = get_supabase()
+        # Use service role client to bypass RLS policies
+        from ...core.supabase_config import get_supabase_service_client
+        supabase = get_supabase_service_client()
+        if not supabase:
+            raise HTTPException(status_code=500, detail="Database connection failed")
         
         # Check if project exists and belongs to user
-        existing_result = await supabase.table('projects').select('id').eq('id', project_id).eq('user_id', current_user.get("id")).single().execute()
+        existing_result = await supabase.table('projects').select('id').eq('id', project_id).eq('created_by', current_user.get("id")).single().execute()
         
         if not existing_result.data:
             raise HTTPException(status_code=404, detail="Project not found")
@@ -248,10 +262,14 @@ async def delete_project(
 ):
     """Delete a specific project."""
     try:
-        supabase = get_supabase()
+        # Use service role client to bypass RLS policies
+        from ...core.supabase_config import get_supabase_service_client
+        supabase = get_supabase_service_client()
+        if not supabase:
+            raise HTTPException(status_code=500, detail="Database connection failed")
         
         # Check if project exists and belongs to user
-        existing_result = await supabase.table('projects').select('id').eq('id', project_id).eq('user_id', current_user.get("id")).single().execute()
+        existing_result = await supabase.table('projects').select('id').eq('id', project_id).eq('created_by', current_user.get("id")).single().execute()
         
         if not existing_result.data:
             raise HTTPException(status_code=404, detail="Project not found")
@@ -274,10 +292,14 @@ async def get_project_stats(
 ):
     """Get statistics for a specific project."""
     try:
-        supabase = get_supabase()
+        # Use service role client to bypass RLS policies
+        from ...core.supabase_config import get_supabase_service_client
+        supabase = get_supabase_service_client()
+        if not supabase:
+            raise HTTPException(status_code=500, detail="Database connection failed")
         
         # Check if project exists and belongs to user
-        project_result = await supabase.table('projects').select('id').eq('id', project_id).eq('user_id', current_user.get("id")).single().execute()
+        project_result = await supabase.table('projects').select('id').eq('id', project_id).eq('created_by', current_user.get("id")).single().execute()
         
         if not project_result.data:
             raise HTTPException(status_code=404, detail="Project not found")
@@ -301,7 +323,7 @@ async def get_project_stats(
             status_counts[doc_status] = status_counts.get(doc_status, 0) + 1
         
         # Get meeting count for this project
-        meetings_result = await supabase.table('meetings').select('id', count='exact').eq('project_id', project_id).eq('user_id', current_user.get("id")).execute()
+        meetings_result = await supabase.table('meetings').select('id', count='exact').eq('project_id', project_id).eq('created_by', current_user.get("id")).execute()
         meeting_count = meetings_result.count or 0
         
         return ProjectStats(
@@ -327,10 +349,14 @@ async def get_project_documents(
 ):
     """Get all documents for a specific project."""
     try:
-        supabase = get_supabase()
+        # Use service role client to bypass RLS policies
+        from ...core.supabase_config import get_supabase_service_client
+        supabase = get_supabase_service_client()
+        if not supabase:
+            raise HTTPException(status_code=500, detail="Database connection failed")
         
         # Check if project exists and belongs to user
-        project_result = await supabase.table('projects').select('id').eq('id', project_id).eq('user_id', current_user.get("id")).single().execute()
+        project_result = await supabase.table('projects').select('id').eq('id', project_id).eq('created_by', current_user.get("id")).single().execute()
         
         if not project_result.data:
             raise HTTPException(status_code=404, detail="Project not found")
@@ -359,16 +385,20 @@ async def get_project_meetings(
 ):
     """Get all meetings for a specific project."""
     try:
-        supabase = get_supabase()
+        # Use service role client to bypass RLS policies
+        from ...core.supabase_config import get_supabase_service_client
+        supabase = get_supabase_service_client()
+        if not supabase:
+            raise HTTPException(status_code=500, detail="Database connection failed")
         
         # Check if project exists and belongs to user
-        project_result = await supabase.table('projects').select('id').eq('id', project_id).eq('user_id', current_user.get("id")).single().execute()
+        project_result = await supabase.table('projects').select('id').eq('id', project_id).eq('created_by', current_user.get("id")).single().execute()
         
         if not project_result.data:
             raise HTTPException(status_code=404, detail="Project not found")
         
         # Get meetings for project - ALWAYS filter by user first for security
-        query = supabase.table('meetings').select('*').eq('user_id', current_user.get("id")).eq('project_id', project_id)
+        query = supabase.table('meetings').select('*').eq('created_by', current_user.get("id")).eq('project_id', project_id)
         
         # Apply pagination
         query = query.range(offset, offset + limit - 1).order('start_time', desc=True)
@@ -388,10 +418,14 @@ async def get_projects_overview(
 ):
     """Get overview statistics for all user projects."""
     try:
-        supabase = get_supabase()
+        # Use service role client to bypass RLS policies
+        from ...core.supabase_config import get_supabase_service_client
+        supabase = get_supabase_service_client()
+        if not supabase:
+            raise HTTPException(status_code=500, detail="Database connection failed")
         
         # Get total project count
-        projects_result = await supabase.table('projects').select('id', count='exact').eq('user_id', current_user.get("id")).execute()
+        projects_result = await supabase.table('projects').select('id', count='exact').eq('created_by', current_user.get("id")).execute()
         total_projects = projects_result.count or 0
         
         # Get total document count
@@ -399,7 +433,7 @@ async def get_projects_overview(
         total_documents = docs_result.count or 0
         
         # Get total meeting count
-        meetings_result = await supabase.table('meetings').select('id', count='exact').eq('user_id', current_user.get("id")).execute()
+        meetings_result = await supabase.table('meetings').select('id', count='exact').eq('created_by', current_user.get("id")).execute()
         total_meetings = meetings_result.count or 0
         
         # Get unclassified document count
