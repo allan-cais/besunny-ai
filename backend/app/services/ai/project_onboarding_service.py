@@ -86,10 +86,10 @@ class ProjectOnboardingAIService:
             logger.info(f"Starting AI project onboarding for project {project_id}")
             
             # Generate project metadata using AI
-            metadata = await self._generate_project_metadata(summary)
+            metadata = await self.generate_project_metadata(summary)
             
             # Validate generated metadata
-            if not await self._validate_metadata(metadata):
+            if not await self.validate_metadata(metadata):
                 return {
                     'success': False,
                     'error': 'Generated metadata validation failed',
@@ -98,7 +98,7 @@ class ProjectOnboardingAIService:
                 }
             
             # Update project with generated metadata
-            update_success = await self._update_project_metadata(project_id, metadata)
+            update_success = await self.update_project_metadata(project_id, metadata)
             if not update_success:
                 return {
                     'success': False,
@@ -108,7 +108,7 @@ class ProjectOnboardingAIService:
                 }
             
             # Create metadata record
-            record_success = await self._create_project_metadata_record(project_id, metadata)
+            record_success = await self.create_project_metadata_record(project_id, metadata)
             
             # Calculate processing time
             processing_time = (datetime.now() - start_time).microseconds // 1000
@@ -132,7 +132,7 @@ class ProjectOnboardingAIService:
                 'success': True,
                 'project_id': project_id,
                 'user_id': user_id,
-                'metadata': metadata.dict(),
+                'metadata': metadata.model_dump(),
                 'processing_time_ms': processing_time
             }
             

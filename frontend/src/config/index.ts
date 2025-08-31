@@ -94,19 +94,6 @@ export const config: Config = {
       const finalUrl = envUrl || runtimeUrl;
       
       // Debug logging
-      console.log('🔧 Python Backend URL Configuration:');
-      console.log('  Environment Variable (VITE_PYTHON_BACKEND_URL):', envUrl);
-      console.log('  Runtime Config URL:', runtimeUrl);
-      console.log('  Is Railway Environment:', isRailwayEnv);
-      console.log('  Final URL:', finalUrl);
-      console.log('  Environment Variables:', {
-        VITE_PYTHON_BACKEND_URL: import.meta.env.VITE_PYTHON_BACKEND_URL,
-        NODE_ENV: import.meta.env.NODE_ENV,
-        MODE: import.meta.env.MODE,
-        DEV: import.meta.env.DEV,
-        PROD: import.meta.env.PROD
-      });
-      
       return finalUrl;
     })(),
     timeout: getOptionalNumberEnvVar('VITE_PYTHON_BACKEND_TIMEOUT', runtimeConfig.pythonBackend.timeout),

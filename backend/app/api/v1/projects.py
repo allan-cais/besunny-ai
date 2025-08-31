@@ -104,30 +104,18 @@ async def create_project(
 ):
     """Create a new project."""
     try:
-        # Debug logging
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.info(f"🔍 Project Creation Debug - current_user: {current_user}")
-        logger.info(f"🔍 Project Creation Debug - current_user type: {type(current_user)}")
-        logger.info(f"🔍 Project Creation Debug - current_user keys: {list(current_user.keys()) if isinstance(current_user, dict) else 'Not a dict'}")
-        
         # Validate current_user
         if not current_user or not isinstance(current_user, dict):
-            logger.error(f"🔍 Project Creation Debug - Invalid current_user: {current_user}")
             raise HTTPException(status_code=400, detail="Invalid user data")
         
         user_id = current_user.get("id")
         if not user_id:
-            logger.error(f"🔍 Project Creation Debug - No user_id in current_user: {current_user}")
             raise HTTPException(status_code=400, detail="User ID not found")
-        
-        logger.info(f"🔍 Project Creation Debug - User ID: {user_id}")
         
         # Use service role client to bypass RLS policies
         from ...core.supabase_config import get_supabase_service_client
         supabase = get_supabase_service_client()
         if not supabase:
-            logger.error("🔍 Project Creation Debug - Supabase service client not available")
             raise HTTPException(status_code=500, detail="Database connection failed")
         
         # Add user and creation metadata
@@ -140,25 +128,18 @@ async def create_project(
         import uuid
         project_data['id'] = str(uuid.uuid4())
         
-        logger.info(f"🔍 Project Creation Debug - project_data: {project_data}")
-        
         # Insert project
-        logger.info("🔍 Project Creation Debug - Attempting to insert project into database")
         result = supabase.table('projects').insert(project_data).execute()
-        logger.info(f"🔍 Project Creation Debug - Database result: {result}")
         
         if result.data:
-            logger.info(f"🔍 Project Creation Debug - Project created successfully: {result.data[0]}")
             return Project(**result.data[0])
         else:
-            logger.error(f"🔍 Project Creation Debug - No data returned from database: {result}")
             raise HTTPException(status_code=500, detail="Failed to create project - no data returned")
             
     except HTTPException:
         # Re-raise HTTP exceptions as-is
         raise
     except Exception as e:
-        logger.error(f"🔍 Project Creation Debug - Unexpected exception: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to create project: {str(e)}")
 
 

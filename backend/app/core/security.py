@@ -104,20 +104,14 @@ async def get_current_user_from_supabase_token(
     """Dependency to get current authenticated user from Supabase token."""
     try:
         token = credentials.credentials
-        logger.info(f"🔍 Auth Debug - Validating Supabase token of length: {len(token) if token else 0}")
-        
         # Validate the Supabase token by making a request to Supabase
         from .supabase_config import get_supabase, get_supabase_config
         
         # Check Supabase configuration first
         supabase_config = get_supabase_config()
-        config_info = supabase_config.get_config_info()
-        logger.info(f"🔍 Auth Debug - Supabase config: {config_info}")
         
         if not supabase_config.is_initialized():
-            logger.warning("🔍 Auth Debug - Supabase not initialized, attempting to initialize")
             if not supabase_config.initialize():
-                logger.error("🔍 Auth Debug - Failed to initialize Supabase")
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail="Supabase service unavailable",
@@ -126,33 +120,24 @@ async def get_current_user_from_supabase_token(
         
         supabase = get_supabase()
         if not supabase:
-            logger.error("🔍 Auth Debug - Failed to get Supabase client")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Supabase client unavailable",
                 headers={"WWW-Authenticate": "Bearer"},
             )
         
-        logger.info("🔍 Auth Debug - Attempting to validate token with Supabase")
-        
         # Use the token to get user info from Supabase
         response = supabase.auth.get_user(token)
-        
-        logger.info(f"🔍 Auth Debug - Supabase response: {response}")
-        logger.info(f"🔍 Auth Debug - Response type: {type(response)}")
-        logger.info(f"🔍 Auth Debug - Response attributes: {[attr for attr in dir(response) if not attr.startswith('_')]}")
         
         # Handle different response types from Supabase client
         # Supabase v2+ returns UserResponse directly, not a wrapper
         try:
             # Check if this is a UserResponse object directly (Supabase v2+)
             if hasattr(response, 'id') and hasattr(response, 'email'):
-                logger.info("🔍 Auth Debug - Detected UserResponse object (Supabase v2+), using directly")
                 user = response
             else:
                 # Legacy format with response.user (Supabase v1)
                 if not hasattr(response, 'user') or not response.user:
-                    logger.error("🔍 Auth Debug - No user returned from Supabase")
                     raise HTTPException(
                         status_code=status.HTTP_401_UNAUTHORIZED,
                         detail="No user found for token",
@@ -161,14 +146,11 @@ async def get_current_user_from_supabase_token(
                 user = response.user
                 
         except AttributeError as attr_error:
-            logger.error(f"🔍 Auth Debug - Attribute error accessing response: {attr_error}")
-            logger.error(f"🔍 Auth Debug - Response object: {response}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid response format from Supabase",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        logger.info(f"🔍 Auth Debug - Successfully authenticated user: {user.id}")
         
         return {
             "id": user.id,
@@ -182,7 +164,6 @@ async def get_current_user_from_supabase_token(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"🔍 Auth Debug - Supabase authentication error: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Supabase authentication failed: {str(e)}",
@@ -196,37 +177,29 @@ async def get_current_user_hybrid(
     """Dependency to get current authenticated user from either JWT or Supabase token."""
     try:
         token = credentials.credentials
-        logger.info(f"🔍 Auth Debug - Validating token of length: {len(token) if token else 0}")
         
         # First try to validate as JWT token
         try:
             payload = security_manager.verify_token(token)
             if payload and payload.get("sub"):
-                logger.info(f"🔍 Auth Debug - JWT validation successful for user: {payload.get('sub')}")
                 return {
                     "id": payload.get("sub"),
                     "email": payload.get("email"),
                     "username": payload.get("username"),
                     "permissions": payload.get("permissions", []),
                 }
-        except Exception as jwt_error:
-            logger.info(f"🔍 Auth Debug - JWT validation failed: {jwt_error}")
+        except Exception:
             pass
         
         # If JWT validation fails, try Supabase token
         try:
             from .supabase_config import get_supabase, get_supabase_config
-            logger.info(f"🔍 Auth Debug - Attempting Supabase token validation")
             
             # Check Supabase configuration first
             supabase_config = get_supabase_config()
-            config_info = supabase_config.get_config_info()
-            logger.info(f"🔍 Auth Debug - Supabase config: {config_info}")
             
             if not supabase_config.is_initialized():
-                logger.warning("🔍 Auth Debug - Supabase not initialized, attempting to initialize")
                 if not supabase_config.initialize():
-                    logger.error("🔍 Auth Debug - Failed to initialize Supabase")
                     raise HTTPException(
                         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                         detail="Supabase service unavailable",
@@ -235,32 +208,20 @@ async def get_current_user_hybrid(
             
             supabase = get_supabase()
             if not supabase:
-                logger.error("🔍 Auth Debug - Supabase client not available")
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail="Supabase client unavailable",
                     headers={"WWW-Authenticate": "Bearer"},
                 )
             
-            # Test if Supabase client is working
-            logger.info(f"🔍 Auth Debug - Supabase client type: {type(supabase)}")
-            logger.info(f"🔍 Auth Debug - Supabase client attributes: {[attr for attr in dir(supabase) if not attr.startswith('_')]}")
-            
-            logger.info(f"🔍 Auth Debug - Calling supabase.auth.get_user with token")
             response = supabase.auth.get_user(token)
-            logger.info(f"🔍 Auth Debug - Supabase response type: {type(response)}")
-            logger.info(f"🔍 Auth Debug - Supabase response: {response}")
-            logger.info(f"🔍 Auth Debug - Response dir: {dir(response)}")
-            logger.info(f"🔍 Auth Debug - Response attributes: {[attr for attr in dir(response) if not attr.startswith('_')]}")
             
             # Handle different Supabase response formats
             # Supabase v2+ returns UserResponse directly, not a wrapper
             try:
                 # Check if this is a UserResponse object directly (Supabase v2+)
                 if hasattr(response, 'id') and hasattr(response, 'email'):
-                    logger.info("🔍 Auth Debug - Detected UserResponse object (Supabase v2+), using directly")
                     user = response
-                    logger.info(f"🔍 Auth Debug - Supabase validation successful for user: {user.id}")
                     
                     return {
                         "id": user.id,
@@ -272,7 +233,6 @@ async def get_current_user_hybrid(
                     # Legacy format with response.user (Supabase v1)
                     if hasattr(response, 'user') and response.user:
                         user = response.user
-                        logger.info(f"🔍 Auth Debug - Supabase validation successful for user: {user.id}")
                         
                         return {
                             "id": user.id,
@@ -282,16 +242,13 @@ async def get_current_user_hybrid(
                         }
                     else:
                         # No user found
-                        logger.error("🔍 Auth Debug - No user returned from Supabase")
                         raise HTTPException(
                             status_code=status.HTTP_401_UNAUTHORIZED,
                             detail="No user found for token",
                             headers={"WWW-Authenticate": "Bearer"},
                         )
                 
-            except AttributeError as attr_error:
-                logger.error(f"🔍 Auth Debug - Attribute error accessing response: {attr_error}")
-                logger.error(f"🔍 Auth Debug - Response object: {response}")
+            except AttributeError:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Invalid response format from Supabase",
@@ -301,10 +258,6 @@ async def get_current_user_hybrid(
         except HTTPException:
             raise
         except Exception as e:
-            logger.error(f"🔍 Auth Debug - Supabase token validation failed: {e}")
-            logger.error(f"🔍 Auth Debug - Exception type: {type(e)}")
-            import traceback
-            logger.error(f"🔍 Auth Debug - Traceback: {traceback.format_exc()}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail=f"Token validation failed: {str(e)}",
@@ -314,9 +267,6 @@ async def get_current_user_hybrid(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"🔍 Auth Debug - Hybrid authentication error: {e}")
-        import traceback
-        logger.error(f"🔍 Auth Debug - Full traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication failed",
