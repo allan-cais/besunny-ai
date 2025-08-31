@@ -27,6 +27,7 @@ ENVIRONMENT = "production"
 DEBUG = "false"
 HOST = "0.0.0.0"
 PORT = "8000"
+FORCE_HTTPS = "true"
 
 [services.besunny-backend.deploy]
 healthcheckPath = "/health"
