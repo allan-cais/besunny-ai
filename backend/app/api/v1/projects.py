@@ -15,7 +15,7 @@ from ...models.schemas.project import (
     ProjectListResponse,
     ProjectStats
 )
-from ...core.security import get_current_user_from_supabase_token
+from ...core.security import get_current_user_from_supabase_token, security
 from ...models.schemas.user import User
 
 router = APIRouter()
@@ -38,6 +38,49 @@ async def test_auth(
         "email": current_user.get("email"),
         "username": current_user.get("username")
     }
+
+
+@router.get("/test-token")
+async def test_token(
+    credentials = Depends(security)
+):
+    """Test endpoint to debug token issues."""
+    try:
+        token = credentials.credentials
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        logger.info(f"🔍 Token Debug - Token length: {len(token) if token else 0}")
+        logger.info(f"🔍 Token Debug - Token start: {token[:50] if token else 'None'}...")
+        logger.info(f"🔍 Token Debug - Token end: ...{token[-50:] if token else 'None'}")
+        
+        # Try to decode the JWT without verification
+        try:
+            import jwt
+            from jose import jwt as jose_jwt
+            # Try both libraries
+            try:
+                unverified_payload = jwt.decode(token, options={"verify_signature": False})
+                logger.info(f"🔍 Token Debug - PyJWT unverified payload: {unverified_payload}")
+            except:
+                try:
+                    unverified_payload = jose_jwt.decode(token, options={"verify_signature": False})
+                    logger.info(f"🔍 Token Debug - Python-Jose unverified payload: {unverified_payload}")
+                except Exception as e:
+                    logger.error(f"🔍 Token Debug - Both JWT libraries failed: {e}")
+        except Exception as e:
+            logger.error(f"🔍 Token Debug - JWT decode error: {e}")
+        
+        return {
+            "message": "Token received",
+            "token_length": len(token) if token else 0,
+            "token_start": token[:50] if token else None,
+            "token_end": token[-50:] if token else None
+        }
+        
+    except Exception as e:
+        logger.error(f"🔍 Token Debug - Exception: {e}", exc_info=True)
+        return {"error": str(e)}
 
 
 @router.post("/", response_model=Project)
