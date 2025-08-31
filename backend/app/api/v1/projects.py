@@ -144,7 +144,7 @@ async def create_project(
         
         # Insert project
         logger.info("🔍 Project Creation Debug - Attempting to insert project into database")
-        result = await supabase.table('projects').insert(project_data).execute()
+        result = supabase.table('projects').insert(project_data).execute()
         logger.info(f"🔍 Project Creation Debug - Database result: {result}")
         
         if result.data:
@@ -182,7 +182,7 @@ async def list_projects(
         # Apply pagination
         query = query.range(offset, offset + limit - 1).order('created_at', desc=True)
         
-        result = await query.execute()
+        result = query.execute()
         
         return ProjectListResponse(
             projects=result.data or [],
@@ -209,7 +209,7 @@ async def get_project(
             raise HTTPException(status_code=500, detail="Database connection failed")
         
         # Get project - ALWAYS filter by user first for security
-        result = await supabase.table('projects').select('*').eq('id', project_id).eq('created_by', current_user.get("id")).single().execute()
+        result = supabase.table('projects').select('*').eq('id', project_id).eq('created_by', current_user.get("id")).single().execute()
         
         if not result.data:
             raise HTTPException(status_code=404, detail="Project not found")
@@ -237,7 +237,7 @@ async def update_project(
             raise HTTPException(status_code=500, detail="Database connection failed")
         
         # Check if project exists and belongs to user
-        existing_result = await supabase.table('projects').select('id').eq('id', project_id).eq('created_by', current_user.get("id")).single().execute()
+        existing_result = supabase.table('projects').select('id').eq('id', project_id).eq('created_by', current_user.get("id")).single().execute()
         
         if not existing_result.data:
             raise HTTPException(status_code=404, detail="Project not found")
@@ -246,7 +246,7 @@ async def update_project(
         update_data = project_update.dict(exclude_unset=True)
         update_data['updated_at'] = datetime.now().isoformat()
         
-        result = await supabase.table('projects').update(update_data).eq('id', project_id).execute()
+        result = supabase.table('projects').update(update_data).eq('id', project_id).execute()
         
         if result.data:
             return Project(**result.data[0])
@@ -273,13 +273,13 @@ async def delete_project(
             raise HTTPException(status_code=500, detail="Database connection failed")
         
         # Check if project exists and belongs to user
-        existing_result = await supabase.table('projects').select('id').eq('id', project_id).eq('created_by', current_user.get("id")).single().execute()
+        existing_result = supabase.table('projects').select('id').eq('id', project_id).eq('created_by', current_user.get("id")).single().execute()
         
         if not existing_result.data:
             raise HTTPException(status_code=404, detail="Project not found")
         
         # Delete project
-        await supabase.table('projects').delete().eq('id', project_id).execute()
+        supabase.table('projects').delete().eq('id', project_id).execute()
         
         return {"message": "Project deleted successfully"}
         
@@ -303,31 +303,31 @@ async def get_project_stats(
             raise HTTPException(status_code=500, detail="Database connection failed")
         
         # Check if project exists and belongs to user
-        project_result = await supabase.table('projects').select('id').eq('id', project_id).eq('created_by', current_user.get("id")).single().execute()
+        project_result = supabase.table('projects').select('id').eq('id', project_id).eq('created_by', current_user.get("id")).single().execute()
         
         if not project_result.data:
             raise HTTPException(status_code=404, detail="Project not found")
         
         # Get document count for this project
-        docs_result = await supabase.table('documents').select('id', count='exact').eq('project_id', project_id).eq('created_by', current_user.get("id")).execute()
+        docs_result = supabase.table('documents').select('id', count='exact').eq('project_id', project_id).eq('created_by', current_user.get("id")).execute()
         document_count = docs_result.count or 0
         
         # Get documents by type
-        type_result = await supabase.table('documents').select('type').eq('project_id', project_id).eq('created_by', current_user.get("id")).execute()
+        type_result = supabase.table('documents').select('type').eq('project_id', project_id).eq('created_by', current_user.get("id")).execute()
         type_counts = {}
         for doc in type_result.data or []:
             doc_type = doc.get('type', 'unknown')
             type_counts[doc_type] = type_counts.get(doc_type, 0) + 1
         
         # Get documents by status
-        status_result = await supabase.table('documents').select('status').eq('project_id', project_id).eq('created_by', current_user.get("id")).execute()
+        status_result = supabase.table('documents').select('status').eq('project_id', project_id).eq('created_by', current_user.get("id")).execute()
         status_counts = {}
         for doc in status_result.data or []:
             doc_status = doc.get('status', 'unknown')
             status_counts[doc_status] = status_counts.get(doc_status, 0) + 1
         
         # Get meeting count for this project
-        meetings_result = await supabase.table('meetings').select('id', count='exact').eq('project_id', project_id).eq('created_by', current_user.get("id")).execute()
+        meetings_result = supabase.table('meetings').select('id', count='exact').eq('project_id', project_id).eq('created_by', current_user.get("id")).execute()
         meeting_count = meetings_result.count or 0
         
         return ProjectStats(
@@ -360,7 +360,7 @@ async def get_project_documents(
             raise HTTPException(status_code=500, detail="Database connection failed")
         
         # Check if project exists and belongs to user
-        project_result = await supabase.table('projects').select('id').eq('id', project_id).eq('created_by', current_user.get("id")).single().execute()
+        project_result = supabase.table('projects').select('id').eq('id', project_id).eq('created_by', current_user.get("id")).single().execute()
         
         if not project_result.data:
             raise HTTPException(status_code=404, detail="Project not found")
@@ -371,7 +371,7 @@ async def get_project_documents(
         # Apply pagination
         query = query.range(offset, offset + limit - 1).order('created_at', desc=True)
         
-        result = await query.execute()
+        result = query.execute()
         return result.data or []
         
     except HTTPException:
@@ -396,7 +396,7 @@ async def get_project_meetings(
             raise HTTPException(status_code=500, detail="Database connection failed")
         
         # Check if project exists and belongs to user
-        project_result = await supabase.table('projects').select('id').eq('id', project_id).eq('created_by', current_user.get("id")).single().execute()
+        project_result = supabase.table('projects').select('id').eq('id', project_id).eq('created_by', current_user.get("id")).single().execute()
         
         if not project_result.data:
             raise HTTPException(status_code=404, detail="Project not found")
@@ -407,7 +407,7 @@ async def get_project_meetings(
         # Apply pagination
         query = query.range(offset, offset + limit - 1).order('start_time', desc=True)
         
-        result = await query.execute()
+        result = query.execute()
         return result.data or []
         
     except HTTPException:
@@ -429,19 +429,19 @@ async def get_projects_overview(
             raise HTTPException(status_code=500, detail="Database connection failed")
         
         # Get total project count
-        projects_result = await supabase.table('projects').select('id', count='exact').eq('created_by', current_user.get("id")).execute()
+        projects_result = supabase.table('projects').select('id', count='exact').eq('created_by', current_user.get("id")).execute()
         total_projects = projects_result.count or 0
         
         # Get total document count
-        docs_result = await supabase.table('documents').select('id', count='exact').eq('created_by', current_user.get("id")).execute()
+        docs_result = supabase.table('documents').select('id', count='exact').eq('created_by', current_user.get("id")).execute()
         total_documents = docs_result.count or 0
         
         # Get total meeting count
-        meetings_result = await supabase.table('meetings').select('id', count='exact').eq('created_by', current_user.get("id")).execute()
+        meetings_result = supabase.table('meetings').select('id', count='exact').eq('created_by', current_user.get("id")).execute()
         total_meetings = meetings_result.count or 0
         
         # Get unclassified document count
-        unclassified_result = await supabase.table('documents').select('id', count='exact').eq('created_by', current_user.get("id")).is_('project_id', None).execute()
+        unclassified_result = supabase.table('documents').select('id', count='exact').eq('created_by', current_user.get("id")).is_('project_id', None).execute()
         unclassified_documents = unclassified_result.count or 0
         
         return {
