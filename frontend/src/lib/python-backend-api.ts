@@ -414,7 +414,7 @@ export class PythonBackendAPI {
   // ============================================================================
 
   async getProjects(userId: string): Promise<ApiResponse<Project[]>> {
-    return this.makeRequestWithRetry(`/api/v1/projects?user_id=${userId}`);
+    return this.makeRequestWithRetry(`/api/v1/projects/?user_id=${userId}`);
   }
 
   async getProject(projectId: string): Promise<ApiResponse<Project>> {
@@ -422,7 +422,7 @@ export class PythonBackendAPI {
   }
 
   async createProject(data: Omit<Project, 'id' | 'created_at' | 'updated_at'>): Promise<ApiResponse<Project>> {
-    return this.makeRequestWithRetry('/api/v1/projects', {
+    return this.makeRequestWithRetry('/api/v1/projects/', {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -498,7 +498,7 @@ export class PythonBackendAPI {
       params.append('project_id', projectId);
     }
     
-    return this.makeRequestWithRetry(`/api/v1/documents?${params}`);
+    return this.makeRequestWithRetry(`/api/v1/documents/?${params}`);
   }
 
   async uploadDocument(file: File, userId: string, projectId?: string): Promise<ApiResponse<any>> {
