@@ -80,7 +80,7 @@ class Settings(BaseSettings):
     embedding_model_choice: str = Field(default="text-embedding-3-small", env="EMBEDDING_MODEL_CHOICE")
     
     # Webhook settings
-    webhook_base_url: str = Field(default="http://localhost:8000", env="WEBHOOK_BASE_URL")
+    webhook_base_url: str = Field(default="https://backend-staging-6085.up.railway.app", env="WEBHOOK_BASE_URL")
     n8n_classification_webhook_url: Optional[str] = Field(default=None, env="N8N_CLASSIFICATION_WEBHOOK_URL")
     n8n_drivesync_webhook_url: Optional[str] = Field(default=None, env="N8N_DRIVESYNC_WEBHOOK_URL")
     
