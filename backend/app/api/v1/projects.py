@@ -15,7 +15,7 @@ from ...models.schemas.project import (
     ProjectListResponse,
     ProjectStats
 )
-from ...core.security import get_current_user
+from ...core.security import get_current_user_from_supabase_token
 from ...models.schemas.user import User
 
 router = APIRouter()
@@ -24,7 +24,7 @@ router = APIRouter()
 @router.post("/", response_model=Project)
 async def create_project(
     project: ProjectCreate,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_from_supabase_token)
 ):
     """Create a new project."""
     try:
@@ -52,7 +52,7 @@ async def create_project(
 async def list_projects(
     limit: int = Query(100, description="Number of projects to return"),
     offset: int = Query(0, description="Number of projects to skip"),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_from_supabase_token)
 ):
     """List projects for the current user."""
     try:
@@ -80,7 +80,7 @@ async def list_projects(
 @router.get("/{project_id}", response_model=Project)
 async def get_project(
     project_id: str,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_from_supabase_token)
 ):
     """Get a specific project by ID."""
     try:
@@ -104,7 +104,7 @@ async def get_project(
 async def update_project(
     project_id: str,
     project_update: ProjectUpdate,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_from_supabase_token)
 ):
     """Update a specific project."""
     try:
@@ -136,7 +136,7 @@ async def update_project(
 @router.delete("/{project_id}")
 async def delete_project(
     project_id: str,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_from_supabase_token)
 ):
     """Delete a specific project."""
     try:
@@ -162,7 +162,7 @@ async def delete_project(
 @router.get("/{project_id}/stats", response_model=ProjectStats)
 async def get_project_stats(
     project_id: str,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_from_supabase_token)
 ):
     """Get statistics for a specific project."""
     try:
@@ -215,7 +215,7 @@ async def get_project_documents(
     project_id: str,
     limit: int = Query(100, description="Number of documents to return"),
     offset: int = Query(0, description="Number of documents to skip"),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_from_supabase_token)
 ):
     """Get all documents for a specific project."""
     try:
@@ -247,7 +247,7 @@ async def get_project_meetings(
     project_id: str,
     limit: int = Query(100, description="Number of meetings to return"),
     offset: int = Query(0, description="Number of meetings to skip"),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_from_supabase_token)
 ):
     """Get all meetings for a specific project."""
     try:
@@ -276,7 +276,7 @@ async def get_project_meetings(
 
 @router.get("/stats/overview")
 async def get_projects_overview(
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_from_supabase_token)
 ):
     """Get overview statistics for all user projects."""
     try:
