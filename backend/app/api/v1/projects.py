@@ -27,6 +27,20 @@ async def test_endpoint():
     return {"message": "Projects API is working!", "timestamp": datetime.now().isoformat()}
 
 
+@router.get("/test-user")
+async def test_user_endpoint(
+    current_user: dict = Depends(get_current_user_from_supabase_token)
+):
+    """Test endpoint to verify user authentication and show user data."""
+    return {
+        "message": "User authentication successful!",
+        "user_data": current_user,
+        "user_id": current_user.get("id"),
+        "email": current_user.get("email"),
+        "timestamp": datetime.now().isoformat()
+    }
+
+
 @router.get("/test-auth")
 async def test_auth(
     current_user: dict = Depends(get_current_user_from_supabase_token)
@@ -97,26 +111,48 @@ async def create_project(
         logger.info(f"🔍 Project Creation Debug - current_user type: {type(current_user)}")
         logger.info(f"🔍 Project Creation Debug - current_user keys: {list(current_user.keys()) if isinstance(current_user, dict) else 'Not a dict'}")
         
+        # Validate current_user
+        if not current_user or not isinstance(current_user, dict):
+            logger.error(f"🔍 Project Creation Debug - Invalid current_user: {current_user}")
+            raise HTTPException(status_code=400, detail="Invalid user data")
+        
+        user_id = current_user.get("id")
+        if not user_id:
+            logger.error(f"🔍 Project Creation Debug - No user_id in current_user: {current_user}")
+            raise HTTPException(status_code=400, detail="User ID not found")
+        
+        logger.info(f"🔍 Project Creation Debug - User ID: {user_id}")
+        
         supabase = get_supabase()
+        if not supabase:
+            logger.error("🔍 Project Creation Debug - Supabase client not available")
+            raise HTTPException(status_code=500, detail="Database connection failed")
         
         # Add user and creation metadata
         project_data = project.dict()
-        project_data['user_id'] = current_user.get("id")
+        project_data['created_by'] = user_id  # Use 'created_by' instead of 'user_id'
         project_data['created_at'] = datetime.now().isoformat()
         project_data['updated_at'] = datetime.now().isoformat()
         
         logger.info(f"🔍 Project Creation Debug - project_data: {project_data}")
         
         # Insert project
+        logger.info("🔍 Project Creation Debug - Attempting to insert project into database")
         result = await supabase.table('projects').insert(project_data).execute()
+        logger.info(f"🔍 Project Creation Debug - Database result: {result}")
         
         if result.data:
+            logger.info(f"🔍 Project Creation Debug - Project created successfully: {result.data[0]}")
             return Project(**result.data[0])
         else:
-            raise HTTPException(status_code=500, detail="Failed to create project")
+            logger.error(f"🔍 Project Creation Debug - No data returned from database: {result}")
+            raise HTTPException(status_code=500, detail="Failed to create project - no data returned")
             
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
     except Exception as e:
-        logger.error(f"🔍 Project Creation Debug - Exception: {e}", exc_info=True)
+        logger.error(f"🔍 Project Creation Debug - Unexpected exception: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to create project: {str(e)}")
 
 
@@ -131,7 +167,7 @@ async def list_projects(
         supabase = get_supabase()
         
         # Get projects - ALWAYS filter by user first for security
-        query = supabase.table('projects').select('*').eq('user_id', current_user.get('id'))
+        query = supabase.table('projects').select('*').eq('created_by', current_user.get('id'))
         
         # Apply pagination
         query = query.range(offset, offset + limit - 1).order('created_at', desc=True)
@@ -159,7 +195,7 @@ async def get_project(
         supabase = get_supabase()
         
         # Get project - ALWAYS filter by user first for security
-        result = await supabase.table('projects').select('*').eq('id', project_id).eq('user_id', current_user.get("id")).single().execute()
+        result = await supabase.table('projects').select('*').eq('id', project_id).eq('created_by', current_user.get("id")).single().execute()
         
         if not result.data:
             raise HTTPException(status_code=404, detail="Project not found")

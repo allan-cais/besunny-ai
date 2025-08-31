@@ -13,9 +13,19 @@ class Project(BaseModel):
     id: str = Field(..., description="Project ID")
     name: str = Field(..., description="Project name")
     description: Optional[str] = Field(None, description="Project description")
-    created_at: datetime = Field(..., description="Creation timestamp")
-    updated_at: datetime = Field(..., description="Last update timestamp")
-    user_id: str = Field(..., description="User ID who owns the project")
+    status: Optional[str] = Field(None, description="Project status")
+    created_by: str = Field(..., description="User ID who created the project")
+    created_at: Optional[datetime] = Field(None, description="Creation timestamp")
+    updated_at: Optional[datetime] = Field(None, description="Last update timestamp")
+    normalized_tags: Optional[List[str]] = Field(None, description="Standardized tags for classification")
+    categories: Optional[List[str]] = Field(None, description="High-level project categories")
+    reference_keywords: Optional[List[str]] = Field(None, description="Key terms for content matching")
+    notes: Optional[str] = Field(None, description="Human-readable project summary")
+    classification_signals: Optional[Dict[str, Any]] = Field(None, description="Advanced classification metadata")
+    entity_patterns: Optional[Dict[str, Any]] = Field(None, description="People, emails, locations, and organizations")
+    pinecone_document_count: Optional[int] = Field(None, description="Number of documents in Pinecone")
+    last_classification_at: Optional[datetime] = Field(None, description="Timestamp of most recent classification")
+    classification_feedback: Optional[Dict[str, Any]] = Field(None, description="Learning data from classification results")
 
 
 class ProjectCreate(BaseModel):
