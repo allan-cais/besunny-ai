@@ -302,6 +302,13 @@ export class PythonBackendAPI {
         },
       });
 
+      // Debug: Log what headers were actually sent
+      console.log('🔐 Auth Debug - Request headers sent:', {
+        'Content-Type': 'application/json',
+        'Authorization': authHeader || 'NOT SET',
+        ...options.headers
+      });
+
       clearTimeout(timeoutId);
 
       if (response.ok) {
