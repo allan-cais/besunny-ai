@@ -189,6 +189,49 @@ const originalEventSource = window.EventSource;
   return new originalEventSource(url, ...args);
 };
 
+// Intercept any HTTP requests that might be coming from the browser's network stack
+window.addEventListener('beforeunload', () => {
+  console.log('🚨 BEFORE UNLOAD - Checking for any pending HTTP requests');
+});
+
+// Intercept any network errors that might indicate HTTP requests
+window.addEventListener('error', (event) => {
+  if (event.message && event.message.includes('Mixed Content')) {
+    console.log('🚨 MIXED CONTENT ERROR CAUGHT:', {
+      message: event.message,
+      filename: event.filename,
+      lineno: event.lineno,
+      colno: event.colno,
+      error: event.error,
+      stack: event.error?.stack
+    });
+  }
+});
+
+// Intercept any unhandled rejections that might indicate HTTP requests
+window.addEventListener('unhandledrejection', (event) => {
+  if (event.reason && typeof event.reason === 'string' && event.reason.includes('Mixed Content')) {
+    console.log('🚨 UNHANDLED MIXED CONTENT REJECTION:', {
+      reason: event.reason,
+      promise: event.promise
+    });
+  }
+});
+
+// Console error interceptor
+const originalConsoleError = console.error;
+console.error = function(...args) {
+  args.forEach(arg => {
+    if (typeof arg === 'string' && arg.includes('Mixed Content')) {
+      console.log('🚨 CONSOLE ERROR WITH MIXED CONTENT:', {
+        message: arg,
+        stack: new Error().stack
+      });
+    }
+  });
+  return originalConsoleError.apply(this, args);
+};
+
 export class PythonBackendAPI {
   private baseUrl: string;
   private timeout: number;
