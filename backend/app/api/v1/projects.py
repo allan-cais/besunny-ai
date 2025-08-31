@@ -37,7 +37,7 @@ async def test_auth(
 @router.post("/", response_model=Project)
 async def create_project(
     project: ProjectCreate,
-    current_user: User = Depends(get_current_user_from_supabase_token)
+    current_user: dict = Depends(get_current_user_from_supabase_token)
 ):
     """Create a new project."""
     try:
@@ -45,7 +45,7 @@ async def create_project(
         
         # Add user and creation metadata
         project_data = project.dict()
-        project_data['user_id'] = current_user.id
+        project_data['user_id'] = current_user.get("id")
         project_data['created_at'] = datetime.now().isoformat()
         project_data['updated_at'] = datetime.now().isoformat()
         
@@ -65,14 +65,14 @@ async def create_project(
 async def list_projects(
     limit: int = Query(100, description="Number of projects to return"),
     offset: int = Query(0, description="Number of projects to skip"),
-    current_user: User = Depends(get_current_user_from_supabase_token)
+    current_user: dict = Depends(get_current_user_from_supabase_token)
 ):
     """List projects for the current user."""
     try:
         supabase = get_supabase()
         
         # Get projects - ALWAYS filter by user first for security
-        query = supabase.table('projects').select('*').eq('user_id', current_user.id)
+        query = supabase.table('projects').select('*').eq('user_id', current_user.get('id'))
         
         # Apply pagination
         query = query.range(offset, offset + limit - 1).order('created_at', desc=True)
@@ -93,14 +93,14 @@ async def list_projects(
 @router.get("/{project_id}", response_model=Project)
 async def get_project(
     project_id: str,
-    current_user: User = Depends(get_current_user_from_supabase_token)
+    current_user: dict = Depends(get_current_user_from_supabase_token)
 ):
     """Get a specific project by ID."""
     try:
         supabase = get_supabase()
         
         # Get project - ALWAYS filter by user first for security
-        result = await supabase.table('projects').select('*').eq('id', project_id).eq('user_id', current_user.id).single().execute()
+        result = await supabase.table('projects').select('*').eq('id', project_id).eq('user_id', current_user.get("id")).single().execute()
         
         if not result.data:
             raise HTTPException(status_code=404, detail="Project not found")
@@ -117,14 +117,14 @@ async def get_project(
 async def update_project(
     project_id: str,
     project_update: ProjectUpdate,
-    current_user: User = Depends(get_current_user_from_supabase_token)
+    current_user: dict = Depends(get_current_user_from_supabase_token)
 ):
     """Update a specific project."""
     try:
         supabase = get_supabase()
         
         # Check if project exists and belongs to user
-        existing_result = await supabase.table('projects').select('id').eq('id', project_id).eq('user_id', current_user.id).single().execute()
+        existing_result = await supabase.table('projects').select('id').eq('id', project_id).eq('user_id', current_user.get("id")).single().execute()
         
         if not existing_result.data:
             raise HTTPException(status_code=404, detail="Project not found")
@@ -149,14 +149,14 @@ async def update_project(
 @router.delete("/{project_id}")
 async def delete_project(
     project_id: str,
-    current_user: User = Depends(get_current_user_from_supabase_token)
+    current_user: dict = Depends(get_current_user_from_supabase_token)
 ):
     """Delete a specific project."""
     try:
         supabase = get_supabase()
         
         # Check if project exists and belongs to user
-        existing_result = await supabase.table('projects').select('id').eq('id', project_id).eq('user_id', current_user.id).single().execute()
+        existing_result = await supabase.table('projects').select('id').eq('id', project_id).eq('user_id', current_user.get("id")).single().execute()
         
         if not existing_result.data:
             raise HTTPException(status_code=404, detail="Project not found")
@@ -175,38 +175,38 @@ async def delete_project(
 @router.get("/{project_id}/stats", response_model=ProjectStats)
 async def get_project_stats(
     project_id: str,
-    current_user: User = Depends(get_current_user_from_supabase_token)
+    current_user: dict = Depends(get_current_user_from_supabase_token)
 ):
     """Get statistics for a specific project."""
     try:
         supabase = get_supabase()
         
         # Check if project exists and belongs to user
-        project_result = await supabase.table('projects').select('id').eq('id', project_id).eq('user_id', current_user.id).single().execute()
+        project_result = await supabase.table('projects').select('id').eq('id', project_id).eq('user_id', current_user.get("id")).single().execute()
         
         if not project_result.data:
             raise HTTPException(status_code=404, detail="Project not found")
         
         # Get document count for this project
-        docs_result = await supabase.table('documents').select('id', count='exact').eq('project_id', project_id).eq('created_by', current_user.id).execute()
+        docs_result = await supabase.table('documents').select('id', count='exact').eq('project_id', project_id).eq('created_by', current_user.get("id")).execute()
         document_count = docs_result.count or 0
         
         # Get documents by type
-        type_result = await supabase.table('documents').select('type').eq('project_id', project_id).eq('created_by', current_user.id).execute()
+        type_result = await supabase.table('documents').select('type').eq('project_id', project_id).eq('created_by', current_user.get("id")).execute()
         type_counts = {}
         for doc in type_result.data or []:
             doc_type = doc.get('type', 'unknown')
             type_counts[doc_type] = type_counts.get(doc_type, 0) + 1
         
         # Get documents by status
-        status_result = await supabase.table('documents').select('status').eq('project_id', project_id).eq('created_by', current_user.id).execute()
+        status_result = await supabase.table('documents').select('status').eq('project_id', project_id).eq('created_by', current_user.get("id")).execute()
         status_counts = {}
         for doc in status_result.data or []:
             doc_status = doc.get('status', 'unknown')
             status_counts[doc_status] = status_counts.get(doc_status, 0) + 1
         
         # Get meeting count for this project
-        meetings_result = await supabase.table('meetings').select('id', count='exact').eq('project_id', project_id).eq('user_id', current_user.id).execute()
+        meetings_result = await supabase.table('meetings').select('id', count='exact').eq('project_id', project_id).eq('user_id', current_user.get("id")).execute()
         meeting_count = meetings_result.count or 0
         
         return ProjectStats(
@@ -228,20 +228,20 @@ async def get_project_documents(
     project_id: str,
     limit: int = Query(100, description="Number of documents to return"),
     offset: int = Query(0, description="Number of documents to skip"),
-    current_user: User = Depends(get_current_user_from_supabase_token)
+    current_user: dict = Depends(get_current_user_from_supabase_token)
 ):
     """Get all documents for a specific project."""
     try:
         supabase = get_supabase()
         
         # Check if project exists and belongs to user
-        project_result = await supabase.table('projects').select('id').eq('id', project_id).eq('user_id', current_user.id).single().execute()
+        project_result = await supabase.table('projects').select('id').eq('id', project_id).eq('user_id', current_user.get("id")).single().execute()
         
         if not project_result.data:
             raise HTTPException(status_code=404, detail="Project not found")
         
         # Get documents for project - ALWAYS filter by user first for security
-        query = supabase.table('documents').select('*').eq('created_by', current_user.id).eq('project_id', project_id)
+        query = supabase.table('documents').select('*').eq('created_by', current_user.get("id")).eq('project_id', project_id)
         
         # Apply pagination
         query = query.range(offset, offset + limit - 1).order('created_at', desc=True)
@@ -260,20 +260,20 @@ async def get_project_meetings(
     project_id: str,
     limit: int = Query(100, description="Number of meetings to return"),
     offset: int = Query(0, description="Number of meetings to skip"),
-    current_user: User = Depends(get_current_user_from_supabase_token)
+    current_user: dict = Depends(get_current_user_from_supabase_token)
 ):
     """Get all meetings for a specific project."""
     try:
         supabase = get_supabase()
         
         # Check if project exists and belongs to user
-        project_result = await supabase.table('projects').select('id').eq('id', project_id).eq('user_id', current_user.id).single().execute()
+        project_result = await supabase.table('projects').select('id').eq('id', project_id).eq('user_id', current_user.get("id")).single().execute()
         
         if not project_result.data:
             raise HTTPException(status_code=404, detail="Project not found")
         
         # Get meetings for project - ALWAYS filter by user first for security
-        query = supabase.table('meetings').select('*').eq('user_id', current_user.id).eq('project_id', project_id)
+        query = supabase.table('meetings').select('*').eq('user_id', current_user.get("id")).eq('project_id', project_id)
         
         # Apply pagination
         query = query.range(offset, offset + limit - 1).order('start_time', desc=True)
@@ -289,26 +289,26 @@ async def get_project_meetings(
 
 @router.get("/stats/overview")
 async def get_projects_overview(
-    current_user: User = Depends(get_current_user_from_supabase_token)
+    current_user: dict = Depends(get_current_user_from_supabase_token)
 ):
     """Get overview statistics for all user projects."""
     try:
         supabase = get_supabase()
         
         # Get total project count
-        projects_result = await supabase.table('projects').select('id', count='exact').eq('user_id', current_user.id).execute()
+        projects_result = await supabase.table('projects').select('id', count='exact').eq('user_id', current_user.get("id")).execute()
         total_projects = projects_result.count or 0
         
         # Get total document count
-        docs_result = await supabase.table('documents').select('id', count='exact').eq('created_by', current_user.id).execute()
+        docs_result = await supabase.table('documents').select('id', count='exact').eq('created_by', current_user.get("id")).execute()
         total_documents = docs_result.count or 0
         
         # Get total meeting count
-        meetings_result = await supabase.table('meetings').select('id', count='exact').eq('user_id', current_user.id).execute()
+        meetings_result = await supabase.table('meetings').select('id', count='exact').eq('user_id', current_user.get("id")).execute()
         total_meetings = meetings_result.count or 0
         
         # Get unclassified document count
-        unclassified_result = await supabase.table('documents').select('id', count='exact').eq('created_by', current_user.id).is_('project_id', None).execute()
+        unclassified_result = await supabase.table('documents').select('id', count='exact').eq('created_by', current_user.get("id")).is_('project_id', None).execute()
         unclassified_documents = unclassified_result.count or 0
         
         return {
