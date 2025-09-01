@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from openai import AsyncOpenAI
 from pydantic import BaseModel
 
-from ...core.database import get_supabase_service_client
+from ...core.supabase_config import get_supabase_service_client
 from ...core.config import get_settings
 from ...models.schemas.project import Project
 
