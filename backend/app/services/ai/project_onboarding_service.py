@@ -206,27 +206,28 @@ class ProjectOnboardingAIService:
                     "max_tokens": 1000
                 }
                 
-                logger.info(f"Using OpenAI model: {self.model}")
+                print(f"Using OpenAI model: {self.model}")
                 
-                # Only add response_format for models that support it
-                if "gpt-4" in self.model.lower() or "gpt-3.5-turbo" in self.model.lower():
+                # Only add response_format for models that definitely support it
+                # Be conservative - only use for known GPT-4 Turbo models
+                if "gpt-4-turbo" in self.model.lower() or "gpt-4o" in self.model.lower():
                     model_params["response_format"] = {"type": "json_object"}
-                    logger.info("Added response_format: json_object")
+                    print("Added response_format: json_object for GPT-4 Turbo model")
                 else:
-                    logger.info("Model does not support response_format, will parse text response")
+                    print(f"Model {self.model} may not support response_format, will parse text response")
                 
-                logger.info(f"Model parameters: {model_params}")
+                print(f"Model parameters: {model_params}")
                 response = await self._get_client().chat.completions.create(**model_params)
                 
                 # Parse response
                 result_content = response.choices[0].message.content
-                logger.info(f"OpenAI response content: {result_content}")
+                print(f"OpenAI response content: {result_content}")
                 
                 # Try to parse as JSON, fallback to text parsing if needed
                 try:
                     metadata_dict = self._parse_metadata_response(result_content)
                 except Exception as parse_error:
-                    logger.warning(f"Failed to parse JSON response, attempting text extraction: {parse_error}")
+                    print(f"Failed to parse JSON response, attempting text extraction: {parse_error}")
                     metadata_dict = self._extract_metadata_from_text(result_content)
                 
                 # Create ProjectMetadata object
@@ -246,11 +247,61 @@ class ProjectOnboardingAIService:
                     confidence_score=metadata_dict.get('confidence_score', 0.8)
                 )
                 
-                logger.info(f"Generated project metadata with confidence score: {metadata.confidence_score}")
+                print(f"Generated project metadata with confidence score: {metadata.confidence_score}")
                 return metadata
                 
         except Exception as e:
-            logger.error(f"Failed to generate project metadata: {e}")
+            print(f"Failed to generate project metadata: {e}")
+            
+            # If it's a response_format error, try again without it
+            if "response_format" in str(e) and "not supported" in str(e):
+                print("Retrying without response_format parameter...")
+                try:
+                    # Retry without response_format
+                    retry_params = {
+                        "model": self.model,
+                        "messages": [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_message}
+                        ],
+                        "temperature": 0.3,
+                        "max_tokens": 1000
+                    }
+                    
+                    print(f"Retrying with parameters: {retry_params}")
+                    response = await self._get_client().chat.completions.create(**retry_params)
+                    
+                    # Parse response
+                    result_content = response.choices[0].message.content
+                    print(f"OpenAI retry response content: {result_content}")
+                    
+                    # Use text extraction for non-JSON response
+                    metadata_dict = self._extract_metadata_from_text(result_content)
+                    
+                    # Create ProjectMetadata object
+                    metadata = ProjectMetadata(
+                        title=metadata_dict.get('title', ''),
+                        description=metadata_dict.get('description', ''),
+                        category=metadata_dict.get('category', ''),
+                        tags=metadata_dict.get('tags', []),
+                        priority=metadata_dict.get('priority', 'medium'),
+                        estimated_duration=metadata_dict.get('estimated_duration', ''),
+                        complexity=metadata_dict.get('complexity', 'moderate'),
+                        required_skills=metadata_dict.get('required_skills', []),
+                        stakeholders=metadata_dict.get('stakeholders', []),
+                        success_metrics=metadata_dict.get('success_metrics', []),
+                        risks=metadata_dict.get('risks', []),
+                        recommendations=metadata_dict.get('recommendations', []),
+                        confidence_score=metadata_dict.get('confidence_score', 0.8)
+                    )
+                    
+                    print(f"Generated project metadata with retry, confidence score: {metadata.confidence_score}")
+                    return metadata
+                    
+                except Exception as retry_error:
+                    print(f"Retry also failed: {retry_error}")
+                    raise e
+            
             raise e
     
     async def validate_metadata(self, metadata: ProjectMetadata) -> bool:
@@ -519,7 +570,7 @@ Project Summary:
     
     def _extract_metadata_from_text(self, text_content: str) -> Dict[str, Any]:
         """Extract metadata from text response when JSON parsing fails."""
-        logger.info("Extracting metadata from text response")
+        print("Extracting metadata from text response")
         
         # Default metadata structure
         metadata = {
@@ -576,7 +627,7 @@ Project Summary:
             words = metadata['title'].split()
             metadata['tags'] = [word.lower() for word in words if len(word) > 3][:5]
         
-        logger.info(f"Extracted metadata from text: {metadata}")
+        print(f"Extracted metadata from text: {metadata}")
         return metadata
     
     async def _store_onboarding_result(self, result: ProjectOnboardingResult):
