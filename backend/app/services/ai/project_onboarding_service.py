@@ -195,20 +195,39 @@ class ProjectOnboardingAIService:
                 user_message = self._build_user_message(summary)
                 
                 # Call OpenAI API
-                response = await self._get_client().chat.completions.create(
-                    model=self.model,
-                    messages=[
+                # Check if model supports response_format
+                model_params = {
+                    "model": self.model,
+                    "messages": [
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_message}
                     ],
-                    temperature=0.3,
-                    max_tokens=1000,
-                    response_format={"type": "json_object"}
-                )
+                    "temperature": 0.3,
+                    "max_tokens": 1000
+                }
+                
+                logger.info(f"Using OpenAI model: {self.model}")
+                
+                # Only add response_format for models that support it
+                if "gpt-4" in self.model.lower() or "gpt-3.5-turbo" in self.model.lower():
+                    model_params["response_format"] = {"type": "json_object"}
+                    logger.info("Added response_format: json_object")
+                else:
+                    logger.info("Model does not support response_format, will parse text response")
+                
+                logger.info(f"Model parameters: {model_params}")
+                response = await self._get_client().chat.completions.create(**model_params)
                 
                 # Parse response
                 result_content = response.choices[0].message.content
-                metadata_dict = self._parse_metadata_response(result_content)
+                logger.info(f"OpenAI response content: {result_content}")
+                
+                # Try to parse as JSON, fallback to text parsing if needed
+                try:
+                    metadata_dict = self._parse_metadata_response(result_content)
+                except Exception as parse_error:
+                    logger.warning(f"Failed to parse JSON response, attempting text extraction: {parse_error}")
+                    metadata_dict = self._extract_metadata_from_text(result_content)
                 
                 # Create ProjectMetadata object
                 metadata = ProjectMetadata(
@@ -497,6 +516,68 @@ Project Summary:
         except Exception as e:
             logger.error(f"Unexpected error parsing metadata response: {e}")
             return {}
+    
+    def _extract_metadata_from_text(self, text_content: str) -> Dict[str, Any]:
+        """Extract metadata from text response when JSON parsing fails."""
+        logger.info("Extracting metadata from text response")
+        
+        # Default metadata structure
+        metadata = {
+            'title': '',
+            'description': '',
+            'category': 'General',
+            'tags': [],
+            'priority': 'medium',
+            'estimated_duration': '',
+            'complexity': 'moderate',
+            'required_skills': [],
+            'stakeholders': [],
+            'success_metrics': [],
+            'risks': [],
+            'recommendations': [],
+            'confidence_score': 0.7
+        }
+        
+        # Try to extract key information from text
+        lines = text_content.split('\n')
+        for line in lines:
+            line = line.strip()
+            if ':' in line:
+                key, value = line.split(':', 1)
+                key = key.strip().lower()
+                value = value.strip()
+                
+                if 'title' in key and value:
+                    metadata['title'] = value
+                elif 'description' in key and value:
+                    metadata['description'] = value
+                elif 'category' in key and value:
+                    metadata['category'] = value
+                elif 'priority' in key and value:
+                    priority = value.lower()
+                    if priority in ['low', 'medium', 'high']:
+                        metadata['priority'] = priority
+                elif 'complexity' in key and value:
+                    complexity = value.lower()
+                    if complexity in ['simple', 'moderate', 'complex']:
+                        metadata['complexity'] = complexity
+                elif 'duration' in key and value:
+                    metadata['estimated_duration'] = value
+                elif 'confidence' in key and value:
+                    try:
+                        score = float(value)
+                        if 0.0 <= score <= 1.0:
+                            metadata['confidence_score'] = score
+                    except ValueError:
+                        pass
+        
+        # Generate some basic tags from the content
+        if metadata['title']:
+            words = metadata['title'].split()
+            metadata['tags'] = [word.lower() for word in words if len(word) > 3][:5]
+        
+        logger.info(f"Extracted metadata from text: {metadata}")
+        return metadata
     
     async def _store_onboarding_result(self, result: ProjectOnboardingResult):
         """Store onboarding result in database."""
