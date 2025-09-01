@@ -361,22 +361,24 @@ class ProjectOnboardingAIService:
             True if successful, False otherwise
         """
         try:
-            # Update project record
+            # Update project with metadata - only use fields that exist in the projects table
             update_data = {
-                'title': metadata.title,
-                'description': metadata.description,
-                'category': metadata.category,
-                'tags': metadata.tags,
-                'priority': metadata.priority,
-                'estimated_duration': metadata.estimated_duration,
-                'complexity': metadata.complexity,
-                'required_skills': metadata.required_skills,
-                'stakeholders': metadata.stakeholders,
-                'success_metrics': metadata.success_metrics,
-                'risks': metadata.risks,
-                'recommendations': metadata.recommendations,
-                'ai_metadata_generated': True,
-                'ai_confidence_score': metadata.confidence_score,
+                'normalized_tags': metadata.tags,
+                'categories': [metadata.category],
+                'reference_keywords': metadata.required_skills,
+                'notes': metadata.description,
+                'classification_signals': {
+                    'priority': metadata.priority,
+                    'complexity': metadata.complexity,
+                    'estimated_duration': metadata.estimated_duration,
+                    'confidence_score': metadata.confidence_score
+                },
+                'entity_patterns': {
+                    'stakeholders': metadata.stakeholders,
+                    'success_metrics': metadata.success_metrics,
+                    'risks': metadata.risks,
+                    'recommendations': metadata.recommendations
+                },
                 'updated_at': datetime.now().isoformat()
             }
             
@@ -386,14 +388,14 @@ class ProjectOnboardingAIService:
                 .execute()
             
             if result.data:
-                logger.info(f"Updated project {project_id} with AI-generated metadata")
+                print(f"Updated project {project_id} with AI-generated metadata")
                 return True
             else:
-                logger.error(f"Failed to update project {project_id}")
+                print(f"Failed to update project {project_id}")
                 return False
                 
         except Exception as e:
-            logger.error(f"Failed to update project metadata: {e}")
+            print(f"Failed to update project metadata: {e}")
             return False
     
     async def create_project_metadata_record(self, project_id: str, metadata: ProjectMetadata) -> bool:
@@ -408,29 +410,31 @@ class ProjectOnboardingAIService:
             True if successful, False otherwise
         """
         try:
-            # Create metadata record in project_metadata table
+            # Create metadata record in project_metadata table using the correct schema
             record_data = {
                 'project_id': project_id,
                 'normalized_tags': metadata.tags,
                 'categories': [metadata.category],
                 'reference_keywords': metadata.required_skills,
-                'notes': metadata.description,
+                'notes': f"AI Generated Metadata - Title: {metadata.title}, Priority: {metadata.priority}, Complexity: {metadata.complexity}, Duration: {metadata.estimated_duration}, Confidence: {metadata.confidence_score}",
                 'created_at': datetime.now().isoformat()
             }
+            
+            print(f"Creating project_metadata record: {record_data}")
             
             result = self.supabase.table("project_metadata") \
                 .insert(record_data) \
                 .execute()
             
             if result.data:
-                logger.info(f"Created metadata record for project {project_id}")
+                print(f"Created metadata record for project {project_id}")
                 return True
             else:
-                logger.error(f"Failed to create metadata record for project {project_id}")
+                print(f"Failed to create metadata record for project {project_id}")
                 return False
                 
         except Exception as e:
-            logger.error(f"Failed to create metadata record: {e}")
+            print(f"Failed to create metadata record: {e}")
             return False
     
     # Private helper methods
@@ -640,11 +644,14 @@ Project Summary:
                 'created_at': result.timestamp.isoformat()
             }
             
-            self.supabase.table("project_metadata").insert(result_data).execute()
-            logger.info(f"Stored onboarding result for project {result.project_id}")
+            print(f"Storing onboarding result: {result_data}")
+            
+            # Use upsert to handle duplicate project_id
+            self.supabase.table("project_metadata").upsert(result_data, on_conflict="project_id").execute()
+            print(f"Stored onboarding result for project {result.project_id}")
             
         except Exception as e:
-            logger.error(f"Failed to store onboarding result: {e}")
+            print(f"Failed to store onboarding result: {e}")
     
     async def _validate_metadata(self, metadata: ProjectMetadata) -> bool:
         """Validate generated metadata."""
