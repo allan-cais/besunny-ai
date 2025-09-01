@@ -338,16 +338,17 @@ class ProjectOnboardingAIService:
             True if successful, False otherwise
         """
         try:
-            # Create metadata record
+            # Create metadata record in project_metadata table
             record_data = {
                 'project_id': project_id,
-                'metadata': metadata.model_dump(),
-                'generated_at': datetime.now().isoformat(),
-                'model_used': self.model,
-                'confidence_score': metadata.confidence_score
+                'normalized_tags': metadata.tags,
+                'categories': [metadata.category],
+                'reference_keywords': metadata.required_skills,
+                'notes': metadata.description,
+                'created_at': datetime.now().isoformat()
             }
             
-            result = self.supabase.table("ai_generated_metadata") \
+            result = self.supabase.table("project_metadata") \
                 .insert(record_data) \
                 .execute()
             
@@ -500,10 +501,15 @@ Project Summary:
     async def _store_onboarding_result(self, result: ProjectOnboardingResult):
         """Store onboarding result in database."""
         try:
-            result_data = result.model_dump()
-            result_data['timestamp'] = result_data['timestamp'].isoformat()
+            # Store result in project_metadata table as additional metadata
+            result_data = {
+                'project_id': result.project_id,
+                'notes': f"AI Onboarding Result: {'Success' if result.success else 'Failed'} - Processing time: {result.processing_time_ms}ms - {result.error_message or ''}",
+                'created_at': result.timestamp.isoformat()
+            }
             
-            self.supabase.table("project_onboarding_results").insert(result_data).execute()
+            self.supabase.table("project_metadata").insert(result_data).execute()
+            logger.info(f"Stored onboarding result for project {result.project_id}")
             
         except Exception as e:
             logger.error(f"Failed to store onboarding result: {e}")
