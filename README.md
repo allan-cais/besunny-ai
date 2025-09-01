@@ -1,180 +1,199 @@
-# BeSunny.ai - Intelligent Workspace
+# BeSunny.ai - Full Stack AI Platform
 
-A modern, intelligent development workspace built with React, TypeScript, and Supabase.
+A comprehensive AI-powered platform that integrates Google services, AI orchestration, and intelligent document processing to streamline your workflow.
 
-## Features
+## 🚀 Features
 
-- **User Authentication**: Complete Supabase authentication system with login, signup, and password reset
-- **User Management**: Profile editing and account management
-- **Real-time Chat**: AI-powered chat interface with message history
-- **Modern UI**: Beautiful, responsive interface built with shadcn/ui components
-- **Theme Support**: Light, dark, and system theme modes
-- **Project Management**: Organize your work with projects and knowledge spaces
-- **Virtual Email Addresses**: Unique email addresses for document ingestion
-- **Google Drive Integration**: Real-time file monitoring and synchronization
-- **Document Management**: Intelligent document processing and classification
+- **🤖 AI Orchestration** - Intelligent document classification and processing
+- **📅 Google Calendar Integration** - Smart scheduling and meeting management
+- **📁 Google Drive Integration** - Automated file monitoring and processing
+- **📧 Gmail Integration** - Intelligent email classification and organization
+- **👥 Attendee Management** - Automated meeting bot integration
+- **🔍 Vector Search** - Semantic document search and retrieval
+- **📊 Real-time Analytics** - Live insights and performance monitoring
 
-## Authentication Setup
-
-This application uses Supabase for authentication. To set up authentication:
-
-1. **Create a Supabase Project**:
-   - Go to [supabase.com](https://supabase.com) and create a new project
-   - Note your project URL and anon key
-
-2. **Configure Environment Variables**:
-   - Copy `env.example` to `.env.local`
-   - Update the Supabase configuration:
-   ```env
-   VITE_SUPABASE_URL=https://your-project.supabase.co
-   VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
-   ```
-
-3. **Database Setup**:
-   - The application will automatically create user records in the `users` table when users sign up
-   - Make sure your Supabase project has the required tables (users, projects, chat_sessions, etc.)
-
-## Getting Started
-
-1. **Install Dependencies**:
-   ```bash
-   npm install
-   ```
-
-2. **Set up Environment Variables**:
-   ```bash
-   cp env.example .env.local
-   # Edit .env.local with your configuration
-   ```
-
-3. **Start Development Server**:
-   ```bash
-   npm run dev
-   ```
-
-4. **Open in Browser**:
-   Navigate to `http://localhost:5173`
-
-## Authentication Flow
-
-1. **Landing Page**: Users start at the main landing page
-2. **Authentication**: Click "LOGIN" to access the authentication page
-3. **Sign Up/Login**: Users can create accounts or sign in with existing credentials
-4. **Dashboard**: Authenticated users are redirected to the main dashboard
-5. **Account Management**: Users can manage their profile and account settings via the account menu
-
-## User Management
-
-- **Profile Editing**: Users can update their name and view their email
-- **Account Settings**: Access to settings and integrations (placeholder)
-- **Logout**: Secure logout functionality
-- **Password Reset**: Users can reset their password via email
-
-## Project Structure
+## 🏗️ Architecture
 
 ```
-src/
-├── components/
-│   ├── auth/           # Authentication components
-│   │   ├── LoginForm.tsx
-│   │   ├── SignUpForm.tsx
-│   │   ├── ForgotPasswordForm.tsx
-│   │   ├── UserAccountMenu.tsx
-│   │   └── ProtectedRoute.tsx
-│   └── ui/             # UI components
-├── pages/
-│   ├── auth.tsx        # Authentication page
-│   ├── dashboard.tsx   # Main dashboard
-│   └── index.tsx       # Landing page
-├── providers/
-│   ├── AuthProvider.tsx    # Authentication context
-│   └── ThemeProvider.tsx   # Theme context
-└── lib/
-    └── supabase.ts     # Supabase client and types
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   React         │    │   Python        │    │   External      │
+│   Frontend      │◄──►│   Backend       │◄──►│   Services      │
+│   (TypeScript)  │    │   (FastAPI)     │    │   (Google, AI)  │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+          │                       │                       │
+          ▼                       ▼                       ▼
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Supabase      │    │   Redis         │    │   Vector DB     │
+│   (Auth/DB)     │    │   (Cache/Tasks) │    │   (Pinecone)    │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
-## Technologies Used
+## 🚀 Quick Start
 
-- **Frontend**: React 18, TypeScript, Vite
-- **UI Components**: shadcn/ui, Tailwind CSS
-- **Authentication**: Supabase Auth
-- **Database**: Supabase PostgreSQL
-- **State Management**: React Context, React Query
-- **Routing**: React Router DOM
+### Prerequisites
+- Node.js 18+ and npm
+- Python 3.11+
+- Docker (optional, for local development)
+- Supabase account
+- Google Cloud Platform account
+- OpenAI API key
 
-## Development
+### 1. Clone the Repository
+```bash
+git clone <repository-url>
+cd besunny-ai
+```
 
-### Available Scripts
+### 2. Frontend Setup
+```bash
+# Install dependencies
+npm install
 
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm run preview` - Preview production build
-- `npm run lint` - Run ESLint
+# Start development server
+npm run dev
+```
 
-### Environment Variables
+### 3. Backend Setup
+```bash
+cd backend
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `VITE_SUPABASE_URL` | Your Supabase project URL | Yes |
-| `VITE_SUPABASE_ANON_KEY` | Your Supabase anon key | Yes |
-| `VITE_N8N_WEBHOOK_URL` | N8N webhook URL for AI chat | No |
-| `VITE_N8N_DRIVESYNC_WEBHOOK_URL` | N8N webhook URL for Drive sync | No |
+# Install Python dependencies
+pip install -r requirements.txt
 
-## Contributing
+# Copy environment template
+cp env.example .env
+# Edit .env with your API keys
+
+# Start the backend
+python start.py
+```
+
+### 4. Environment Configuration
+Create `.env` files in both root and backend directories with:
+- Supabase credentials
+- Google OAuth credentials
+- OpenAI API key
+- Other service API keys
+
+## 🔧 Development
+
+### Frontend Development
+```bash
+npm run dev          # Start development server
+npm run build        # Build for production
+npm run preview      # Preview production build
+npm run lint         # Run ESLint
+npm run type-check   # Run TypeScript checks
+```
+
+### Backend Development
+```bash
+cd backend
+python start.py      # Start development server
+pytest               # Run tests
+black .              # Format code
+isort .              # Sort imports
+```
+
+### Full Stack Development
+```bash
+# Start both frontend and backend
+./start-fullstack.sh
+```
+
+## 📚 API Documentation
+
+- **Frontend**: http://localhost:3000
+- **Backend API**: http://localhost:8000
+- **API Docs**: http://localhost:8000/docs
+- **Health Check**: http://localhost:8000/health
+
+## 🚀 Deployment
+
+### Railway Deployment (Recommended)
+```bash
+# Deploy full stack to Railway
+./deploy-railway-fullstack.sh
+```
+
+### Manual Deployment
+```bash
+# Build and deploy frontend
+./deploy-frontend.sh
+
+# Deploy backend
+./deploy-railway-fullstack.sh
+```
+
+### Docker Deployment
+```bash
+# Build and run with Docker Compose (Recommended)
+docker-compose up
+
+# Or build and run individually
+./docker-build.sh
+docker run -p 3000:80 besunny-frontend:latest
+docker run -p 8000:8000 besunny-backend:latest
+```
+
+## 🧪 Testing
+
+```bash
+# Frontend tests
+npm test
+
+# Backend tests
+cd backend
+pytest
+
+# Full stack tests
+./test-fullstack.sh
+```
+
+## 📁 Project Structure
+
+```
+besunny-ai/
+├── src/                    # React frontend source
+│   ├── components/         # React components
+│   ├── pages/             # Page components
+│   ├── hooks/             # Custom React hooks
+│   ├── lib/               # Utility libraries
+│   └── config/            # Configuration files
+├── backend/                # Python backend
+│   ├── app/               # FastAPI application
+│   ├── services/          # Business logic services
+│   ├── models/            # Data models
+│   └── tests/             # Backend tests
+├── supabase/               # Supabase configuration
+├── database/               # Database migrations
+└── docs/                   # Documentation
+```
+
+## 🔌 Integrations
+
+- **Google Services**: Calendar, Drive, Gmail
+- **AI Services**: OpenAI GPT, Vector embeddings
+- **Database**: Supabase (PostgreSQL)
+- **Authentication**: Supabase Auth + Google OAuth
+- **Caching**: Redis
+- **Vector DB**: Pinecone
+
+## 🤝 Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+4. Add tests for new functionality
+5. Ensure all tests pass
+6. Submit a pull request
 
-## License
+## 📄 License
 
-This project is licensed under the MIT License.
+This project is part of the BeSunny.ai platform.
 
-## Database Setup
+## 🆘 Support
 
-### Required Tables
-
-The application uses the existing database tables in your Supabase project:
-
-1. **users** - Stores user information (created automatically by Supabase Auth)
-2. **projects** - Stores project information with `created_by` field linking to users
-3. **chat_sessions** - Stores chat session information
-4. **chat_messages** - Stores individual chat messages
-5. **documents** - Stores document information with Google Drive integration
-6. **drive_file_watches** - Tracks Google Drive file monitoring
-7. **drive_webhook_logs** - Audit trail for Drive webhook events
-
-### Project Management
-
-- Users can create new projects via the "+ Project" button in the Projects menu
-- Projects are automatically linked to the creator via the `created_by` field
-- Users can see all projects they have created
-- The existing `projects` table structure is used without modification
-
-## Google Drive Integration
-
-The application includes a comprehensive Google Drive File Watch System:
-
-### Features
-- **Real-time File Monitoring**: Automatically detect changes to Google Drive files
-- **Webhook Processing**: Handle file updates and deletions via Google Drive webhooks
-- **Status Tracking**: Visual indicators for file watch status and sync state
-- **n8n Integration**: Automatic triggering of n8n workflows for file synchronization
-
-### Setup
-1. **Google Service Account**: Configure Google service account credentials in Supabase environment variables
-2. **Edge Functions**: Deploy the `subscribe-to-drive-file` and `drive-webhook-handler` functions
-3. **Database Migration**: Run the Google Drive File Watch migration (`009_add_google_drive_file_watch.sql`)
-4. **n8n Webhook**: Configure the `N8N_DRIVESYNC_WEBHOOK_URL` environment variable
-
-### Usage
-- Users can subscribe to Google Drive files via the `GoogleDriveWatchManager` component
-- File changes are automatically detected and processed
-- Status badges show current watch state and last sync time
-- Deleted files are automatically marked and cleaned up
-
-For detailed implementation information, see [Google Drive File Watch System Documentation](docs/GOOGLE_DRIVE_FILE_WATCH_SYSTEM.md).
-
-## User Management
+- **Documentation**: Check the `/docs` folder
+- **Issues**: Create GitHub issues for bugs or feature requests
+- **Discussions**: Use GitHub Discussions for questions

@@ -1,5 +1,35 @@
-[build]
-builder = "nixpacks"
+# Railway configuration for BeSunny.ai Monorepo
 
-[deploy]
-startCommand = "npm start"
+# Deploying both frontend and backend services from monorepo structure
+
+# Frontend service
+[[services]]
+name = "besunny-frontend"
+builder = "dockerfile"
+dockerfilePath = "frontend/Dockerfile"
+
+[services.besunny-frontend.build.environment]
+NODE_ENV = "production"
+
+[services.besunny-frontend.deploy]
+healthcheckPath = "/"
+healthcheckTimeout = 300
+healthcheckInterval = 30
+
+# Backend service
+[[services]]
+name = "besunny-backend"
+builder = "dockerfile"
+dockerfilePath = "backend/Dockerfile"
+
+[services.besunny-backend.build.environment]
+ENVIRONMENT = "production"
+DEBUG = "false"
+HOST = "0.0.0.0"
+PORT = "8000"
+FORCE_HTTPS = "true"
+
+[services.besunny-backend.deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+healthcheckInterval = 30

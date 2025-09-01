@@ -3,7 +3,7 @@ Security module for BeSunny.ai Python backend.
 Handles JWT tokens, password hashing, and authentication.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Union
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -45,9 +45,9 @@ class SecurityManager:
         to_encode = data.copy()
         
         if expires_delta:
-            expire = datetime.utcnow() + expires_delta
+            expire = datetime.now(timezone.utc) + expires_delta
         else:
-            expire = datetime.utcnow() + timedelta(
+            expire = datetime.now(timezone.utc) + timedelta(
                 minutes=self.settings.access_token_expire_minutes
             )
         
@@ -76,7 +76,7 @@ class SecurityManager:
         """Create JWT refresh token."""
         to_encode = data.copy()
         # Refresh tokens have longer expiration
-        expire = datetime.utcnow() + timedelta(days=7)
+        expire = datetime.now(timezone.utc) + timedelta(days=7)
         to_encode.update({"exp": expire, "type": "refresh"})
         encoded_jwt = jwt.encode(
             to_encode, 
@@ -93,39 +93,180 @@ security_manager = SecurityManager()
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ) -> dict:
-    """Dependency to get current authenticated user from JWT token."""
+    """Dependency to get current authenticated user from Supabase token."""
+    # Now uses Supabase authentication by default instead of custom JWT
+    return await get_current_user_from_supabase_token(credentials)
+
+
+async def get_current_user_from_supabase_token(
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+) -> dict:
+    """Dependency to get current authenticated user from Supabase token."""
     try:
         token = credentials.credentials
-        payload = security_manager.verify_token(token)
+        # Validate the Supabase token by making a request to Supabase
+        from .supabase_config import get_supabase, get_supabase_config
         
-        if payload is None:
+        # Check Supabase configuration first
+        supabase_config = get_supabase_config()
+        
+        if not supabase_config.is_initialized():
+            if not supabase_config.initialize():
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Supabase service unavailable",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+        
+        supabase = get_supabase()
+        if not supabase:
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Could not validate credentials",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Supabase client unavailable",
                 headers={"WWW-Authenticate": "Bearer"},
             )
         
-        user_id: str = payload.get("sub")
-        if user_id is None:
+        # Use the token to get user info from Supabase
+        response = supabase.auth.get_user(token)
+        
+        # Handle different response types from Supabase client
+        # Supabase v2+ returns UserResponse directly, not a wrapper
+        try:
+            # Check if this is a UserResponse object directly (Supabase v2+)
+            if hasattr(response, 'id') and hasattr(response, 'email'):
+                user = response
+            else:
+                # Legacy format with response.user (Supabase v1)
+                if not hasattr(response, 'user') or not response.user:
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="No user found for token",
+                        headers={"WWW-Authenticate": "Bearer"},
+                    )
+                user = response.user
+                
+        except AttributeError as attr_error:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token payload",
+                detail="Invalid response format from Supabase",
                 headers={"WWW-Authenticate": "Bearer"},
             )
         
-        # In a real implementation, you would fetch user from database here
-        # For now, we'll return the payload
         return {
-            "id": user_id,
-            "email": payload.get("email"),
-            "username": payload.get("username"),
-            "permissions": payload.get("permissions", []),
+            "id": user.id,
+            "email": user.email,
+            "username": user.user_metadata.get("username"),
+            "created_at": user.created_at or datetime.now(datetime.timezone.utc),
+            "updated_at": user.last_sign_in_at or datetime.now(datetime.timezone.utc),
+            "permissions": user.user_metadata.get("permissions", []),
         }
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Authentication error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Supabase authentication failed: {str(e)}",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+
+async def get_current_user_hybrid(
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+) -> dict:
+    """Dependency to get current authenticated user from either JWT or Supabase token."""
+    try:
+        token = credentials.credentials
+        
+        # First try to validate as JWT token
+        try:
+            payload = security_manager.verify_token(token)
+            if payload and payload.get("sub"):
+                return {
+                    "id": payload.get("sub"),
+                    "email": payload.get("email"),
+                    "username": payload.get("username"),
+                    "permissions": payload.get("permissions", []),
+                }
+        except Exception:
+            pass
+        
+        # If JWT validation fails, try Supabase token
+        try:
+            from .supabase_config import get_supabase, get_supabase_config
+            
+            # Check Supabase configuration first
+            supabase_config = get_supabase_config()
+            
+            if not supabase_config.is_initialized():
+                if not supabase_config.initialize():
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail="Supabase service unavailable",
+                        headers={"WWW-Authenticate": "Bearer"},
+                    )
+            
+            supabase = get_supabase()
+            if not supabase:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Supabase client unavailable",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+            
+            response = supabase.auth.get_user(token)
+            
+            # Handle different Supabase response formats
+            # Supabase v2+ returns UserResponse directly, not a wrapper
+            try:
+                # Check if this is a UserResponse object directly (Supabase v2+)
+                if hasattr(response, 'id') and hasattr(response, 'email'):
+                    user = response
+                    
+                    return {
+                        "id": user.id,
+                        "email": user.email,
+                        "username": user.user_metadata.get("username") if hasattr(user, 'user_metadata') else None,
+                        "permissions": user.user_metadata.get("permissions", []) if hasattr(user, 'user_metadata') else [],
+                    }
+                else:
+                    # Legacy format with response.user (Supabase v1)
+                    if hasattr(response, 'user') and response.user:
+                        user = response.user
+                        
+                        return {
+                            "id": user.id,
+                            "email": user.email,
+                            "username": user.user_metadata.get("username") if hasattr(user, 'user_metadata') else None,
+                            "permissions": user.user_metadata.get("permissions", []) if hasattr(user, 'user_metadata') else [],
+                        }
+                    else:
+                        # No user found
+                        raise HTTPException(
+                            status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail="No user found for token",
+                            headers={"WWW-Authenticate": "Bearer"},
+                        )
+                
+            except AttributeError:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid response format from Supabase",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=f"Token validation failed: {str(e)}",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication failed",
@@ -143,6 +284,38 @@ async def get_current_active_user(
             detail="Inactive user"
         )
     return current_user
+
+
+async def get_current_user_optional(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)
+) -> Optional[dict]:
+    """Dependency to get current user if authenticated, None otherwise."""
+    if not credentials:
+        return None
+    
+    try:
+        token = credentials.credentials
+        payload = security_manager.verify_token(token)
+        
+        if payload is None:
+            return None
+        
+        user_id: str = payload.get("sub")
+        if user_id is None:
+            return None
+        
+        # In a real implementation, you would fetch user from database here
+        # For now, we'll return the payload
+        return {
+            "id": user_id,
+            "email": payload.get("email"),
+            "username": payload.get("username"),
+            "permissions": payload.get("permissions", []),
+        }
+        
+    except Exception as e:
+        logger.warning(f"Optional authentication failed: {e}")
+        return None
 
 
 def require_permission(permission: str):
@@ -180,7 +353,7 @@ class RateLimiter:
     
     def is_allowed(self, identifier: str) -> bool:
         """Check if request is allowed based on rate limits."""
-        now = datetime.utcnow()
+        now = datetime.now(datetime.timezone.utc)
         window_start = now - timedelta(seconds=self.settings.rate_limit_window)
         
         # Clean old requests

@@ -21,10 +21,16 @@ celery_app = Celery(
     backend=settings.redis_url,
     include=[
         "app.services.email.tasks",
+        "app.services.email.gmail_watch_setup_tasks",
         "app.services.classification.tasks",
         "app.services.drive.tasks",
+        "app.services.drive.drive_file_subscription_tasks",
         "app.services.calendar.tasks",
         "app.services.attendee.tasks",
+        "app.services.ai.tasks",
+        "app.services.sync.tasks",
+        "app.services.auth.tasks",
+        "app.services.user.tasks",
     ]
 )
 
@@ -40,10 +46,16 @@ celery_app.conf.update(
     # Task routing
     task_routes={
         "app.services.email.tasks.*": {"queue": "email"},
+        "app.services.email.gmail_watch_setup_tasks.*": {"queue": "email"},
         "app.services.classification.tasks.*": {"queue": "ai"},
         "app.services.drive.tasks.*": {"queue": "drive"},
+        "app.services.drive.drive_file_subscription_tasks.*": {"queue": "drive"},
         "app.services.calendar.tasks.*": {"queue": "calendar"},
         "app.services.attendee.tasks.*": {"queue": "attendee"},
+        "app.services.ai.tasks.*": {"queue": "ai"},
+        "app.services.sync.tasks.*": {"queue": "sync"},
+        "app.services.auth.tasks.*": {"queue": "auth"},
+        "app.services.user.tasks.*": {"queue": "user"},
     },
     
     # Task execution
@@ -83,32 +95,116 @@ celery_app.conf.update(
 celery_app.conf.beat_schedule = {
     # Email processing tasks
     "process-pending-emails": {
-        "task": "app.services.email.tasks.process_pending_emails",
+        "task": "email.process_pending_emails",
         "schedule": crontab(minute="*/5"),  # Every 5 minutes
     },
     
     # Drive monitoring tasks
     "sync-drive-files": {
-        "task": "app.services.drive.tasks.sync_drive_files",
+        "task": "drive.sync_files",
         "schedule": crontab(minute="*/15"),  # Every 15 minutes
     },
     
     # Calendar synchronization
     "sync-calendar-events": {
-        "task": "app.services.calendar.tasks.sync_calendar_events",
+        "task": "calendar.sync_events",
         "schedule": crontab(minute="*/30"),  # Every 30 minutes
+    },
+    
+    # Attendee polling
+    "attendee-polling-cron": {
+        "task": "attendee.polling_cron",
+        "schedule": crontab(minute="*/10"),  # Every 10 minutes
+    },
+    
+    # Calendar watch renewal
+    "renew-calendar-watches": {
+        "task": "calendar.renew_watches",
+        "schedule": crontab(hour="*/6"),  # Every 6 hours
+    },
+    
+    # Calendar webhook renewal
+    "renew-calendar-webhooks": {
+        "task": "calendar.renew_webhooks",
+        "schedule": crontab(hour="*/6"),  # Every 6 hours
+    },
+    
+    # Drive watch cleanup
+    "cleanup-drive-watches": {
+        "task": "drive.cleanup_expired_watches",
+        "schedule": crontab(hour=1, minute=0),  # Daily at 1 AM
+    },
+    
+    # Gmail watch renewal
+    "renew-gmail-watches": {
+        "task": "email.renew_gmail_watches",
+        "schedule": crontab(hour="*/4"),  # Every 4 hours
+    },
+    
+    # Gmail watch setup
+    "setup-gmail-watches": {
+        "task": "email.gmail_watch_setup_cron",
+        "schedule": crontab(hour="*/2"),  # Every 2 hours
+    },
+    
+    # Drive file subscription
+    "setup-drive-file-subscriptions": {
+        "task": "drive.file_subscription_cron",
+        "schedule": crontab(hour="*/3"),  # Every 3 hours
+    },
+    
+    # Username management
+    "manage-usernames": {
+        "task": "user.username_management_cron",
+        "schedule": crontab(hour=3, minute=0),  # Daily at 3 AM
     },
     
     # AI model updates
     "update-ai-models": {
-        "task": "app.services.classification.tasks.update_ai_models",
+        "task": "ai.update_models",
         "schedule": crontab(hour=2, minute=0),  # Daily at 2 AM
     },
     
-    # Cleanup tasks
-    "cleanup-old-tasks": {
-        "task": "app.core.tasks.cleanup_old_tasks",
-        "schedule": crontab(hour=3, minute=0),  # Daily at 3 AM
+    # Sync optimization
+    "optimize-sync-intervals": {
+        "task": "sync.optimize_intervals",
+        "schedule": crontab(hour=4, minute=0),  # Daily at 4 AM
+    },
+    
+    # Google token refresh
+    "refresh-google-tokens": {
+        "task": "auth.refresh_google_tokens",
+        "schedule": crontab(minute="*/30"),  # Every 30 minutes
+    },
+    
+    # Proactive Google token refresh (refresh tokens before they expire)
+    "refresh-expiring-google-tokens": {
+        "task": "auth.refresh_expiring_google_tokens",
+        "schedule": crontab(minute="*/15"),  # Every 15 minutes
+    },
+    
+    # Google token validation
+    "validate-google-tokens": {
+        "task": "auth.validate_google_tokens",
+        "schedule": crontab(hour=5, minute=0),  # Daily at 5 AM
+    },
+    
+    # Session cleanup
+    "cleanup-expired-sessions": {
+        "task": "auth.cleanup_expired_sessions",
+        "schedule": crontab(hour=6, minute=0),  # Daily at 6 AM
+    },
+    
+    # Token revocation
+    "revoke-expired-tokens": {
+        "task": "auth.revoke_expired_tokens",
+        "schedule": crontab(hour=7, minute=0),  # Daily at 7 AM
+    },
+    
+    # Batch token maintenance
+    "batch-token-maintenance": {
+        "task": "auth.batch_token_maintenance",
+        "schedule": crontab(hour=8, minute=0),  # Daily at 8 AM
     },
     
     # Health checks
@@ -203,27 +299,32 @@ def cleanup_old_tasks():
         return {"error": str(e), "timestamp": time.time()}
 
 
-# Task event handlers
-@celery_app.task_success.connect
+# Task event handlers - using modern Celery event registration
 def task_success_handler(sender=None, **kwargs):
     """Handle successful task completion."""
     logger.info(f"Task {sender.name} completed successfully")
 
 
-@celery_app.task_failure.connect
 def task_failure_handler(sender=None, task_id=None, exception=None, **kwargs):
     """Handle task failure."""
     logger.error(f"Task {sender.name} failed: {exception}")
 
 
-@celery_app.task_revoked.connect
 def task_revoked_handler(sender=None, request=None, terminated=None, signum=None, **kwargs):
     """Handle task revocation."""
     logger.warning(f"Task {sender.name} was revoked")
 
 
+def register_celery_event_handlers():
+    """Register Celery event handlers after the app is fully initialized."""
+    try:
+        celery_app.task_success.connect(task_success_handler)
+        celery_app.task_failure.connect(task_failure_handler)
+        celery_app.task_revoked.connect(task_revoked_handler)
+        logger.info("Celery event handlers registered successfully")
+    except Exception as e:
+        logger.warning(f"Failed to register Celery event handlers: {e}")
+
+
 # Import time to avoid circular imports
 import time
-from .database import db_manager
-from .redis_client import redis_client
-from .external_services import check_external_services

@@ -1,0 +1,52 @@
+# Development Dockerfile for BeSunny.ai Backend
+# Optimized for local development with hot reloading
+
+FROM python:3.11-bullseye
+
+# Set environment variables for development
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV ENVIRONMENT=development
+ENV DEBUG=true
+ENV HOST=0.0.0.0
+ENV PORT=8000
+ENV PYTHONPATH=/app
+
+# Set work directory
+WORKDIR /app
+
+# Install system dependencies with retry logic
+RUN apt-get update --fix-missing --allow-releaseinfo-change && \
+    apt-get install -y \
+    curl \
+    gcc \
+    g++ \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements first for better caching
+COPY backend-service/requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Development dependencies removed due to network connectivity issues
+# These can be installed manually if needed during development
+
+# Copy backend code
+COPY . .
+
+# Create a simple health check script
+RUN echo '#!/bin/sh\ncurl -f http://localhost:8000/health || exit 1' > /healthcheck.sh && \
+    chmod +x /healthcheck.sh
+
+# Expose port
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD /healthcheck.sh
+
+# Start the FastAPI application with hot reloading
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

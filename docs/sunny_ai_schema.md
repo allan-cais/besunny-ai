@@ -180,10 +180,10 @@ CREATE TABLE meetings (
     project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
     attendee_bot_id UUID REFERENCES bots(id),
     bot_name TEXT DEFAULT 'Sunny AI Notetaker',
-    bot_status TEXT DEFAULT 'pending' CHECK (bot_status = ANY (ARRAY['pending', 'bot_scheduled', 'bot_joined', 'transcribing', 'completed', 'failed'])),
+    bot_status TEXT DEFAULT 'pending' CHECK (bot_status = ANY (ARRAY['pending', 'bot_scheduled', 'bot_joined', 'transcribing', 'post_processing', 'completed', 'failed'])),
     event_status TEXT DEFAULT 'needsAction' CHECK (event_status = ANY (ARRAY['accepted', 'declined', 'tentative', 'needsAction'])),
     bot_configuration JSONB,
-    bot_deployment_method TEXT DEFAULT 'manual',
+    bot_deployment_method TEXT DEFAULT 'manual' CHECK (bot_deployment_method = ANY (ARRAY['manual', 'automatic', 'scheduled']),
     bot_chat_message TEXT DEFAULT 'Hi, I''m here to transcribe this meeting!',
     auto_bot_notification_sent BOOLEAN DEFAULT false,
     auto_scheduled_via_email BOOLEAN DEFAULT false,
@@ -200,6 +200,8 @@ CREATE TABLE meetings (
     transcript_speakers JSONB,
     transcript_segments JSONB,
     transcript_retrieved_at TIMESTAMP WITH TIME ZONE,
+    transcript_ready_for_classification BOOLEAN DEFAULT false,
+    transcript_ready_for_embedding BOOLEAN DEFAULT false,
     last_polled_at TIMESTAMP WITH TIME ZONE,
     next_poll_time TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
@@ -211,10 +213,37 @@ CREATE TABLE meetings (
 COMMENT ON COLUMN meetings.bot_configuration IS 'Configuration for the bot attending this meeting';
 COMMENT ON COLUMN meetings.transcript_audio_url IS 'URL to the audio recording if available';
 COMMENT ON COLUMN meetings.transcript_recording_url IS 'URL to the video recording if available';
-COMMENT ON COLUMN meetings.transcript_participants IS 'Array of participant information from transcript';
-COMMENT ON COLUMN meetings.transcript_speakers IS 'Array of unique speakers identified in transcript';
-COMMENT ON COLUMN meetings.transcript_segments IS 'Detailed transcript segments with timestamps and speaker info';
-COMMENT ON COLUMN meetings.transcript_language IS 'Language of the transcript';
+COMMENT ON COLUMN meetings.bot_deployment_method IS 'How the bot was deployed: manual (UI), automatic (virtual email), or scheduled';
+COMMENT ON COLUMN meetings.transcript_ready_for_classification IS 'Flag indicating transcript is ready for classification agent processing';
+COMMENT ON COLUMN meetings.transcript_ready_for_embedding IS 'Flag indicating transcript is ready for vector embedding workflow';
+```
+
+### Meeting Bots Table
+```sql
+CREATE TABLE meeting_bots (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    bot_id TEXT NOT NULL UNIQUE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    meeting_url TEXT NOT NULL,
+    bot_name TEXT NOT NULL,
+    status TEXT DEFAULT 'created',
+    attendee_project_id TEXT,
+    deployment_method TEXT DEFAULT 'manual' CHECK (deployment_method = ANY (ARRAY['manual', 'automatic']),
+    metadata JSONB,
+    is_recording BOOLEAN DEFAULT false,
+    is_paused BOOLEAN DEFAULT false,
+    last_state_change TIMESTAMP WITH TIME ZONE,
+    event_type TEXT,
+    event_sub_type TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+-- Add comment
+COMMENT ON COLUMN meeting_bots.deployment_method IS 'How the bot was deployed: manual (UI) or automatic (virtual email)';
+COMMENT ON COLUMN meeting_bots.metadata IS 'Additional metadata about the bot deployment';
+COMMENT ON COLUMN meeting_bots.event_type IS 'Type of event that triggered the last state change';
+COMMENT ON COLUMN meeting_bots.event_sub_type IS 'Sub-type of event that triggered the last state change';
 ```
 
 ### Chat Sessions Table
