@@ -720,6 +720,9 @@ async def process_project_onboarding(
     AI-powered project metadata including categories, tags, and recommendations.
     """
     try:
+        logger.info(f"Starting project onboarding with payload: {payload}")
+        logger.info(f"Current user: {current_user}")
+        
         onboarding_service = ProjectOnboardingAIService()
         
         # Extract data from payload
@@ -727,15 +730,20 @@ async def process_project_onboarding(
         user_id = payload.get('user_id')
         summary = payload.get('summary', {})
         
+        logger.info(f"Extracted data - project_id: {project_id}, user_id: {user_id}")
+        
         if not project_id or not user_id:
             raise HTTPException(status_code=400, detail="Missing required fields: project_id and user_id")
         
         # Process project onboarding
+        logger.info(f"Calling onboarding service for project {project_id}")
         result = await onboarding_service.process_project_onboarding(
             project_id=project_id,
             user_id=user_id,
             summary=summary
         )
+        
+        logger.info(f"Onboarding service result: {result}")
         
         if not result.get('success'):
             raise HTTPException(status_code=500, detail=result.get('error', 'Project onboarding failed'))
@@ -744,4 +752,7 @@ async def process_project_onboarding(
         
     except Exception as e:
         logger.error(f"Project onboarding failed: {str(e)}")
+        logger.error(f"Exception type: {type(e)}")
+        import traceback
+        logger.error(f"Full traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Project onboarding failed: {str(e)}")

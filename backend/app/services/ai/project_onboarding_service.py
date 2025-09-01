@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from openai import AsyncOpenAI
 from pydantic import BaseModel
 
-from ...core.database import get_supabase
+from ...core.database import get_supabase_service_client
 from ...core.config import get_settings
 from ...models.schemas.project import Project
 
@@ -50,7 +50,7 @@ class ProjectOnboardingAIService:
     
     def __init__(self):
         self.settings = get_settings()
-        self.supabase = get_supabase()
+        self.supabase = get_supabase_service_client()
         self.client = None  # Initialize lazily
         self.model = self.settings.openai_model
         
@@ -84,8 +84,10 @@ class ProjectOnboardingAIService:
         
         try:
             logger.info(f"Starting AI project onboarding for project {project_id}")
+            logger.info(f"Summary data: {summary}")
             
             # Generate project metadata using AI
+            logger.info("Generating project metadata...")
             metadata = await self.generate_project_metadata(summary)
             
             # Validate generated metadata
@@ -339,7 +341,7 @@ class ProjectOnboardingAIService:
             # Create metadata record
             record_data = {
                 'project_id': project_id,
-                'metadata': metadata.dict(),
+                'metadata': metadata.model_dump(),
                 'generated_at': datetime.now().isoformat(),
                 'model_used': self.model,
                 'confidence_score': metadata.confidence_score
@@ -498,7 +500,7 @@ Project Summary:
     async def _store_onboarding_result(self, result: ProjectOnboardingResult):
         """Store onboarding result in database."""
         try:
-            result_data = result.dict()
+            result_data = result.model_dump()
             result_data['timestamp'] = result_data['timestamp'].isoformat()
             
             self.supabase.table("project_onboarding_results").insert(result_data).execute()
