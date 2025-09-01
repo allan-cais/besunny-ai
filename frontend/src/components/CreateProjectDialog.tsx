@@ -347,19 +347,10 @@ const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
   };
 
   const handleConfirm = async () => {
-    console.log('handleConfirm called');
     setSubmitting(true);
     setError(null);
 
     try {
-      console.log('Creating project with data:', {
-        name: onboardingData.project_name || '',
-        description: onboardingData.overview || '',
-        status: 'active',
-        updated_at: new Date().toISOString(),
-        created_by: currentUserId
-      });
-      
       // First create the project in Python backend
       const projectResponse = await createProject({
         name: onboardingData.project_name || '',
@@ -367,8 +358,6 @@ const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
         status: 'active',
         owner_id: currentUserId
       });
-
-      console.log('Project creation response:', projectResponse);
 
       if (!projectResponse.success || !projectResponse.data) {
         throw new Error(projectResponse.error || 'Failed to create project');

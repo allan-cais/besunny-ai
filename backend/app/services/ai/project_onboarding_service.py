@@ -83,11 +83,7 @@ class ProjectOnboardingAIService:
         start_time = datetime.now()
         
         try:
-            logger.info(f"Starting AI project onboarding for project {project_id}")
-            logger.info(f"Summary data: {summary}")
-            
             # Generate project metadata using AI
-            logger.info("Generating project metadata...")
             metadata = await self.generate_project_metadata(summary)
             
             # Validate generated metadata
@@ -128,7 +124,7 @@ class ProjectOnboardingAIService:
             # Store result
             await self._store_onboarding_result(result)
             
-            logger.info(f"AI project onboarding completed for project {project_id}")
+
             
             return {
                 'success': True,
@@ -140,7 +136,6 @@ class ProjectOnboardingAIService:
             
         except Exception as e:
             error_message = str(e)
-            logger.error(f"AI project onboarding failed for project {project_id}: {error_message}")
             
             # Create failed result
             result = ProjectOnboardingResult(
@@ -206,28 +201,19 @@ class ProjectOnboardingAIService:
                     "max_tokens": 1000
                 }
                 
-                print(f"Using OpenAI model: {self.model}")
-                
                 # Only add response_format for models that definitely support it
                 # Be conservative - only use for known GPT-4 Turbo models
                 if "gpt-4-turbo" in self.model.lower() or "gpt-4o" in self.model.lower():
                     model_params["response_format"] = {"type": "json_object"}
-                    print("Added response_format: json_object for GPT-4 Turbo model")
-                else:
-                    print(f"Model {self.model} may not support response_format, will parse text response")
-                
-                print(f"Model parameters: {model_params}")
                 response = await self._get_client().chat.completions.create(**model_params)
                 
                 # Parse response
                 result_content = response.choices[0].message.content
-                print(f"OpenAI response content: {result_content}")
                 
                 # Try to parse as JSON, fallback to text parsing if needed
                 try:
                     metadata_dict = self._parse_metadata_response(result_content)
                 except Exception as parse_error:
-                    print(f"Failed to parse JSON response, attempting text extraction: {parse_error}")
                     metadata_dict = self._extract_metadata_from_text(result_content)
                 
                 # Create ProjectMetadata object
@@ -247,15 +233,11 @@ class ProjectOnboardingAIService:
                     confidence_score=metadata_dict.get('confidence_score', 0.8)
                 )
                 
-                print(f"Generated project metadata with confidence score: {metadata.confidence_score}")
                 return metadata
                 
         except Exception as e:
-            print(f"Failed to generate project metadata: {e}")
-            
             # If it's a response_format error, try again without it
             if "response_format" in str(e) and "not supported" in str(e):
-                print("Retrying without response_format parameter...")
                 try:
                     # Retry without response_format
                     retry_params = {
@@ -268,12 +250,10 @@ class ProjectOnboardingAIService:
                         "max_tokens": 1000
                     }
                     
-                    print(f"Retrying with parameters: {retry_params}")
                     response = await self._get_client().chat.completions.create(**retry_params)
                     
                     # Parse response
                     result_content = response.choices[0].message.content
-                    print(f"OpenAI retry response content: {result_content}")
                     
                     # Use text extraction for non-JSON response
                     metadata_dict = self._extract_metadata_from_text(result_content)
@@ -295,11 +275,9 @@ class ProjectOnboardingAIService:
                         confidence_score=metadata_dict.get('confidence_score', 0.8)
                     )
                     
-                    print(f"Generated project metadata with retry, confidence score: {metadata.confidence_score}")
                     return metadata
                     
                 except Exception as retry_error:
-                    print(f"Retry also failed: {retry_error}")
                     raise e
             
             raise e
@@ -388,14 +366,11 @@ class ProjectOnboardingAIService:
                 .execute()
             
             if result.data:
-                print(f"Updated project {project_id} with AI-generated metadata")
                 return True
             else:
-                print(f"Failed to update project {project_id}")
                 return False
                 
         except Exception as e:
-            print(f"Failed to update project metadata: {e}")
             return False
     
     async def create_project_metadata_record(self, project_id: str, metadata: ProjectMetadata) -> bool:
@@ -420,21 +395,16 @@ class ProjectOnboardingAIService:
                 'created_at': datetime.now().isoformat()
             }
             
-            print(f"Creating project_metadata record: {record_data}")
-            
             result = self.supabase.table("project_metadata") \
                 .insert(record_data) \
                 .execute()
             
             if result.data:
-                print(f"Created metadata record for project {project_id}")
                 return True
             else:
-                print(f"Failed to create metadata record for project {project_id}")
                 return False
                 
         except Exception as e:
-            print(f"Failed to create metadata record: {e}")
             return False
     
     # Private helper methods
@@ -574,7 +544,6 @@ Project Summary:
     
     def _extract_metadata_from_text(self, text_content: str) -> Dict[str, Any]:
         """Extract metadata from text response when JSON parsing fails."""
-        print("Extracting metadata from text response")
         
         # Default metadata structure
         metadata = {
@@ -631,7 +600,6 @@ Project Summary:
             words = metadata['title'].split()
             metadata['tags'] = [word.lower() for word in words if len(word) > 3][:5]
         
-        print(f"Extracted metadata from text: {metadata}")
         return metadata
     
     async def _store_onboarding_result(self, result: ProjectOnboardingResult):
@@ -644,14 +612,11 @@ Project Summary:
                 'created_at': result.timestamp.isoformat()
             }
             
-            print(f"Storing onboarding result: {result_data}")
-            
             # Use upsert to handle duplicate project_id
             self.supabase.table("project_metadata").upsert(result_data, on_conflict="project_id").execute()
-            print(f"Stored onboarding result for project {result.project_id}")
             
         except Exception as e:
-            print(f"Failed to store onboarding result: {e}")
+            pass
     
     async def _validate_metadata(self, metadata: ProjectMetadata) -> bool:
         """Validate generated metadata."""
