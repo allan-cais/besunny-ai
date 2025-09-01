@@ -339,8 +339,8 @@ async def gmail_webhook(
             return {
                 "status": "success",
                 "message": processing_result.get("message"),
-                "total_processed": processing_result.get("total_processed", 0),
-                "successful": processing_result.get("successful", 0),
+                "total_processed": str(processing_result.get("total_processed", 0)),
+                "successful": str(processing_result.get("successful", 0)),
                 "timestamp": datetime.now().isoformat()
             }
         else:

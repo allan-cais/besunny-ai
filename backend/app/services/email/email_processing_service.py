@@ -120,8 +120,8 @@ class EmailProcessingService:
                 return {
                     "status": "error",
                     "message": "No message data in webhook",
-                    "total_processed": 0,
-                    "successful": 0
+                    "total_processed": "0",
+                    "successful": "0"
                 }
             
             # Get the email message ID
@@ -130,8 +130,8 @@ class EmailProcessingService:
                 return {
                     "status": "error", 
                     "message": "No message ID in webhook",
-                    "total_processed": 0,
-                    "successful": 0
+                    "total_processed": "0",
+                    "successful": "0"
                 }
             
             # Decode the base64 message ID
@@ -145,8 +145,8 @@ class EmailProcessingService:
                 return {
                     "status": "error",
                     "message": f"Failed to decode message ID: {str(e)}",
-                    "total_processed": 0,
-                    "successful": 0
+                    "total_processed": "0",
+                    "successful": "0"
                 }
             
             # For now, just log the webhook receipt and return success
@@ -158,8 +158,8 @@ class EmailProcessingService:
             return {
                 "status": "success",
                 "message": f"Webhook processed for message {gmail_message_id}",
-                "total_processed": 1,
-                "successful": 1,
+                "total_processed": "1",
+                "successful": "1",
                 "gmail_message_id": gmail_message_id
             }
             
@@ -168,8 +168,8 @@ class EmailProcessingService:
             return {
                 "status": "error",
                 "message": f"Webhook processing error: {str(e)}",
-                "total_processed": 0,
-                "successful": 0
+                "total_processed": "0",
+                "successful": "0"
             }
     
     async def _detect_content_type(self, email_data: Dict[str, Any]) -> Dict[str, Any]:
