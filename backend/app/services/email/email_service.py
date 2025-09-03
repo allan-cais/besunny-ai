@@ -166,7 +166,7 @@ class EmailProcessingService:
                 sender=from_header,
                 status='processed',
                 document_id=document_id,
-                classification_success=bool(classification_result)
+                # classification_success=bool(classification_result)  # Column doesn't exist in schema
             )
             
             return EmailProcessingResult(
@@ -735,7 +735,7 @@ class EmailProcessingService:
         sender: Optional[str] = None,
         status: Optional[str] = None,
         document_id: Optional[str] = None,
-        classification_success: Optional[bool] = None,
+        # classification_success: Optional[bool] = None,  # Column doesn't exist in schema
         error_message: Optional[str] = None
     ):
         """Log email processing activity."""
@@ -762,8 +762,8 @@ class EmailProcessingService:
             if document_id:
                 log_data['document_id'] = document_id
             
-            if classification_success is not None:
-                log_data['classification_success'] = classification_success
+            # if classification_success is not None:
+            #     log_data['classification_success'] = classification_success  # Column doesn't exist in schema
             
             if error_message:
                 log_data['error_message'] = error_message

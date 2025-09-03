@@ -121,6 +121,12 @@ class VirtualEmail(BaseModel):
 class ClassificationPayload(BaseModel):
     """Payload for document classification."""
     document_id: str = Field(..., description="Document ID to classify")
+    user_id: str = Field(..., description="User ID who owns the document")
+    type: str = Field(..., description="Document type (email, drive, etc.)")
+    source: str = Field(..., description="Document source (gmail, drive, etc.)")
+    title: str = Field(..., description="Document title")
+    author: Optional[str] = Field(None, description="Document author")
+    received_at: Optional[str] = Field(None, description="Document received timestamp")
     content: str = Field(..., description="Document content")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Document metadata")
 
