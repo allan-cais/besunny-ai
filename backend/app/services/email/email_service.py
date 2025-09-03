@@ -8,6 +8,7 @@ from datetime import datetime
 import logging
 import re
 import base64
+import uuid
 from fastapi import HTTPException
 
 from ...core.database import get_supabase
@@ -377,6 +378,7 @@ class EmailProcessingService:
             
             # Create document record
             result = supabase.table('documents').insert({
+                'id': str(uuid.uuid4()),  # Generate UUID for document ID
                 'project_id': None,  # Will be assigned by classification service
                 'source': 'gmail',
                 'source_id': gmail_message.id,
