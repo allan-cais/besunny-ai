@@ -15,6 +15,7 @@ from ...core.database import get_supabase
 from ...core.supabase_config import get_supabase_service_client
 from ...core.config import get_settings
 from ...services.ai.classification_service import ClassificationService
+from ...services.ai.vector_embedding_service import VectorEmbeddingService
 from ...models.schemas.email import (
     GmailMessage,
     EmailProcessingResult,
@@ -800,20 +801,29 @@ class EmailProcessingService:
                 user_id=user_id
             )
             
+            # Initiate vector embedding pipeline after classification
+            embedding_result = await self._initiate_vector_embedding_pipeline(
+                content=content,
+                classification_result=classification_result,
+                user_id=user_id
+            )
+            
             # Convert result to expected format
             if classification_result and classification_result.get('project_id'):
                 return {
                     'success': True,
                     'classified_project_id': classification_result['project_id'],
                     'confidence': classification_result.get('confidence', 0.0),
-                    'message': f"Document classified to project {classification_result['project_id']} with confidence {classification_result.get('confidence', 0.0)}"
+                    'message': f"Document classified to project {classification_result['project_id']} with confidence {classification_result.get('confidence', 0.0)}",
+                    'embedding_result': embedding_result
                 }
             else:
                 return {
                     'success': True,
                     'classified_project_id': None,
                     'confidence': 0.0,
-                    'message': 'Document classified as unclassified - no matching project found'
+                    'message': 'Document classified as unclassified - no matching project found',
+                    'embedding_result': embedding_result
                 }
             
         except Exception as e:
@@ -823,4 +833,35 @@ class EmailProcessingService:
                 'classified_project_id': None,
                 'confidence': 0.0,
                 'message': f'Classification error: {str(e)}'
+            }
+    
+    async def _initiate_vector_embedding_pipeline(
+        self, 
+        content: Dict[str, Any], 
+        classification_result: Dict[str, Any], 
+        user_id: str
+    ) -> Dict[str, Any]:
+        """Initiate vector embedding pipeline for classified content."""
+        try:
+            logger.info(f"Starting vector embedding pipeline for content: {content.get('source_id', 'unknown')}")
+            
+            # Initialize vector embedding service
+            vector_service = VectorEmbeddingService()
+            
+            # Embed the classified content
+            embedding_result = await vector_service.embed_classified_content(
+                content=content,
+                classification_result=classification_result,
+                user_id=user_id
+            )
+            
+            logger.info(f"Vector embedding pipeline completed: {embedding_result}")
+            return embedding_result
+            
+        except Exception as e:
+            logger.error(f"Error in vector embedding pipeline: {e}")
+            return {
+                'embedded': False,
+                'error': str(e),
+                'chunks_created': 0
             }
