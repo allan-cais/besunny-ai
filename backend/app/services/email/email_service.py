@@ -14,7 +14,7 @@ from fastapi import HTTPException
 from ...core.database import get_supabase
 from ...core.supabase_config import get_supabase_service_client
 from ...core.config import get_settings
-# from ...services.classification import DocumentClassificationService  # Will be implemented in future version
+from ...services.ai.classification_service import ClassificationService
 from ...models.schemas.email import (
     GmailMessage,
     EmailProcessingResult,
@@ -771,3 +771,56 @@ class EmailProcessingService:
             
         except Exception as e:
             logger.error(f"Error logging email processing: {e}")
+    
+    async def _initiate_classification_agent(self, classification_payload: ClassificationPayload) -> Dict[str, Any]:
+        """Initiate classification agent for document processing."""
+        try:
+            logger.info(f"Classification agent called for document {classification_payload.document_id}")
+            
+            # Initialize classification service
+            classification_service = ClassificationService()
+            
+            # Prepare content for classification
+            content = {
+                'type': 'email',
+                'source_id': classification_payload.document_id,
+                'author': classification_payload.author,
+                'date': classification_payload.received_at,
+                'subject': classification_payload.title,
+                'content_text': classification_payload.content,
+                'metadata': classification_payload.metadata
+            }
+            
+            # Get user ID from the classification payload
+            user_id = classification_payload.user_id
+            
+            # Perform classification
+            classification_result = await classification_service.classify_content(
+                content=content,
+                user_id=user_id
+            )
+            
+            # Convert result to expected format
+            if classification_result and classification_result.get('project_id'):
+                return {
+                    'success': True,
+                    'classified_project_id': classification_result['project_id'],
+                    'confidence': classification_result.get('confidence', 0.0),
+                    'message': f"Document classified to project {classification_result['project_id']} with confidence {classification_result.get('confidence', 0.0)}"
+                }
+            else:
+                return {
+                    'success': True,
+                    'classified_project_id': None,
+                    'confidence': 0.0,
+                    'message': 'Document classified as unclassified - no matching project found'
+                }
+            
+        except Exception as e:
+            logger.error(f"Error in classification agent: {e}")
+            return {
+                'success': False,
+                'classified_project_id': None,
+                'confidence': 0.0,
+                'message': f'Classification error: {str(e)}'
+            }
