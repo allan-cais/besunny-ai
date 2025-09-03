@@ -11,6 +11,7 @@ import base64
 from fastapi import HTTPException
 
 from ...core.database import get_supabase
+from ...core.supabase_config import get_supabase_service_client
 from ...core.config import get_settings
 # from ...services.classification import DocumentClassificationService  # Will be implemented in future version
 from ...models.schemas.email import (
@@ -203,21 +204,29 @@ class EmailProcessingService:
     def _extract_username_from_email(self, email: str) -> Optional[str]:
         """Extract username from email address."""
         if not email:
+            logger.warning("No email provided for username extraction")
             return None
+        
+        logger.info(f"Extracting username from email: '{email}'")
         
         # Extract the part before @
         parts = email.split('@')
         if len(parts) != 2:
+            logger.warning(f"Invalid email format: '{email}'")
             return None
         
         local_part = parts[0]
+        logger.info(f"Local part of email: '{local_part}'")
         
         # Check if it contains a plus sign (plus-addressing)
         if '+' in local_part:
             plus_parts = local_part.split('+')
             if len(plus_parts) >= 2:
-                return plus_parts[1]  # Return the part after the plus sign
+                username = plus_parts[1]  # Return the part after the plus sign
+                logger.info(f"Extracted username: '{username}'")
+                return username
         
+        logger.warning(f"No plus-addressing found in email: '{email}'")
         return None
     
     async def _extract_email_content(self, gmail_message: GmailMessage) -> Dict[str, Any]:
@@ -317,21 +326,28 @@ class EmailProcessingService:
     async def _find_user_by_username(self, username: str) -> Optional[User]:
         """Find user by username."""
         try:
-            supabase = get_supabase()
+            # Use service role client to bypass RLS policies
+            supabase = get_supabase_service_client()
             if not supabase:
-                raise Exception("Supabase client not available")
+                raise Exception("Supabase service client not available")
+            
+            logger.info(f"Looking up user with username: '{username}'")
             
             # Query users table directly
             result = supabase.table('users').select('id, username, email').eq('username', username).execute()
             
+            logger.info(f"User lookup result: {result.data}")
+            
             if result.data and len(result.data) > 0:
                 user_data = result.data[0]
+                logger.info(f"Found user: {user_data}")
                 return User(
                     id=user_data['id'],
                     username=user_data.get('username'),
                     email=user_data.get('email')
                 )
             
+            logger.warning(f"No user found with username: '{username}'")
             return None
             
         except Exception as e:
@@ -705,9 +721,10 @@ class EmailProcessingService:
     ):
         """Log email processing activity."""
         try:
-            supabase = get_supabase()
+            # Use service role client to bypass RLS policies for logging
+            supabase = get_supabase_service_client()
             if not supabase:
-                logger.warning("Supabase client not available for logging")
+                logger.warning("Supabase service client not available for logging")
                 return
             
             log_data = {
