@@ -49,24 +49,39 @@ async def handle_gmail_webhook(
         webhook_data = await request.json()
         logger.info(f"Received Gmail webhook: {webhook_data}")
         
-        # Extract message data
-        message_data = webhook_data.get('message', {})
-        if not message_data:
-            return {"status": "no_message_data", "message": "No message data in webhook"}
+        # Handle different webhook payload formats
+        if 'message' in webhook_data:
+            # Pub/Sub format
+            message_data = webhook_data.get('message', {})
+            if not message_data:
+                return {"status": "no_message_data", "message": "No message data in webhook"}
+            
+            # Get the email message ID
+            message_id = message_data.get('data')
+            if not message_id:
+                return {"status": "no_message_id", "message": "No message ID in webhook"}
+            
+            # Decode the base64 message ID
+            try:
+                decoded_message_id = base64.urlsafe_b64decode(message_id + '=' * (-len(message_id) % 4))
+                gmail_message_id = decoded_message_id.decode('utf-8')
+            except Exception as e:
+                logger.error(f"Failed to decode message ID: {e}")
+                return {"status": "decode_error", "message": "Failed to decode message ID"}
         
-        # Get the email message ID
-        message_id = message_data.get('data')
-        if not message_id:
-            return {"status": "no_message_id", "message": "No message ID in webhook"}
-        
-        # Decode the base64 message ID
-        import base64
-        try:
-            decoded_message_id = base64.urlsafe_b64decode(message_id + '=' * (-len(message_id) % 4))
-            gmail_message_id = decoded_message_id.decode('utf-8')
-        except Exception as e:
-            logger.error(f"Failed to decode message ID: {e}")
-            return {"status": "decode_error", "message": "Failed to decode message ID"}
+        elif 'emailAddress' in webhook_data and 'historyId' in webhook_data:
+            # Direct Gmail webhook format
+            email_address = webhook_data.get('emailAddress')
+            history_id = webhook_data.get('historyId')
+            
+            logger.info(f"Gmail webhook for {email_address}, history ID: {history_id}")
+            
+            # For now, we'll process recent messages instead of specific history
+            # This is a simplified approach - in production you'd want to process the specific history
+            gmail_message_id = f"history_{history_id}"
+            
+        else:
+            return {"status": "invalid_payload", "message": "Invalid webhook payload format"}
         
         # Process the email in the background
         background_tasks.add_task(
@@ -213,6 +228,11 @@ async def _process_gmail_message(gmail_message_id: str) -> None:
     try:
         logger.info(f"Processing Gmail message: {gmail_message_id}")
         
+        # Handle history ID format
+        if gmail_message_id.startswith('history_'):
+            await _process_gmail_history(gmail_message_id)
+            return
+        
         # Get the email service
         email_service = EmailProcessingService()
         
@@ -240,15 +260,84 @@ async def _process_gmail_message(gmail_message_id: str) -> None:
         logger.error(f"Error processing Gmail message {gmail_message_id}: {e}")
 
 
+async def _process_gmail_history(history_id: str) -> None:
+    """Process Gmail history by fetching recent messages."""
+    try:
+        logger.info(f"Processing Gmail history: {history_id}")
+        
+        # Import the Gmail service
+        from ....services.email.gmail_service import GmailService
+        
+        # Create Gmail service instance
+        gmail_service = GmailService()
+        
+        if not gmail_service.is_ready():
+            logger.error("Gmail service not ready")
+            return
+        
+        # Fetch recent messages
+        recent_emails = await gmail_service.fetch_recent_emails(max_results=10)
+        
+        logger.info(f"Found {len(recent_emails)} recent emails to process")
+        
+        # Process each email
+        for email in recent_emails:
+            try:
+                # Check if this is a virtual email
+                to_header = _get_header_value(email.get('payload', {}).get('headers', []), 'to')
+                if to_header and _is_virtual_email(to_header):
+                    logger.info(f"Processing virtual email: {to_header}")
+                    
+                    # Get the email service
+                    email_service = EmailProcessingService()
+                    
+                    # Process the virtual email
+                    result = await email_service.process_inbound_email(email)
+                    
+                    if result.success:
+                        logger.info(f"Successfully processed virtual email: {result.message}")
+                    else:
+                        logger.error(f"Failed to process virtual email: {result.message}")
+                else:
+                    logger.info(f"Skipping non-virtual email: {to_header}")
+                    
+            except Exception as e:
+                logger.error(f"Error processing individual email: {e}")
+                continue
+        
+        logger.info(f"Completed processing Gmail history: {history_id}")
+        
+    except Exception as e:
+        logger.error(f"Error processing Gmail history {history_id}: {e}")
+
+
 async def _fetch_gmail_message(message_id: str) -> Optional[Dict[str, Any]]:
     """Fetch a Gmail message using the Gmail API."""
     try:
-        # Gmail API call to fetch message will be implemented in future version
-        # This will be implemented when we add Gmail API integration
-        # For now, return a placeholder structure
+        # Import the Gmail service
+        from ....services.email.gmail_service import GmailService
         
-        logger.info(f"Would fetch Gmail message: {message_id}")
-        return None
+        # Create Gmail service instance
+        gmail_service = GmailService()
+        
+        if not gmail_service.is_ready():
+            logger.error("Gmail service not ready")
+            return None
+        
+        # Fetch the message
+        try:
+            message = gmail_service.gmail_service.users().messages().get(
+                userId=gmail_service.master_email,
+                id=message_id,
+                format='full'
+            ).execute()
+            
+            logger.info(f"Successfully fetched Gmail message: {message_id}")
+            return message
+            
+        except Exception as e:
+            logger.error(f"Failed to fetch Gmail message {message_id}: {e}")
+            return None
         
     except Exception as e:
         logger.error(f"Error fetching Gmail message {message_id}: {e}")
