@@ -22,9 +22,9 @@ class GmailWebhookHandler:
     def __init__(self):
         self.settings = get_settings()
     
-    async def _get_supabase_client(self):
+    def _get_supabase_client(self):
         """Get Supabase client."""
-        return await get_supabase()
+        return get_supabase()
     
     async def process_webhook(self, webhook_data: Dict[str, Any]) -> bool:
         """Process incoming Gmail webhook data."""
@@ -85,8 +85,8 @@ class GmailWebhookHandler:
         """Handle Gmail change notification."""
         try:
             # Update webhook activity tracking
-            supabase = await self._get_supabase_client()
-            await supabase.client.table('gmail_watches').update({
+            supabase = self._get_supabase_client()
+            supabase.table('gmail_watches').update({
                 'last_webhook_received': datetime.now().isoformat(),
                 'webhook_failures': 0,
                 'updated_at': datetime.now().isoformat()
@@ -116,8 +116,8 @@ class GmailWebhookHandler:
         """Handle Gmail sync notification."""
         try:
             # Update webhook activity tracking
-            supabase = await self._get_supabase_client()
-            await supabase.client.table('gmail_watches').update({
+            supabase = self._get_supabase_client()
+            supabase.table('gmail_watches').update({
                 'last_webhook_received': datetime.now().isoformat(),
                 'webhook_failures': 0,
                 'updated_at': datetime.now().isoformat()
@@ -194,8 +194,8 @@ class GmailWebhookHandler:
                     'created_at': datetime.now().isoformat()
                 }
                 
-                supabase = await self._get_supabase_client()
-                await supabase.client.table('virtual_email_detections').insert(detection_data).execute()
+                supabase = self._get_supabase_client()
+                supabase.table('virtual_email_detections').insert(detection_data).execute()
                 
                 logger.info(f"Recorded virtual email detection: {virtual_email_info['email']}")
                 
@@ -206,8 +206,8 @@ class GmailWebhookHandler:
         """Create a document entry from an email."""
         try:
             # Check if document already exists
-            supabase = await self._get_supabase_client()
-            existing_doc = await supabase.client.table('documents').select('id').eq('source_id', message_id).single().execute()
+            supabase = self._get_supabase_client()
+            existing_doc = supabase.table('documents').select('id').eq('source_id', message_id).single().execute()
             
             if existing_doc.data:
                 logger.info(f"Document already exists for message {message_id}")
@@ -232,8 +232,8 @@ class GmailWebhookHandler:
             }
             
             # Insert document
-            result = supabase = await self._get_supabase_client()
-            await supabase.client.table('documents').insert(doc_data).execute()
+            supabase = self._get_supabase_client()
+            supabase.table('documents').insert(doc_data).execute()
             
             if result.data:
                 logger.info(f"Created new document {result.data[0]['id']} for message {message_id}")
@@ -277,8 +277,8 @@ class GmailWebhookHandler:
     async def _get_user_id_by_email(self, email: str) -> Optional[str]:
         """Get user ID by email address."""
         try:
-            supabase = await self._get_supabase_client()
-            result = await supabase.client.table('users').select('id').eq('email', email).single().execute()
+            supabase = self._get_supabase_client()
+            result = supabase.table('users').select('id').eq('email', email).single().execute()
             return result.data['id'] if result.data else None
         except Exception as e:
             logger.error(f"Failed to get user ID by email: {e}")
@@ -287,9 +287,9 @@ class GmailWebhookHandler:
     async def _increment_webhook_failures(self, email_address: str):
         """Increment webhook failure count for the user."""
         try:
-            supabase = await self._get_supabase_client()
-            await supabase.client.table('gmail_watches').update({
-                'webhook_failures': supabase.client.raw('webhook_failures + 1'),
+            supabase = self._get_supabase_client()
+            supabase.table('gmail_watches').update({
+                'webhook_failures': supabase.raw('webhook_failures + 1'),
                 'updated_at': datetime.now().isoformat()
             }).eq('user_email', email_address).execute()
             
@@ -310,8 +310,8 @@ class GmailWebhookHandler:
         """Mark webhook as processed."""
         try:
             # Update the gmail_watches table to mark as processed
-            supabase = await self._get_supabase_client()
-            await supabase.client.table('gmail_watches').update({
+            supabase = self._get_supabase_client()
+            supabase.table('gmail_watches').update({
                 'last_webhook_received': datetime.now().isoformat(),
                 'webhook_failures': 0,
                 'updated_at': datetime.now().isoformat()
@@ -326,8 +326,8 @@ class GmailWebhookHandler:
         """Get webhook processing logs."""
         try:
             # This would return logs from the gmail_watches table
-            supabase = await self._get_supabase_client()
-            query = supabase.client.table('gmail_watches').select('*').order('updated_at', desc=True).limit(limit)
+            supabase = self._get_supabase_client()
+            query = supabase.table('gmail_watches').select('*').order('updated_at', desc=True).limit(limit)
             
             if email_address:
                 query = query.eq('user_email', email_address)
@@ -342,8 +342,8 @@ class GmailWebhookHandler:
     async def get_active_watches(self, user_id: Optional[str] = None) -> list:
         """Get active Gmail watches."""
         try:
-            supabase = await self._get_supabase_client()
-            query = supabase.client.table('gmail_watches').select('*').eq('is_active', True)
+            supabase = self._get_supabase_client()
+            query = supabase.table('gmail_watches').select('*').eq('is_active', True)
             
             if user_id:
                 # Join with users table to filter by user_id
