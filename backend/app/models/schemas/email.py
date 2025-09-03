@@ -127,6 +127,7 @@ class ClassificationPayload(BaseModel):
 
 class DocumentCreate(BaseModel):
     """Document creation from email."""
+    id: Optional[str] = Field(None, description="Document ID")
     title: str = Field(..., description="Document title")
     content: str = Field(..., description="Document content")
     source: str = Field("email", description="Document source")

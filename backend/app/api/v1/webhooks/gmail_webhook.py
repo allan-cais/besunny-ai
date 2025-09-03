@@ -250,6 +250,15 @@ async def _process_gmail_message(gmail_message_id: str) -> None:
             await _process_gmail_history(gmail_message_id)
             return
         
+        # Check if we've already processed this Gmail message
+        from ....core.supabase_config import get_supabase_service_client
+        supabase = get_supabase_service_client()
+        if supabase:
+            existing_doc = supabase.table('documents').select('id').eq('source_id', gmail_message_id).eq('source', 'gmail').execute()
+            if existing_doc.data and len(existing_doc.data) > 0:
+                logger.info(f"Gmail message {gmail_message_id} already processed, skipping")
+                return
+        
         # Get the email service
         email_service = EmailProcessingService()
         

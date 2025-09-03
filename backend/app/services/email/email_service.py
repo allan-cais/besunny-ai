@@ -376,6 +376,13 @@ class EmailProcessingService:
             if not supabase:
                 raise Exception("Supabase client not available")
             
+            # Check if document already exists for this Gmail message ID
+            existing_doc = supabase.table('documents').select('id').eq('source_id', gmail_message.id).eq('source', 'gmail').execute()
+            
+            if existing_doc.data and len(existing_doc.data) > 0:
+                logger.info(f"Document already exists for Gmail message {gmail_message.id}, returning existing ID: {existing_doc.data[0]['id']}")
+                return existing_doc.data[0]['id']
+            
             # Create document record
             result = supabase.table('documents').insert({
                 'id': str(uuid.uuid4()),  # Generate UUID for document ID
@@ -395,6 +402,7 @@ class EmailProcessingService:
             if not result.data:
                 raise Exception("Failed to create document")
             
+            logger.info(f"Created new document {result.data[0]['id']} for Gmail message {gmail_message.id}")
             return result.data[0]['id']
             
         except Exception as e:
