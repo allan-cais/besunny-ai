@@ -414,6 +414,8 @@ class EmailProcessingService:
                 doc_data = result.data[0]
                 # Add default metadata since documents table doesn't have metadata column
                 doc_data['metadata'] = {}
+                # Add default content since documents table doesn't have content column
+                doc_data['content'] = doc_data.get('summary', '')
                 return DocumentCreate(**doc_data)
             
             return None
