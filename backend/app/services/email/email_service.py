@@ -386,9 +386,8 @@ class EmailProcessingService:
                     int(gmail_message.internal_date) / 1000
                 ).isoformat(),
                 'created_by': user_id,
-                'summary': content.get('full_content', content.get('body_text', '')), # Use full_content for summary
-                'mimetype': gmail_message.payload.mime_type or None
-                # Note: metadata field removed as it doesn't exist in documents table schema
+                'summary': content.get('full_content', content.get('body_text', '')) # Use full_content for summary
+                # Note: metadata and mimetype fields removed as they don't exist in documents table schema
             }).execute()
             
             if not result.data:
@@ -461,7 +460,7 @@ class EmailProcessingService:
             metadata={
                 'gmail_message_id': document.source_id,
                 'filename': document.title,
-                'mimetype': document.mimetype,
+                'mimetype': getattr(document, 'mimetype', None),  # Handle missing mimetype field
                 'notification_type': None,
                 'metadata': document.metadata # Include all metadata
             },
@@ -649,11 +648,9 @@ class EmailProcessingService:
                     'source': 'drive_shared',
                     'source_id': file_id,
                     'title': file_metadata.get('name', f'Drive File {file_id}'),
-                    'mimetype': file_metadata.get('mimeType', 'application/octet-stream'),
                     'file_size': str(file_metadata.get('size', 0)),
-                    'drive_url': drive_url,
-                    'drive_metadata': file_metadata,
                     'last_synced_at': datetime.utcnow().isoformat()
+                    # Note: mimetype, drive_url, and drive_metadata fields removed as they don't exist in documents table schema
                 }
                 
                 supabase.table('documents').update(update_data).eq('id', document_id).execute()
