@@ -521,7 +521,7 @@ Please analyze the content and return ONLY a valid JSON response following the e
             
             # Make the OpenAI API call
             response = await self.openai_client.chat.completions.create(
-                model="gpt-4",
+                model="gpt-4o",  # Use gpt-4o which supports response_format
                 messages=[
                     {"role": "system", "content": self.classification_prompt},
                     {"role": "user", "content": user_message}
@@ -667,16 +667,16 @@ Please analyze the content and return ONLY a valid JSON response following the e
             # Update documents table
             if content.get('source_id'):
                 self.supabase.table('documents').update({
-                    'project_id': project_id,
-                    'updated_at': datetime.now().isoformat()
+                    'project_id': project_id
+                    # 'updated_at': datetime.now().isoformat()  # Column doesn't exist in schema
                 }).eq('id', content['source_id']).execute()
                 logger.info(f"Updated document {content['source_id']} with project_id {project_id}")
             
             # Update email_processing_logs if applicable
             if content.get('type') == 'email':
                 self.supabase.table('email_processing_logs').update({
-                    'project_id': project_id,
-                    'updated_at': datetime.now().isoformat()
+                    'project_id': project_id
+                    # 'updated_at': datetime.now().isoformat()  # Column doesn't exist in schema
                 }).eq('document_id', content.get('source_id')).execute()
             
         except Exception as e:

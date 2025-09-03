@@ -373,7 +373,7 @@ class EmailProcessingService:
     ) -> str:
         """Create a document record from email."""
         try:
-            supabase = get_supabase()
+            supabase = get_supabase_service_client()  # Use service role client to bypass RLS
             if not supabase:
                 raise Exception("Supabase client not available")
             
