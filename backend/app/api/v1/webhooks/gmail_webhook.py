@@ -64,7 +64,24 @@ async def handle_gmail_webhook(
             # Decode the base64 message ID
             try:
                 decoded_message_id = base64.urlsafe_b64decode(message_id + '=' * (-len(message_id) % 4))
-                gmail_message_id = decoded_message_id.decode('utf-8')
+                decoded_data = decoded_message_id.decode('utf-8')
+                
+                # Try to parse the decoded data as JSON
+                try:
+                    parsed_data = json.loads(decoded_data)
+                    if 'emailAddress' in parsed_data and 'historyId' in parsed_data:
+                        # This is a Gmail history notification
+                        email_address = parsed_data.get('emailAddress')
+                        history_id = parsed_data.get('historyId')
+                        logger.info(f"Gmail history notification for {email_address}, history ID: {history_id}")
+                        gmail_message_id = f"history_{history_id}"
+                    else:
+                        # This is a regular message ID
+                        gmail_message_id = decoded_data
+                except json.JSONDecodeError:
+                    # Not JSON, treat as regular message ID
+                    gmail_message_id = decoded_data
+                    
             except Exception as e:
                 logger.error(f"Failed to decode message ID: {e}")
                 return {"status": "decode_error", "message": "Failed to decode message ID"}
