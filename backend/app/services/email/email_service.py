@@ -509,13 +509,18 @@ class EmailProcessingService:
     async def _update_project_classification_tracking(self, project_id: str):
         """Update project classification tracking."""
         try:
-            supabase = get_supabase()
+            supabase = get_supabase_service_client()  # Use service role client to bypass RLS
             if not supabase:
                 raise Exception("Supabase client not available")
             
+            # Execute RPC call first to get the actual result
+            rpc_result = supabase.rpc('increment_pinecone_count', {'project_id': project_id}).execute()
+            pinecone_count = rpc_result.data if rpc_result.data else 0
+            
+            # Update project with the actual count value
             supabase.table('projects').update({
                 'last_classification_at': datetime.utcnow().isoformat(),
-                'pinecone_document_count': supabase.rpc('increment_pinecone_count', {'project_id': project_id})
+                'pinecone_document_count': pinecone_count
             }).eq('id', project_id).execute()
             
         except Exception as e:

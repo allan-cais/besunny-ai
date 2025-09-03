@@ -674,10 +674,11 @@ Please analyze the content and return ONLY a valid JSON response following the e
             
             # Update email_processing_logs if applicable
             if content.get('type') == 'email':
-                self.supabase.table('email_processing_logs').update({
-                    'project_id': project_id
-                    # 'updated_at': datetime.now().isoformat()  # Column doesn't exist in schema
-                }).eq('document_id', content.get('source_id')).execute()
+                # Note: project_id column doesn't exist in email_processing_logs schema
+                # self.supabase.table('email_processing_logs').update({
+                #     'project_id': project_id
+                # }).eq('document_id', content.get('source_id')).execute()
+                logger.info(f"Skipping email_processing_logs update - project_id column doesn't exist in schema")
             
         except Exception as e:
             logger.error(f"Error updating document project: {e}")
