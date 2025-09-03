@@ -513,15 +513,14 @@ class EmailProcessingService:
             if not supabase:
                 raise Exception("Supabase client not available")
             
-            # Execute RPC call first to get the actual result
-            rpc_result = supabase.rpc('increment_pinecone_count', {'project_id': project_id}).execute()
-            pinecone_count = rpc_result.data if rpc_result.data else 0
-            
-            # Update project with the actual count value
+            # Update project with last classification timestamp
+            # Note: increment_pinecone_count function doesn't exist in schema
             supabase.table('projects').update({
-                'last_classification_at': datetime.utcnow().isoformat(),
-                'pinecone_document_count': pinecone_count
+                'last_classification_at': datetime.utcnow().isoformat()
+                # 'pinecone_document_count': pinecone_count  # Function doesn't exist, skip for now
             }).eq('id', project_id).execute()
+            
+            logger.info(f"Updated project {project_id} classification tracking")
             
         except Exception as e:
             logger.error(f"Error updating project classification tracking: {e}")
