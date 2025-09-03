@@ -317,20 +317,18 @@ class EmailProcessingService:
     async def _find_user_by_username(self, username: str) -> Optional[User]:
         """Find user by username."""
         try:
-            supabase = await get_supabase()
-            if not supabase.client:
+            supabase = get_supabase()
+            if not supabase:
                 raise Exception("Supabase client not available")
             
-            # Call the get_user_by_username RPC function
-            result = supabase.client.rpc('get_user_by_username', {
-                'search_username': username
-            }).execute()
+            # Query users table directly
+            result = supabase.table('users').select('id, username, email').eq('username', username).execute()
             
-            if result.data:
-                user_data = result.data
+            if result.data and len(result.data) > 0:
+                user_data = result.data[0]
                 return User(
-                    id=user_data['user_id'],
-                    username=username,
+                    id=user_data['id'],
+                    username=user_data.get('username'),
                     email=user_data.get('email')
                 )
             
@@ -351,12 +349,12 @@ class EmailProcessingService:
     ) -> str:
         """Create a document record from email."""
         try:
-            supabase = await get_supabase()
-            if not supabase.client:
+            supabase = get_supabase()
+            if not supabase:
                 raise Exception("Supabase client not available")
             
             # Create document record
-            result = supabase.client.table('documents').insert({
+            result = supabase.table('documents').insert({
                 'project_id': None,  # Will be assigned by classification service
                 'source': 'gmail',
                 'source_id': gmail_message.id,
@@ -383,11 +381,11 @@ class EmailProcessingService:
     async def _get_document(self, document_id: str) -> Optional[DocumentCreate]:
         """Get document by ID."""
         try:
-            supabase = await get_supabase()
-            if not supabase.client:
+            supabase = get_supabase()
+            if not supabase:
                 raise Exception("Supabase client not available")
             
-            result = supabase.client.table('documents').select('*').eq('id', document_id).execute()
+            result = supabase.table('documents').select('*').eq('id', document_id).execute()
             
             if result.data:
                 return DocumentCreate(**result.data[0])
@@ -401,11 +399,11 @@ class EmailProcessingService:
     async def _get_active_projects_for_user(self, user_id: str) -> List[Project]:
         """Get active projects for user."""
         try:
-            supabase = await get_supabase()
-            if not supabase.client:
+            supabase = get_supabase()
+            if not supabase:
                 raise Exception("Supabase client not available")
             
-            result = supabase.client.table('projects').select(
+            result = supabase.table('projects').select(
                 "id, name, description, status, normalized_tags, categories, reference_keywords, notes, classification_signals, entity_patterns, created_by"
             ).eq('created_by', user_id).in_('status', ['active', 'in_progress']).order('last_classification_at', desc=True).execute()
             
@@ -459,11 +457,11 @@ class EmailProcessingService:
     async def _update_document_project(self, document_id: str, project_id: str):
         """Update document with classified project ID."""
         try:
-            supabase = await get_supabase()
-            if not supabase.client:
+            supabase = get_supabase()
+            if not supabase:
                 raise Exception("Supabase client not available")
             
-            supabase.client.table('documents').update({
+            supabase.table('documents').update({
                 'project_id': project_id
             }).eq('id', document_id).execute()
             
@@ -474,13 +472,13 @@ class EmailProcessingService:
     async def _update_project_classification_tracking(self, project_id: str):
         """Update project classification tracking."""
         try:
-            supabase = await get_supabase()
-            if not supabase.client:
+            supabase = get_supabase()
+            if not supabase:
                 raise Exception("Supabase client not available")
             
-            supabase.client.table('projects').update({
+            supabase.table('projects').update({
                 'last_classification_at': datetime.utcnow().isoformat(),
-                'pinecone_document_count': supabase.client.rpc('increment_pinecone_count', {'project_id': project_id})
+                'pinecone_document_count': supabase.rpc('increment_pinecone_count', {'project_id': project_id})
             }).eq('id', project_id).execute()
             
         except Exception as e:
@@ -568,11 +566,11 @@ class EmailProcessingService:
     async def _get_user_id_from_username(self, username: str) -> Optional[str]:
         """Get user ID from username."""
         try:
-            supabase = await get_supabase()
-            if not supabase.client:
+            supabase = get_supabase()
+            if not supabase:
                 return None
             
-            result = supabase.client.table('users').select('id').eq('username', username).single().execute()
+            result = supabase.table('users').select('id').eq('username', username).single().execute()
             
             if result.data:
                 return result.data['id']
@@ -612,8 +610,8 @@ class EmailProcessingService:
     async def _store_drive_file_metadata(self, file_id: str, document_id: str, user_id: str, drive_url: Optional[str]):
         """Store Drive file metadata in the documents table."""
         try:
-            supabase = await get_supabase()
-            if not supabase.client:
+            supabase = get_supabase()
+            if not supabase:
                 return
             
             # Get file metadata from Google Drive API
@@ -633,7 +631,7 @@ class EmailProcessingService:
                     'last_synced_at': datetime.utcnow().isoformat()
                 }
                 
-                supabase.client.table('documents').update(update_data).eq('id', document_id).execute()
+                supabase.table('documents').update(update_data).eq('id', document_id).execute()
                 
                 logger.info(f"Updated document {document_id} with Drive file metadata")
             else:
@@ -673,8 +671,8 @@ class EmailProcessingService:
     async def _update_document_with_drive_info(self, document_id: str, file_id: str, watch_id: str, drive_url: Optional[str]):
         """Update document with Drive file watch information."""
         try:
-            supabase = await get_supabase()
-            if not supabase.client:
+            supabase = get_supabase()
+            if not supabase:
                 return
             
             update_data = {
@@ -685,7 +683,7 @@ class EmailProcessingService:
                 'last_synced_at': datetime.utcnow().isoformat()
             }
             
-            supabase.client.table('documents').update(update_data).eq('id', document_id).execute()
+            supabase.table('documents').update(update_data).eq('id', document_id).execute()
             
             logger.info(f"Updated document {document_id} with Drive watch information")
             
@@ -707,8 +705,8 @@ class EmailProcessingService:
     ):
         """Log email processing activity."""
         try:
-            supabase = await get_supabase()
-            if not supabase.client:
+            supabase = get_supabase()
+            if not supabase:
                 logger.warning("Supabase client not available for logging")
                 return
             
@@ -734,7 +732,7 @@ class EmailProcessingService:
             if error_message:
                 log_data['error_message'] = error_message
             
-            supabase.client.table('email_processing_logs').insert(log_data).execute()
+            supabase.table('email_processing_logs').insert(log_data).execute()
             
         except Exception as e:
             logger.error(f"Error logging email processing: {e}")
