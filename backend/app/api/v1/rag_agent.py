@@ -83,6 +83,21 @@ async def get_project_summary(
         logger.error(f"Error getting project summary: {e}")
         raise HTTPException(status_code=500, detail="Failed to get project summary")
 
+@router.get("/query")
+async def query_project_data_get(
+    question: str,
+    project_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """GET endpoint for RAG agent queries (fallback for debugging)."""
+    try:
+        # Convert GET parameters to POST request format
+        request = RAGQueryRequest(question=question, project_id=project_id)
+        return await query_project_data(request, current_user)
+    except Exception as e:
+        logger.error(f"Error in RAG GET query: {e}")
+        raise HTTPException(status_code=500, detail="Failed to process RAG query")
+
 @router.get("/health")
 async def rag_agent_health():
     """Health check for the RAG agent service."""
