@@ -254,15 +254,21 @@ async def _process_gmail_message(gmail_message_id: str) -> None:
         email_service = EmailProcessingService()
         
         # Fetch the full message from Gmail
-        gmail_message = await _fetch_gmail_message(gmail_message_id)
-        if not gmail_message:
+        raw_gmail_message = await _fetch_gmail_message(gmail_message_id)
+        if not raw_gmail_message:
             logger.error(f"Failed to fetch Gmail message: {gmail_message_id}")
             return
         
         # Check if this is a virtual email
-        to_header = _get_header_value(gmail_message.get('payload', {}).get('headers', []), 'to')
+        to_header = _get_header_value(raw_gmail_message.get('payload', {}).get('headers', []), 'to')
         if not to_header or not _is_virtual_email(to_header):
             logger.info(f"Message {gmail_message_id} is not a virtual email: {to_header}")
+            return
+        
+        # Convert raw Gmail API response to GmailMessage format
+        gmail_message = _convert_to_gmail_message(raw_gmail_message)
+        if not gmail_message:
+            logger.error(f"Failed to convert email to GmailMessage format")
             return
         
         # Process the virtual email
@@ -305,11 +311,17 @@ async def _process_gmail_history(history_id: str) -> None:
                 if to_header and _is_virtual_email(to_header):
                     logger.info(f"Processing virtual email: {to_header}")
                     
+                    # Convert raw Gmail API response to GmailMessage format
+                    gmail_message = _convert_to_gmail_message(email)
+                    if not gmail_message:
+                        logger.error(f"Failed to convert email to GmailMessage format")
+                        continue
+                    
                     # Get the email service
                     email_service = EmailProcessingService()
                     
                     # Process the virtual email
-                    result = await email_service.process_inbound_email(email)
+                    result = await email_service.process_inbound_email(gmail_message)
                     
                     if result.success:
                         logger.info(f"Successfully processed virtual email: {result.message}")
@@ -380,3 +392,67 @@ def _is_virtual_email(email: str) -> bool:
     import re
     pattern = r'ai\+[a-zA-Z0-9]+@besunny\.ai'
     return bool(re.match(pattern, email))
+
+
+def _convert_to_gmail_message(raw_message: Dict[str, Any]) -> Optional[Any]:
+    """Convert raw Gmail API response to GmailMessage format."""
+    try:
+        from ....models.schemas.email import GmailMessage, GmailPayload, GmailHeader, GmailBody
+        
+        # Extract basic message info
+        message_id = raw_message.get('id', '')
+        thread_id = raw_message.get('threadId', '')
+        label_ids = raw_message.get('labelIds', [])
+        snippet = raw_message.get('snippet', '')
+        history_id = raw_message.get('historyId', '')
+        internal_date = raw_message.get('internalDate', '')
+        size_estimate = raw_message.get('sizeEstimate', 0)
+        
+        # Extract payload
+        raw_payload = raw_message.get('payload', {})
+        
+        # Convert headers
+        headers = []
+        for header in raw_payload.get('headers', []):
+            headers.append(GmailHeader(
+                name=header.get('name', ''),
+                value=header.get('value', '')
+            ))
+        
+        # Convert body
+        raw_body = raw_payload.get('body', {})
+        body = None
+        if raw_body:
+            body = GmailBody(
+                attachment_id=raw_body.get('attachmentId'),
+                size=raw_body.get('size', 0),
+                data=raw_body.get('data')
+            )
+        
+        # Create payload
+        payload = GmailPayload(
+            part_id=raw_payload.get('partId', ''),
+            mime_type=raw_payload.get('mimeType', ''),
+            filename=raw_payload.get('filename'),
+            headers=headers,
+            body=body,
+            parts=None  # TODO: Handle parts if needed
+        )
+        
+        # Create GmailMessage
+        gmail_message = GmailMessage(
+            id=message_id,
+            thread_id=thread_id,
+            label_ids=label_ids,
+            snippet=snippet,
+            history_id=history_id,
+            internal_date=internal_date,
+            payload=payload,
+            size_estimate=size_estimate
+        )
+        
+        return gmail_message
+        
+    except Exception as e:
+        logger.error(f"Error converting to GmailMessage: {e}")
+        return None
