@@ -114,7 +114,7 @@ class EmailProcessingService:
                     'message_id': gmail_message.id,
                     'thread_id': getattr(gmail_message, 'threadId', None),
                     'labels': getattr(gmail_message, 'labelIds', []),
-                    'has_attachments': bool(getattr(gmail_message, 'payload', {}).get('parts', []))
+                    'has_attachments': bool(getattr(gmail_message.payload, 'parts', []) if gmail_message.payload else [])
                 }
             )
             
@@ -232,6 +232,7 @@ class EmailProcessingService:
     async def _extract_email_content(self, gmail_message: GmailMessage) -> Dict[str, Any]:
         """Extract full email content including body and attachments."""
         try:
+            logger.info(f"Extracting email content for message {gmail_message.id}")
             content = {
                 'body_text': '',
                 'body_html': '',
@@ -241,7 +242,10 @@ class EmailProcessingService:
             
             # Extract content from payload
             if hasattr(gmail_message, 'payload') and gmail_message.payload:
-                content.update(self._extract_payload_content(gmail_message.payload))
+                logger.info(f"Payload type: {type(gmail_message.payload)}")
+                payload_content = self._extract_payload_content(gmail_message.payload)
+                logger.info(f"Payload content type: {type(payload_content)}")
+                content.update(payload_content)
             
             # Fallback to snippet if no body content found
             if not content['body_text'] and not content['body_html']:
@@ -254,6 +258,8 @@ class EmailProcessingService:
             
         except Exception as e:
             logger.error(f"Error extracting email content: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return {
                 'body_text': gmail_message.snippet or '',
                 'body_html': '',
