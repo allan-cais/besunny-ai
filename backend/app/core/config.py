@@ -84,6 +84,7 @@ class Settings(BaseSettings):
     base_url: str = Field(default="https://backend-staging-6085.up.railway.app", env="BASE_URL")
     n8n_classification_webhook_url: Optional[str] = Field(default=None, env="N8N_CLASSIFICATION_WEBHOOK_URL")
     n8n_drivesync_webhook_url: Optional[str] = Field(default=None, env="N8N_DRIVESYNC_WEBHOOK_URL")
+    verify_gmail_webhooks: bool = Field(default=True, env="VERIFY_GMAIL_WEBHOOKS")
     
     # Attendee service settings
     attendee_api_base_url: Optional[str] = Field(default=None, env="ATTENDEE_API_BASE_URL")

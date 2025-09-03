@@ -7,11 +7,15 @@ from typing import Dict, Any, Optional
 from fastapi import APIRouter, Request, HTTPException, BackgroundTasks, status
 import logging
 import json
+import base64
 from datetime import datetime
+import jwt
+import requests
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 
 from ....services.email import EmailProcessingService
 from ....core.config import get_settings
-# from ....core.security import verify_gmail_webhook_token  # Function doesn't exist yet
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -30,12 +34,16 @@ async def handle_gmail_webhook(
     virtual email addresses (ai+{username}@besunny.ai).
     """
     try:
-        # Verify the webhook is from Gmail
-        if not await _verify_gmail_webhook(request):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid Gmail webhook signature"
-            )
+        # Verify the webhook is from Gmail (can be disabled for testing)
+        settings = get_settings()
+        if getattr(settings, 'verify_gmail_webhooks', True):
+            if not await _verify_gmail_webhook(request):
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid Gmail webhook signature"
+                )
+        else:
+            logger.info("Gmail webhook verification disabled for testing")
         
         # Parse the webhook payload
         webhook_data = await request.json()
@@ -92,7 +100,7 @@ async def test_gmail_webhook() -> Dict[str, Any]:
 
 
 async def _verify_gmail_webhook(request: Request) -> bool:
-    """Verify that the webhook is from Gmail."""
+    """Verify that the webhook is from Google Pub/Sub using JWT verification."""
     try:
         # Get the authorization header
         auth_header = request.headers.get('authorization')
@@ -100,14 +108,104 @@ async def _verify_gmail_webhook(request: Request) -> bool:
             logger.warning("No authorization header in Gmail webhook")
             return False
         
-        # Verify the token (implement based on your security requirements)
-        # For now, we'll accept all requests but log them
-        logger.info("Gmail webhook verification passed")
-        return True
+        # Extract the JWT token from the Bearer token
+        if not auth_header.startswith('Bearer '):
+            logger.warning("Invalid authorization header format")
+            return False
+        
+        token = auth_header[7:]  # Remove 'Bearer ' prefix
+        
+        # Verify the JWT token
+        try:
+            # Decode the JWT header to get the key ID
+            header = jwt.get_unverified_header(token)
+            kid = header.get('kid')
+            if not kid:
+                logger.warning("No key ID in JWT header")
+                return False
+            
+            # Get the public key from Google
+            public_key = await _get_google_public_key(kid)
+            if not public_key:
+                logger.warning(f"Could not retrieve public key for kid: {kid}")
+                return False
+            
+            # Verify the JWT token
+            decoded_token = jwt.decode(
+                token,
+                public_key,
+                algorithms=['RS256'],
+                audience=f"projects/{get_settings().google_project_id}/topics/gmail-notifications",
+                issuer="https://accounts.google.com"
+            )
+            
+            logger.info("Gmail webhook JWT verification passed")
+            return True
+            
+        except jwt.ExpiredSignatureError:
+            logger.warning("JWT token has expired")
+            return False
+        except jwt.InvalidTokenError as e:
+            logger.warning(f"Invalid JWT token: {e}")
+            return False
         
     except Exception as e:
         logger.error(f"Error verifying Gmail webhook: {e}")
         return False
+
+
+async def _get_google_public_key(kid: str) -> Optional[str]:
+    """Get Google's public key for JWT verification."""
+    try:
+        # Google's public key endpoint
+        url = "https://www.googleapis.com/oauth2/v3/certs"
+        
+        response = requests.get(url, timeout=10)
+        if response.status_code != 200:
+            logger.error(f"Failed to fetch Google public keys: {response.status_code}")
+            return None
+        
+        keys_data = response.json()
+        
+        # Find the key with matching kid
+        for key in keys_data.get('keys', []):
+            if key.get('kid') == kid:
+                # Convert JWK to PEM format
+                return _jwk_to_pem(key)
+        
+        logger.warning(f"Public key not found for kid: {kid}")
+        return None
+        
+    except Exception as e:
+        logger.error(f"Error fetching Google public key: {e}")
+        return None
+
+
+def _jwk_to_pem(jwk: Dict[str, Any]) -> str:
+    """Convert JWK to PEM format for JWT verification."""
+    try:
+        # Extract the key components
+        n = base64.urlsafe_b64decode(jwk['n'] + '==')
+        e = base64.urlsafe_b64decode(jwk['e'] + '==')
+        
+        # Convert to integers
+        n_int = int.from_bytes(n, 'big')
+        e_int = int.from_bytes(e, 'big')
+        
+        # Create RSA public key
+        public_key = rsa.RSAPublicNumbers(e_int, n_int).public_key()
+        
+        # Serialize to PEM format
+        pem = public_key.public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo
+        )
+        
+        return pem.decode('utf-8')
+        
+    except Exception as e:
+        logger.error(f"Error converting JWK to PEM: {e}")
+        return None
 
 
 async def _process_gmail_message(gmail_message_id: str) -> None:
