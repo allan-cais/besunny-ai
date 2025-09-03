@@ -387,8 +387,8 @@ class EmailProcessingService:
                 ).isoformat(),
                 'created_by': user_id,
                 'summary': content.get('full_content', content.get('body_text', '')), # Use full_content for summary
-                'mimetype': gmail_message.payload.mime_type or None,
-                'metadata': metadata # Store all metadata
+                'mimetype': gmail_message.payload.mime_type or None
+                # Note: metadata field removed as it doesn't exist in documents table schema
             }).execute()
             
             if not result.data:
@@ -410,7 +410,10 @@ class EmailProcessingService:
             result = supabase.table('documents').select('*').eq('id', document_id).execute()
             
             if result.data:
-                return DocumentCreate(**result.data[0])
+                doc_data = result.data[0]
+                # Add default metadata since documents table doesn't have metadata column
+                doc_data['metadata'] = {}
+                return DocumentCreate(**doc_data)
             
             return None
             
