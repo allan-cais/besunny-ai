@@ -133,6 +133,7 @@ class DocumentCreate(BaseModel):
     source: str = Field("email", description="Document source")
     source_id: str = Field(..., description="Source ID (Gmail message ID)")
     author: Optional[str] = Field(None, description="Document author")
+    received_at: Optional[str] = Field(None, description="Document received timestamp")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Document metadata")
 
 
