@@ -169,6 +169,9 @@ class EmailProcessingService:
                 # classification_success=bool(classification_result)  # Column doesn't exist in schema
             )
             
+            # Mark email as processed in Gmail to prevent duplicate webhook notifications
+            await self._mark_email_as_processed_in_gmail(gmail_message.id)
+            
             return EmailProcessingResult(
                 success=True,
                 message=f"Email processed successfully for user: {username}",
@@ -869,3 +872,36 @@ class EmailProcessingService:
                 'error': str(e),
                 'chunks_created': 0
             }
+    
+    async def _mark_email_as_processed_in_gmail(self, gmail_message_id: str) -> None:
+        """Mark email as processed in Gmail to prevent duplicate webhook notifications."""
+        try:
+            logger.info(f"Marking Gmail message {gmail_message_id} as processed")
+            
+            # Initialize Gmail service
+            from .gmail_service import GmailService
+            gmail_service = GmailService()
+            
+            if not gmail_service.is_ready():
+                logger.warning("Gmail service not ready, cannot mark email as processed")
+                return
+            
+            # Get the action from settings
+            from ...core.config import get_settings
+            settings = get_settings()
+            action = settings.gmail_mark_processed_action
+            
+            # Mark email as processed
+            success = await gmail_service.mark_email_as_processed(
+                message_id=gmail_message_id, 
+                action=action
+            )
+            
+            if success:
+                logger.info(f"Successfully marked email {gmail_message_id} as processed (action: {action})")
+            else:
+                logger.warning(f"Failed to mark email {gmail_message_id} as processed")
+                
+        except Exception as e:
+            logger.error(f"Error marking email as processed: {e}")
+            # Don't raise the exception - this is not critical for email processing

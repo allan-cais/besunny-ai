@@ -432,3 +432,72 @@ class GmailService:
         except Exception as e:
             logger.error(f"Error building Drive service: {e}")
             return None
+    
+    async def mark_email_as_read(self, message_id: str) -> bool:
+        """Mark an email as read in Gmail."""
+        try:
+            if not self.is_ready():
+                logger.error("Gmail service not ready")
+                return False
+            
+            # Remove UNREAD label
+            self.gmail_service.users().messages().modify(
+                userId=self.master_email,
+                id=message_id,
+                body={'removeLabelIds': ['UNREAD']}
+            ).execute()
+            
+            logger.info(f"Marked email {message_id} as read")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error marking email as read: {e}")
+            return False
+    
+    async def archive_email(self, message_id: str) -> bool:
+        """Archive an email in Gmail."""
+        try:
+            if not self.is_ready():
+                logger.error("Gmail service not ready")
+                return False
+            
+            # Remove INBOX label (this archives the email)
+            self.gmail_service.users().messages().modify(
+                userId=self.master_email,
+                id=message_id,
+                body={'removeLabelIds': ['INBOX']}
+            ).execute()
+            
+            logger.info(f"Archived email {message_id}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error archiving email: {e}")
+            return False
+    
+    async def mark_email_as_processed(self, message_id: str, action: str = "read") -> bool:
+        """Mark email as processed based on the specified action."""
+        try:
+            logger.info(f"Marking email {message_id} as processed with action: {action}")
+            
+            if action == "read":
+                return await self.mark_email_as_read(message_id)
+            elif action == "archive":
+                return await self.archive_email(message_id)
+            elif action == "read_then_archive":
+                # First mark as read
+                read_success = await self.mark_email_as_read(message_id)
+                if read_success:
+                    # Then archive
+                    archive_success = await self.archive_email(message_id)
+                    return archive_success
+                else:
+                    logger.warning(f"Failed to mark email {message_id} as read, skipping archive")
+                    return False
+            else:
+                logger.warning(f"Unknown action '{action}', defaulting to 'read'")
+                return await self.mark_email_as_read(message_id)
+                
+        except Exception as e:
+            logger.error(f"Error marking email as processed: {e}")
+            return False
