@@ -429,6 +429,7 @@ def _is_virtual_email(email: str) -> bool:
 def _convert_payload_part(raw_part: Dict[str, Any]) -> Optional[Any]:
     """Convert a raw payload part to GmailPayload format."""
     try:
+        print(f"--- Converting payload part: {raw_part.get('mimeType')} ---")
         from ....models.schemas.email import GmailPayload, GmailHeader, GmailBody
         
         # Convert headers
@@ -468,9 +469,11 @@ def _convert_payload_part(raw_part: Dict[str, Any]) -> Optional[Any]:
             parts=parts
         )
         
+        print(f"--- Payload part converted successfully ---")
         return payload_part
         
     except Exception as e:
+        print(f"--- Error converting payload part: {e} ---")
         logger.error(f"Error converting payload part: {e}")
         return None
 
@@ -513,11 +516,19 @@ def _convert_to_gmail_message(raw_message: Dict[str, Any]) -> Optional[Any]:
         # Convert parts recursively
         parts = None
         if raw_payload.get('parts'):
+            print(f"=== CONVERTING PARTS ===")
+            print(f"Raw parts count: {len(raw_payload['parts'])}")
             parts = []
-            for part in raw_payload['parts']:
+            for i, part in enumerate(raw_payload['parts']):
+                print(f"Converting part {i}: mime_type={part.get('mimeType')}")
                 converted_part = _convert_payload_part(part)
                 if converted_part:
+                    print(f"Part {i} converted successfully")
                     parts.append(converted_part)
+                else:
+                    print(f"Part {i} conversion failed")
+            print(f"Total converted parts: {len(parts)}")
+            print("=" * 50)
         
         # Create payload
         payload = GmailPayload(

@@ -170,6 +170,9 @@ class EmailProcessingService:
             )
             
             # Mark email as processed in Gmail to prevent duplicate webhook notifications
+            print(f"=== MARKING EMAIL AS PROCESSED ===")
+            print(f"Gmail message ID: {gmail_message.id}")
+            print(f"Action: {get_settings().gmail_mark_processed_action}")
             await self._mark_email_as_processed_in_gmail(gmail_message.id)
             
             return EmailProcessingResult(
@@ -925,6 +928,8 @@ class EmailProcessingService:
     async def _mark_email_as_processed_in_gmail(self, gmail_message_id: str) -> None:
         """Mark email as processed in Gmail to prevent duplicate webhook notifications."""
         try:
+            print(f"=== MARKING EMAIL AS PROCESSED IN GMAIL ===")
+            print(f"Gmail message ID: {gmail_message_id}")
             logger.info(f"Marking Gmail message {gmail_message_id} as processed")
             
             # Initialize Gmail service
@@ -932,6 +937,7 @@ class EmailProcessingService:
             gmail_service = GmailService()
             
             if not gmail_service.is_ready():
+                print("Gmail service not ready, cannot mark email as processed")
                 logger.warning("Gmail service not ready, cannot mark email as processed")
                 return
             
@@ -939,6 +945,7 @@ class EmailProcessingService:
             from ...core.config import get_settings
             settings = get_settings()
             action = settings.gmail_mark_processed_action
+            print(f"Using action: {action}")
             
             # Mark email as processed
             success = await gmail_service.mark_email_as_processed(
@@ -947,8 +954,10 @@ class EmailProcessingService:
             )
             
             if success:
+                print(f"Successfully marked email {gmail_message_id} as processed (action: {action})")
                 logger.info(f"Successfully marked email {gmail_message_id} as processed (action: {action})")
             else:
+                print(f"Failed to mark email {gmail_message_id} as processed")
                 logger.warning(f"Failed to mark email {gmail_message_id} as processed")
                 
         except Exception as e:
