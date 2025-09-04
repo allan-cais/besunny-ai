@@ -48,7 +48,7 @@ const defaultConfig: RuntimeEnvConfig = {
     serviceRoleKey: '',
   },
   pythonBackend: {
-    url: 'https://backend-production-298a.up.railway.app',  // Updated to use production backend
+    url: 'https://backend-production-298a.up.railway.app',  // Fallback URL - main config will override with env var
     timeout: 30000,
     retries: 3,
     retryDelay: 1000,
