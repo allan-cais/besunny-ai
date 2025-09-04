@@ -5,7 +5,7 @@ Handles incoming webhook notifications from various services.
 
 from fastapi import APIRouter
 
-from . import calendar_webhook, drive_webhook, gmail_webhook, attendee_webhook
+from . import calendar_webhook, drive_webhook, gmail_webhook, gmail_watch, attendee_webhook
 
 # Create webhooks router
 router = APIRouter(tags=["webhooks"])
@@ -14,6 +14,7 @@ router = APIRouter(tags=["webhooks"])
 router.include_router(calendar_webhook.router, prefix="/calendar", tags=["calendar-webhooks"])
 router.include_router(drive_webhook.router, prefix="/drive", tags=["drive-webhooks"])
 router.include_router(gmail_webhook.router, prefix="/gmail", tags=["gmail-webhooks"])
+router.include_router(gmail_watch.router, prefix="/gmail-watch", tags=["gmail-watch"])
 router.include_router(attendee_webhook.router, prefix="/attendee", tags=["attendee-webhooks"])
 
 # Health check endpoint

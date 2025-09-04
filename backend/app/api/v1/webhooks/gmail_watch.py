@@ -1,0 +1,109 @@
+"""
+Gmail watch management endpoints.
+This allows re-establishing Gmail watches when they expire.
+"""
+
+from typing import Dict, Any
+from fastapi import APIRouter, HTTPException
+import logging
+from datetime import datetime
+
+from ....services.email.gmail_service import GmailService
+
+logger = logging.getLogger(__name__)
+router = APIRouter()
+
+
+@router.post("/re-establish-watch")
+async def re_establish_gmail_watch() -> Dict[str, Any]:
+    """
+    Re-establish Gmail watch for the master account.
+    This should be called when webhooks stop working due to expired watch.
+    """
+    try:
+        logger.info("Re-establishing Gmail watch...")
+        
+        # Initialize Gmail service
+        gmail_service = GmailService()
+        
+        if not gmail_service.is_ready():
+            raise HTTPException(
+                status_code=500,
+                detail="Gmail service not ready - check service account configuration"
+            )
+        
+        # Re-establish watch
+        watch_response = await gmail_service.setup_watch()
+        
+        if watch_response:
+            logger.info(f"Gmail watch re-established successfully: {watch_response}")
+            return {
+                "status": "success",
+                "message": "Gmail watch re-established successfully",
+                "watch_id": watch_response,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to re-establish Gmail watch"
+            )
+            
+    except Exception as e:
+        logger.error(f"Error re-establishing Gmail watch: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to re-establish Gmail watch: {str(e)}"
+        )
+
+
+@router.get("/watch-status")
+async def get_gmail_watch_status() -> Dict[str, Any]:
+    """
+    Check current Gmail watch status.
+    """
+    try:
+        logger.info("Checking Gmail watch status...")
+        
+        # Initialize Gmail service
+        gmail_service = GmailService()
+        
+        if not gmail_service.is_ready():
+            return {
+                "status": "error",
+                "message": "Gmail service not ready",
+                "gmail_ready": False,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        
+        # Check if we can access Gmail
+        try:
+            profile = gmail_service.gmail_service.users().getProfile(
+                userId=gmail_service.master_email
+            ).execute()
+            
+            return {
+                "status": "success",
+                "message": "Gmail service is ready",
+                "gmail_ready": True,
+                "email_address": profile.get('emailAddress'),
+                "messages_total": profile.get('messagesTotal'),
+                "timestamp": datetime.utcnow().isoformat()
+            }
+            
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Gmail access error: {str(e)}",
+                "gmail_ready": False,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+            
+    except Exception as e:
+        logger.error(f"Error checking Gmail watch status: {e}")
+        return {
+            "status": "error",
+            "message": f"Error checking Gmail status: {str(e)}",
+            "gmail_ready": False,
+            "timestamp": datetime.utcnow().isoformat()
+        }
