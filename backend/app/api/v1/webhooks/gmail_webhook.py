@@ -266,10 +266,15 @@ async def _process_gmail_message(gmail_message_id: str) -> None:
         email_service = EmailProcessingService()
         
         # Fetch the full message from Gmail
+        print(f"=== FETCHING GMAIL MESSAGE ===")
+        print(f"Message ID: {gmail_message_id}")
         raw_gmail_message = await _fetch_gmail_message(gmail_message_id)
         if not raw_gmail_message:
+            print(f"Failed to fetch Gmail message: {gmail_message_id}")
             logger.error(f"Failed to fetch Gmail message: {gmail_message_id}")
             return
+        print(f"Successfully fetched Gmail message: {gmail_message_id}")
+        print("=" * 50)
         
         # Check if this is a virtual email
         to_header = _get_header_value(raw_gmail_message.get('payload', {}).get('headers', []), 'to')
@@ -379,13 +384,19 @@ async def _process_gmail_history(history_id: str) -> None:
 async def _fetch_gmail_message(message_id: str) -> Optional[Dict[str, Any]]:
     """Fetch a Gmail message using the Gmail API."""
     try:
+        print(f"=== _FETCH_GMAIL_MESSAGE CALLED ===")
+        print(f"Message ID: {message_id}")
+        
         # Import the Gmail service
         from ....services.email.gmail_service import GmailService
         
         # Create Gmail service instance
         gmail_service = GmailService()
         
+        print(f"Gmail service created, ready: {gmail_service.is_ready()}")
+        
         if not gmail_service.is_ready():
+            print("Gmail service not ready")
             logger.error("Gmail service not ready")
             return None
         
