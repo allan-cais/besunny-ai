@@ -265,12 +265,22 @@ class GmailService:
             return False
     
     async def mark_email_as_processed(self, message_id: str, action: str = "read") -> bool:
-        """Mark an email as processed by either reading or archiving it."""
+        """Mark an email as processed by either reading, archiving, or both."""
         try:
             if action == "read":
                 return await self.mark_email_as_read(message_id)
             elif action == "archive":
                 return await self.archive_email(message_id)
+            elif action == "read_then_archive":
+                # First mark as read
+                read_success = await self.mark_email_as_read(message_id)
+                if read_success:
+                    # Then archive it
+                    archive_success = await self.archive_email(message_id)
+                    return archive_success
+                else:
+                    logger.warning(f"Failed to mark email {message_id} as read, skipping archive")
+                    return False
             else:
                 logger.warning(f"Unknown action '{action}', defaulting to 'read'")
                 return await self.mark_email_as_read(message_id)
