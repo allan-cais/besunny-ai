@@ -196,7 +196,11 @@ class VectorEmbeddingService:
             # Debug: Log what content was embedded
             for i, emb in enumerate(embeddings):
                 chunk_text = emb['metadata'].get('chunk_text', '')
-                logger.info(f"Embedded chunk {i+1}/{len(embeddings)} - Length: {len(chunk_text)}, Preview: {chunk_text[:200]}...")
+                print(f"=== EMBEDDED CHUNK {i+1}/{len(embeddings)} ===")
+                print(f"Length: {len(chunk_text)}")
+                print(f"Preview: {chunk_text[:200]}...")
+                print(f"Full content: {chunk_text}")
+                print("=" * 50)
             
             # Log embedding activity
             await self._log_embedding_activity(content, classification_result, user_id, len(embeddings))
