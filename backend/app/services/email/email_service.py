@@ -353,20 +353,39 @@ class EmailProcessingService:
                 if hasattr(payload, 'body') and payload.body and hasattr(payload.body, 'data'):
                     print(f"Body data available, length: {len(payload.body.data)}")
                     try:
-                        decoded_data = base64.urlsafe_b64decode(payload.body.data + '=' * (-len(payload.body.data) % 4))
-                        content['body_text'] = decoded_data.decode('utf-8', errors='ignore')
-                        print(f"Text content decoded, length: {len(content['body_text'])}")
+                        # Check if the data is already decoded (from raw message content)
+                        # or if it needs base64 decoding (from regular Gmail API)
+                        if payload.body.data.startswith('Subject:') or payload.body.data.startswith('From:') or len(payload.body.data) > 1000:
+                            # This is already decoded content from raw message
+                            print(f"Using raw message content directly (already decoded)")
+                            content['body_text'] = payload.body.data
+                        else:
+                            # This is base64 encoded content from regular Gmail API
+                            print(f"Decoding base64 content from regular Gmail API")
+                            decoded_data = base64.urlsafe_b64decode(payload.body.data + '=' * (-len(payload.body.data) % 4))
+                            content['body_text'] = decoded_data.decode('utf-8', errors='ignore')
+                        print(f"Text content processed, length: {len(content['body_text'])}")
                     except Exception as e:
-                        print(f"Failed to decode text content: {e}")
-                        logger.warning(f"Failed to decode text content: {e}")
+                        print(f"Failed to process text content: {e}")
+                        logger.warning(f"Failed to process text content: {e}")
                 else:
                     print("No body data available for text/plain")
             
             elif payload.mime_type == 'text/html':
                 if hasattr(payload, 'body') and payload.body and hasattr(payload.body, 'data'):
                     try:
-                        decoded_data = base64.urlsafe_b64decode(payload.body.data + '=' * (-len(payload.body.data) % 4))
-                        html_content = decoded_data.decode('utf-8', errors='ignore')
+                        # Check if the data is already decoded (from raw message content)
+                        # or if it needs base64 decoding (from regular Gmail API)
+                        if payload.body.data.startswith('<') or payload.body.data.startswith('Subject:') or len(payload.body.data) > 1000:
+                            # This is already decoded content from raw message
+                            print(f"Using raw HTML content directly (already decoded)")
+                            html_content = payload.body.data
+                        else:
+                            # This is base64 encoded content from regular Gmail API
+                            print(f"Decoding base64 HTML content from regular Gmail API")
+                            decoded_data = base64.urlsafe_b64decode(payload.body.data + '=' * (-len(payload.body.data) % 4))
+                            html_content = decoded_data.decode('utf-8', errors='ignore')
+                        
                         content['body_html'] = html_content
                         
                         # Convert HTML to plain text for better embedding
@@ -374,8 +393,10 @@ class EmailProcessingService:
                         plain_text = re.sub(r'<[^>]+>', '', html_content)
                         plain_text = re.sub(r'\s+', ' ', plain_text).strip()
                         content['body_text'] = plain_text
+                        print(f"HTML content processed, length: {len(html_content)}")
                     except Exception as e:
-                        logger.warning(f"Failed to decode HTML content: {e}")
+                        print(f"Failed to process HTML content: {e}")
+                        logger.warning(f"Failed to process HTML content: {e}")
             
             # Handle attachments
             elif payload.mime_type and not payload.mime_type.startswith('text/'):
