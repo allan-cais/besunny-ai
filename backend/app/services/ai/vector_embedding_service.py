@@ -224,6 +224,16 @@ class VectorEmbeddingService:
     def _create_content_chunks(self, content: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Create text chunks from content for embedding."""
         try:
+            # Debug: Log the content being chunked
+            print(f"=== CREATING CONTENT CHUNKS DEBUG ===")
+            print(f"Content keys: {list(content.keys())}")
+            print(f"Full content length: {len(content.get('full_content', ''))}")
+            print(f"Content text length: {len(content.get('content_text', ''))}")
+            print(f"Body text length: {len(content.get('body_text', ''))}")
+            print(f"Body HTML length: {len(content.get('body_html', ''))}")
+            print(f"Summary length: {len(content.get('summary', ''))}")
+            print("=" * 50)
+            
             # Try multiple content fields to get the full email content
             content_text = (
                 content.get('full_content', '') or 
@@ -233,6 +243,10 @@ class VectorEmbeddingService:
                 content.get('summary', '') or 
                 ''
             )
+            
+            print(f"Selected content text length: {len(content_text)}")
+            print(f"Content text preview: {content_text[:200]}...")
+            print("=" * 50)
             
             if not content_text:
                 logger.warning("No content found for chunking - available fields: %s", list(content.keys()))

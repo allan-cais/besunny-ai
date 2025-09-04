@@ -904,6 +904,16 @@ class EmailProcessingService:
         try:
             logger.info(f"Starting vector embedding pipeline for content: {content.get('source_id', 'unknown')}")
             
+            # Debug: Log the content being passed to embedding service
+            print(f"=== VECTOR EMBEDDING PIPELINE DEBUG ===")
+            print(f"Content keys: {list(content.keys())}")
+            print(f"Full content length: {len(content.get('full_content', ''))}")
+            print(f"Content text length: {len(content.get('content_text', ''))}")
+            print(f"Body text length: {len(content.get('body_text', ''))}")
+            print(f"Body HTML length: {len(content.get('body_html', ''))}")
+            print(f"Full content preview: {content.get('full_content', '')[:200]}...")
+            print("=" * 50)
+            
             # Initialize vector embedding service
             vector_service = VectorEmbeddingService()
             
