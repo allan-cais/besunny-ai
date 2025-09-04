@@ -636,13 +636,53 @@ def _convert_to_gmail_message(raw_message: Dict[str, Any]) -> Optional[Any]:
             if raw_payload.get('mimeType', '').startswith('multipart/'):
                 print(f"=== HANDLING MULTIPART MESSAGE WITHOUT PARTS ===")
                 print(f"This is a Gmail API issue - multipart message has no parts")
-                print(f"Creating synthetic part structure from available data")
+                print(f"Attempting to fetch full message content using alternative methods")
+                
+                # Try to get the full message content using alternative Gmail API methods
+                full_content = None
+                try:
+                    # Import Gmail service to try alternative fetching
+                    from ....services.email.gmail_service import GmailService
+                    gmail_service = GmailService()
+                    
+                    if gmail_service.is_ready():
+                        print(f"Trying to fetch full message content with alternative Gmail API call")
+                        # Try with format='raw' to get the raw message content
+                        raw_message_content = gmail_service.gmail_service.users().messages().get(
+                            userId=gmail_service.master_email,
+                            id=raw_message.get('id', ''),
+                            format='raw'
+                        ).execute()
+                        
+                        if raw_message_content.get('raw'):
+                            print(f"Successfully fetched raw message content")
+                            # Decode the raw message content
+                            import base64
+                            raw_data = raw_message_content['raw']
+                            # Add padding if needed
+                            raw_data += '=' * (-len(raw_data) % 4)
+                            decoded_data = base64.urlsafe_b64decode(raw_data)
+                            full_content = decoded_data.decode('utf-8', errors='ignore')
+                            print(f"Raw message content length: {len(full_content)}")
+                        else:
+                            print(f"Raw message content not available")
+                    else:
+                        print(f"Gmail service not ready for alternative fetch")
+                        
+                except Exception as e:
+                    print(f"Alternative Gmail API fetch failed: {e}")
+                
+                # Use full content if available, otherwise fall back to snippet
+                content_to_use = full_content if full_content else raw_message.get('snippet', '')
+                content_source = "full message" if full_content else "snippet"
+                
+                print(f"Using {content_source} content (length: {len(content_to_use)})")
                 
                 # Create a synthetic part from the available data
                 synthetic_part = {
                     'mimeType': 'text/plain',
                     'body': {
-                        'data': raw_message.get('snippet', '')  # Use snippet as fallback
+                        'data': content_to_use
                     }
                 }
                 
@@ -650,7 +690,7 @@ def _convert_to_gmail_message(raw_message: Dict[str, Any]) -> Optional[Any]:
                 converted_part = _convert_payload_part(synthetic_part)
                 if converted_part:
                     parts = [converted_part]
-                    print(f"Created synthetic part with snippet content")
+                    print(f"Created synthetic part with {content_source} content")
                 else:
                     print(f"Failed to create synthetic part")
                 print("=" * 50)
