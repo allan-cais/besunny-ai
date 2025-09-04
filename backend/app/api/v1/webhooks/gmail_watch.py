@@ -53,6 +53,8 @@ async def re_establish_gmail_watch() -> Dict[str, Any]:
             
     except Exception as e:
         logger.error(f"Error re-establishing Gmail watch: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=500,
             detail=f"Failed to re-establish Gmail watch: {str(e)}"
@@ -109,3 +111,57 @@ async def get_gmail_watch_status() -> Dict[str, Any]:
             "gmail_ready": False,
             "timestamp": datetime.utcnow().isoformat()
         }
+
+
+@router.post("/test-watch")
+async def test_gmail_watch() -> Dict[str, Any]:
+    """
+    Test Gmail watch establishment without database storage.
+    This is a simpler test to see if the Gmail API call works.
+    """
+    try:
+        logger.info("Testing Gmail watch establishment...")
+        
+        # Initialize Gmail service
+        gmail_service = GmailService()
+        
+        if not gmail_service.is_ready():
+            raise HTTPException(
+                status_code=500,
+                detail="Gmail service not ready - check service account configuration"
+            )
+        
+        # Try to establish watch directly with Gmail API
+        topic_name = "projects/sunny-ai-468016/topics/gmail-notifications"
+        
+        watch_request = {
+            'labelIds': ['INBOX'],
+            'labelFilterAction': 'include',
+            'topicName': topic_name
+        }
+        
+        logger.info(f"Watch request: {watch_request}")
+        
+        # Make the Gmail API call directly
+        watch = gmail_service.gmail_service.users().watch(
+            userId=gmail_service.master_email, 
+            body=watch_request
+        ).execute()
+        
+        logger.info(f"Gmail watch API call successful: {watch}")
+        
+        return {
+            "status": "success",
+            "message": "Gmail watch test successful",
+            "watch_response": watch,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error testing Gmail watch: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Gmail watch test failed: {str(e)}"
+        )
