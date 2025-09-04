@@ -283,6 +283,16 @@ async def _process_gmail_message(gmail_message_id: str) -> None:
             logger.error(f"Failed to convert email to GmailMessage format")
             return
         
+        # Debug: Log the raw message structure
+        print(f"=== RAW GMAIL MESSAGE DEBUG ===")
+        print(f"Message ID: {gmail_message_id}")
+        print(f"Raw payload keys: {list(raw_gmail_message.get('payload', {}).keys())}")
+        print(f"Raw payload parts count: {len(raw_gmail_message.get('payload', {}).get('parts', []))}")
+        if raw_gmail_message.get('payload', {}).get('parts'):
+            for i, part in enumerate(raw_gmail_message['payload']['parts']):
+                print(f"Part {i}: mime_type={part.get('mimeType')}, has_body={bool(part.get('body', {}).get('data'))}")
+        print("=" * 50)
+        
         # Process the virtual email
         result = await email_service.process_inbound_email(gmail_message)
         
@@ -406,6 +416,55 @@ def _is_virtual_email(email: str) -> bool:
     return bool(re.match(pattern, email))
 
 
+def _convert_payload_part(raw_part: Dict[str, Any]) -> Optional[Any]:
+    """Convert a raw payload part to GmailPayload format."""
+    try:
+        from ....models.schemas.email import GmailPayload, GmailHeader, GmailBody
+        
+        # Convert headers
+        headers = []
+        for header in raw_part.get('headers', []):
+            headers.append(GmailHeader(
+                name=header.get('name', ''),
+                value=header.get('value', '')
+            ))
+        
+        # Convert body
+        raw_body = raw_part.get('body', {})
+        body = None
+        if raw_body:
+            body = GmailBody(
+                attachment_id=raw_body.get('attachmentId'),
+                size=raw_body.get('size', 0),
+                data=raw_body.get('data')
+            )
+        
+        # Convert nested parts recursively
+        parts = None
+        if raw_part.get('parts'):
+            parts = []
+            for part in raw_part['parts']:
+                converted_part = _convert_payload_part(part)
+                if converted_part:
+                    parts.append(converted_part)
+        
+        # Create payload part
+        payload_part = GmailPayload(
+            part_id=raw_part.get('partId', ''),
+            mime_type=raw_part.get('mimeType', ''),
+            filename=raw_part.get('filename'),
+            headers=headers,
+            body=body,
+            parts=parts
+        )
+        
+        return payload_part
+        
+    except Exception as e:
+        logger.error(f"Error converting payload part: {e}")
+        return None
+
+
 def _convert_to_gmail_message(raw_message: Dict[str, Any]) -> Optional[Any]:
     """Convert raw Gmail API response to GmailMessage format."""
     try:
@@ -441,6 +500,15 @@ def _convert_to_gmail_message(raw_message: Dict[str, Any]) -> Optional[Any]:
                 data=raw_body.get('data')
             )
         
+        # Convert parts recursively
+        parts = None
+        if raw_payload.get('parts'):
+            parts = []
+            for part in raw_payload['parts']:
+                converted_part = _convert_payload_part(part)
+                if converted_part:
+                    parts.append(converted_part)
+        
         # Create payload
         payload = GmailPayload(
             part_id=raw_payload.get('partId', ''),
@@ -448,7 +516,7 @@ def _convert_to_gmail_message(raw_message: Dict[str, Any]) -> Optional[Any]:
             filename=raw_payload.get('filename'),
             headers=headers,
             body=body,
-            parts=None  # TODO: Handle parts if needed
+            parts=parts
         )
         
         # Create GmailMessage
