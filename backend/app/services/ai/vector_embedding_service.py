@@ -219,6 +219,9 @@ class VectorEmbeddingService:
                 logger.warning("No content_text found for chunking")
                 return []
             
+            # Debug logging to see what content we're working with
+            logger.info(f"Content for chunking - Type: {content.get('type', 'unknown')}, Length: {len(content_text)}, Preview: {content_text[:200]}...")
+            
             # Tokenize the content
             tokens = self.tokenizer.encode(content_text)
             

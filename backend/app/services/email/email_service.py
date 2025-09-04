@@ -260,6 +260,9 @@ class EmailProcessingService:
             # Combine all text content for full content
             content['full_content'] = f"{content['body_text']} {content['body_html']}".strip()
             
+            # Debug logging to see what content was extracted
+            logger.info(f"Email content extracted - Body text length: {len(content['body_text'])}, HTML length: {len(content['body_html'])}, Full content length: {len(content['full_content'])}, Preview: {content['full_content'][:200]}...")
+            
             return content
             
         except Exception as e:
@@ -307,7 +310,15 @@ class EmailProcessingService:
                 if hasattr(payload, 'body') and payload.body and hasattr(payload.body, 'data'):
                     try:
                         decoded_data = base64.urlsafe_b64decode(payload.body.data + '=' * (-len(payload.body.data) % 4))
-                        content['body_text'] = decoded_data.decode('utf-8', errors='ignore')
+                        html_content = decoded_data.decode('utf-8', errors='ignore')
+                        content['body_html'] = html_content
+                        # Convert HTML to plain text for better embedding
+                        import re
+                        # Simple HTML tag removal
+                        plain_text = re.sub(r'<[^>]+>', '', html_content)
+                        # Clean up whitespace
+                        plain_text = re.sub(r'\s+', ' ', plain_text).strip()
+                        content['body_text'] = plain_text
                     except Exception as e:
                         logger.warning(f"Failed to decode HTML content: {e}")
             
