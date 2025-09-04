@@ -104,10 +104,15 @@ async def handle_gmail_webhook(
             return {"status": "invalid_payload", "message": "Invalid webhook payload format"}
         
         # Process the email in the background
+        print(f"=== ADDING BACKGROUND TASK ===")
+        print(f"Message ID: {gmail_message_id}")
+        print(f"About to call _process_gmail_message")
         background_tasks.add_task(
             _process_gmail_message,
             gmail_message_id
         )
+        print(f"Background task added successfully")
+        print("=" * 50)
         
         return {
             "status": "success",
