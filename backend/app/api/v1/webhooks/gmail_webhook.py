@@ -337,6 +337,13 @@ async def _process_gmail_message(gmail_message_id: str) -> None:
                 print(f"Converted Part {i}: mime_type={part.mime_type}, has_body={bool(part.body and part.body.data)}")
         print("=" * 50)
         
+        # Debug: Check if we're about to process the email
+        print(f"=== ABOUT TO PROCESS EMAIL ===")
+        print(f"Gmail message ID: {gmail_message_id}")
+        print(f"Gmail message object: {gmail_message}")
+        print(f"About to call email_service.process_inbound_email")
+        print("=" * 50)
+        
         # Process the virtual email
         print(f"=== PROCESSING VIRTUAL EMAIL ===")
         print(f"About to call email_service.process_inbound_email")
