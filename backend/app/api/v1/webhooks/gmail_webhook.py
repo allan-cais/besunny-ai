@@ -500,6 +500,13 @@ def _convert_to_gmail_message(raw_message: Dict[str, Any]) -> Optional[Any]:
         
         # Extract payload
         raw_payload = raw_message.get('payload', {})
+        print(f"Raw payload keys: {list(raw_payload.keys())}")
+        print(f"Raw payload mimeType: {raw_payload.get('mimeType')}")
+        print(f"Raw payload has parts: {bool(raw_payload.get('parts'))}")
+        if raw_payload.get('parts'):
+            print(f"Raw payload parts count: {len(raw_payload['parts'])}")
+        else:
+            print("No parts in raw payload")
         
         # Convert headers
         headers = []
