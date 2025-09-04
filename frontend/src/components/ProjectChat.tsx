@@ -7,6 +7,7 @@ import { useSupabase } from '@/hooks/use-supabase';
 import { useAuth } from '@/providers/AuthProvider';
 import { ChatMessage } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
+import { config } from '@/config';
 
 interface ProjectChatProps {
   projectId: string;
@@ -29,7 +30,7 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
   // Simple chat state management - no complex database operations for now
 
   // RAG Agent API endpoint
-  const RAG_AGENT_API_URL = '/api/v1/rag-agent/query';
+  const RAG_AGENT_API_URL = `${config.pythonBackend.url}/api/v1/rag-agent/query`;
 
   // Initialize chat automatically when component mounts
   useEffect(() => {
