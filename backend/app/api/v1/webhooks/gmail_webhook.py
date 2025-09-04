@@ -104,10 +104,15 @@ async def handle_gmail_webhook(
             return {"status": "invalid_payload", "message": "Invalid webhook payload format"}
         
         # Process the email in the background
+        print(f"=== ADDING BACKGROUND TASK ===")
+        print(f"Message ID: {gmail_message_id}")
+        print(f"About to call _process_gmail_message")
         background_tasks.add_task(
             _process_gmail_message,
             gmail_message_id
         )
+        print(f"Background task added successfully")
+        print("=" * 50)
         
         return {
             "status": "success",
@@ -419,7 +424,8 @@ async def _fetch_gmail_message(message_id: str) -> Optional[Dict[str, Any]]:
             print(f"Gmail service ready: {gmail_service.is_ready()}")
             print(f"Gmail service type: {type(gmail_service.gmail_service)}")
             
-            # First try with format='full' (should return complete message)
+            # Use the correct Gmail API request format to get full message structure
+            # The issue is that we need to ensure we get the complete message with all parts
             message = gmail_service.gmail_service.users().messages().get(
                 userId=gmail_service.master_email,
                 id=message_id,
@@ -449,10 +455,18 @@ async def _fetch_gmail_message(message_id: str) -> Optional[Dict[str, Any]]:
             print(f"Complete payload: {message.get('payload', {})}")
             print("=" * 50)
             
-            # If no parts found, try alternative Gmail API approach
+            # If no parts found, this indicates a Gmail API issue
+            # The message should have parts for multipart/alternative messages
             if not message.get('payload', {}).get('parts'):
-                print(f"=== TRYING ALTERNATIVE GMAIL API APPROACH ===")
+                print(f"=== GMAIL API ISSUE DETECTED ===")
+                print(f"Message has mimeType '{message.get('payload', {}).get('mimeType')}' but no parts")
+                print(f"This suggests the Gmail API is not returning the full message structure")
+                print(f"Payload structure: {message.get('payload', {})}")
+                print("=" * 50)
+                
+                # Try alternative Gmail API approach with different parameters
                 try:
+                    print(f"=== TRYING ALTERNATIVE GMAIL API APPROACH ===")
                     # Try without format parameter (should return full message by default)
                     alt_message = gmail_service.gmail_service.users().messages().get(
                         userId=gmail_service.master_email,
@@ -467,6 +481,7 @@ async def _fetch_gmail_message(message_id: str) -> Optional[Dict[str, Any]]:
                         print("Using alternative Gmail API response")
                     else:
                         print("Alternative request also has no parts")
+                        print("This is a Gmail API issue - the message structure is incomplete")
                 except Exception as e:
                     print(f"Alternative Gmail API request failed: {e}")
                 print("=" * 50)
@@ -615,6 +630,30 @@ def _convert_to_gmail_message(raw_message: Dict[str, Any]) -> Optional[Any]:
                     print(f"Part {i} conversion failed")
             print(f"Total converted parts: {len(parts)}")
             print("=" * 50)
+        else:
+            # If no parts but it's a multipart message, this is a Gmail API issue
+            # We need to handle this case by creating a synthetic part structure
+            if raw_payload.get('mimeType', '').startswith('multipart/'):
+                print(f"=== HANDLING MULTIPART MESSAGE WITHOUT PARTS ===")
+                print(f"This is a Gmail API issue - multipart message has no parts")
+                print(f"Creating synthetic part structure from available data")
+                
+                # Create a synthetic part from the available data
+                synthetic_part = {
+                    'mimeType': 'text/plain',
+                    'body': {
+                        'data': raw_message.get('snippet', '')  # Use snippet as fallback
+                    }
+                }
+                
+                # Convert the synthetic part
+                converted_part = _convert_payload_part(synthetic_part)
+                if converted_part:
+                    parts = [converted_part]
+                    print(f"Created synthetic part with snippet content")
+                else:
+                    print(f"Failed to create synthetic part")
+                print("=" * 50)
         
         # Create payload
         payload = GmailPayload(
