@@ -34,6 +34,9 @@ async def handle_gmail_webhook(
     virtual email addresses (ai+{username}@besunny.ai).
     """
     try:
+        logger.info("=== GMAIL WEBHOOK RECEIVED ===")
+        logger.info(f"Request headers: {dict(request.headers)}")
+        
         # Verify the webhook is from Gmail (can be disabled for testing)
         settings = get_settings()
         if getattr(settings, 'verify_gmail_webhooks', True):
