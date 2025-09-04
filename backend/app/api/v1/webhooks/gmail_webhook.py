@@ -293,6 +293,16 @@ async def _process_gmail_message(gmail_message_id: str) -> None:
                 print(f"Part {i}: mime_type={part.get('mimeType')}, has_body={bool(part.get('body', {}).get('data'))}")
         print("=" * 50)
         
+        # Debug: Log the converted message structure
+        print(f"=== CONVERTED GMAIL MESSAGE DEBUG ===")
+        print(f"Converted payload mime_type: {gmail_message.payload.mime_type}")
+        print(f"Converted payload has parts: {bool(gmail_message.payload.parts)}")
+        if gmail_message.payload.parts:
+            print(f"Converted parts count: {len(gmail_message.payload.parts)}")
+            for i, part in enumerate(gmail_message.payload.parts):
+                print(f"Converted Part {i}: mime_type={part.mime_type}, has_body={bool(part.body and part.body.data)}")
+        print("=" * 50)
+        
         # Process the virtual email
         result = await email_service.process_inbound_email(gmail_message)
         
