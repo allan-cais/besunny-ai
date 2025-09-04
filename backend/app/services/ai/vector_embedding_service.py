@@ -141,6 +141,7 @@ class VectorEmbeddingService:
                         'author': content.get('author', ''),
                         'date': content.get('date', ''),
                         'subject': content.get('subject', ''),
+                        'chunk_text': chunks[i]['text'],  # Add the actual chunk text content
                         'confidence': classification_result.get('confidence', 0.0),
                         'matched_tags': classification_result.get('document', {}).get('matched_tags', []),
                         'inferred_tags': classification_result.get('document', {}).get('inferred_tags', []),
@@ -191,6 +192,11 @@ class VectorEmbeddingService:
             # Store embeddings in Pinecone
             self.index.upsert(vectors=embeddings)
             logger.info(f"Successfully stored {len(embeddings)} embeddings in Pinecone")
+            
+            # Debug: Log what content was embedded
+            for i, emb in enumerate(embeddings):
+                chunk_text = emb['metadata'].get('chunk_text', '')
+                logger.info(f"Embedded chunk {i+1}/{len(embeddings)} - Length: {len(chunk_text)}, Preview: {chunk_text[:200]}...")
             
             # Log embedding activity
             await self._log_embedding_activity(content, classification_result, user_id, len(embeddings))
