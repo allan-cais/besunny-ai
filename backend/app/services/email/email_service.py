@@ -328,23 +328,39 @@ class EmailProcessingService:
                 'body_html': '',
                 'attachments': []
             }
+            
+            print(f"=== PROCESSING PAYLOAD CONTENT (depth {depth}) ===")
+            print(f"Payload mime_type: {payload.mime_type}")
+            print(f"About to process payload content")
+            
             # Handle multipart messages
             if payload.mime_type == 'multipart/alternative' or payload.mime_type == 'multipart/mixed':
+                print(f"Processing multipart message with {len(payload.parts) if hasattr(payload, 'parts') and payload.parts else 0} parts")
                 if hasattr(payload, 'parts') and payload.parts:
-                    for part in payload.parts:
+                    for i, part in enumerate(payload.parts):
+                        print(f"Processing part {i}: {part.mime_type}")
                         part_content = self._extract_payload_content(part, depth + 1)
                         content['body_text'] += part_content.get('body_text', '')
                         content['body_html'] += part_content.get('body_html', '')
                         content['attachments'].extend(part_content.get('attachments', []))
+                        print(f"Part {i} processed, content length: {len(content['body_text'])}")
+                else:
+                    print("No parts found in multipart message")
             
             # Handle text content
             elif payload.mime_type == 'text/plain':
+                print(f"Processing text/plain content")
                 if hasattr(payload, 'body') and payload.body and hasattr(payload.body, 'data'):
+                    print(f"Body data available, length: {len(payload.body.data)}")
                     try:
                         decoded_data = base64.urlsafe_b64decode(payload.body.data + '=' * (-len(payload.body.data) % 4))
                         content['body_text'] = decoded_data.decode('utf-8', errors='ignore')
+                        print(f"Text content decoded, length: {len(content['body_text'])}")
                     except Exception as e:
+                        print(f"Failed to decode text content: {e}")
                         logger.warning(f"Failed to decode text content: {e}")
+                else:
+                    print("No body data available for text/plain")
             
             elif payload.mime_type == 'text/html':
                 if hasattr(payload, 'body') and payload.body and hasattr(payload.body, 'data'):
