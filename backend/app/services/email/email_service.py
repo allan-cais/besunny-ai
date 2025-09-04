@@ -171,7 +171,8 @@ class EmailProcessingService:
             )
             
             # Mark email as processed in Gmail to prevent duplicate webhook notifications
-            await self._mark_email_as_processed_in_gmail(gmail_message.id)
+            # Temporarily disabled to debug webhook issues
+            # await self._mark_email_as_processed_in_gmail(gmail_message.id)
             
             return EmailProcessingResult(
                 success=True,
