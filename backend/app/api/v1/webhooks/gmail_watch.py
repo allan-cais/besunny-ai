@@ -165,3 +165,37 @@ async def test_gmail_watch() -> Dict[str, Any]:
             status_code=500,
             detail=f"Gmail watch test failed: {str(e)}"
         )
+
+
+@router.get("/scheduler-status")
+async def get_scheduler_status() -> Dict[str, Any]:
+    """
+    Get Gmail watch scheduler status.
+    """
+    try:
+        from ....services.email.gmail_watch_scheduler import gmail_watch_scheduler
+        return gmail_watch_scheduler.get_status()
+    except Exception as e:
+        logger.error(f"Error getting scheduler status: {e}")
+        return {
+            "status": "error",
+            "message": f"Error getting scheduler status: {str(e)}",
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+
+@router.post("/force-refresh")
+async def force_refresh_watch() -> Dict[str, Any]:
+    """
+    Manually force a Gmail watch refresh.
+    """
+    try:
+        from ....services.email.gmail_watch_scheduler import gmail_watch_scheduler
+        return await gmail_watch_scheduler.force_refresh()
+    except Exception as e:
+        logger.error(f"Error forcing watch refresh: {e}")
+        return {
+            "status": "error",
+            "message": f"Error forcing watch refresh: {str(e)}",
+            "timestamp": datetime.utcnow().isoformat()
+        }

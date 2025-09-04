@@ -76,6 +76,17 @@ async def lifespan(app: FastAPI):
             logger.error(f"Token refresh background task failed: {e}")
             _health_status["services"]["token_refresh"] = "failed"
         
+        # Start Gmail watch scheduler
+        logger.info("Starting Gmail watch scheduler...")
+        try:
+            from app.services.email.gmail_watch_scheduler import gmail_watch_scheduler
+            await gmail_watch_scheduler.start()
+            logger.info("Gmail watch scheduler started successfully")
+            _health_status["services"]["gmail_watch_scheduler"] = "started"
+        except Exception as e:
+            logger.error(f"Gmail watch scheduler failed to start: {e}")
+            _health_status["services"]["gmail_watch_scheduler"] = "failed"
+        
         # Mark startup as successful
         _health_status["startup_time"] = time.time()
         _health_status["last_check"] = time.time()
@@ -91,6 +102,14 @@ async def lifespan(app: FastAPI):
     
     finally:
         logger.info("Shutting down BeSunny.ai Python Backend")
+        
+        # Stop Gmail watch scheduler
+        try:
+            from app.services.email.gmail_watch_scheduler import gmail_watch_scheduler
+            await gmail_watch_scheduler.stop()
+            logger.info("Gmail watch scheduler stopped")
+        except Exception as e:
+            logger.error(f"Error stopping Gmail watch scheduler: {e}")
         
         logger.info("Application shutdown completed")
         
