@@ -286,11 +286,15 @@ async def _process_gmail_message(gmail_message_id: str) -> None:
         # Debug: Log the raw message structure
         print(f"=== RAW GMAIL MESSAGE DEBUG ===")
         print(f"Message ID: {gmail_message_id}")
+        print(f"Raw message keys: {list(raw_gmail_message.keys())}")
         print(f"Raw payload keys: {list(raw_gmail_message.get('payload', {}).keys())}")
         print(f"Raw payload parts count: {len(raw_gmail_message.get('payload', {}).get('parts', []))}")
+        print(f"Raw payload mimeType: {raw_gmail_message.get('payload', {}).get('mimeType')}")
         if raw_gmail_message.get('payload', {}).get('parts'):
             for i, part in enumerate(raw_gmail_message['payload']['parts']):
                 print(f"Part {i}: mime_type={part.get('mimeType')}, has_body={bool(part.get('body', {}).get('data'))}")
+        else:
+            print("No parts found in raw payload")
         print("=" * 50)
         
         # Debug: Log the converted message structure
@@ -481,6 +485,8 @@ def _convert_payload_part(raw_part: Dict[str, Any]) -> Optional[Any]:
 def _convert_to_gmail_message(raw_message: Dict[str, Any]) -> Optional[Any]:
     """Convert raw Gmail API response to GmailMessage format."""
     try:
+        print(f"=== STARTING GMAIL MESSAGE CONVERSION ===")
+        print(f"Raw message keys: {list(raw_message.keys())}")
         from ....models.schemas.email import GmailMessage, GmailPayload, GmailHeader, GmailBody
         
         # Extract basic message info
@@ -552,8 +558,16 @@ def _convert_to_gmail_message(raw_message: Dict[str, Any]) -> Optional[Any]:
             size_estimate=size_estimate
         )
         
+        print(f"=== GMAIL MESSAGE CONVERSION COMPLETED ===")
+        print(f"Converted message ID: {gmail_message.id}")
+        print(f"Converted payload mime_type: {gmail_message.payload.mime_type}")
+        print(f"Converted payload has parts: {bool(gmail_message.payload.parts)}")
+        if gmail_message.payload.parts:
+            print(f"Converted parts count: {len(gmail_message.payload.parts)}")
+        print("=" * 50)
         return gmail_message
         
     except Exception as e:
+        print(f"=== ERROR IN GMAIL MESSAGE CONVERSION: {e} ===")
         logger.error(f"Error converting to GmailMessage: {e}")
         return None
