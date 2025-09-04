@@ -100,20 +100,12 @@ class EmailProcessingService:
                 )
             
             # Extract email content (body and attachments)
-            print(f"=== EXTRACTING EMAIL CONTENT ===")
-            print(f"Gmail message ID: {gmail_message.id}")
+            logger.info(f"Extracting email content for message {gmail_message.id}")
             email_content = await self._extract_email_content(gmail_message)
-            print(f"Email content extracted successfully")
-            print(f"Body text length: {len(email_content.get('body_text', ''))}")
-            print(f"Body HTML length: {len(email_content.get('body_html', ''))}")
-            print(f"Full content length: {len(email_content.get('full_content', ''))}")
-            print("=" * 50)
+            logger.info(f"Email content extracted - text: {len(email_content.get('body_text', ''))} chars, HTML: {len(email_content.get('body_html', ''))} chars")
             
             # Create document with enhanced metadata
-            print(f"=== CREATING DOCUMENT ===")
-            print(f"User ID: {user.id}")
-            print(f"Subject: {subject_header or 'No Subject'}")
-            print(f"Sender: {from_header or 'Unknown Sender'}")
+            logger.info(f"Creating document for user {user.id}, subject: {subject_header or 'No Subject'}")
             document_id = await self._create_document_from_email(
                 user.id,
                 gmail_message,
@@ -130,40 +122,30 @@ class EmailProcessingService:
                     'has_attachments': bool(getattr(gmail_message.payload, 'parts', []) if gmail_message.payload else [])
                 }
             )
-            print(f"Document created with ID: {document_id}")
-            print("=" * 50)
+            logger.info(f"Document created with ID: {document_id}")
             
             # Get the created document
-            print(f"=== RETRIEVING DOCUMENT ===")
             document = await self._get_document(document_id)
             
             if not document:
                 raise Exception("Failed to retrieve created document")
-            print(f"Document retrieved successfully")
-            print("=" * 50)
+            logger.info(f"Document retrieved successfully")
             
             # Get active projects for the user
-            print(f"=== GETTING ACTIVE PROJECTS ===")
             projects = await self._get_active_projects_for_user(user.id)
-            print(f"Found {len(projects)} active projects")
-            print("=" * 50)
+            logger.info(f"Found {len(projects)} active projects for user {user.id}")
             
             # Build classification payload
-            print(f"=== BUILDING CLASSIFICATION PAYLOAD ===")
             classification_payload = self._build_classification_payload(
                 document, user, projects, email_content
             )
-            print(f"Classification payload built successfully")
-            print("=" * 50)
+            logger.info(f"Classification payload built successfully")
             
             # Send to classification service (to be implemented)
-            print(f"=== INITIATING CLASSIFICATION AGENT ===")
             classification_result = await self._initiate_classification_agent(
                 classification_payload
             )
-            print(f"Classification agent completed")
-            print(f"Result: {classification_result}")
-            print("=" * 50)
+            logger.info(f"Classification agent completed with result: {classification_result}")
             
             # Update document with classification result
             if classification_result and isinstance(classification_result, dict) and classification_result.get('classified_project_id'):
@@ -196,9 +178,7 @@ class EmailProcessingService:
             )
             
             # Mark email as processed in Gmail to prevent duplicate webhook notifications
-            print(f"=== MARKING EMAIL AS PROCESSED ===")
-            print(f"Gmail message ID: {gmail_message.id}")
-            print(f"Action: {get_settings().gmail_mark_processed_action}")
+            logger.info(f"Marking email {gmail_message.id} as processed with action: {get_settings().gmail_mark_processed_action}")
             await self._mark_email_as_processed_in_gmail(gmail_message.id)
             
             return EmailProcessingResult(
@@ -276,18 +256,10 @@ class EmailProcessingService:
             
             # Extract content from payload
             if hasattr(gmail_message, 'payload') and gmail_message.payload:
-                print(f"=== PAYLOAD EXTRACTION DEBUG ===")
-                print(f"Payload type: {type(gmail_message.payload)}")
-                print(f"Payload mime_type: {getattr(gmail_message.payload, 'mime_type', 'None')}")
-                print(f"Payload has parts: {bool(getattr(gmail_message.payload, 'parts', None))}")
-                if hasattr(gmail_message.payload, 'parts') and gmail_message.payload.parts:
-                    print(f"Parts count: {len(gmail_message.payload.parts)}")
-                    for i, part in enumerate(gmail_message.payload.parts):
-                        print(f"Part {i}: mime_type={getattr(part, 'mime_type', 'None')}, has_body={bool(getattr(part, 'body', None) and getattr(part.body, 'data', None))}")
-                print("=" * 50)
+                logger.debug(f"Payload extraction debug - type: {type(gmail_message.payload)}, mime_type: {getattr(gmail_message.payload, 'mime_type', 'None')}, has_parts: {bool(getattr(gmail_message.payload, 'parts', None))}")
                 
                 payload_content = self._extract_payload_content(gmail_message.payload)
-                print(f"Payload content extracted: {payload_content}")
+                logger.debug(f"Payload content extracted: {payload_content}")
                 content.update(payload_content)
             
             # Fallback to snippet if no body content found
@@ -313,13 +285,7 @@ class EmailProcessingService:
             content['full_content'] = '\n\n'.join(full_content_parts)
             
             # Log content extraction details
-            print(f"=== EMAIL CONTENT EXTRACTED ===")
-            print(f"Body text length: {len(content['body_text'])}")
-            print(f"HTML length: {len(content['body_html'])}")
-            print(f"Full content length: {len(content['full_content'])}")
-            print(f"Preview: {content['full_content'][:200]}...")
-            print(f"Full content: {content['full_content']}")
-            print("=" * 50)
+            logger.info(f"Email content extracted - text: {len(content['body_text'])} chars, HTML: {len(content['body_html'])} chars, full: {len(content['full_content'])} chars")
             
             return content
             
@@ -337,16 +303,10 @@ class EmailProcessingService:
     def _extract_payload_content(self, payload: Any, depth: int = 0) -> Dict[str, Any]:
         """Recursively extract content from Gmail message payload."""
         if depth > 10:  # Prevent infinite recursion
-            print(f"=== MAX DEPTH REACHED (depth {depth}) ===")
+            logger.warning(f"Max depth reached in payload extraction (depth {depth})")
             return {}
         
-        print(f"=== EXTRACTING PAYLOAD CONTENT (depth {depth}) ===")
-        print(f"Payload mime_type: {getattr(payload, 'mime_type', 'None')}")
-        print(f"Payload has body: {bool(getattr(payload, 'body', None))}")
-        print(f"Payload has parts: {bool(getattr(payload, 'parts', None))}")
-        if hasattr(payload, 'body') and payload.body and hasattr(payload.body, 'data'):
-            print(f"Body data length: {len(payload.body.data) if payload.body.data else 0}")
-        print("=" * 50)
+        logger.debug(f"Extracting payload content (depth {depth}) - mime_type: {getattr(payload, 'mime_type', 'None')}, has_parts: {bool(getattr(payload, 'parts', None))}")
         
         try:
             content = {
@@ -355,50 +315,47 @@ class EmailProcessingService:
                 'attachments': []
             }
             
-            print(f"=== PROCESSING PAYLOAD CONTENT (depth {depth}) ===")
-            print(f"Payload mime_type: {payload.mime_type}")
-            print(f"About to process payload content")
+            logger.debug(f"Processing payload content (depth {depth}) - mime_type: {payload.mime_type}")
             
             # Handle multipart messages
             if payload.mime_type == 'multipart/alternative' or payload.mime_type == 'multipart/mixed':
-                print(f"Processing multipart message with {len(payload.parts) if hasattr(payload, 'parts') and payload.parts else 0} parts")
+                logger.debug(f"Processing multipart message with {len(payload.parts) if hasattr(payload, 'parts') and payload.parts else 0} parts")
                 if hasattr(payload, 'parts') and payload.parts:
                     for i, part in enumerate(payload.parts):
-                        print(f"Processing part {i}: {part.mime_type}")
+                        logger.debug(f"Processing part {i}: {part.mime_type}")
                         part_content = self._extract_payload_content(part, depth + 1)
                         content['body_text'] += part_content.get('body_text', '')
                         content['body_html'] += part_content.get('body_html', '')
                         content['attachments'].extend(part_content.get('attachments', []))
-                        print(f"Part {i} processed, content length: {len(content['body_text'])}")
+                        logger.debug(f"Part {i} processed, content length: {len(content['body_text'])}")
                 else:
-                    print("No parts found in multipart message")
+                    logger.warning("No parts found in multipart message")
             
             # Handle text content
             elif payload.mime_type == 'text/plain':
-                print(f"Processing text/plain content")
+                logger.debug(f"Processing text/plain content")
                 if hasattr(payload, 'body') and payload.body and hasattr(payload.body, 'data'):
-                    print(f"Body data available, length: {len(payload.body.data)}")
+                    logger.debug(f"Body data available, length: {len(payload.body.data)}")
                     try:
                         # Check if the data is already decoded (from raw message content)
                         # or if it needs base64 decoding (from regular Gmail API)
                         if payload.body.data.startswith('Subject:') or payload.body.data.startswith('From:') or len(payload.body.data) > 1000:
                             # This is already decoded content from raw message
-                            print(f"Using raw message content directly (already decoded)")
+                            logger.debug(f"Using raw message content directly (already decoded)")
                             # Parse the raw MIME content to extract just the text/plain part
                             parsed_content = self._parse_raw_mime_content(payload.body.data)
                             content['body_text'] = parsed_content.get('text', '')
                             content['body_html'] = parsed_content.get('html', '')
                         else:
                             # This is base64 encoded content from regular Gmail API
-                            print(f"Decoding base64 content from regular Gmail API")
+                            logger.debug(f"Decoding base64 content from regular Gmail API")
                             decoded_data = base64.urlsafe_b64decode(payload.body.data + '=' * (-len(payload.body.data) % 4))
                             content['body_text'] = decoded_data.decode('utf-8', errors='ignore')
-                        print(f"Text content processed, length: {len(content['body_text'])}")
+                        logger.debug(f"Text content processed, length: {len(content['body_text'])}")
                     except Exception as e:
-                        print(f"Failed to process text content: {e}")
                         logger.warning(f"Failed to process text content: {e}")
                 else:
-                    print("No body data available for text/plain")
+                    logger.warning("No body data available for text/plain")
             
             elif payload.mime_type == 'text/html':
                 if hasattr(payload, 'body') and payload.body and hasattr(payload.body, 'data'):
@@ -407,13 +364,13 @@ class EmailProcessingService:
                         # or if it needs base64 decoding (from regular Gmail API)
                         if payload.body.data.startswith('<') or payload.body.data.startswith('Subject:') or len(payload.body.data) > 1000:
                             # This is already decoded content from raw message
-                            print(f"Using raw HTML content directly (already decoded)")
+                            logger.debug(f"Using raw HTML content directly (already decoded)")
                             # Parse the raw MIME content to extract just the HTML part
                             parsed_content = self._parse_raw_mime_content(payload.body.data)
                             html_content = parsed_content.get('html', '')
                         else:
                             # This is base64 encoded content from regular Gmail API
-                            print(f"Decoding base64 HTML content from regular Gmail API")
+                            logger.debug(f"Decoding base64 HTML content from regular Gmail API")
                             decoded_data = base64.urlsafe_b64decode(payload.body.data + '=' * (-len(payload.body.data) % 4))
                             html_content = decoded_data.decode('utf-8', errors='ignore')
                         
@@ -424,9 +381,8 @@ class EmailProcessingService:
                         plain_text = re.sub(r'<[^>]+>', '', html_content)
                         plain_text = re.sub(r'\s+', ' ', plain_text).strip()
                         content['body_text'] = plain_text
-                        print(f"HTML content processed, length: {len(html_content)}")
+                        logger.debug(f"HTML content processed, length: {len(html_content)}")
                     except Exception as e:
-                        print(f"Failed to process HTML content: {e}")
                         logger.warning(f"Failed to process HTML content: {e}")
             
             # Handle attachments
@@ -449,26 +405,20 @@ class EmailProcessingService:
                     content['attachments'].extend(part_content.get('attachments', []))
                     
         except Exception as e:
-            print(f"=== ERROR IN PAYLOAD EXTRACTION (depth {depth}) ===")
-            print(f"Error: {e}")
-            print(f"Payload type: {type(payload)}")
-            print(f"Payload mime_type: {getattr(payload, 'mime_type', 'None')}")
-            print("=" * 50)
+            logger.error(f"Error in payload extraction (depth {depth})")
+            logger.error(f"Payload type: {type(payload)}, mime_type: {getattr(payload, 'mime_type', 'None')}")
             logger.error(f"Error extracting payload content at depth {depth}: {e}")
             import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")
         
-        print(f"=== PAYLOAD EXTRACTION COMPLETED (depth {depth}) ===")
-        print(f"Content: {content}")
-        print("=" * 50)
+        logger.debug(f"Payload extraction completed (depth {depth})")
+        logger.debug(f"Content: {content}")
         return content
     
     def _parse_raw_mime_content(self, raw_content: str) -> Dict[str, str]:
         """Parse raw MIME content to extract text and HTML parts."""
         try:
-            print(f"=== PARSING RAW MIME CONTENT ===")
-            print(f"Raw content length: {len(raw_content)}")
-            print(f"Raw content preview: {raw_content[:200]}...")
+            logger.debug(f"Parsing raw MIME content - length: {len(raw_content)}")
             
             text_content = ''
             html_content = ''
@@ -477,18 +427,18 @@ class EmailProcessingService:
             boundary_match = re.search(r'boundary="([^"]+)"', raw_content)
             if boundary_match:
                 boundary = boundary_match.group(1)
-                print(f"Found boundary: {boundary}")
+                logger.debug(f"Found boundary: {boundary}")
                 
                 # Split by boundary
                 parts = raw_content.split(f'--{boundary}')
-                print(f"Found {len(parts)} parts")
+                logger.debug(f"Found {len(parts)} parts")
                 
                 for i, part in enumerate(parts):
-                    print(f"Processing part {i}")
+                    logger.debug(f"Processing part {i}")
                     
                     # Check if this is a text/plain part
                     if 'Content-Type: text/plain' in part:
-                        print(f"Found text/plain part in part {i}")
+                        logger.debug(f"Found text/plain part in part {i}")
                         # Extract content after headers
                         content_start = part.find('\r\n\r\n')
                         if content_start != -1:
@@ -497,11 +447,11 @@ class EmailProcessingService:
                             if 'Content-Transfer-Encoding: quoted-printable' in part:
                                 text_part = self._decode_quoted_printable(text_part)
                             text_content = text_part.strip()
-                            print(f"Extracted text content, length: {len(text_content)}")
+                            logger.debug(f"Extracted text content, length: {len(text_content)}")
                     
                     # Check if this is a text/html part
                     elif 'Content-Type: text/html' in part:
-                        print(f"Found text/html part in part {i}")
+                        logger.debug(f"Found text/html part in part {i}")
                         # Extract content after headers
                         content_start = part.find('\r\n\r\n')
                         if content_start != -1:
@@ -510,12 +460,9 @@ class EmailProcessingService:
                             if 'Content-Transfer-Encoding: quoted-printable' in part:
                                 html_part = self._decode_quoted_printable(html_part)
                             html_content = html_part.strip()
-                            print(f"Extracted HTML content, length: {len(html_content)}")
+                            logger.debug(f"Extracted HTML content, length: {len(html_content)}")
             
-            print(f"=== MIME PARSING COMPLETED ===")
-            print(f"Text content length: {len(text_content)}")
-            print(f"HTML content length: {len(html_content)}")
-            print("=" * 50)
+            logger.debug(f"MIME parsing completed - text: {len(text_content)} chars, HTML: {len(html_content)} chars")
             
             return {
                 'text': text_content,
@@ -523,7 +470,6 @@ class EmailProcessingService:
             }
             
         except Exception as e:
-            print(f"Error parsing raw MIME content: {e}")
             logger.error(f"Error parsing raw MIME content: {e}")
             return {'text': '', 'html': ''}
     
@@ -533,7 +479,7 @@ class EmailProcessingService:
             import quopri
             return quopri.decodestring(content).decode('utf-8', errors='ignore')
         except Exception as e:
-            print(f"Error decoding quoted-printable: {e}")
+            logger.error(f"Error decoding quoted-printable: {e}")
             return content
     
     async def _find_user_by_username(self, username: str) -> Optional[User]:
@@ -1056,14 +1002,7 @@ class EmailProcessingService:
             logger.info(f"Starting vector embedding pipeline for content: {content.get('source_id', 'unknown')}")
             
             # Debug: Log the content being passed to embedding service
-            print(f"=== VECTOR EMBEDDING PIPELINE DEBUG ===")
-            print(f"Content keys: {list(content.keys())}")
-            print(f"Full content length: {len(content.get('full_content', ''))}")
-            print(f"Content text length: {len(content.get('content_text', ''))}")
-            print(f"Body text length: {len(content.get('body_text', ''))}")
-            print(f"Body HTML length: {len(content.get('body_html', ''))}")
-            print(f"Full content preview: {content.get('full_content', '')[:200]}...")
-            print("=" * 50)
+            logger.debug(f"Vector embedding pipeline - content keys: {list(content.keys())}, full: {len(content.get('full_content', ''))} chars")
             
             # Initialize vector embedding service
             vector_service = VectorEmbeddingService()
@@ -1089,16 +1028,13 @@ class EmailProcessingService:
     async def _mark_email_as_processed_in_gmail(self, gmail_message_id: str) -> None:
         """Mark email as processed in Gmail to prevent duplicate webhook notifications."""
         try:
-            print(f"=== MARKING EMAIL AS PROCESSED IN GMAIL ===")
-            print(f"Gmail message ID: {gmail_message_id}")
-            logger.info(f"Marking Gmail message {gmail_message_id} as processed")
+            logger.info(f"Marking email {gmail_message_id} as processed in Gmail")
             
             # Initialize Gmail service
             from .gmail_service import GmailService
             gmail_service = GmailService()
             
             if not gmail_service.is_ready():
-                print("Gmail service not ready, cannot mark email as processed")
                 logger.warning("Gmail service not ready, cannot mark email as processed")
                 return
             
@@ -1106,7 +1042,7 @@ class EmailProcessingService:
             from ...core.config import get_settings
             settings = get_settings()
             action = settings.gmail_mark_processed_action
-            print(f"Using action: {action}")
+            logger.info(f"Using action: {action}")
             
             # Mark email as processed
             success = await gmail_service.mark_email_as_processed(
@@ -1115,10 +1051,8 @@ class EmailProcessingService:
             )
             
             if success:
-                print(f"Successfully marked email {gmail_message_id} as processed (action: {action})")
                 logger.info(f"Successfully marked email {gmail_message_id} as processed (action: {action})")
             else:
-                print(f"Failed to mark email {gmail_message_id} as processed")
                 logger.warning(f"Failed to mark email {gmail_message_id} as processed")
                 
         except Exception as e:
