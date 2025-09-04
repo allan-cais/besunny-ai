@@ -275,7 +275,13 @@ class EmailProcessingService:
             content['full_content'] = '\n\n'.join(full_content_parts)
             
             # Log content extraction details
-            logger.info(f"Email content extracted - Body text length: {len(content['body_text'])}, HTML length: {len(content['body_html'])}, Full content length: {len(content['full_content'])}, Preview: {content['full_content'][:200]}...")
+            print(f"=== EMAIL CONTENT EXTRACTED ===")
+            print(f"Body text length: {len(content['body_text'])}")
+            print(f"HTML length: {len(content['body_html'])}")
+            print(f"Full content length: {len(content['full_content'])}")
+            print(f"Preview: {content['full_content'][:200]}...")
+            print(f"Full content: {content['full_content']}")
+            print("=" * 50)
             
             return content
             

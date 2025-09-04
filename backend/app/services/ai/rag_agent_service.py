@@ -261,11 +261,18 @@ Please provide a helpful, accurate response based on the retrieved context."""
             )
             
             context_items = []
-            logger.info(f"Pinecone search returned {len(search_results.matches)} matches for query: {query[:100]}...")
+            print(f"=== PINECONE SEARCH RESULTS ===")
+            print(f"Query: {query[:100]}...")
+            print(f"Matches found: {len(search_results.matches)}")
             
             for i, match in enumerate(search_results.matches):
                 chunk_text = match.metadata.get('chunk_text', '')
-                logger.info(f"Match {i+1} - Score: {match.score:.3f}, Content length: {len(chunk_text)}, Preview: {chunk_text[:200]}...")
+                print(f"--- MATCH {i+1} ---")
+                print(f"Score: {match.score:.3f}")
+                print(f"Content length: {len(chunk_text)}")
+                print(f"Preview: {chunk_text[:200]}...")
+                print(f"Full content: {chunk_text}")
+                print("-" * 30)
                 
                 context_items.append({
                     'type': 'vector_chunk',
@@ -284,7 +291,8 @@ Please provide a helpful, accurate response based on the retrieved context."""
                     }
                 })
             
-            logger.info(f"Returning {len(context_items)} context items from Pinecone")
+            print(f"Returning {len(context_items)} context items from Pinecone")
+            print("=" * 50)
             return context_items
             
         except Exception as e:
