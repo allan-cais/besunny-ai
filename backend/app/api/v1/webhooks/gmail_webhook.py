@@ -268,7 +268,9 @@ async def _process_gmail_message(gmail_message_id: str) -> None:
         # Fetch the full message from Gmail
         print(f"=== FETCHING GMAIL MESSAGE ===")
         print(f"Message ID: {gmail_message_id}")
+        print(f"About to call _fetch_gmail_message")
         raw_gmail_message = await _fetch_gmail_message(gmail_message_id)
+        print(f"_fetch_gmail_message returned: {raw_gmail_message is not None}")
         if not raw_gmail_message:
             print(f"Failed to fetch Gmail message: {gmail_message_id}")
             logger.error(f"Failed to fetch Gmail message: {gmail_message_id}")
