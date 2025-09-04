@@ -212,6 +212,73 @@ class GmailService:
             logger.error(f"Error processing email {message_id}: {e}")
             return False
     
+    async def mark_email_as_read(self, message_id: str) -> bool:
+        """Mark an email as read by removing the UNREAD label."""
+        try:
+            if not self.gmail_service:
+                logger.error("Gmail service not initialized")
+                return False
+            
+            # Remove the UNREAD label from the message
+            self.gmail_service.users().messages().modify(
+                userId=self.master_email,
+                id=message_id,
+                body={
+                    'removeLabelIds': ['UNREAD']
+                }
+            ).execute()
+            
+            logger.info(f"Marked email {message_id} as read")
+            return True
+            
+        except HttpError as e:
+            logger.error(f"Gmail API error marking email as read: {e}")
+            return False
+        except Exception as e:
+            logger.error(f"Error marking email {message_id} as read: {e}")
+            return False
+    
+    async def archive_email(self, message_id: str) -> bool:
+        """Archive an email by removing it from the INBOX."""
+        try:
+            if not self.gmail_service:
+                logger.error("Gmail service not initialized")
+                return False
+            
+            # Remove the INBOX label from the message (this archives it)
+            self.gmail_service.users().messages().modify(
+                userId=self.master_email,
+                id=message_id,
+                body={
+                    'removeLabelIds': ['INBOX']
+                }
+            ).execute()
+            
+            logger.info(f"Archived email {message_id}")
+            return True
+            
+        except HttpError as e:
+            logger.error(f"Gmail API error archiving email: {e}")
+            return False
+        except Exception as e:
+            logger.error(f"Error archiving email {message_id}: {e}")
+            return False
+    
+    async def mark_email_as_processed(self, message_id: str, action: str = "read") -> bool:
+        """Mark an email as processed by either reading or archiving it."""
+        try:
+            if action == "read":
+                return await self.mark_email_as_read(message_id)
+            elif action == "archive":
+                return await self.archive_email(message_id)
+            else:
+                logger.warning(f"Unknown action '{action}', defaulting to 'read'")
+                return await self.mark_email_as_read(message_id)
+                
+        except Exception as e:
+            logger.error(f"Error marking email {message_id} as processed: {e}")
+            return False
+    
     async def fetch_recent_emails(self, max_results: int = 100) -> List[Dict[str, Any]]:
         """Fetch recent emails from the master account inbox."""
         if not self.is_ready():

@@ -16,6 +16,7 @@ from ...core.supabase_config import get_supabase_service_client
 from ...core.config import get_settings
 from ...services.ai.classification_service import ClassificationService
 from ...services.ai.vector_embedding_service import VectorEmbeddingService
+from .gmail_service import GmailService
 from ...models.schemas.email import (
     GmailMessage,
     EmailProcessingResult,
@@ -168,6 +169,9 @@ class EmailProcessingService:
                 document_id=document_id,
                 # classification_success=bool(classification_result)  # Column doesn't exist in schema
             )
+            
+            # Mark email as processed in Gmail to prevent duplicate webhook notifications
+            await self._mark_email_as_processed_in_gmail(gmail_message.id)
             
             return EmailProcessingResult(
                 success=True,
@@ -869,3 +873,28 @@ class EmailProcessingService:
                 'error': str(e),
                 'chunks_created': 0
             }
+    
+    async def _mark_email_as_processed_in_gmail(self, gmail_message_id: str) -> None:
+        """Mark email as processed in Gmail to prevent duplicate webhook notifications."""
+        try:
+            logger.info(f"Marking Gmail message {gmail_message_id} as processed")
+            
+            # Initialize Gmail service
+            gmail_service = GmailService()
+            
+            # Mark as processed using configured action (read or archive)
+            settings = get_settings()
+            action = settings.gmail_mark_processed_action
+            success = await gmail_service.mark_email_as_processed(
+                message_id=gmail_message_id,
+                action=action
+            )
+            
+            if success:
+                logger.info(f"Successfully marked Gmail message {gmail_message_id} as processed")
+            else:
+                logger.warning(f"Failed to mark Gmail message {gmail_message_id} as processed")
+                
+        except Exception as e:
+            logger.error(f"Error marking Gmail message {gmail_message_id} as processed: {e}")
+            # Don't raise the exception as this is not critical to the main processing flow

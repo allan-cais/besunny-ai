@@ -94,6 +94,15 @@ export const config: Config = {
       const finalUrl = envUrl || runtimeUrl;
       
       // Debug logging
+      if (import.meta.env.DEV || import.meta.env.VITE_DEBUG_ENV === 'true') {
+        console.log('🔧 Python Backend URL Configuration:', {
+          envUrl,
+          runtimeUrl,
+          isRailwayEnv,
+          finalUrl,
+          envVar: import.meta.env.VITE_PYTHON_BACKEND_URL
+        });
+      }
       return finalUrl;
     })(),
     timeout: getOptionalNumberEnvVar('VITE_PYTHON_BACKEND_TIMEOUT', runtimeConfig.pythonBackend.timeout),

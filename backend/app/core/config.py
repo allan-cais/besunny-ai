@@ -86,6 +86,9 @@ class Settings(BaseSettings):
     n8n_drivesync_webhook_url: Optional[str] = Field(default=None, env="N8N_DRIVESYNC_WEBHOOK_URL")
     verify_gmail_webhooks: bool = Field(default=True, env="VERIFY_GMAIL_WEBHOOKS")
     
+    # Gmail email processing
+    gmail_mark_processed_action: str = Field(default="read", env="GMAIL_MARK_PROCESSED_ACTION")  # "read" or "archive"
+    
     # Attendee service settings
     attendee_api_base_url: Optional[str] = Field(default=None, env="ATTENDEE_API_BASE_URL")
     master_attendee_api_key: Optional[str] = Field(default=None, env="MASTER_ATTENDEE_API_KEY")

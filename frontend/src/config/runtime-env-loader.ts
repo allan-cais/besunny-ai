@@ -48,7 +48,7 @@ const defaultConfig: RuntimeEnvConfig = {
     serviceRoleKey: '',
   },
   pythonBackend: {
-    url: 'https://backend-staging-6085.up.railway.app',  // Updated to use HTTPS staging backend
+    url: 'https://backend-production-298a.up.railway.app',  // Fallback URL - main config will override with env var
     timeout: 30000,
     retries: 3,
     retryDelay: 1000,
