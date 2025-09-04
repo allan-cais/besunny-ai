@@ -484,6 +484,8 @@ class GmailService:
                 return await self.mark_email_as_read(message_id)
             elif action == "archive":
                 return await self.archive_email(message_id)
+            elif action == "delete":
+                return await self.delete_email(message_id)
             elif action == "read_then_archive":
                 # First mark as read
                 read_success = await self.mark_email_as_read(message_id)
@@ -494,10 +496,42 @@ class GmailService:
                 else:
                     logger.warning(f"Failed to mark email {message_id} as read, skipping archive")
                     return False
+            elif action == "read_then_delete":
+                # First mark as read
+                read_success = await self.mark_email_as_read(message_id)
+                if read_success:
+                    # Then delete
+                    delete_success = await self.delete_email(message_id)
+                    return delete_success
+                else:
+                    logger.warning(f"Failed to mark email {message_id} as read, skipping delete")
+                    return False
             else:
                 logger.warning(f"Unknown action '{action}', defaulting to 'read'")
                 return await self.mark_email_as_read(message_id)
                 
         except Exception as e:
             logger.error(f"Error marking email as processed: {e}")
+            return False
+    
+    async def delete_email(self, message_id: str) -> bool:
+        """Delete an email from Gmail."""
+        try:
+            logger.info(f"Deleting Gmail message {message_id}")
+            
+            if not self.is_ready():
+                logger.warning("Gmail service not ready, cannot delete email")
+                return False
+            
+            # Delete the message
+            self.gmail_service.users().messages().delete(
+                userId=self.master_email,
+                id=message_id
+            ).execute()
+            
+            logger.info(f"Successfully deleted Gmail message {message_id}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error deleting Gmail message {message_id}: {e}")
             return False
