@@ -247,9 +247,18 @@ class EmailProcessingService:
             
             # Extract content from payload
             if hasattr(gmail_message, 'payload') and gmail_message.payload:
-                logger.info(f"Payload type: {type(gmail_message.payload)}")
+                print(f"=== PAYLOAD EXTRACTION DEBUG ===")
+                print(f"Payload type: {type(gmail_message.payload)}")
+                print(f"Payload mime_type: {getattr(gmail_message.payload, 'mime_type', 'None')}")
+                print(f"Payload has parts: {bool(getattr(gmail_message.payload, 'parts', None))}")
+                if hasattr(gmail_message.payload, 'parts') and gmail_message.payload.parts:
+                    print(f"Parts count: {len(gmail_message.payload.parts)}")
+                    for i, part in enumerate(gmail_message.payload.parts):
+                        print(f"Part {i}: mime_type={getattr(part, 'mime_type', 'None')}, has_body={bool(getattr(part, 'body', None) and getattr(part.body, 'data', None))}")
+                print("=" * 50)
+                
                 payload_content = self._extract_payload_content(gmail_message.payload)
-                logger.info(f"Payload content type: {type(payload_content)}")
+                print(f"Payload content extracted: {payload_content}")
                 content.update(payload_content)
             
             # Fallback to snippet if no body content found
@@ -300,6 +309,14 @@ class EmailProcessingService:
         """Recursively extract content from Gmail message payload."""
         if depth > 10:  # Prevent infinite recursion
             return {}
+        
+        print(f"=== EXTRACTING PAYLOAD CONTENT (depth {depth}) ===")
+        print(f"Payload mime_type: {getattr(payload, 'mime_type', 'None')}")
+        print(f"Payload has body: {bool(getattr(payload, 'body', None))}")
+        print(f"Payload has parts: {bool(getattr(payload, 'parts', None))}")
+        if hasattr(payload, 'body') and payload.body and hasattr(payload.body, 'data'):
+            print(f"Body data length: {len(payload.body.data) if payload.body.data else 0}")
+        print("=" * 50)
         
         content = {
             'body_text': '',
