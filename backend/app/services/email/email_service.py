@@ -257,7 +257,25 @@ class EmailProcessingService:
                 content['body_text'] = gmail_message.snippet or ''
             
             # Combine all text content for full content
-            content['full_content'] = f"{content['body_text']} {content['body_html']}".strip()
+            # Include subject, sender, and body content for comprehensive embedding
+            subject = getattr(gmail_message, 'subject', '') or ''
+            sender = getattr(gmail_message, 'from', '') or ''
+            
+            full_content_parts = []
+            if subject:
+                full_content_parts.append(f"Subject: {subject}")
+            if sender:
+                full_content_parts.append(f"From: {sender}")
+            if content['body_text']:
+                full_content_parts.append(f"Content: {content['body_text']}")
+            if content['body_html'] and content['body_html'] != content['body_text']:
+                # Only add HTML if it's different from the plain text
+                full_content_parts.append(f"HTML Content: {content['body_html']}")
+            
+            content['full_content'] = '\n\n'.join(full_content_parts)
+            
+            # Log content extraction details
+            logger.info(f"Email content extracted - Body text length: {len(content['body_text'])}, HTML length: {len(content['body_html'])}, Full content length: {len(content['full_content'])}, Preview: {content['full_content'][:200]}...")
             
             return content
             
@@ -306,7 +324,14 @@ class EmailProcessingService:
                 if hasattr(payload, 'body') and payload.body and hasattr(payload.body, 'data'):
                     try:
                         decoded_data = base64.urlsafe_b64decode(payload.body.data + '=' * (-len(payload.body.data) % 4))
-                        content['body_text'] = decoded_data.decode('utf-8', errors='ignore')
+                        html_content = decoded_data.decode('utf-8', errors='ignore')
+                        content['body_html'] = html_content
+                        
+                        # Convert HTML to plain text for better embedding
+                        import re
+                        plain_text = re.sub(r'<[^>]+>', '', html_content)
+                        plain_text = re.sub(r'\s+', ' ', plain_text).strip()
+                        content['body_text'] = plain_text
                     except Exception as e:
                         logger.warning(f"Failed to decode HTML content: {e}")
             
@@ -796,6 +821,7 @@ class EmailProcessingService:
                 'date': classification_payload.received_at,
                 'subject': classification_payload.title,
                 'content_text': classification_payload.content,
+                'full_content': classification_payload.content,  # Add full content for vector embedding
                 'metadata': classification_payload.metadata
             }
             
