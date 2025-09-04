@@ -229,8 +229,8 @@ async def get_index_statistics(current_user: dict = Depends(get_current_user)):
 @router.post("/chunk-document")
 async def chunk_document_text(
     text: str,
-    chunk_size: int = 1000,
-    overlap: int = 200,
+    chunk_size: int = 512,
+    overlap: int = 50,
     current_user: dict = Depends(get_current_user)
 ):
     """
@@ -263,11 +263,80 @@ async def chunk_document_text(
         raise HTTPException(status_code=500, detail=f"Chunking failed: {str(e)}")
 
 
+@router.post("/chunk-analyze")
+async def analyze_chunking_quality(
+    text: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Analyze the quality of chunking for a given text.
+    
+    This endpoint provides detailed analytics about how text would be chunked,
+    including quality scores, overlap analysis, and optimization suggestions.
+    """
+    try:
+        from ...services.ai.vector_embedding_service import VectorEmbeddingService
+        
+        vector_service = VectorEmbeddingService()
+        
+        # Create content dict for analysis
+        content = {
+            'full_content': text,
+            'type': 'document'
+        }
+        
+        # Get optimized chunks with full metadata
+        chunks = vector_service._create_content_chunks(content)
+        
+        # Analyze chunk quality
+        total_chunks = len(chunks)
+        avg_quality = sum(chunk.get('quality_score', 0) for chunk in chunks) / total_chunks if total_chunks > 0 else 0
+        avg_length = sum(len(chunk['text']) for chunk in chunks) / total_chunks if total_chunks > 0 else 0
+        avg_tokens = sum(chunk.get('token_count', 0) for chunk in chunks) / total_chunks if total_chunks > 0 else 0
+        
+        # Calculate overlap percentage
+        total_text_length = len(text)
+        chunked_text_length = sum(len(chunk['text']) for chunk in chunks)
+        overlap_percentage = ((chunked_text_length - total_text_length) / total_text_length * 100) if total_text_length > 0 else 0
+        
+        # Quality distribution
+        quality_distribution = {
+            'high_quality': len([c for c in chunks if c.get('quality_score', 0) > 0.7]),
+            'medium_quality': len([c for c in chunks if 0.4 <= c.get('quality_score', 0) <= 0.7]),
+            'low_quality': len([c for c in chunks if c.get('quality_score', 0) < 0.4])
+        }
+        
+        return {
+            "original_text_length": total_text_length,
+            "chunks_created": total_chunks,
+            "average_quality_score": round(avg_quality, 3),
+            "average_chunk_length": round(avg_length, 1),
+            "average_tokens_per_chunk": round(avg_tokens, 1),
+            "overlap_percentage": round(overlap_percentage, 2),
+            "quality_distribution": quality_distribution,
+            "chunks": [
+                {
+                    "chunk_id": chunk.get('chunk_id', f'chunk_{i}'),
+                    "text_preview": chunk['text'][:100] + "..." if len(chunk['text']) > 100 else chunk['text'],
+                    "length": len(chunk['text']),
+                    "token_count": chunk.get('token_count', 0),
+                    "quality_score": round(chunk.get('quality_score', 0), 3),
+                    "chunk_type": chunk.get('chunk_type', 'unknown')
+                }
+                for i, chunk in enumerate(chunks)
+            ]
+        }
+        
+    except Exception as e:
+        logger.error(f"Chunk analysis failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+
+
 @router.post("/batch-process")
 async def batch_process_documents(
     documents: List[Dict[str, Any]],
-    chunk_size: int = 1000,
-    overlap: int = 200,
+    chunk_size: int = 512,
+    overlap: int = 50,
     current_user: dict = Depends(get_current_user)
 ):
     """

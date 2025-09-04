@@ -404,44 +404,38 @@ class EmbeddingService:
     async def chunk_document(
         self, 
         text: str, 
-        chunk_size: int = 1000, 
-        overlap: int = 200
+        chunk_size: int = 512, 
+        overlap: int = 50
     ) -> List[str]:
         """
-        Split document text into overlapping chunks.
+        Split document text into optimized chunks with semantic boundary detection.
         
         Args:
             text: Document text to chunk
-            chunk_size: Maximum size of each chunk
-            overlap: Overlap between consecutive chunks
+            chunk_size: Maximum size of each chunk (default: 512 tokens)
+            overlap: Overlap between consecutive chunks (default: 50 tokens)
             
         Returns:
             List of text chunks
         """
-        if len(text) <= chunk_size:
-            return [text]
+        if not text or len(text.strip()) == 0:
+            return []
         
-        chunks = []
-        start = 0
+        # Use the optimized chunking strategy from VectorEmbeddingService
+        from .vector_embedding_service import VectorEmbeddingService
+        vector_service = VectorEmbeddingService()
         
-        while start < len(text):
-            end = start + chunk_size
-            
-            # Try to break at sentence boundary
-            if end < len(text):
-                # Look for sentence endings
-                for i in range(end, max(start + chunk_size // 2, end - 200), -1):
-                    if text[i] in '.!?':
-                        end = i + 1
-                        break
-            
-            chunk = text[start:end].strip()
-            if chunk:
-                chunks.append(chunk)
-            
-            start = end - overlap
-            if start >= len(text):
-                break
+        # Create content dict for chunking
+        content = {
+            'full_content': text,
+            'type': 'document'
+        }
+        
+        # Get optimized chunks
+        chunk_objects = vector_service._create_content_chunks(content)
+        
+        # Extract just the text from chunk objects
+        chunks = [chunk['text'] for chunk in chunk_objects if chunk.get('text')]
         
         return chunks
     

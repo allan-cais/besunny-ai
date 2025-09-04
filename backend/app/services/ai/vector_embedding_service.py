@@ -40,9 +40,11 @@ class VectorEmbeddingService:
         # Tokenizer for chunking
         self.tokenizer = tiktoken.get_encoding("cl100k_base")
         
-        # Chunking configuration
-        self.max_chunk_tokens = 1000  # OpenAI recommends 1000 tokens for good embeddings
-        self.chunk_overlap = 200  # Overlap to maintain context
+        # Optimized chunking configuration for production
+        self.max_chunk_tokens = 512  # Smaller chunks for better semantic retrieval
+        self.min_chunk_tokens = 100  # Minimum chunk size to avoid noise
+        self.chunk_overlap = 50  # Reduced overlap (10% of max size)
+        self.max_chunk_characters = 2000  # Character limit as fallback
     
     def _get_or_create_index(self):
         """Get existing index or create new one if it doesn't exist."""
@@ -222,80 +224,242 @@ class VectorEmbeddingService:
             }
     
     def _create_content_chunks(self, content: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Create text chunks from content for embedding."""
+        """Create optimized text chunks from content for embedding."""
         try:
-            # Debug: Log the content being chunked
-            print(f"=== CREATING CONTENT CHUNKS DEBUG ===")
-            print(f"Content keys: {list(content.keys())}")
-            print(f"Full content length: {len(content.get('full_content', ''))}")
-            print(f"Content text length: {len(content.get('content_text', ''))}")
-            print(f"Body text length: {len(content.get('body_text', ''))}")
-            print(f"Body HTML length: {len(content.get('body_html', ''))}")
-            print(f"Summary length: {len(content.get('summary', ''))}")
-            print("=" * 50)
-            
-            # Try multiple content fields to get the full email content
-            content_text = (
-                content.get('full_content', '') or 
-                content.get('content_text', '') or 
-                content.get('body_text', '') or 
-                content.get('body_html', '') or 
-                content.get('summary', '') or 
-                ''
-            )
-            
-            print(f"Selected content text length: {len(content_text)}")
-            print(f"Content text preview: {content_text[:200]}...")
-            print("=" * 50)
+            # Get the best available content
+            content_text = self._extract_best_content(content)
             
             if not content_text:
                 logger.warning("No content found for chunking - available fields: %s", list(content.keys()))
                 return []
             
-            logger.info(f"Content for chunking - Type: {content.get('type', 'unknown')}, Length: {len(content_text)}, Preview: {content_text[:200]}...")
+            logger.info(f"Chunking content - Type: {content.get('type', 'unknown')}, Length: {len(content_text)} chars")
             
-            # Tokenize the content
-            tokens = self.tokenizer.encode(content_text)
+            # Clean and preprocess content
+            cleaned_text = self._preprocess_content(content_text)
             
-            if len(tokens) <= self.max_chunk_tokens:
-                # Content fits in single chunk
-                return [{
-                    'text': content_text,
-                    'start_token': 0,
-                    'end_token': len(tokens),
-                    'token_count': len(tokens)
-                }]
+            # Create semantic chunks
+            chunks = self._create_semantic_chunks(cleaned_text, content)
             
-            # Create overlapping chunks
-            chunks = []
-            start = 0
+            # Post-process chunks to ensure quality
+            optimized_chunks = self._optimize_chunks(chunks)
             
-            while start < len(tokens):
-                end = min(start + self.max_chunk_tokens, len(tokens))
-                
-                # Decode tokens back to text for this chunk
-                chunk_tokens = tokens[start:end]
-                chunk_text = self.tokenizer.decode(chunk_tokens)
-                
-                chunks.append({
-                    'text': chunk_text,
-                    'start_token': start,
-                    'end_token': end,
-                    'token_count': len(chunk_tokens)
-                })
-                
-                # Move start position with overlap
-                start = end - self.chunk_overlap
-                
-                # Ensure we don't create tiny overlapping chunks
-                if start >= len(tokens) - self.chunk_overlap:
-                    break
-            
-            return chunks
+            logger.info(f"Created {len(optimized_chunks)} optimized chunks")
+            return optimized_chunks
             
         except Exception as e:
             logger.error(f"Error creating content chunks: {e}")
             return []
+    
+    def _extract_best_content(self, content: Dict[str, Any]) -> str:
+        """Extract the best available content for chunking."""
+        # Priority order for content extraction
+        content_fields = [
+            'full_content',
+            'content_text', 
+            'body_text',
+            'body_html',
+            'summary'
+        ]
+        
+        for field in content_fields:
+            text = content.get(field, '').strip()
+            if text and len(text) > 50:  # Ensure meaningful content
+                return text
+        
+        return ''
+    
+    def _preprocess_content(self, text: str) -> str:
+        """Clean and preprocess content for better chunking."""
+        import re
+        
+        # Remove excessive whitespace
+        text = re.sub(r'\s+', ' ', text)
+        
+        # Remove email headers and footers
+        text = re.sub(r'^.*?Subject:.*?\n', '', text, flags=re.MULTILINE | re.DOTALL)
+        text = re.sub(r'From:.*?\n', '', text, flags=re.MULTILINE)
+        text = re.sub(r'To:.*?\n', '', text, flags=re.MULTILINE)
+        text = re.sub(r'Date:.*?\n', '', text, flags=re.MULTILINE)
+        text = re.sub(r'Message-ID:.*?\n', '', text, flags=re.MULTILINE)
+        
+        # Remove HTML tags if present
+        text = re.sub(r'<[^>]+>', '', text)
+        
+        # Clean up line breaks
+        text = re.sub(r'\n+', '\n', text)
+        
+        return text.strip()
+    
+    def _create_semantic_chunks(self, text: str, content: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Create chunks with semantic boundary detection."""
+        # Tokenize the content
+        tokens = self.tokenizer.encode(text)
+        
+        if len(tokens) <= self.max_chunk_tokens:
+            return [{
+                'text': text,
+                'start_token': 0,
+                'end_token': len(tokens),
+                'token_count': len(tokens),
+                'chunk_type': 'single',
+                'source_type': content.get('type', 'unknown')
+            }]
+        
+        chunks = []
+        start = 0
+        
+        while start < len(tokens):
+            # Calculate chunk end position
+            end = min(start + self.max_chunk_tokens, len(tokens))
+            
+            # Try to find a good semantic boundary
+            if end < len(tokens):
+                end = self._find_semantic_boundary(tokens, start, end)
+            
+            # Extract chunk tokens
+            chunk_tokens = tokens[start:end]
+            chunk_text = self.tokenizer.decode(chunk_tokens).strip()
+            
+            # Skip chunks that are too small
+            if len(chunk_tokens) >= self.min_chunk_tokens:
+                chunks.append({
+                    'text': chunk_text,
+                    'start_token': start,
+                    'end_token': end,
+                    'token_count': len(chunk_tokens),
+                    'chunk_type': 'semantic',
+                    'source_type': content.get('type', 'unknown')
+                })
+            
+            # Move to next chunk with minimal overlap
+            start = max(start + self.max_chunk_tokens - self.chunk_overlap, end - self.chunk_overlap)
+            
+            # Break if we've covered most of the content
+            if start >= len(tokens) - self.chunk_overlap:
+                break
+        
+        return chunks
+    
+    def _find_semantic_boundary(self, tokens: List[int], start: int, max_end: int) -> int:
+        """Find the best semantic boundary for chunking."""
+        # Look for sentence boundaries within the chunk
+        text = self.tokenizer.decode(tokens[start:max_end])
+        
+        # Priority order for boundary detection
+        boundary_patterns = [
+            r'\.\s+',  # Period followed by space
+            r'!\s+',   # Exclamation followed by space
+            r'\?\s+',  # Question mark followed by space
+            r'\.\n',   # Period followed by newline
+            r';\s+',   # Semicolon followed by space
+            r':\s+',   # Colon followed by space
+            r',\s+',   # Comma followed by space
+        ]
+        
+        best_boundary = max_end
+        best_position = 0
+        
+        for pattern in boundary_patterns:
+            import re
+            matches = list(re.finditer(pattern, text))
+            if matches:
+                # Find the last match that's not too close to the start
+                for match in reversed(matches):
+                    position = match.end()
+                    if position > len(text) * 0.3:  # At least 30% into the chunk
+                        # Convert character position back to token position
+                        char_start = start
+                        for i, token in enumerate(tokens[start:max_end]):
+                            if char_start >= position:
+                                best_boundary = start + i
+                                break
+                            char_start += len(self.tokenizer.decode([token]))
+                        break
+                if best_boundary < max_end:
+                    break
+        
+        return best_boundary
+    
+    def _optimize_chunks(self, chunks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Post-process chunks to ensure quality and remove redundancy."""
+        if not chunks:
+            return chunks
+        
+        optimized = []
+        seen_texts = set()
+        
+        for i, chunk in enumerate(chunks):
+            # Skip if chunk is too similar to previous chunks
+            chunk_text = chunk['text']
+            if self._is_duplicate_chunk(chunk_text, seen_texts):
+                continue
+            
+            # Add chunk metadata
+            chunk['chunk_id'] = f"chunk_{i}_{hash(chunk_text) % 10000}"
+            chunk['quality_score'] = self._calculate_chunk_quality(chunk)
+            
+            # Only include high-quality chunks
+            if chunk['quality_score'] > 0.3:
+                optimized.append(chunk)
+                seen_texts.add(chunk_text[:100])  # Store first 100 chars for deduplication
+        
+        return optimized
+    
+    def _is_duplicate_chunk(self, text: str, seen_texts: set) -> bool:
+        """Check if chunk is too similar to previously seen chunks."""
+        text_preview = text[:100]
+        for seen in seen_texts:
+            if self._calculate_similarity(text_preview, seen) > 0.8:
+                return True
+        return False
+    
+    def _calculate_similarity(self, text1: str, text2: str) -> float:
+        """Calculate simple text similarity for deduplication."""
+        if not text1 or not text2:
+            return 0.0
+        
+        # Simple Jaccard similarity
+        words1 = set(text1.lower().split())
+        words2 = set(text2.lower().split())
+        
+        if not words1 or not words2:
+            return 0.0
+        
+        intersection = len(words1.intersection(words2))
+        union = len(words1.union(words2))
+        
+        return intersection / union if union > 0 else 0.0
+    
+    def _calculate_chunk_quality(self, chunk: Dict[str, Any]) -> float:
+        """Calculate quality score for a chunk."""
+        text = chunk['text']
+        score = 0.0
+        
+        # Length score (prefer chunks that are not too short or too long)
+        length_score = min(1.0, len(text) / 500)  # Optimal around 500 chars
+        score += length_score * 0.3
+        
+        # Content richness (variety of words)
+        words = text.split()
+        if len(words) > 10:
+            unique_words = len(set(word.lower() for word in words))
+            richness_score = unique_words / len(words)
+            score += richness_score * 0.3
+        
+        # Sentence structure (prefer chunks with complete sentences)
+        sentence_count = text.count('.') + text.count('!') + text.count('?')
+        if sentence_count > 0:
+            structure_score = min(1.0, sentence_count / 5)  # Optimal around 5 sentences
+            score += structure_score * 0.2
+        
+        # Avoid chunks that are mostly whitespace or special characters
+        alpha_chars = sum(1 for c in text if c.isalpha())
+        if len(text) > 0:
+            alpha_ratio = alpha_chars / len(text)
+            score += alpha_ratio * 0.2
+        
+        return min(1.0, score)
     
     async def embed_manually_assigned_content(
         self,
