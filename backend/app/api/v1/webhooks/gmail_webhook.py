@@ -398,6 +398,20 @@ async def _fetch_gmail_message(message_id: str) -> Optional[Dict[str, Any]]:
             ).execute()
             
             logger.info(f"Successfully fetched Gmail message: {message_id}")
+            
+            # Debug: Log the complete raw Gmail API response
+            print(f"=== RAW GMAIL API RESPONSE DEBUG ===")
+            print(f"Message ID: {message_id}")
+            print(f"Response keys: {list(message.keys())}")
+            print(f"Payload keys: {list(message.get('payload', {}).keys())}")
+            print(f"Payload mimeType: {message.get('payload', {}).get('mimeType')}")
+            print(f"Payload has parts: {bool(message.get('payload', {}).get('parts'))}")
+            if message.get('payload', {}).get('parts'):
+                print(f"Parts count: {len(message['payload']['parts'])}")
+            else:
+                print("No parts in Gmail API response")
+            print("=" * 50)
+            
             return message
             
         except Exception as e:
