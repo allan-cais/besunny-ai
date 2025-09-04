@@ -311,6 +311,7 @@ class EmailProcessingService:
     def _extract_payload_content(self, payload: Any, depth: int = 0) -> Dict[str, Any]:
         """Recursively extract content from Gmail message payload."""
         if depth > 10:  # Prevent infinite recursion
+            print(f"=== MAX DEPTH REACHED (depth {depth}) ===")
             return {}
         
         print(f"=== EXTRACTING PAYLOAD CONTENT (depth {depth}) ===")
@@ -321,13 +322,12 @@ class EmailProcessingService:
             print(f"Body data length: {len(payload.body.data) if payload.body.data else 0}")
         print("=" * 50)
         
-        content = {
-            'body_text': '',
-            'body_html': '',
-            'attachments': []
-        }
-        
         try:
+            content = {
+                'body_text': '',
+                'body_html': '',
+                'attachments': []
+            }
             # Handle multipart messages
             if payload.mime_type == 'multipart/alternative' or payload.mime_type == 'multipart/mixed':
                 if hasattr(payload, 'parts') and payload.parts:
@@ -381,8 +381,18 @@ class EmailProcessingService:
                     content['attachments'].extend(part_content.get('attachments', []))
                     
         except Exception as e:
+            print(f"=== ERROR IN PAYLOAD EXTRACTION (depth {depth}) ===")
+            print(f"Error: {e}")
+            print(f"Payload type: {type(payload)}")
+            print(f"Payload mime_type: {getattr(payload, 'mime_type', 'None')}")
+            print("=" * 50)
             logger.error(f"Error extracting payload content at depth {depth}: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
         
+        print(f"=== PAYLOAD EXTRACTION COMPLETED (depth {depth}) ===")
+        print(f"Content: {content}")
+        print("=" * 50)
         return content
     
     async def _find_user_by_username(self, username: str) -> Optional[User]:
