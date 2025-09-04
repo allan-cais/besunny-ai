@@ -214,10 +214,21 @@ class VectorEmbeddingService:
     def _create_content_chunks(self, content: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Create text chunks from content for embedding."""
         try:
-            content_text = content.get('content_text', '')
+            # Try multiple content fields to get the full email content
+            content_text = (
+                content.get('full_content', '') or 
+                content.get('content_text', '') or 
+                content.get('body_text', '') or 
+                content.get('body_html', '') or 
+                content.get('summary', '') or 
+                ''
+            )
+            
             if not content_text:
-                logger.warning("No content_text found for chunking")
+                logger.warning("No content found for chunking - available fields: %s", list(content.keys()))
                 return []
+            
+            logger.info(f"Content for chunking - Type: {content.get('type', 'unknown')}, Length: {len(content_text)}, Preview: {content_text[:200]}...")
             
             # Tokenize the content
             tokens = self.tokenizer.encode(content_text)
