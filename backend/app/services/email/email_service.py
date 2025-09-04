@@ -100,9 +100,20 @@ class EmailProcessingService:
                 )
             
             # Extract email content (body and attachments)
+            print(f"=== EXTRACTING EMAIL CONTENT ===")
+            print(f"Gmail message ID: {gmail_message.id}")
             email_content = await self._extract_email_content(gmail_message)
+            print(f"Email content extracted successfully")
+            print(f"Body text length: {len(email_content.get('body_text', ''))}")
+            print(f"Body HTML length: {len(email_content.get('body_html', ''))}")
+            print(f"Full content length: {len(email_content.get('full_content', ''))}")
+            print("=" * 50)
             
             # Create document with enhanced metadata
+            print(f"=== CREATING DOCUMENT ===")
+            print(f"User ID: {user.id}")
+            print(f"Subject: {subject_header or 'No Subject'}")
+            print(f"Sender: {from_header or 'Unknown Sender'}")
             document_id = await self._create_document_from_email(
                 user.id,
                 gmail_message,
@@ -119,25 +130,40 @@ class EmailProcessingService:
                     'has_attachments': bool(getattr(gmail_message.payload, 'parts', []) if gmail_message.payload else [])
                 }
             )
+            print(f"Document created with ID: {document_id}")
+            print("=" * 50)
             
             # Get the created document
+            print(f"=== RETRIEVING DOCUMENT ===")
             document = await self._get_document(document_id)
             
             if not document:
                 raise Exception("Failed to retrieve created document")
+            print(f"Document retrieved successfully")
+            print("=" * 50)
             
             # Get active projects for the user
+            print(f"=== GETTING ACTIVE PROJECTS ===")
             projects = await self._get_active_projects_for_user(user.id)
+            print(f"Found {len(projects)} active projects")
+            print("=" * 50)
             
             # Build classification payload
+            print(f"=== BUILDING CLASSIFICATION PAYLOAD ===")
             classification_payload = self._build_classification_payload(
                 document, user, projects, email_content
             )
+            print(f"Classification payload built successfully")
+            print("=" * 50)
             
             # Send to classification service (to be implemented)
+            print(f"=== INITIATING CLASSIFICATION AGENT ===")
             classification_result = await self._initiate_classification_agent(
                 classification_payload
             )
+            print(f"Classification agent completed")
+            print(f"Result: {classification_result}")
+            print("=" * 50)
             
             # Update document with classification result
             if classification_result and isinstance(classification_result, dict) and classification_result.get('classified_project_id'):
@@ -358,7 +384,10 @@ class EmailProcessingService:
                         if payload.body.data.startswith('Subject:') or payload.body.data.startswith('From:') or len(payload.body.data) > 1000:
                             # This is already decoded content from raw message
                             print(f"Using raw message content directly (already decoded)")
-                            content['body_text'] = payload.body.data
+                            # Parse the raw MIME content to extract just the text/plain part
+                            parsed_content = self._parse_raw_mime_content(payload.body.data)
+                            content['body_text'] = parsed_content.get('text', '')
+                            content['body_html'] = parsed_content.get('html', '')
                         else:
                             # This is base64 encoded content from regular Gmail API
                             print(f"Decoding base64 content from regular Gmail API")
@@ -379,7 +408,9 @@ class EmailProcessingService:
                         if payload.body.data.startswith('<') or payload.body.data.startswith('Subject:') or len(payload.body.data) > 1000:
                             # This is already decoded content from raw message
                             print(f"Using raw HTML content directly (already decoded)")
-                            html_content = payload.body.data
+                            # Parse the raw MIME content to extract just the HTML part
+                            parsed_content = self._parse_raw_mime_content(payload.body.data)
+                            html_content = parsed_content.get('html', '')
                         else:
                             # This is base64 encoded content from regular Gmail API
                             print(f"Decoding base64 HTML content from regular Gmail API")
@@ -431,6 +462,79 @@ class EmailProcessingService:
         print(f"Content: {content}")
         print("=" * 50)
         return content
+    
+    def _parse_raw_mime_content(self, raw_content: str) -> Dict[str, str]:
+        """Parse raw MIME content to extract text and HTML parts."""
+        try:
+            print(f"=== PARSING RAW MIME CONTENT ===")
+            print(f"Raw content length: {len(raw_content)}")
+            print(f"Raw content preview: {raw_content[:200]}...")
+            
+            text_content = ''
+            html_content = ''
+            
+            # Look for multipart/alternative boundary
+            boundary_match = re.search(r'boundary="([^"]+)"', raw_content)
+            if boundary_match:
+                boundary = boundary_match.group(1)
+                print(f"Found boundary: {boundary}")
+                
+                # Split by boundary
+                parts = raw_content.split(f'--{boundary}')
+                print(f"Found {len(parts)} parts")
+                
+                for i, part in enumerate(parts):
+                    print(f"Processing part {i}")
+                    
+                    # Check if this is a text/plain part
+                    if 'Content-Type: text/plain' in part:
+                        print(f"Found text/plain part in part {i}")
+                        # Extract content after headers
+                        content_start = part.find('\r\n\r\n')
+                        if content_start != -1:
+                            text_part = part[content_start + 4:]
+                            # Decode quoted-printable if needed
+                            if 'Content-Transfer-Encoding: quoted-printable' in part:
+                                text_part = self._decode_quoted_printable(text_part)
+                            text_content = text_part.strip()
+                            print(f"Extracted text content, length: {len(text_content)}")
+                    
+                    # Check if this is a text/html part
+                    elif 'Content-Type: text/html' in part:
+                        print(f"Found text/html part in part {i}")
+                        # Extract content after headers
+                        content_start = part.find('\r\n\r\n')
+                        if content_start != -1:
+                            html_part = part[content_start + 4:]
+                            # Decode quoted-printable if needed
+                            if 'Content-Transfer-Encoding: quoted-printable' in part:
+                                html_part = self._decode_quoted_printable(html_part)
+                            html_content = html_part.strip()
+                            print(f"Extracted HTML content, length: {len(html_content)}")
+            
+            print(f"=== MIME PARSING COMPLETED ===")
+            print(f"Text content length: {len(text_content)}")
+            print(f"HTML content length: {len(html_content)}")
+            print("=" * 50)
+            
+            return {
+                'text': text_content,
+                'html': html_content
+            }
+            
+        except Exception as e:
+            print(f"Error parsing raw MIME content: {e}")
+            logger.error(f"Error parsing raw MIME content: {e}")
+            return {'text': '', 'html': ''}
+    
+    def _decode_quoted_printable(self, content: str) -> str:
+        """Decode quoted-printable content."""
+        try:
+            import quopri
+            return quopri.decodestring(content).decode('utf-8', errors='ignore')
+        except Exception as e:
+            print(f"Error decoding quoted-printable: {e}")
+            return content
     
     async def _find_user_by_username(self, username: str) -> Optional[User]:
         """Find user by username."""
