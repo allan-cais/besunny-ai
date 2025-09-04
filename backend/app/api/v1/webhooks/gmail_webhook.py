@@ -298,9 +298,19 @@ async def _process_gmail_message(gmail_message_id: str) -> None:
             return
         
         # Convert raw Gmail API response to GmailMessage format
-        gmail_message = _convert_to_gmail_message(raw_gmail_message)
-        if not gmail_message:
-            logger.error(f"Failed to convert email to GmailMessage format")
+        print(f"=== CONVERTING TO GMAIL MESSAGE ===")
+        try:
+            gmail_message = _convert_to_gmail_message(raw_gmail_message)
+            print(f"Gmail message converted: {gmail_message is not None}")
+            if not gmail_message:
+                print(f"Failed to convert Gmail message: {gmail_message_id}")
+                logger.error(f"Failed to convert email to GmailMessage format")
+                return
+            print(f"Successfully converted Gmail message: {gmail_message_id}")
+            print("=" * 50)
+        except Exception as e:
+            print(f"Error converting Gmail message: {e}")
+            logger.error(f"Error converting Gmail message: {e}")
             return
         
         # Debug: Log the raw message structure
@@ -328,12 +338,21 @@ async def _process_gmail_message(gmail_message_id: str) -> None:
         print("=" * 50)
         
         # Process the virtual email
-        result = await email_service.process_inbound_email(gmail_message)
-        
-        if result.success:
-            logger.info(f"Successfully processed virtual email {gmail_message_id}: {result.message}")
-        else:
-            logger.error(f"Failed to process virtual email {gmail_message_id}: {result.message}")
+        print(f"=== PROCESSING VIRTUAL EMAIL ===")
+        print(f"About to call email_service.process_inbound_email")
+        try:
+            result = await email_service.process_inbound_email(gmail_message)
+            print(f"Email processing completed: {result.success}")
+            print(f"Result message: {result.message}")
+            
+            if result.success:
+                logger.info(f"Successfully processed virtual email {gmail_message_id}: {result.message}")
+            else:
+                logger.error(f"Failed to process virtual email {gmail_message_id}: {result.message}")
+        except Exception as e:
+            print(f"Error in email processing: {e}")
+            logger.error(f"Error in email processing: {e}")
+        print("=" * 50)
             
     except Exception as e:
         logger.error(f"Error processing Gmail message {gmail_message_id}: {e}")
