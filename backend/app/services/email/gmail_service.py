@@ -114,12 +114,17 @@ class GmailService:
             
             logger.info(f"Gmail watch API call successful: {watch}")
             
-            # Store watch info
-            logger.info("Storing watch info in database...")
-            watch_id = await self._store_watch_info(watch)
-            
-            logger.info(f"Gmail watch setup successful: {watch_id}")
-            return watch_id
+            # Store watch info (optional - don't fail if this doesn't work)
+            try:
+                logger.info("Storing watch info in database...")
+                watch_id = await self._store_watch_info(watch)
+                logger.info(f"Gmail watch setup successful: {watch_id}")
+                return watch_id
+            except Exception as store_error:
+                logger.warning(f"Could not store watch info in database: {store_error}")
+                # Return the watch response anyway - the watch is still active
+                logger.info(f"Gmail watch setup successful (without database storage): {watch.get('historyId')}")
+                return watch.get('historyId', 'unknown')
             
         except HttpError as e:
             logger.error(f"Gmail API error setting up watch: {e}")

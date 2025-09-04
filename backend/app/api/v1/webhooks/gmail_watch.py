@@ -32,8 +32,9 @@ async def re_establish_gmail_watch() -> Dict[str, Any]:
                 detail="Gmail service not ready - check service account configuration"
             )
         
-        # Re-establish watch
-        watch_response = await gmail_service.setup_watch()
+        # Re-establish watch with the correct topic name
+        topic_name = "projects/sunny-ai-468016/topics/gmail-notifications"
+        watch_response = await gmail_service.setup_watch(topic_name)
         
         if watch_response:
             logger.info(f"Gmail watch re-established successfully: {watch_response}")
@@ -44,9 +45,10 @@ async def re_establish_gmail_watch() -> Dict[str, Any]:
                 "timestamp": datetime.utcnow().isoformat()
             }
         else:
+            logger.error("Gmail watch setup returned None")
             raise HTTPException(
                 status_code=500,
-                detail="Failed to re-establish Gmail watch"
+                detail="Failed to re-establish Gmail watch - setup returned None"
             )
             
     except Exception as e:
