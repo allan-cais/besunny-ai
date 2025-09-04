@@ -391,11 +391,22 @@ async def _fetch_gmail_message(message_id: str) -> Optional[Dict[str, Any]]:
         
         # Fetch the message
         try:
+            # Try different Gmail API request formats based on documentation
+            print(f"=== GMAIL API REQUEST DEBUG ===")
+            print(f"Requesting message {message_id} with format='full'")
+            print(f"User ID: {gmail_service.master_email}")
+            print(f"Gmail service ready: {gmail_service.is_ready()}")
+            print(f"Gmail service type: {type(gmail_service.gmail_service)}")
+            
+            # First try with format='full' (should return complete message)
             message = gmail_service.gmail_service.users().messages().get(
                 userId=gmail_service.master_email,
                 id=message_id,
                 format='full'
             ).execute()
+            
+            print(f"Gmail API request completed")
+            print("=" * 50)
             
             logger.info(f"Successfully fetched Gmail message: {message_id}")
             
@@ -406,11 +417,38 @@ async def _fetch_gmail_message(message_id: str) -> Optional[Dict[str, Any]]:
             print(f"Payload keys: {list(message.get('payload', {}).keys())}")
             print(f"Payload mimeType: {message.get('payload', {}).get('mimeType')}")
             print(f"Payload has parts: {bool(message.get('payload', {}).get('parts'))}")
+            print(f"Payload has body: {bool(message.get('payload', {}).get('body'))}")
+            print(f"Payload body keys: {list(message.get('payload', {}).get('body', {}).keys())}")
             if message.get('payload', {}).get('parts'):
                 print(f"Parts count: {len(message['payload']['parts'])}")
+                for i, part in enumerate(message['payload']['parts']):
+                    print(f"Part {i}: mimeType={part.get('mimeType')}, has_body={bool(part.get('body', {}).get('data'))}")
             else:
                 print("No parts in Gmail API response")
+            print(f"Complete payload: {message.get('payload', {})}")
             print("=" * 50)
+            
+            # If no parts found, try alternative Gmail API approach
+            if not message.get('payload', {}).get('parts'):
+                print(f"=== TRYING ALTERNATIVE GMAIL API APPROACH ===")
+                try:
+                    # Try without format parameter (should return full message by default)
+                    alt_message = gmail_service.gmail_service.users().messages().get(
+                        userId=gmail_service.master_email,
+                        id=message_id
+                    ).execute()
+                    
+                    print(f"Alternative request - Payload keys: {list(alt_message.get('payload', {}).keys())}")
+                    print(f"Alternative request - Has parts: {bool(alt_message.get('payload', {}).get('parts'))}")
+                    if alt_message.get('payload', {}).get('parts'):
+                        print(f"Alternative request - Parts count: {len(alt_message['payload']['parts'])}")
+                        message = alt_message  # Use the alternative response
+                        print("Using alternative Gmail API response")
+                    else:
+                        print("Alternative request also has no parts")
+                except Exception as e:
+                    print(f"Alternative Gmail API request failed: {e}")
+                print("=" * 50)
             
             return message
             
