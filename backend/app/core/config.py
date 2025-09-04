@@ -87,7 +87,7 @@ class Settings(BaseSettings):
     verify_gmail_webhooks: bool = Field(default=True, env="VERIFY_GMAIL_WEBHOOKS")
     
     # Gmail email processing
-    gmail_mark_processed_action: str = Field(default="read", env="GMAIL_MARK_PROCESSED_ACTION")  # "read" or "archive"
+    gmail_mark_processed_action: str = Field(default="read_then_archive", env="GMAIL_MARK_PROCESSED_ACTION")  # "read", "archive", or "read_then_archive"
     
     # Attendee service settings
     attendee_api_base_url: Optional[str] = Field(default=None, env="ATTENDEE_API_BASE_URL")
