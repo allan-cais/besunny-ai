@@ -619,7 +619,24 @@ Please analyze the content and return ONLY a valid JSON response following the e
     def _process_llm_response(self, llm_response: str, original_content: Dict[str, Any]) -> Dict[str, Any]:
         """Process and validate LLM classification response."""
         try:
-            result = json.loads(llm_response)
+            # Clean the response - remove any markdown formatting
+            cleaned_response = llm_response.strip()
+            if cleaned_response.startswith('```json'):
+                cleaned_response = cleaned_response[7:]
+            if cleaned_response.endswith('```'):
+                cleaned_response = cleaned_response[:-3]
+            cleaned_response = cleaned_response.strip()
+            
+            # Try to find JSON object in the response
+            json_start = cleaned_response.find('{')
+            json_end = cleaned_response.rfind('}')
+            
+            if json_start != -1 and json_end != -1 and json_end > json_start:
+                json_str = cleaned_response[json_start:json_end + 1]
+                result = json.loads(json_str)
+            else:
+                # Try to parse the entire response
+                result = json.loads(cleaned_response)
             
             # Validate required fields
             required_fields = ['project_id', 'confidence', 'unclassified', 'document']
@@ -641,7 +658,45 @@ Please analyze the content and return ONLY a valid JSON response following the e
             
         except json.JSONDecodeError as e:
             logger.error(f"Invalid JSON in LLM response: {e}")
-            return self._create_unclassified_result("Invalid JSON response from LLM")
+            logger.error(f"Response content: {llm_response[:500]}...")
+            
+            # Try to extract basic information from the response even if JSON is malformed
+            try:
+                # Look for project_id in the response
+                project_id = ""
+                if 'project_id' in llm_response:
+                    import re
+                    match = re.search(r'"project_id":\s*"([^"]*)"', llm_response)
+                    if match:
+                        project_id = match.group(1)
+                
+                # Look for confidence score
+                confidence = 0.0
+                if 'confidence' in llm_response:
+                    import re
+                    match = re.search(r'"confidence":\s*([0-9.]+)', llm_response)
+                    if match:
+                        confidence = float(match.group(1))
+                
+                # Create a partial result
+                return {
+                    "project_id": project_id,
+                    "confidence": confidence,
+                    "unclassified": confidence < 0.5,
+                    "document": {
+                        "source": original_content.get('source', 'unknown'),
+                        "source_id": original_content.get('source_id', ''),
+                        "author": original_content.get('author', ''),
+                        "date": original_content.get('date', ''),
+                        "content_text": original_content.get('content_text', ''),
+                        "matched_tags": [],
+                        "inferred_tags": [],
+                        "classification_notes": f"Partial parsing due to JSON error: {str(e)}"
+                    }
+                }
+            except Exception as parse_error:
+                logger.error(f"Failed to extract partial information: {parse_error}")
+                return self._create_unclassified_result("Invalid JSON response from LLM")
     
     def _create_unclassified_result(self, reason: str) -> Dict[str, Any]:
         """Create an unclassified result."""

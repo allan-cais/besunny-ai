@@ -108,7 +108,7 @@ class GmailService:
             # Set up the watch
             logger.info("Executing Gmail watch API call...")
             watch = self.gmail_service.users().watch(
-                userId=self.master_email, 
+                userId='me', 
                 body=watch_request
             ).execute()
             
@@ -174,7 +174,7 @@ class GmailService:
         try:
             # Get message details
             message = self.gmail_service.users().messages().get(
-                userId=self.master_email,
+                userId='me',
                 id=message_id,
                 format='metadata',
                 metadataHeaders=['From', 'To', 'Subject', 'Date']
@@ -226,7 +226,7 @@ class GmailService:
         try:
             # Get recent messages
             results = self.gmail_service.users().messages().list(
-                userId=self.master_email,
+                userId='me',
                 labelIds=['INBOX'],
                 maxResults=max_results
             ).execute()
@@ -238,7 +238,7 @@ class GmailService:
                 try:
                     # Get full message details
                     msg = self.gmail_service.users().messages().get(
-                        userId=self.master_email,
+                        userId='me',
                         id=message['id'],
                         format='metadata',
                         metadataHeaders=['From', 'To', 'Subject', 'Date']
@@ -442,7 +442,7 @@ class GmailService:
             
             # Remove UNREAD label
             self.gmail_service.users().messages().modify(
-                userId=self.master_email,
+                userId='me',
                 id=message_id,
                 body={'removeLabelIds': ['UNREAD']}
             ).execute()
@@ -463,7 +463,7 @@ class GmailService:
             
             # Remove INBOX label (this archives the email)
             self.gmail_service.users().messages().modify(
-                userId=self.master_email,
+                userId='me',
                 id=message_id,
                 body={'removeLabelIds': ['INBOX']}
             ).execute()
@@ -525,7 +525,7 @@ class GmailService:
             
             # Delete the message
             self.gmail_service.users().messages().delete(
-                userId=self.master_email,
+                userId='me',
                 id=message_id
             ).execute()
             
