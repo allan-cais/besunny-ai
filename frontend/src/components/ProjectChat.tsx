@@ -47,6 +47,24 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
         timestamp: new Date().toISOString()
       };
       setMessages([welcomeMessage]);
+      
+      // Ensure chat starts at bottom when initialized
+      setTimeout(() => {
+        const scrollToBottom = () => {
+          if (scrollAreaRef.current) {
+            const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+            if (scrollContainer) {
+              scrollContainer.scrollTop = scrollContainer.scrollHeight;
+            } else {
+              scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
+            }
+          }
+        };
+        
+        scrollToBottom();
+        setTimeout(scrollToBottom, 100);
+        setTimeout(scrollToBottom, 200);
+      }, 200);
     }
   }, [userId, projectId, projectName]);
 
@@ -251,8 +269,8 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
                     : msg
                 ));
                 
-                // Scroll to bottom during streaming
-                setTimeout(() => {
+                // Scroll to bottom during streaming - keep latest visible
+                const scrollToBottom = () => {
                   if (scrollAreaRef.current) {
                     const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
                     if (scrollContainer) {
@@ -261,7 +279,13 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
                       scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
                     }
                   }
-                }, 10);
+                };
+                
+                // Immediate scroll + multiple follow-ups to ensure visibility
+                scrollToBottom();
+                setTimeout(scrollToBottom, 1);
+                setTimeout(scrollToBottom, 5);
+                setTimeout(scrollToBottom, 15);
               }
             }
           }
@@ -325,40 +349,31 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
 
 
 
-  // Auto-scroll to bottom when new messages arrive
+  // Auto-scroll to bottom when new messages arrive - ALWAYS keep latest visible
   useEffect(() => {
-    if (scrollAreaRef.current) {
-      // Use multiple timeouts to ensure DOM has updated
-      setTimeout(() => {
-        if (scrollAreaRef.current) {
-          // Try multiple scrolling methods
-          const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
-          if (scrollContainer) {
-            scrollContainer.scrollTop = scrollContainer.scrollHeight;
-          } else {
-            scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
-          }
+    const scrollToBottom = () => {
+      if (scrollAreaRef.current) {
+        const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+        if (scrollContainer) {
+          scrollContainer.scrollTop = scrollContainer.scrollHeight;
+        } else {
+          scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
         }
-      }, 50);
-      
-      setTimeout(() => {
-        if (scrollAreaRef.current) {
-          const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
-          if (scrollContainer) {
-            scrollContainer.scrollTop = scrollContainer.scrollHeight;
-          } else {
-            scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
-          }
-        }
-      }, 150);
-    }
+      }
+    };
+
+    // Multiple aggressive scroll attempts to ensure nothing is below the fold
+    scrollToBottom();
+    setTimeout(scrollToBottom, 10);
+    setTimeout(scrollToBottom, 50);
+    setTimeout(scrollToBottom, 100);
+    setTimeout(scrollToBottom, 200);
   }, [messages]);
 
-  // Additional scroll effect for streaming messages
+  // Additional scroll effect for streaming messages - keep latest visible during streaming
   useEffect(() => {
     if (scrollAreaRef.current && isLoading) {
-      // Scroll to bottom during streaming
-      setTimeout(() => {
+      const scrollToBottom = () => {
         if (scrollAreaRef.current) {
           const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
           if (scrollContainer) {
@@ -367,12 +382,38 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
             scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
           }
         }
-      }, 10);
+      };
+
+      // Aggressive scrolling during streaming to keep latest content visible
+      scrollToBottom();
+      setTimeout(scrollToBottom, 5);
+      setTimeout(scrollToBottom, 15);
+      setTimeout(scrollToBottom, 30);
     }
   }, [messages, isLoading]);
 
   const toggleChat = () => {
     setIsCollapsed(!isCollapsed);
+    
+    // When opening chat, ensure we're at the bottom
+    if (isCollapsed) {
+      setTimeout(() => {
+        const scrollToBottom = () => {
+          if (scrollAreaRef.current) {
+            const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+            if (scrollContainer) {
+              scrollContainer.scrollTop = scrollContainer.scrollHeight;
+            } else {
+              scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
+            }
+          }
+        };
+        
+        scrollToBottom();
+        setTimeout(scrollToBottom, 50);
+        setTimeout(scrollToBottom, 100);
+      }, 100);
+    }
   };
 
   // Show placeholder when no chat is selected
