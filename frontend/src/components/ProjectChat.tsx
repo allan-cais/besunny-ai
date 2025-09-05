@@ -167,7 +167,7 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
         console.log("User ID:", userId);
         console.log("Question:", userMessageText);
         console.log("Payload:", ragPayload);
-        console.log("=" * 50);
+        console.log("=".repeat(50));
         
         const ragResponse = await fetch(RAG_AGENT_API_URL, {
           method: 'POST',
