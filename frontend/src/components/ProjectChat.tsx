@@ -139,6 +139,13 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
       // Add user message immediately
       setMessages(prev => [...prev, userMessage]);
       
+      // Scroll to bottom when user message is added
+      setTimeout(() => {
+        if (scrollAreaRef.current) {
+          scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
+        }
+      }, 50);
+      
       // Add typing indicator after a small delay to feel more natural
       setTimeout(() => {
         const typingMessage: ChatMessage = {
@@ -148,6 +155,13 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
           timestamp: new Date().toISOString()
         };
         setMessages(prev => [...prev, typingMessage]);
+        
+        // Scroll to bottom when typing indicator is added
+        setTimeout(() => {
+          if (scrollAreaRef.current) {
+            scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
+          }
+        }, 50);
       }, 500); // 500ms delay
       
       setIsLoading(true);
@@ -226,6 +240,13 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
                     ? { ...msg, content: responseText }
                     : msg
                 ));
+                
+                // Scroll to bottom during streaming
+                setTimeout(() => {
+                  if (scrollAreaRef.current) {
+                    scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
+                  }
+                }, 10);
               }
             }
           }
@@ -280,9 +301,26 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     if (scrollAreaRef.current) {
-      scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
+      // Use setTimeout to ensure DOM has updated
+      setTimeout(() => {
+        if (scrollAreaRef.current) {
+          scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
+        }
+      }, 100);
     }
   }, [messages]);
+
+  // Additional scroll effect for streaming messages
+  useEffect(() => {
+    if (scrollAreaRef.current && isLoading) {
+      // Scroll to bottom during streaming
+      setTimeout(() => {
+        if (scrollAreaRef.current) {
+          scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
+        }
+      }, 50);
+    }
+  }, [messages, isLoading]);
 
   const toggleChat = () => {
     setIsCollapsed(!isCollapsed);
