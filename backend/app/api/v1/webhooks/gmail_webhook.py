@@ -308,7 +308,22 @@ async def _process_gmail_message(gmail_message_id: str) -> None:
                 supabase.table('email_processing_locks').delete().eq('message_id', gmail_message_id).execute()
                 return
             else:
-                print(f"Message {gmail_message_id} not processed yet, continuing with lock")
+                print(f"Message {gmail_message_id} not processed yet, continuing")
+                
+            # Strategy 3: If no lock acquired, use in-memory duplicate check as last resort
+            if not lock_acquired:
+                # Check if we're already processing this message in this instance
+                if not hasattr(_process_gmail_message, '_processing_messages'):
+                    _process_gmail_message._processing_messages = set()
+                
+                if gmail_message_id in _process_gmail_message._processing_messages:
+                    print(f"Message {gmail_message_id} is already being processed in this instance, skipping")
+                    logger.info(f"Gmail message {gmail_message_id} is already being processed in this instance, skipping")
+                    return
+                
+                # Add to processing set
+                _process_gmail_message._processing_messages.add(gmail_message_id)
+                print(f"Added {gmail_message_id} to in-memory processing set")
         else:
             print("Supabase not available, continuing")
         print("=" * 50)
@@ -410,6 +425,16 @@ async def _process_gmail_message(gmail_message_id: str) -> None:
                 except Exception as cleanup_error:
                     print(f"Error cleaning up lock: {cleanup_error}")
                     logger.warning(f"Error cleaning up processing lock: {cleanup_error}")
+            
+            # Clean up in-memory processing set
+            if not lock_acquired and hasattr(_process_gmail_message, '_processing_messages'):
+                try:
+                    _process_gmail_message._processing_messages.discard(gmail_message_id)
+                    print(f"Removed {gmail_message_id} from in-memory processing set")
+                    logger.info(f"Removed {gmail_message_id} from in-memory processing set")
+                except Exception as cleanup_error:
+                    print(f"Error cleaning up in-memory processing set: {cleanup_error}")
+                    logger.warning(f"Error cleaning up in-memory processing set: {cleanup_error}")
         print("=" * 50)
             
     except Exception as e:
@@ -424,6 +449,14 @@ async def _process_gmail_message(gmail_message_id: str) -> None:
                     logger.info(f"Cleaned up processing lock for {gmail_message_id} after error")
             except Exception as cleanup_error:
                 logger.warning(f"Error cleaning up processing lock after error: {cleanup_error}")
+        
+        # Clean up in-memory processing set on error
+        if not lock_acquired and hasattr(_process_gmail_message, '_processing_messages'):
+            try:
+                _process_gmail_message._processing_messages.discard(gmail_message_id)
+                logger.info(f"Removed {gmail_message_id} from in-memory processing set after error")
+            except Exception as cleanup_error:
+                logger.warning(f"Error cleaning up in-memory processing set after error: {cleanup_error}")
 
 
 async def _process_gmail_history(history_id: str) -> None:
