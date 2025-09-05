@@ -405,7 +405,7 @@ class EmbeddingService:
         self, 
         text: str, 
         chunk_size: int = 512, 
-        overlap: int = 50
+        overlap: int = 25
     ) -> List[str]:
         """
         Split document text into optimized chunks with semantic boundary detection.
@@ -413,7 +413,7 @@ class EmbeddingService:
         Args:
             text: Document text to chunk
             chunk_size: Maximum size of each chunk (default: 512 tokens)
-            overlap: Overlap between consecutive chunks (default: 50 tokens)
+            overlap: Overlap between consecutive chunks (default: 25 tokens)
             
         Returns:
             List of text chunks

@@ -523,6 +523,18 @@ class GmailService:
                 logger.warning("Gmail service not ready, cannot delete email")
                 return False
             
+            # Ensure credentials are fresh before attempting delete
+            try:
+                if self.credentials and self.credentials.expired:
+                    logger.info("Refreshing expired credentials before delete operation")
+                    from google.auth.transport.requests import Request
+                    self.credentials.refresh(Request())
+                    
+                    # Rebuild the service with refreshed credentials
+                    self.gmail_service = build('gmail', 'v1', credentials=self.credentials)
+            except Exception as refresh_error:
+                logger.warning(f"Failed to refresh credentials: {refresh_error}")
+            
             # Delete the message
             self.gmail_service.users().messages().delete(
                 userId='me',
@@ -534,4 +546,23 @@ class GmailService:
             
         except Exception as e:
             logger.error(f"Error deleting Gmail message {message_id}: {e}")
+            # If it's a permission error, try to refresh credentials and retry once
+            if "insufficient authentication scopes" in str(e) or "insufficientPermissions" in str(e):
+                logger.warning("Permission error detected, attempting credential refresh and retry")
+                try:
+                    from google.auth.transport.requests import Request
+                    if self.credentials:
+                        self.credentials.refresh(Request())
+                        self.gmail_service = build('gmail', 'v1', credentials=self.credentials)
+                        
+                        # Retry the delete operation
+                        self.gmail_service.users().messages().delete(
+                            userId='me',
+                            id=message_id
+                        ).execute()
+                        logger.info(f"Successfully deleted Gmail message {message_id} after retry")
+                        return True
+                except Exception as retry_error:
+                    logger.error(f"Retry failed: {retry_error}")
+            
             return False

@@ -43,7 +43,7 @@ class VectorEmbeddingService:
         # Optimized chunking configuration for production
         self.max_chunk_tokens = 512  # Smaller chunks for better semantic retrieval
         self.min_chunk_tokens = 100  # Minimum chunk size to avoid noise
-        self.chunk_overlap = 50  # Reduced overlap (10% of max size)
+        self.chunk_overlap = 25  # Minimal overlap (5% of max size)
         self.max_chunk_characters = 2000  # Character limit as fallback
     
     def _get_or_create_index(self):
@@ -333,6 +333,7 @@ class VectorEmbeddingService:
                 })
             
             # Move to next chunk with minimal overlap
+            # Use the actual end position to calculate next start, ensuring minimal overlap
             start = max(start + self.max_chunk_tokens - self.chunk_overlap, end - self.chunk_overlap)
             
             # Break if we've covered most of the content

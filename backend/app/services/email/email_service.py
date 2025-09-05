@@ -124,10 +124,19 @@ class EmailProcessingService:
             )
             logger.info(f"Document created with ID: {document_id}")
             
-            # Get the created document
-            document = await self._get_document(document_id)
+            # Get the created document with retry logic
+            document = None
+            for attempt in range(3):  # Try up to 3 times
+                document = await self._get_document(document_id)
+                if document:
+                    break
+                if attempt < 2:  # Don't sleep on the last attempt
+                    logger.warning(f"Document not found on attempt {attempt + 1}, retrying in 1 second...")
+                    import asyncio
+                    await asyncio.sleep(1)
             
             if not document:
+                logger.error(f"Failed to retrieve created document {document_id} after 3 attempts")
                 raise Exception("Failed to retrieve created document")
             logger.info(f"Document retrieved successfully")
             
