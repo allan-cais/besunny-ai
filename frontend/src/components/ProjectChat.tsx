@@ -142,7 +142,12 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
       // Scroll to bottom when user message is added
       setTimeout(() => {
         if (scrollAreaRef.current) {
-          scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
+          const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+          if (scrollContainer) {
+            scrollContainer.scrollTop = scrollContainer.scrollHeight;
+          } else {
+            scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
+          }
         }
       }, 50);
       
@@ -159,7 +164,12 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
         // Scroll to bottom when typing indicator is added
         setTimeout(() => {
           if (scrollAreaRef.current) {
-            scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
+            const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+            if (scrollContainer) {
+              scrollContainer.scrollTop = scrollContainer.scrollHeight;
+            } else {
+              scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
+            }
           }
         }, 50);
       }, 500); // 500ms delay
@@ -244,7 +254,12 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
                 // Scroll to bottom during streaming
                 setTimeout(() => {
                   if (scrollAreaRef.current) {
-                    scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
+                    const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+                    if (scrollContainer) {
+                      scrollContainer.scrollTop = scrollContainer.scrollHeight;
+                    } else {
+                      scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
+                    }
                   }
                 }, 10);
               }
@@ -265,6 +280,18 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
             ? { ...msg, content: responseText }
             : msg
         ));
+        
+        // Final scroll to bottom when response is complete
+        setTimeout(() => {
+          if (scrollAreaRef.current) {
+            const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+            if (scrollContainer) {
+              scrollContainer.scrollTop = scrollContainer.scrollHeight;
+            } else {
+              scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
+            }
+          }
+        }, 100);
       } catch (error) {
         // Error sending message
         // Remove typing indicator and add error message
@@ -301,12 +328,29 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     if (scrollAreaRef.current) {
-      // Use setTimeout to ensure DOM has updated
+      // Use multiple timeouts to ensure DOM has updated
       setTimeout(() => {
         if (scrollAreaRef.current) {
-          scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
+          // Try multiple scrolling methods
+          const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+          if (scrollContainer) {
+            scrollContainer.scrollTop = scrollContainer.scrollHeight;
+          } else {
+            scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
+          }
         }
-      }, 100);
+      }, 50);
+      
+      setTimeout(() => {
+        if (scrollAreaRef.current) {
+          const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+          if (scrollContainer) {
+            scrollContainer.scrollTop = scrollContainer.scrollHeight;
+          } else {
+            scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
+          }
+        }
+      }, 150);
     }
   }, [messages]);
 
@@ -316,9 +360,14 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
       // Scroll to bottom during streaming
       setTimeout(() => {
         if (scrollAreaRef.current) {
-          scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
+          const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+          if (scrollContainer) {
+            scrollContainer.scrollTop = scrollContainer.scrollHeight;
+          } else {
+            scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
+          }
         }
-      }, 50);
+      }, 10);
     }
   }, [messages, isLoading]);
 
