@@ -362,6 +362,13 @@ Please provide a helpful, accurate response based on the retrieved context."""
                 retrieved_context=context_text
             )
             
+            # Debug logging to see the full system prompt
+            print(f"=== SYSTEM PROMPT DEBUG ===")
+            print(f"System prompt length: {len(system_prompt)}")
+            print(f"First 1000 chars of system prompt:")
+            print(system_prompt[:1000])
+            print("=" * 50)
+            
             # Create chat completion with streaming
             stream = await self.openai_client.chat.completions.create(
                 model=self.settings.openai_model,
@@ -393,7 +400,8 @@ Please provide a helpful, accurate response based on the retrieved context."""
             for i, item in enumerate(context, 1):
                 source_type = item.get('source', 'unknown').replace('_', ' ').title()
                 title = item.get('title', 'Untitled')
-                content = item.get('content', '')[:200] + "..." if len(item.get('content', '')) > 200 else item.get('content', '')
+                # Increase content length limit to 1000 characters to preserve more context
+                content = item.get('content', '')[:1000] + "..." if len(item.get('content', '')) > 1000 else item.get('content', '')
                 author = item.get('author', 'Unknown')
                 date = item.get('created_at', 'Unknown')
                 relevance = item.get('relevance_score', 0)
@@ -407,7 +415,17 @@ Please provide a helpful, accurate response based on the retrieved context."""
 """
                 formatted_items.append(formatted_item)
             
-            return "\n".join(formatted_items)
+            formatted_context = "\n".join(formatted_items)
+            
+            # Debug logging to see what context is being sent to the AI model
+            print(f"=== FORMATTED CONTEXT FOR AI MODEL ===")
+            print(f"Total context items: {len(context)}")
+            print(f"Formatted context length: {len(formatted_context)}")
+            print(f"First 500 chars of formatted context:")
+            print(formatted_context[:500])
+            print("=" * 50)
+            
+            return formatted_context
             
         except Exception as e:
             logger.error(f"Error formatting context: {e}")
