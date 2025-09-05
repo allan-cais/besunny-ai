@@ -104,6 +104,12 @@ Please provide a helpful, accurate response based on the retrieved context."""
             Streaming response text
         """
         try:
+            print(f"=== RAG AGENT DEBUG ===")
+            print(f"Received project_id: {project_id}")
+            print(f"Received user_id: {user_id}")
+            print(f"Received question: {user_question}")
+            print("=" * 50)
+            
             logger.info(f"RAG query for project {project_id}: {user_question}")
             
             # Step 1: Get project information
@@ -252,6 +258,11 @@ Please provide a helpful, accurate response based on the retrieved context."""
                 'user_id': user_id,
                 'project_id': project_id
             }
+            
+            print(f"=== PINECONE SEARCH DEBUG ===")
+            print(f"Searching with user_id: {user_id}")
+            print(f"Searching with project_id: {project_id}")
+            print(f"Filter dict: {filter_dict}")
             
             search_results = self.pinecone.Index(self.index_name).query(
                 vector=query_vector,
