@@ -230,7 +230,7 @@ async def get_index_statistics(current_user: dict = Depends(get_current_user)):
 async def chunk_document_text(
     text: str,
     chunk_size: int = 512,
-    overlap: int = 50,
+    overlap: int = 25,
     current_user: dict = Depends(get_current_user)
 ):
     """
@@ -336,7 +336,7 @@ async def analyze_chunking_quality(
 async def batch_process_documents(
     documents: List[Dict[str, Any]],
     chunk_size: int = 512,
-    overlap: int = 50,
+    overlap: int = 25,
     current_user: dict = Depends(get_current_user)
 ):
     """

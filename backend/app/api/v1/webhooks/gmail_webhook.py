@@ -250,6 +250,7 @@ def _jwk_to_pem(jwk: Dict[str, Any]) -> str:
 
 async def _process_gmail_message(gmail_message_id: str) -> None:
     """Process a Gmail message in the background."""
+    lock_acquired = False  # Track if we acquired a processing lock
     try:
         logger.info(f"Processing Gmail message: {gmail_message_id}")
         
@@ -258,19 +259,56 @@ async def _process_gmail_message(gmail_message_id: str) -> None:
             await _process_gmail_history(gmail_message_id)
             return
         
-        # Check if we've already processed this Gmail message
-        print(f"=== CHECKING IF MESSAGE ALREADY PROCESSED ===")
+        # Atomic check-and-insert for duplicate prevention
+        print(f"=== ATOMIC DUPLICATE CHECK ===")
         print(f"Message ID: {gmail_message_id}")
         from ....core.supabase_config import get_supabase_service_client
         supabase = get_supabase_service_client()
         if supabase:
+            # First, try to insert a processing lock record
+            try:
+                lock_result = supabase.table('email_processing_locks').insert({
+                    'message_id': gmail_message_id,
+                    'status': 'processing',
+                    'created_at': datetime.utcnow().isoformat(),
+                    'expires_at': (datetime.utcnow().timestamp() + 300)  # 5 minute expiry
+                }).execute()
+                
+                if not lock_result.data:
+                    print(f"Failed to acquire processing lock for {gmail_message_id}")
+                    logger.warning(f"Failed to acquire processing lock for {gmail_message_id}")
+                    return
+                
+                lock_acquired = True
+                print(f"Acquired processing lock for {gmail_message_id}")
+                logger.info(f"Acquired processing lock for {gmail_message_id}")
+                
+            except Exception as lock_error:
+                # If we can't insert the lock, it might already exist (duplicate processing)
+                if "duplicate key" in str(lock_error).lower() or "unique constraint" in str(lock_error).lower():
+                    print(f"Message {gmail_message_id} is already being processed, skipping")
+                    logger.info(f"Gmail message {gmail_message_id} is already being processed, skipping")
+                    return
+                elif "relation" in str(lock_error).lower() and "does not exist" in str(lock_error).lower():
+                    # Table doesn't exist yet, fall back to simple duplicate check
+                    print(f"Email processing locks table not found, using fallback duplicate check")
+                    logger.warning(f"Email processing locks table not found, using fallback duplicate check")
+                    lock_acquired = False
+                else:
+                    print(f"Error acquiring lock: {lock_error}")
+                    logger.error(f"Error acquiring processing lock: {lock_error}")
+                    return
+            
+            # Now check if document already exists
             existing_doc = supabase.table('documents').select('id').eq('source_id', gmail_message_id).eq('source', 'gmail').execute()
             if existing_doc.data and len(existing_doc.data) > 0:
-                print(f"Message {gmail_message_id} already processed, skipping")
-                logger.info(f"Gmail message {gmail_message_id} already processed, skipping")
+                print(f"Message {gmail_message_id} already processed, cleaning up lock")
+                logger.info(f"Gmail message {gmail_message_id} already processed, cleaning up lock")
+                # Clean up the lock
+                supabase.table('email_processing_locks').delete().eq('message_id', gmail_message_id).execute()
                 return
             else:
-                print(f"Message {gmail_message_id} not processed yet, continuing")
+                print(f"Message {gmail_message_id} not processed yet, continuing with lock")
         else:
             print("Supabase not available, continuing")
         print("=" * 50)
@@ -359,10 +397,33 @@ async def _process_gmail_message(gmail_message_id: str) -> None:
         except Exception as e:
             print(f"Error in email processing: {e}")
             logger.error(f"Error in email processing: {e}")
+        finally:
+            # Clean up the processing lock if we acquired one
+            if lock_acquired:
+                try:
+                    from ....core.supabase_config import get_supabase_service_client
+                    supabase = get_supabase_service_client()
+                    if supabase:
+                        supabase.table('email_processing_locks').delete().eq('message_id', gmail_message_id).execute()
+                        print(f"Cleaned up processing lock for {gmail_message_id}")
+                        logger.info(f"Cleaned up processing lock for {gmail_message_id}")
+                except Exception as cleanup_error:
+                    print(f"Error cleaning up lock: {cleanup_error}")
+                    logger.warning(f"Error cleaning up processing lock: {cleanup_error}")
         print("=" * 50)
             
     except Exception as e:
         logger.error(f"Error processing Gmail message {gmail_message_id}: {e}")
+        # Clean up lock on error if we acquired one
+        if lock_acquired:
+            try:
+                from ....core.supabase_config import get_supabase_service_client
+                supabase = get_supabase_service_client()
+                if supabase:
+                    supabase.table('email_processing_locks').delete().eq('message_id', gmail_message_id).execute()
+                    logger.info(f"Cleaned up processing lock for {gmail_message_id} after error")
+            except Exception as cleanup_error:
+                logger.warning(f"Error cleaning up processing lock after error: {cleanup_error}")
 
 
 async def _process_gmail_history(history_id: str) -> None:
@@ -516,7 +577,7 @@ async def _fetch_gmail_message(message_id: str) -> Optional[Dict[str, Any]]:
             
         except Exception as e:
             logger.error(f"Failed to fetch Gmail message {message_id}: {e}")
-            return None
+        return None
         
     except Exception as e:
         logger.error(f"Error fetching Gmail message {message_id}: {e}")
