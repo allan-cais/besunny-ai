@@ -31,6 +31,12 @@ async def query_project_data(
 ):
     """Query project data using the RAG agent."""
     try:
+        print(f"=== RAG API ENDPOINT DEBUG ===")
+        print(f"Request project_id: {request.project_id}")
+        print(f"Current user id: {current_user['id']}")
+        print(f"Question: {request.question}")
+        print("=" * 50)
+        
         rag_service = RAGAgentService()
         
         # Create streaming response
