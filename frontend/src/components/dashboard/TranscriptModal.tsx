@@ -352,7 +352,7 @@ const TranscriptModal: React.FC<TranscriptModalProps> = ({
             ) : (
               <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 border border-[#4a5565] dark:border-zinc-700">
                 <div className="prose prose-sm max-w-none dark:prose-invert">
-                  <div className="text-sm text-gray-700 dark:text-gray-300 font-mono leading-relaxed whitespace-pre-wrap">
+                  <div className="text-sm text-gray-700 dark:text-gray-300 font-mono leading-relaxed whitespace-pre-wrap max-h-96 overflow-y-auto scrollbar-hide">
                     {transcriptText}
                   </div>
                 </div>

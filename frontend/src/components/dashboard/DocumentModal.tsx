@@ -313,7 +313,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
             {/* Document Content */}
             <div className="p-6">
               <div className="prose prose-sm max-w-none dark:prose-invert">
-                <div className="text-sm text-gray-700 dark:text-gray-300 font-mono leading-relaxed whitespace-pre-wrap">
+                <div className="text-sm text-gray-700 dark:text-gray-300 font-mono leading-relaxed whitespace-pre-wrap max-h-96 overflow-y-auto scrollbar-hide">
                   {document.summary || 'No content available for this document.'}
                 </div>
               </div>
