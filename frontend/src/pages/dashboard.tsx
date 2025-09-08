@@ -405,11 +405,6 @@ const Dashboard = () => {
       
       setSendingBot(meeting.id);
       
-      console.log('=== FRONTEND BOT DEPLOYMENT DEBUG ===');
-      console.log('Meeting object:', meeting);
-      console.log('Meeting start_time:', meeting.start_time);
-      console.log('Meeting start_time type:', typeof meeting.start_time);
-      
       const result = await attendeeService.sendBotToMeeting({
         meeting_url: meeting.meeting_url,
         bot_name: configuration?.bot_name || meeting.bot_name || 'AI Assistant',
@@ -425,6 +420,15 @@ const Dashboard = () => {
           updated_at: new Date().toISOString()
         })
         .eq('id', meeting.id);
+
+      // Update local state immediately
+      setCurrentWeekMeetings(prev => 
+        prev.map(m => 
+          m.id === meeting.id 
+            ? { ...m, bot_status: 'bot_scheduled', attendee_bot_id: result.bot_id }
+            : m
+        )
+      );
 
       loadCurrentWeekMeetings();
       

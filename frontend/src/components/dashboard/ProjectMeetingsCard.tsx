@@ -150,6 +150,15 @@ const ProjectMeetingsCard: React.FC<ProjectMeetingsCardProps> = ({ projectId }) 
         result.id || result.bot_id
       );
 
+      // Update local state immediately
+      setMeetings(prev => 
+        prev.map(m => 
+          m.id === meeting.id 
+            ? { ...m, bot_status: 'bot_scheduled', attendee_bot_id: result.id || result.bot_id }
+            : m
+        )
+      );
+
       setSuccess(`Bot scheduled for "${meeting.title}" successfully!`);
       
       // Reload meetings to show updated status
