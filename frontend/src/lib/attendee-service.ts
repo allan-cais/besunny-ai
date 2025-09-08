@@ -6,6 +6,7 @@ export interface AttendeeService {
     meeting_url: string;
     bot_name?: string;
     bot_chat_message?: string;
+    start_time?: string;
   }): Promise<{ botId: string; attendeeBotId: string }>;
 
   // Get bot status
@@ -60,6 +61,7 @@ class AttendeeServiceImpl implements AttendeeService {
     meeting_url: string;
     bot_name?: string;
     bot_chat_message?: string;
+    start_time?: string;
   }) {
     return this.makeRequest('/send-bot', {
       method: 'POST',
