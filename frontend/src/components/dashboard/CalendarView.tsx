@@ -153,6 +153,15 @@ const CalendarView: React.FC<CalendarViewProps> = ({
         })
         .eq('id', meeting.id);
 
+      // Update local state immediately
+      setMeetings(prev => 
+        prev.map(m => 
+          m.id === meeting.id 
+            ? { ...m, bot_status: 'bot_scheduled', attendee_bot_id: result.bot_id }
+            : m
+        )
+      );
+
       onMeetingUpdate();
       
       toast({

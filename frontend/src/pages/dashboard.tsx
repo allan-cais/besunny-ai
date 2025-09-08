@@ -421,6 +421,15 @@ const Dashboard = () => {
         })
         .eq('id', meeting.id);
 
+      // Update local state immediately
+      setCurrentWeekMeetings(prev => 
+        prev.map(m => 
+          m.id === meeting.id 
+            ? { ...m, bot_status: 'bot_scheduled', attendee_bot_id: result.bot_id }
+            : m
+        )
+      );
+
       loadCurrentWeekMeetings();
       
       toast({
