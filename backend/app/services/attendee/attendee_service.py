@@ -109,6 +109,9 @@ class AttendeeService:
             Bot creation result
         """
         try:
+            logger.info(f"=== BOT CREATION STARTED ===")
+            logger.info(f"Options received: {options}")
+            
             # Validate required fields
             required_fields = ['meeting_url', 'bot_name']
             for field in required_fields:
@@ -193,7 +196,12 @@ class AttendeeService:
                 }
             
             logger.info(f"Creating bot with webhook configuration: {bot_data['webhooks']}")
-            logger.info(f"Bot data being sent to Attendee.dev API: {bot_data}")
+            logger.info(f"=== FINAL BOT DATA BEING SENT TO API ===")
+            logger.info(f"Bot data: {bot_data}")
+            logger.info(f"Has join_at: {'join_at' in bot_data}")
+            if 'join_at' in bot_data:
+                logger.info(f"join_at value: {bot_data['join_at']}")
+            logger.info(f"=== END BOT DATA ===")
             
             # Call Attendee.dev API to create bot
             response = await self.http_client.post(
