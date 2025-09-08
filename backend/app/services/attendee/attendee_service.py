@@ -138,7 +138,15 @@ class AttendeeService:
             
             # Add optional bot chat message if provided
             if options.get('bot_chat_message'):
-                bot_data["bot_chat_message"] = options['bot_chat_message']
+                # Convert string bot_chat_message to dictionary format expected by Attendee.dev API
+                if isinstance(options['bot_chat_message'], str):
+                    bot_data["bot_chat_message"] = {
+                        "message": options['bot_chat_message'],
+                        "to": "everyone"
+                    }
+                else:
+                    # If it's already a dictionary, use it as-is
+                    bot_data["bot_chat_message"] = options['bot_chat_message']
             
             # Add deployment method to track how bot was created
             deployment_method = options.get('deployment_method', 'manual')
