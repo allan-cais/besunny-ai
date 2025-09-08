@@ -97,9 +97,13 @@ class SecurityManager:
                 logger.warning("No key ID in Supabase JWT token")
                 return None
             
-            # Get Supabase's public key
+            # Get Supabase's public key - JWKS endpoint should be publicly accessible
+            # The correct format is: https://your-project.supabase.co/auth/v1/jwks
             jwks_url = f"{self.settings.supabase_url}/auth/v1/jwks"
-            jwks_client = PyJWKClient(jwks_url)
+            logger.debug(f"Attempting to fetch JWKS from: {jwks_url}")
+            
+            # Create JWKS client with timeout and error handling
+            jwks_client = PyJWKClient(jwks_url, timeout=10)
             signing_key = jwks_client.get_signing_key_from_jwt(token)
             
             # Verify the token with Supabase's public key
@@ -225,31 +229,8 @@ async def get_current_user_hybrid(
     try:
         token = credentials.credentials
         
-        # First try to validate as Supabase JWT token
-        try:
-            payload = security_manager.verify_supabase_token(token)
-            if payload and payload.get("sub"):
-                return {
-                    "id": payload.get("sub"),
-                    "email": payload.get("email"),
-                    "username": payload.get("user_metadata", {}).get("username"),
-                    "permissions": payload.get("user_metadata", {}).get("permissions", []),
-                }
-        except Exception as e:
-            logger.debug(f"Supabase JWT verification failed, trying regular JWT: {e}")
-        
-        # If Supabase JWT validation fails, try regular JWT token
-        try:
-            payload = security_manager.verify_token(token)
-            if payload and payload.get("sub"):
-                return {
-                    "id": payload.get("sub"),
-                    "email": payload.get("email"),
-                    "username": payload.get("username"),
-                    "permissions": payload.get("permissions", []),
-                }
-        except Exception as e:
-            logger.debug(f"Regular JWT verification failed: {e}")
+        # Skip JWT verification for now and go straight to Supabase API validation
+        # This avoids the JWKS endpoint issues and uses the proven Supabase API method
         
         # If JWT validation fails, try Supabase token
         try:
