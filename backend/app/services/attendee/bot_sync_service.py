@@ -25,7 +25,7 @@ class BotSyncService:
         """
         try:
             # Get all meeting bots for the user
-            meeting_bots = await self._get_user_meeting_bots(user_id)
+            meeting_bots = self._get_user_meeting_bots(user_id)
             
             if not meeting_bots:
                 return {"success": True, "synced": 0, "message": "No meeting bots found"}
@@ -68,7 +68,7 @@ class BotSyncService:
         """
         try:
             # Get the meeting
-            meeting_result = await self.supabase.table('meetings').select('*').eq('id', meeting_id).eq('user_id', user_id).single().execute()
+            meeting_result = self.supabase.table('meetings').select('*').eq('id', meeting_id).eq('user_id', user_id).single().execute()
             
             if not meeting_result.data:
                 return None
@@ -77,7 +77,7 @@ class BotSyncService:
             
             # If meeting has a meeting_url, try to find the bot
             if meeting.get('meeting_url'):
-                bot = await self._find_bot_by_url(meeting['meeting_url'], user_id)
+                bot = self._find_bot_by_url(meeting['meeting_url'], user_id)
                 if bot:
                     # Merge bot information into meeting data
                     meeting.update({
@@ -119,7 +119,7 @@ class BotSyncService:
                 logger.info(f"Applied future filter from {now}")
             
             # Order by start_time descending
-            meetings_result = await query.order('start_time', desc=True).execute()
+            meetings_result = query.order('start_time', desc=True).execute()
             
             logger.info(f"Backend query returned {len(meetings_result.data) if meetings_result.data else 0} meetings")
             
@@ -130,7 +130,7 @@ class BotSyncService:
             meetings = meetings_result.data
             
             # Get all meeting bots for the user
-            meeting_bots = await self._get_user_meeting_bots(user_id)
+            meeting_bots = self._get_user_meeting_bots(user_id)
             
             # Create a lookup map by meeting_url
             bot_lookup = {bot['meeting_url']: bot for bot in meeting_bots if bot.get('meeting_url')}
@@ -157,28 +157,28 @@ class BotSyncService:
     
     # Private helper methods
     
-    async def _get_user_meeting_bots(self, user_id: str) -> List[Dict[str, Any]]:
+    def _get_user_meeting_bots(self, user_id: str) -> List[Dict[str, Any]]:
         """Get all meeting bots for a user."""
         try:
-            result = await self.supabase.table('meeting_bots').select('*').eq('user_id', user_id).execute()
+            result = self.supabase.table('meeting_bots').select('*').eq('user_id', user_id).execute()
             return result.data or []
         except Exception as e:
             logger.error(f"Failed to get user meeting bots: {e}")
             return []
     
-    async def _find_meeting_by_url(self, meeting_url: str, user_id: str) -> Optional[Dict[str, Any]]:
+    def _find_meeting_by_url(self, meeting_url: str, user_id: str) -> Optional[Dict[str, Any]]:
         """Find a meeting by meeting_url and user_id."""
         try:
-            result = await self.supabase.table('meetings').select('*').eq('meeting_url', meeting_url).eq('user_id', user_id).single().execute()
+            result = self.supabase.table('meetings').select('*').eq('meeting_url', meeting_url).eq('user_id', user_id).single().execute()
             return result.data if result.data else None
         except Exception as e:
             logger.error(f"Failed to find meeting by URL: {e}")
             return None
     
-    async def _find_bot_by_url(self, meeting_url: str, user_id: str) -> Optional[Dict[str, Any]]:
+    def _find_bot_by_url(self, meeting_url: str, user_id: str) -> Optional[Dict[str, Any]]:
         """Find a bot by meeting_url and user_id."""
         try:
-            result = await self.supabase.table('meeting_bots').select('*').eq('meeting_url', meeting_url).eq('user_id', user_id).single().execute()
+            result = self.supabase.table('meeting_bots').select('*').eq('meeting_url', meeting_url).eq('user_id', user_id).single().execute()
             return result.data if result.data else None
         except Exception as e:
             logger.error(f"Failed to find bot by URL: {e}")
@@ -202,7 +202,7 @@ class BotSyncService:
                 'updated_at': datetime.now().isoformat()
             }
             
-            await self.supabase.table('meetings').update(update_data).eq('id', meeting_id).execute()
+            self.supabase.table('meetings').update(update_data).eq('id', meeting_id).execute()
             
         except Exception as e:
             logger.error(f"Failed to update meeting with bot info: {e}")
