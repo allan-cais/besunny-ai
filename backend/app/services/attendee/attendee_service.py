@@ -146,10 +146,11 @@ class AttendeeService:
                     # Calculate join time (2 minutes before meeting starts)
                     join_time = meeting_start - timedelta(minutes=2)
                     
-                    # Only schedule if the meeting is in the future
+                    # Always set join_at for future meetings to put bot in scheduled status
                     if join_time > datetime.now(meeting_start.tzinfo):
-                        bot_data["join_at"] = join_time.isoformat()
-                        logger.info(f"Scheduling bot to join meeting at {join_time.isoformat()} (2 minutes before start)")
+                        # Format as ISO 8601 with Z suffix as required by API
+                        bot_data["join_at"] = join_time.strftime('%Y-%m-%dT%H:%M:%SZ')
+                        logger.info(f"Scheduling bot to join meeting at {bot_data['join_at']} (2 minutes before start)")
                     else:
                         logger.info(f"Meeting start time {meeting_start.isoformat()} is in the past, creating bot for immediate join")
                         
@@ -183,6 +184,7 @@ class AttendeeService:
                 }
             
             logger.info(f"Creating bot with webhook configuration: {bot_data['webhooks']}")
+            logger.info(f"Bot data being sent to Attendee.dev API: {bot_data}")
             
             # Call Attendee.dev API to create bot
             response = await self.http_client.post(
