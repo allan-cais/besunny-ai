@@ -146,7 +146,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
       await supabase
         .from('meetings')
         .update({
-          attendee_bot_id: result.botId,
+          attendee_bot_id: result.bot_id,
           bot_status: 'bot_scheduled',
           updated_at: new Date().toISOString()
         })
