@@ -96,13 +96,26 @@ class BotSyncService:
             logger.error(f"Failed to get meeting with bot status: {e}")
             return None
     
-    async def get_user_meetings_with_bot_status(self, user_id: str) -> List[Dict[str, Any]]:
+    async def get_user_meetings_with_bot_status(self, user_id: str, unassigned_only: bool = True, future_only: bool = True) -> List[Dict[str, Any]]:
         """
-        Get all meetings for a user with their associated bot status.
+        Get meetings for a user with their associated bot status.
         """
         try:
-            # Get all meetings for the user
-            meetings_result = await self.supabase.table('meetings').select('*').eq('user_id', user_id).order('start_time', desc=True).execute()
+            # Build query
+            query = self.supabase.table('meetings').select('*').eq('user_id', user_id)
+            
+            # Filter for unassigned meetings (project_id is null)
+            if unassigned_only:
+                query = query.is_('project_id', 'null')
+            
+            # Filter for future meetings (from now onwards)
+            if future_only:
+                from datetime import datetime
+                now = datetime.now().isoformat()
+                query = query.gte('start_time', now)
+            
+            # Order by start_time descending
+            meetings_result = await query.order('start_time', desc=True).execute()
             
             if not meetings_result.data:
                 return []

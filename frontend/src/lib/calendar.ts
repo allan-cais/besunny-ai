@@ -2046,9 +2046,14 @@ export const calendarService = {
   },
 
   // Get meetings with bot status
-  async getMeetingsWithBotStatus(session?: AuthSession): Promise<Meeting[]> {
+  async getMeetingsWithBotStatus(session?: AuthSession, unassigned_only: boolean = true, future_only: boolean = true): Promise<Meeting[]> {
     try {
-      const response = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/bot-sync/meetings-with-bot-status`, {
+      const params = new URLSearchParams({
+        unassigned_only: unassigned_only.toString(),
+        future_only: future_only.toString()
+      });
+      
+      const response = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/bot-sync/meetings-with-bot-status?${params}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${session?.access_token}`,
