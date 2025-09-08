@@ -7,12 +7,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 from datetime import datetime
+import logging
 
 from ...services.attendee.attendee_service import AttendeeService
 from ...services.attendee.attendee_polling_service import AttendeePollingService
 from ...services.attendee.virtual_email_attendee_service import VirtualEmailAttendeeService
 from ...core.security import get_current_user_hybrid
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -136,6 +138,8 @@ async def send_bot_to_meeting(
 ) -> Dict[str, Any]:
     """Send a bot to a meeting (alias for create-bot for frontend compatibility)."""
     try:
+        logger.info(f"Send bot request received for user {current_user.get('id')}: {request}")
+        
         attendee_service = AttendeeService()
         
         # Prepare options for bot creation
@@ -148,10 +152,15 @@ async def send_bot_to_meeting(
         if request.bot_chat_message:
             options["bot_chat_message"] = request.bot_chat_message
         
+        logger.info(f"Bot creation options: {options}")
+        
         # Create the bot using the same service method
         result = await attendee_service.create_bot_for_meeting(options, current_user["id"])
+        
+        logger.info(f"Bot creation result: {result}")
         return result
     except Exception as e:
+        logger.error(f"Error in send_bot_to_meeting: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
