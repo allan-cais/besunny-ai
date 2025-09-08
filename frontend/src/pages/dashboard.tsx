@@ -340,6 +340,7 @@ const Dashboard = () => {
   };
 
   const getBotStatusBadge = (meeting: Meeting) => {
+    if (!meeting) return null;
     const { bot_status, bot_deployment_method, auto_scheduled_via_email } = meeting;
     
     if (!bot_status || bot_status === 'pending') {
@@ -893,7 +894,7 @@ const Dashboard = () => {
 
               <div className="flex items-center gap-2">
                 <span className="text-xs font-mono text-gray-600 dark:text-gray-400">Status:</span>
-                {getBotStatusBadge(selectedMeeting)}
+                {selectedMeeting && getBotStatusBadge(selectedMeeting)}
               </div>
             </div>
 
