@@ -395,8 +395,11 @@ const Dashboard = () => {
       
       const result = await attendeeService.sendBotToMeeting({
         meeting_url: meeting.meeting_url,
-        bot_name: configuration?.transcription_settings?.language || meeting.bot_name || 'AI Assistant',
-        bot_chat_message: configuration?.transcription_settings?.enable_speaker_diarization ? 'Hi, I\'m here to transcribe this meeting!' : 'Hi, I\'m here to transcribe this meeting!'
+        bot_name: configuration?.bot_name || meeting.bot_name || 'AI Assistant',
+        bot_chat_message: {
+          message: configuration?.bot_chat_message || 'Hi, I\'m here to transcribe this meeting!',
+          to: configuration?.chat_message_recipient || 'everyone'
+        }
       });
       
       await supabase
@@ -705,6 +708,7 @@ const Dashboard = () => {
                       key={activity.id} 
                       className="flex items-start space-x-3 p-3 rounded-md border border-stone-200 dark:border-zinc-700 hover:bg-stone-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
                       onClick={() => {
+                        console.log('Unclassified item clicked:', activity);
                         if (activity.type === 'meeting_transcript') {
                           // Transform RawTranscript to Meeting format for TranscriptModal
                           const transcriptData = {
