@@ -398,7 +398,14 @@ export const calendarService = {
           // Get meetings with bot status from the backend
           const meetingsWithBotStatus = await this.getMeetingsWithBotStatus(currentSession, true, true);
           console.log('Meetings with bot status:', meetingsWithBotStatus?.length || 0, meetingsWithBotStatus);
-          return meetingsWithBotStatus;
+          
+          // If backend returns meetings, use them; otherwise fall back to original meetings
+          if (meetingsWithBotStatus && meetingsWithBotStatus.length > 0) {
+            return meetingsWithBotStatus;
+          } else {
+            console.warn('Backend returned 0 meetings, falling back to original Supabase meetings');
+            return meetings || [];
+          }
         } catch (botError) {
           console.warn('Failed to get bot status, returning meetings without bot info:', botError);
           // Fall back to original meetings if bot sync fails
