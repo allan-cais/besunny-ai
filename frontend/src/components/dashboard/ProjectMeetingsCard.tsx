@@ -140,6 +140,7 @@ const ProjectMeetingsCard: React.FC<ProjectMeetingsCardProps> = ({ projectId }) 
           to: 'everyone',
           message: meeting.bot_chat_message || 'Hi, I\'m here to transcribe this meeting!',
         },
+        start_time: meeting.start_time,
       });
 
       // Update bot status to bot_scheduled

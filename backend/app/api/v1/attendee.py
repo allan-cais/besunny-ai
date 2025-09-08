@@ -123,6 +123,9 @@ async def create_bot_for_meeting(
         
         if request.bot_chat_message:
             options["bot_chat_message"] = request.bot_chat_message
+            
+        if request.start_time:
+            options["start_time"] = request.start_time
         
         # This will create the same comprehensive webhook configuration for transcript retrieval
         # Whether deployed manually from UI or automatically via virtual email
