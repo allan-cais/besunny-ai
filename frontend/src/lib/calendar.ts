@@ -2044,4 +2044,50 @@ export const calendarService = {
       return { success: false, error: error.message || String(error) };
     }
   },
+
+  // Get meetings with bot status
+  async getMeetingsWithBotStatus(session?: AuthSession): Promise<Meeting[]> {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/bot-sync/meetings-with-bot-status`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${session?.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data.meetings || [];
+    } catch (error) {
+      console.error('Error fetching meetings with bot status:', error);
+      return [];
+    }
+  },
+
+  // Sync bot status
+  async syncBotStatus(session?: AuthSession): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/bot-sync/sync-bot-status`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session?.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error syncing bot status:', error);
+      return { success: false, message: 'Failed to sync bot status' };
+    }
+  },
 }; 
