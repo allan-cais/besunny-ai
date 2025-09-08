@@ -403,7 +403,7 @@ const Dashboard = () => {
       await supabase
         .from('meetings')
         .update({
-          attendee_bot_id: result.botId,
+          attendee_bot_id: result.bot_id,
           bot_status: 'bot_scheduled',
           updated_at: new Date().toISOString()
         })
@@ -896,7 +896,7 @@ const Dashboard = () => {
             </div>
 
             <div className="flex space-x-2 pt-4">
-              {selectedMeeting && canSendBot(selectedMeeting) && (
+              {selectedMeeting && canSendBot(selectedMeeting) ? (
                 <Button
                   onClick={() => handleConfigureAndDeploy(selectedMeeting)}
                   disabled={sendingBot === selectedMeeting?.id}
@@ -915,7 +915,17 @@ const Dashboard = () => {
                     </>
                   )}
                 </Button>
-              )}
+              ) : selectedMeeting?.attendee_bot_id ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled
+                  className="flex-1 bg-green-50 text-green-700 border-green-200 hover:bg-green-50 cursor-not-allowed font-mono text-xs"
+                >
+                  <Bot className="mr-2 h-4 w-4" />
+                  BOT DEPLOYED
+                </Button>
+              ) : null}
               {selectedMeeting?.meeting_url && (
                 <Button
                   variant="outline"
