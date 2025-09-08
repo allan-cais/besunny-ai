@@ -63,6 +63,11 @@ class AttendeeServiceImpl implements AttendeeService {
     bot_chat_message?: string;
     start_time?: string;
   }) {
+    console.log('=== ATTENDEE SERVICE SEND BOT DEBUG ===');
+    console.log('Options received:', options);
+    console.log('start_time value:', options.start_time);
+    console.log('start_time type:', typeof options.start_time);
+    
     return this.makeRequest('/send-bot', {
       method: 'POST',
       body: JSON.stringify(options),
