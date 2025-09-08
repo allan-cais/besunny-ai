@@ -94,6 +94,7 @@ class Settings(BaseSettings):
     # Attendee service settings
     attendee_api_base_url: Optional[str] = Field(default=None, env="ATTENDEE_API_BASE_URL")
     master_attendee_api_key: Optional[str] = Field(default=None, env="ATTENDEE_API_KEY")
+    attendee_webhook_secret: Optional[str] = Field(default=None, env="ATTENDEE_WEBHOOK_SECRET")
     
     # Performance settings
     max_concurrent_requests: int = Field(default=100, env="MAX_CONCURRENT_REQUESTS")
