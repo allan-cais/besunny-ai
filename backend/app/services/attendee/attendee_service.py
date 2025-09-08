@@ -67,7 +67,13 @@ class AttendeeService:
         self.settings = get_settings()
         self.supabase = get_supabase()
         self.attendee_api_base_url = self.settings.attendee_api_base_url or "https://app.attendee.dev"
+        
+        # Try to get API key from settings first, then fallback to direct env var
         self.attendee_api_key = self.settings.master_attendee_api_key
+        if not self.attendee_api_key:
+            import os
+            self.attendee_api_key = os.getenv('ATTENDEE_API_KEY')
+            logger.info("Using ATTENDEE_API_KEY from environment variable directly")
         
         # Debug logging for environment variables
         logger.info(f"Attendee API key configured: {bool(self.attendee_api_key)}")
