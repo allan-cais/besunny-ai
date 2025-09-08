@@ -385,14 +385,19 @@ export const calendarService = {
         .order('start_time', { ascending: true });
       
       if (error) {
+        console.error('Error fetching meetings from Supabase:', error);
         throw error;
       }
+      
+      console.log('Found meetings from Supabase:', meetings?.length || 0, meetings);
       
       // If we have meetings, try to get bot status for them
       if (meetings && meetings.length > 0) {
         try {
+          console.log('Attempting to get bot status for meetings...');
           // Get meetings with bot status from the backend
           const meetingsWithBotStatus = await this.getMeetingsWithBotStatus(currentSession, true, true);
+          console.log('Meetings with bot status:', meetingsWithBotStatus?.length || 0, meetingsWithBotStatus);
           return meetingsWithBotStatus;
         } catch (botError) {
           console.warn('Failed to get bot status, returning meetings without bot info:', botError);
@@ -401,6 +406,7 @@ export const calendarService = {
         }
       }
       
+      console.log('No meetings found, returning empty array');
       return meetings || [];
     } catch (error) {
       throw error;

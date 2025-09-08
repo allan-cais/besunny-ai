@@ -106,7 +106,7 @@ class BotSyncService:
             
             # Filter for unassigned meetings (project_id is null)
             if unassigned_only:
-                query = query.is_('project_id', 'null')
+                query = query.is_('project_id', None)
             
             # Filter for future meetings (from now onwards)
             if future_only:
