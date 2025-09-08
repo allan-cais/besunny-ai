@@ -330,6 +330,15 @@ const ProjectMeetingsCard: React.FC<ProjectMeetingsCardProps> = ({ projectId }) 
                           </>
                         )}
                       </Button>
+                    ) : meeting.bot_status && meeting.bot_status !== 'pending' ? (
+                      <Button
+                        size="sm"
+                        disabled
+                        className="font-mono text-xs bg-green-50 text-green-700 border-green-200 hover:bg-green-50 cursor-not-allowed"
+                      >
+                        <Send className="mr-1 h-3 w-3" />
+                        BOT DEPLOYED
+                      </Button>
                     ) : (
                       getBotStatusBadge(meeting.bot_status)
                     )}

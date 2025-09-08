@@ -12,7 +12,8 @@ import { MainWorkspace } from '@/components/dashboard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Clock, Database, Bot, Video, Loader2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Clock, Database, Bot, Video, Loader2, Send, ExternalLink } from 'lucide-react';
 import type { Project, VirtualEmailActivity, TranscriptMetadata, BotConfiguration, Document, Meeting } from '@/types';
 import BotConfigurationModal from '@/components/dashboard/BotConfigurationModal';
 import ClassificationModal from '@/components/dashboard/ClassificationModal';
@@ -628,7 +629,7 @@ const Dashboard = () => {
                         </div>
                       </div>
                       <div className="flex flex-col items-end space-y-1">
-                        {meeting.meeting_url && canSendBot(meeting) && (
+                        {meeting.meeting_url && canSendBot(meeting) ? (
                           <Button
                             size="sm"
                             variant="outline"
@@ -645,6 +646,17 @@ const Dashboard = () => {
                               <Bot className="w-3 h-3" />
                             )}
                           </Button>
+                        ) : meeting.bot_status && meeting.bot_status !== 'pending' ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled
+                            className="text-xs bg-green-50 text-green-700 border-green-200 hover:bg-green-50 cursor-not-allowed"
+                          >
+                            <Bot className="w-3 h-3" />
+                          </Button>
+                        ) : (
+                          getBotStatusBadge(meeting)
                         )}
                         {meeting.meeting_url && (
                           <Button
@@ -833,6 +845,90 @@ const Dashboard = () => {
         projects={projects}
         onProjectChange={handleClassify}
       />
+
+      {/* Meeting Details Modal */}
+      <Dialog open={!!selectedMeeting} onOpenChange={() => setSelectedMeeting(null)}>
+        <DialogContent className="sm:max-w-[480px] bg-stone-100 dark:bg-zinc-800 border border-[#4a5565] dark:border-zinc-700 font-mono text-xs">
+          <DialogHeader>
+            <DialogTitle className="text-[#4a5565] dark:text-zinc-50 font-mono text-sm font-bold">
+              {selectedMeeting?.title}
+            </DialogTitle>
+            <DialogDescription className="text-gray-600 dark:text-gray-400 font-mono text-xs">
+              Meeting details and actions
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="bg-white dark:bg-zinc-700 rounded-lg p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-gray-500" />
+                <span className="text-xs font-mono">
+                  {selectedMeeting?.start_time && new Date(selectedMeeting.start_time).toLocaleDateString()} - {selectedMeeting?.end_time && new Date(selectedMeeting.end_time).toLocaleDateString()}
+                </span>
+              </div>
+              
+              {selectedMeeting?.description && (
+                <div className="text-xs text-gray-600 dark:text-gray-400 font-mono">
+                  {selectedMeeting.description}
+                </div>
+              )}
+
+              {selectedMeeting?.meeting_url && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono text-gray-600 dark:text-gray-400">Meeting URL:</span>
+                  <a 
+                    href={selectedMeeting.meeting_url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-mono"
+                  >
+                    Join Meeting
+                  </a>
+                </div>
+              )}
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono text-gray-600 dark:text-gray-400">Status:</span>
+                {getBotStatusBadge(selectedMeeting)}
+              </div>
+            </div>
+
+            <div className="flex space-x-2 pt-4">
+              {selectedMeeting && canSendBot(selectedMeeting) && (
+                <Button
+                  onClick={() => handleConfigureAndDeploy(selectedMeeting)}
+                  disabled={sendingBot === selectedMeeting?.id}
+                  size="sm"
+                  className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-mono text-xs"
+                >
+                  {sendingBot === selectedMeeting?.id ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      SENDING...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="mr-2 h-4 w-4" />
+                      DEPLOY BOT
+                    </>
+                  )}
+                </Button>
+              )}
+              {selectedMeeting?.meeting_url && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open(selectedMeeting.meeting_url, '_blank')}
+                  className="font-mono text-xs border border-[#4a5565] dark:border-zinc-700 bg-stone-100 dark:bg-zinc-800 text-[#4a5565] dark:text-zinc-50 hover:bg-stone-300 dark:hover:bg-zinc-700"
+                >
+                  <ExternalLink className="w-4 h-4 mr-1" />
+                  Join Meeting
+                </Button>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
