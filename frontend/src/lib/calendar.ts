@@ -388,6 +388,19 @@ export const calendarService = {
         throw error;
       }
       
+      // If we have meetings, try to get bot status for them
+      if (meetings && meetings.length > 0) {
+        try {
+          // Get meetings with bot status from the backend
+          const meetingsWithBotStatus = await this.getMeetingsWithBotStatus(currentSession, true, true);
+          return meetingsWithBotStatus;
+        } catch (botError) {
+          console.warn('Failed to get bot status, returning meetings without bot info:', botError);
+          // Fall back to original meetings if bot sync fails
+          return meetings || [];
+        }
+      }
+      
       return meetings || [];
     } catch (error) {
       throw error;

@@ -137,8 +137,8 @@ const Dashboard = () => {
       setMeetingsLoading(true);
       // First sync bot status to ensure meetings table has latest bot info
       await calendarService.syncBotStatus(session);
-      // Then get meetings with bot status
-      const meetings = await calendarService.getMeetingsWithBotStatus(session);
+      // Then get meetings (original function that was working)
+      const meetings = await calendarService.getCurrentWeekMeetings(session);
       setCurrentWeekMeetings(meetings);
     } catch (err: unknown) {
       setCurrentWeekMeetings([]);
