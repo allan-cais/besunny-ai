@@ -36,12 +36,18 @@ async def sync_bot_status(
 
 @router.get("/meetings-with-bot-status")
 async def get_meetings_with_bot_status(
+    unassigned_only: bool = True,
+    future_only: bool = True,
     current_user: Dict[str, Any] = Depends(get_current_user_hybrid)
 ) -> Dict[str, Any]:
-    """Get all meetings for the user with their associated bot status."""
+    """Get meetings for the user with their associated bot status."""
     try:
         bot_sync_service = BotSyncService()
-        meetings = await bot_sync_service.get_user_meetings_with_bot_status(current_user["id"])
+        meetings = await bot_sync_service.get_user_meetings_with_bot_status(
+            current_user["id"], 
+            unassigned_only=unassigned_only, 
+            future_only=future_only
+        )
         
         return {
             "success": True,
