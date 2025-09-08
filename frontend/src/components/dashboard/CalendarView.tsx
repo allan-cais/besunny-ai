@@ -92,6 +92,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
   };
 
   const getBotStatusBadge = (meeting: Meeting) => {
+    if (!meeting) return null;
     const { bot_status, bot_deployment_method, auto_scheduled_via_email } = meeting;
     
     // Don't show any badge if there's no bot (bot_status is null/undefined or 'pending' without auto_scheduled_via_email)
