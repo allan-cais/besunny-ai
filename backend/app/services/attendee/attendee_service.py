@@ -69,7 +69,15 @@ class AttendeeService:
         self.attendee_api_base_url = self.settings.attendee_api_base_url or "https://app.attendee.dev"
         self.attendee_api_key = self.settings.master_attendee_api_key
         
+        # Debug logging for environment variables
+        logger.info(f"Attendee API key configured: {bool(self.attendee_api_key)}")
+        logger.info(f"Attendee API base URL: {self.attendee_api_base_url}")
+        
         if not self.attendee_api_key:
+            logger.error("Attendee API key not configured - checking environment variables")
+            import os
+            logger.error(f"ATTENDEE_API_KEY env var: {bool(os.getenv('ATTENDEE_API_KEY'))}")
+            logger.error(f"MASTER_ATTENDEE_API_KEY env var: {bool(os.getenv('MASTER_ATTENDEE_API_KEY'))}")
             raise ValueError("Attendee API key not configured")
         
         # HTTP client for external API calls
