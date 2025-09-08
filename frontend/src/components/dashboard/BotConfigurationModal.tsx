@@ -8,6 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   Bot, 
   MessageSquare, 
@@ -92,8 +93,8 @@ const BotConfigurationModal: React.FC<BotConfigurationModalProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] bg-stone-100 dark:bg-zinc-800 border border-[#4a5565] dark:border-zinc-700 font-mono">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] bg-stone-100 dark:bg-zinc-800 border border-[#4a5565] dark:border-zinc-700 font-mono flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="text-[#4a5565] dark:text-zinc-50 font-mono text-lg font-bold flex items-center">
             <Bot className="w-5 h-5 mr-2" />
             Configure Meeting Bot
@@ -103,7 +104,8 @@ const BotConfigurationModal: React.FC<BotConfigurationModalProps> = ({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <ScrollArea className="flex-1 min-h-0">
+          <div className="space-y-4 pr-2">
           {/* Basic Bot Configuration */}
           <Card className="bg-white dark:bg-zinc-700 border border-[#4a5565] dark:border-zinc-600">
             <CardHeader className="pb-3">
@@ -253,10 +255,11 @@ const BotConfigurationModal: React.FC<BotConfigurationModalProps> = ({
               </div>
             </CardContent>
           </Card>
-        </div>
+          </div>
+        </ScrollArea>
 
         {/* Action Buttons */}
-        <div className="flex justify-end space-x-2 pt-4">
+        <div className="flex justify-end space-x-2 pt-4 flex-shrink-0">
           <Button
             type="button"
             variant="outline"
