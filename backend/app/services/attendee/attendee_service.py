@@ -109,8 +109,8 @@ class AttendeeService:
             Bot creation result
         """
         try:
-            logger.info(f"=== BOT CREATION STARTED ===")
-            logger.info(f"Options received: {options}")
+            logger.error(f"=== BOT CREATION STARTED ===")
+            logger.error(f"Options received: {options}")
             
             # Validate required fields
             required_fields = ['meeting_url', 'bot_name']
@@ -140,7 +140,7 @@ class AttendeeService:
             }
             
             # Add scheduling if start_time is provided
-            logger.info(f"start_time received: {options.get('start_time')}")
+            logger.error(f"start_time received: {options.get('start_time')}")
             if options.get('start_time'):
                 from datetime import datetime, timedelta
                 try:
@@ -196,12 +196,12 @@ class AttendeeService:
                 }
             
             logger.info(f"Creating bot with webhook configuration: {bot_data['webhooks']}")
-            logger.info(f"=== FINAL BOT DATA BEING SENT TO API ===")
-            logger.info(f"Bot data: {bot_data}")
-            logger.info(f"Has join_at: {'join_at' in bot_data}")
+            logger.error(f"=== FINAL BOT DATA BEING SENT TO API ===")
+            logger.error(f"Bot data: {bot_data}")
+            logger.error(f"Has join_at: {'join_at' in bot_data}")
             if 'join_at' in bot_data:
-                logger.info(f"join_at value: {bot_data['join_at']}")
-            logger.info(f"=== END BOT DATA ===")
+                logger.error(f"join_at value: {bot_data['join_at']}")
+            logger.error(f"=== END BOT DATA ===")
             
             # Call Attendee.dev API to create bot
             response = await self.http_client.post(
