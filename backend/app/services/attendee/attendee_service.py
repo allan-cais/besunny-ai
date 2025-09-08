@@ -137,17 +137,24 @@ class AttendeeService:
             }
             
             # Add scheduling if start_time is provided
+            logger.info(f"start_time received: {options.get('start_time')}")
             if options.get('start_time'):
                 from datetime import datetime, timedelta
                 try:
                     # Parse the meeting start time
                     meeting_start = datetime.fromisoformat(options['start_time'].replace('Z', '+00:00'))
+                    logger.info(f"Parsed meeting_start: {meeting_start}")
                     
                     # Calculate join time (2 minutes before meeting starts)
                     join_time = meeting_start - timedelta(minutes=2)
+                    logger.info(f"Calculated join_time: {join_time}")
+                    
+                    # Check if meeting is in the future
+                    now = datetime.now(meeting_start.tzinfo)
+                    logger.info(f"Current time: {now}, Join time: {join_time}, Is future: {join_time > now}")
                     
                     # Always set join_at for future meetings to put bot in scheduled status
-                    if join_time > datetime.now(meeting_start.tzinfo):
+                    if join_time > now:
                         # Format as ISO 8601 with Z suffix as required by API
                         bot_data["join_at"] = join_time.strftime('%Y-%m-%dT%H:%M:%SZ')
                         logger.info(f"Scheduling bot to join meeting at {bot_data['join_at']} (2 minutes before start)")
@@ -156,6 +163,8 @@ class AttendeeService:
                         
                 except Exception as e:
                     logger.warning(f"Failed to parse start_time {options['start_time']}: {e}, creating bot for immediate join")
+            else:
+                logger.info("No start_time provided, creating bot for immediate join")
             
             # Add optional bot chat message if provided
             if options.get('bot_chat_message'):
