@@ -57,11 +57,29 @@ BEGIN
     END IF;
 END $$;
 
+-- Create RLS policy for meeting_bots (allow service role to insert/update)
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'meeting_bots' AND policyname = 'Service role can manage meeting_bots') THEN
+        CREATE POLICY "Service role can manage meeting_bots" ON meeting_bots
+            FOR ALL USING (auth.role() = 'service_role');
+    END IF;
+END $$;
+
 -- Create RLS policy for users to read their own webhook logs
 DO $$ 
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'attendee_webhook_logs' AND policyname = 'Users can read their own webhook logs') THEN
         CREATE POLICY "Users can read their own webhook logs" ON attendee_webhook_logs
+            FOR SELECT USING (auth.uid() = user_id);
+    END IF;
+END $$;
+
+-- Create RLS policy for users to read their own meeting bots
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'meeting_bots' AND policyname = 'Users can read their own meeting bots') THEN
+        CREATE POLICY "Users can read their own meeting bots" ON meeting_bots
             FOR SELECT USING (auth.uid() = user_id);
     END IF;
 END $$;
