@@ -408,7 +408,8 @@ const Dashboard = () => {
       const result = await attendeeService.sendBotToMeeting({
         meeting_url: meeting.meeting_url,
         bot_name: configuration?.bot_name || meeting.bot_name || 'AI Assistant',
-        bot_chat_message: configuration?.bot_chat_message || 'Hi, I\'m here to transcribe this meeting!'
+        bot_chat_message: configuration?.bot_chat_message || 'Hi, I\'m here to transcribe this meeting!',
+        start_time: meeting.start_time
       });
       
       await supabase

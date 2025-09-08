@@ -91,6 +91,7 @@ class BotDeploymentRequest(BaseModel):
     meeting_url: str
     bot_name: str
     bot_chat_message: Optional[str] = None
+    start_time: Optional[str] = None
 
 
 class ChatMessageRequest(BaseModel):
@@ -151,6 +152,9 @@ async def send_bot_to_meeting(
         
         if request.bot_chat_message:
             options["bot_chat_message"] = request.bot_chat_message
+            
+        if request.start_time:
+            options["start_time"] = request.start_time
         
         logger.info(f"Bot creation options: {options}")
         
