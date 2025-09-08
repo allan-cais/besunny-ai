@@ -90,7 +90,7 @@ class AttendeeService:
         self.http_client = httpx.AsyncClient(
             timeout=30.0,
             headers={
-                "Authorization": f"Bearer {self.attendee_api_key}",
+                "Authorization": f"Token {self.attendee_api_key}",
                 "Content-Type": "application/json"
             }
         )

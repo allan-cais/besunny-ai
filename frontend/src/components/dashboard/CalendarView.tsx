@@ -300,6 +300,16 @@ const CalendarView: React.FC<CalendarViewProps> = ({
                       )}
                       <span className="ml-1">Deploy Bot</span>
                     </Button>
+                  ) : meeting.bot_status && meeting.bot_status !== 'pending' ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled
+                      className="font-mono bg-green-50 text-green-700 border-green-200 hover:bg-green-50 cursor-not-allowed"
+                    >
+                      <Bot className="w-4 h-4" />
+                      <span className="ml-1">Bot Deployed</span>
+                    </Button>
                   ) : (
                     getBotStatusBadge(meeting)
                   )}
