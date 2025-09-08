@@ -42,12 +42,17 @@ async def get_meetings_with_bot_status(
 ) -> Dict[str, Any]:
     """Get meetings for the user with their associated bot status."""
     try:
+        user_id = current_user["id"]
+        logger.info(f"API endpoint called with user_id: {user_id}, unassigned_only: {unassigned_only}, future_only: {future_only}")
+        
         bot_sync_service = BotSyncService()
         meetings = await bot_sync_service.get_user_meetings_with_bot_status(
-            current_user["id"], 
+            user_id, 
             unassigned_only=unassigned_only, 
             future_only=future_only
         )
+        
+        logger.info(f"API returning {len(meetings)} meetings")
         
         return {
             "success": True,
@@ -56,7 +61,7 @@ async def get_meetings_with_bot_status(
         }
         
     except Exception as e:
-        logger.error(f"Failed to get meetings with bot status: {e}")
+        logger.error(f"Failed to get meetings with bot status: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
