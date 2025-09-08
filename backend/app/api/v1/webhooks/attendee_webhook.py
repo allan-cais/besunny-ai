@@ -43,13 +43,17 @@ async def handle_attendee_webhook(
         })
         
         # Verify webhook signature if configured
-        if not await _verify_webhook_signature(webhook_data, signature, user_id):
-            logger.warning(f"Invalid webhook signature for user {user_id}")
-            # Return 200 to prevent retries, but log the issue
-            return JSONResponse(
-                content={"status": "error", "message": "Invalid signature"},
-                status_code=200
-            )
+        settings = get_settings()
+        if settings.attendee_webhook_secret:
+            if not await _verify_webhook_signature(webhook_data, signature, user_id):
+                logger.warning(f"Invalid webhook signature for user {user_id}")
+                # Return 200 to prevent retries, but log the issue
+                return JSONResponse(
+                    content={"status": "error", "message": "Invalid signature"},
+                    status_code=200
+                )
+        else:
+            logger.info(f"Webhook secret not configured - skipping signature validation for user {user_id}")
         
         # Process the webhook
         webhook_handler = AttendeeWebhookHandler()
