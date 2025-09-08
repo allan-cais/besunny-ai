@@ -42,15 +42,14 @@ async def handle_attendee_webhook(
             "signature": signature
         })
         
-        # Verify webhook signature if configured (temporarily disabled for debugging)
-        # TODO: Implement proper webhook secret configuration
-        # if not await _verify_webhook_signature(webhook_data, signature, user_id):
-        #     logger.warning(f"Invalid webhook signature for user {user_id}")
-        #     # Return 200 to prevent retries, but log the issue
-        #     return JSONResponse(
-        #         content={"status": "error", "message": "Invalid signature"},
-        #         status_code=200
-        #     )
+        # Verify webhook signature if configured
+        if not await _verify_webhook_signature(webhook_data, signature, user_id):
+            logger.warning(f"Invalid webhook signature for user {user_id}")
+            # Return 200 to prevent retries, but log the issue
+            return JSONResponse(
+                content={"status": "error", "message": "Invalid signature"},
+                status_code=200
+            )
         
         # Process the webhook
         webhook_handler = AttendeeWebhookHandler()
@@ -93,34 +92,41 @@ async def verify_webhook_endpoint(user_id: str):
 
 
 async def _verify_webhook_signature(payload: Dict[str, Any], signature: Optional[str], user_id: str) -> bool:
-    """Verify webhook signature using HMAC-SHA256."""
+    """Verify webhook signature using HMAC-SHA256 as per Attendee.dev documentation."""
     try:
         if not signature:
             logger.warning(f"No webhook signature provided for user {user_id}")
             return False
         
-        # Get webhook secret for the user (this would be stored in user settings)
-        # For now, we'll use a default approach - in production this should be per-user
+        # Get webhook secret from settings
         settings = get_settings()
-        webhook_secret = settings.master_attendee_api_key
+        webhook_secret = settings.attendee_webhook_secret
         
         if not webhook_secret:
-            logger.warning("No webhook secret configured")
-            return False
+            logger.warning("No webhook secret configured - webhook signature validation disabled")
+            return True  # Allow webhook to proceed if no secret is configured
         
-        # Create canonical JSON string (sorted keys)
-        canonical_payload = json.dumps(payload, sort_keys=True, separators=(',', ':'))
+        # Create canonical JSON string with sorted keys (as per documentation)
+        canonical_payload = json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(',', ':'))
         
-        # Decode the secret
+        # Decode the base64 secret
         secret_decoded = base64.b64decode(webhook_secret)
         
-        # Create the signature
+        # Create the signature using HMAC-SHA256
         expected_signature = base64.b64encode(
             hmac.new(secret_decoded, canonical_payload.encode('utf-8'), hashlib.sha256).digest()
         ).decode('utf-8')
         
-        # Compare signatures
-        return hmac.compare_digest(signature, expected_signature)
+        # Compare signatures using constant-time comparison
+        is_valid = hmac.compare_digest(signature, expected_signature)
+        
+        if not is_valid:
+            logger.warning(f"Webhook signature mismatch for user {user_id}")
+            logger.debug(f"Expected: {expected_signature}")
+            logger.debug(f"Received: {signature}")
+            logger.debug(f"Canonical payload: {canonical_payload}")
+        
+        return is_valid
         
     except Exception as e:
         logger.error(f"Error verifying webhook signature: {e}")
