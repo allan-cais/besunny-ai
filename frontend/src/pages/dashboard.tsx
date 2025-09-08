@@ -135,12 +135,15 @@ const Dashboard = () => {
 
     try {
       setMeetingsLoading(true);
+      console.log('Loading current week meetings...');
       // First sync bot status to ensure meetings table has latest bot info
       await calendarService.syncBotStatus(session);
       // Then get meetings (original function that was working)
       const meetings = await calendarService.getCurrentWeekMeetings(session);
+      console.log('Setting currentWeekMeetings to:', meetings.length, meetings);
       setCurrentWeekMeetings(meetings);
     } catch (err: unknown) {
+      console.error('Error loading meetings:', err);
       setCurrentWeekMeetings([]);
     } finally {
       setMeetingsLoading(false);
@@ -304,6 +307,11 @@ const Dashboard = () => {
       setActiveCenterPanel('data');
     }
   }, [location.search]);
+
+  // Debug currentWeekMeetings changes
+  useEffect(() => {
+    console.log('currentWeekMeetings changed:', currentWeekMeetings.length, currentWeekMeetings);
+  }, [currentWeekMeetings]);
 
   // Helper functions
   const getDocumentType = (source: string, document: Document): VirtualEmailActivity['type'] => {
