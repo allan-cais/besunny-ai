@@ -36,11 +36,11 @@ class BotSyncService:
             for bot in meeting_bots:
                 try:
                     # Find the corresponding meeting by meeting_url
-                    meeting = await self._find_meeting_by_url(bot['meeting_url'], user_id)
+                    meeting = self._find_meeting_by_url(bot['meeting_url'], user_id)
                     
                     if meeting:
                         # Update the meeting with bot information
-                        await self._update_meeting_with_bot_info(meeting['id'], bot)
+                        self._update_meeting_with_bot_info(meeting['id'], bot)
                         synced_count += 1
                         logger.info(f"Synced bot {bot['bot_id']} to meeting {meeting['id']}")
                     else:
@@ -184,7 +184,7 @@ class BotSyncService:
             logger.error(f"Failed to find bot by URL: {e}")
             return None
     
-    async def _update_meeting_with_bot_info(self, meeting_id: str, bot: Dict[str, Any]):
+    def _update_meeting_with_bot_info(self, meeting_id: str, bot: Dict[str, Any]):
         """Update a meeting with bot information."""
         try:
             update_data = {
