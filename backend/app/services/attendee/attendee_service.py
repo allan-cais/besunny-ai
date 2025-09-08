@@ -148,19 +148,13 @@ class AttendeeService:
                     
                     # Only schedule if the meeting is in the future
                     if join_time > datetime.now(meeting_start.tzinfo):
-                        bot_data["join_time"] = join_time.isoformat()
-                        bot_data["auto_join"] = True
+                        bot_data["join_at"] = join_time.isoformat()
                         logger.info(f"Scheduling bot to join meeting at {join_time.isoformat()} (2 minutes before start)")
                     else:
                         logger.info(f"Meeting start time {meeting_start.isoformat()} is in the past, creating bot for immediate join")
-                        bot_data["auto_join"] = True
                         
                 except Exception as e:
                     logger.warning(f"Failed to parse start_time {options['start_time']}: {e}, creating bot for immediate join")
-                    bot_data["auto_join"] = True
-            else:
-                # If no start_time provided, try to join immediately
-                bot_data["auto_join"] = True
             
             # Add optional bot chat message if provided
             if options.get('bot_chat_message'):
