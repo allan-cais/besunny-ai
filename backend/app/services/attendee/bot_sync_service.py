@@ -101,23 +101,30 @@ class BotSyncService:
         Get meetings for a user with their associated bot status.
         """
         try:
+            logger.info(f"Getting meetings for user {user_id}, unassigned_only={unassigned_only}, future_only={future_only}")
+            
             # Build query
             query = self.supabase.table('meetings').select('*').eq('user_id', user_id)
             
             # Filter for unassigned meetings (project_id is null)
             if unassigned_only:
                 query = query.is_('project_id', 'null')
+                logger.info("Applied unassigned filter")
             
             # Filter for future meetings (from now onwards)
             if future_only:
                 from datetime import datetime
                 now = datetime.now().isoformat()
                 query = query.gte('start_time', now)
+                logger.info(f"Applied future filter from {now}")
             
             # Order by start_time descending
             meetings_result = await query.order('start_time', desc=True).execute()
             
+            logger.info(f"Backend query returned {len(meetings_result.data) if meetings_result.data else 0} meetings")
+            
             if not meetings_result.data:
+                logger.info("No meetings found in backend query")
                 return []
             
             meetings = meetings_result.data
