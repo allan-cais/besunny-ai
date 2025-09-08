@@ -8,7 +8,7 @@ export interface ApiKeyStatus {
 
 export const apiKeyService = {
   // Send a bot to a meeting via Edge Function (uses master API key)
-  async sendBotToMeeting(meetingUrl: string, options: { bot_chat_message?: { message: string; to?: string } } = {}): Promise<Record<string, unknown>> {
+  async sendBotToMeeting(meetingUrl: string, options: { bot_chat_message?: { message: string; to?: string }; start_time?: string } = {}): Promise<Record<string, unknown>> {
     const session = (await supabase.auth.getSession()).data.session;
     if (!session) throw new Error('Not authenticated');
     
@@ -21,6 +21,7 @@ export const apiKeyService = {
     const payload = {
       meeting_url: meetingUrl,
       bot_name: options.bot_chat_message?.message || 'Sunny AI Notetaker',
+      start_time: options.start_time,
       ...options
     };
     
