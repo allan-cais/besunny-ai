@@ -140,7 +140,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({
       const result = await attendeeService.sendBotToMeeting({
         meeting_url: meeting.meeting_url,
         bot_name: configuration?.transcription_settings?.language || meeting.bot_name || 'AI Assistant',
-        bot_chat_message: configuration?.transcription_settings?.enable_speaker_diarization ? 'Hi, I\'m here to transcribe this meeting!' : 'Hi, I\'m here to transcribe this meeting!'
+        bot_chat_message: configuration?.transcription_settings?.enable_speaker_diarization ? 'Hi, I\'m here to transcribe this meeting!' : 'Hi, I\'m here to transcribe this meeting!',
+        start_time: meeting.start_time
       });
       
       await supabase
