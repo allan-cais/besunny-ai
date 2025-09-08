@@ -140,21 +140,17 @@ class AttendeeService:
             }
             
             # Add scheduling if start_time is provided
-            logger.error(f"start_time received: {options.get('start_time')}")
             if options.get('start_time'):
                 from datetime import datetime, timedelta
                 try:
                     # Parse the meeting start time
                     meeting_start = datetime.fromisoformat(options['start_time'].replace('Z', '+00:00'))
-                    logger.info(f"Parsed meeting_start: {meeting_start}")
                     
                     # Calculate join time (2 minutes before meeting starts)
                     join_time = meeting_start - timedelta(minutes=2)
-                    logger.info(f"Calculated join_time: {join_time}")
                     
                     # Check if meeting is in the future
                     now = datetime.now(meeting_start.tzinfo)
-                    logger.info(f"Current time: {now}, Join time: {join_time}, Is future: {join_time > now}")
                     
                     # Always set join_at for future meetings to put bot in scheduled status
                     if join_time > now:
@@ -196,12 +192,6 @@ class AttendeeService:
                 }
             
             logger.info(f"Creating bot with webhook configuration: {bot_data['webhooks']}")
-            logger.error(f"=== FINAL BOT DATA BEING SENT TO API ===")
-            logger.error(f"Bot data: {bot_data}")
-            logger.error(f"Has join_at: {'join_at' in bot_data}")
-            if 'join_at' in bot_data:
-                logger.error(f"join_at value: {bot_data['join_at']}")
-            logger.error(f"=== END BOT DATA ===")
             
             # Call Attendee.dev API to create bot
             response = await self.http_client.post(

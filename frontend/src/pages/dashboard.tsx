@@ -405,11 +405,6 @@ const Dashboard = () => {
       
       setSendingBot(meeting.id);
       
-      console.log('=== FRONTEND BOT DEPLOYMENT DEBUG ===');
-      console.log('Meeting object:', meeting);
-      console.log('Meeting start_time:', meeting.start_time);
-      console.log('Meeting start_time type:', typeof meeting.start_time);
-      
       const result = await attendeeService.sendBotToMeeting({
         meeting_url: meeting.meeting_url,
         bot_name: configuration?.bot_name || meeting.bot_name || 'AI Assistant',

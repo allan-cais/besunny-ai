@@ -142,8 +142,7 @@ async def send_bot_to_meeting(
 ) -> Dict[str, Any]:
     """Send a bot to a meeting (alias for create-bot for frontend compatibility)."""
     try:
-        logger.error(f"=== SEND-BOT ENDPOINT CALLED ===")
-        logger.error(f"Send bot request received for user {current_user.get('id')}: {request}")
+        logger.info(f"Send bot request received for user {current_user.get('id')}: {request}")
         
         attendee_service = AttendeeService()
         
