@@ -13,6 +13,12 @@ import logging
 
 from .config import get_settings
 
+# Import PyJWKClient for Supabase JWT verification
+try:
+    from jwt import PyJWKClient
+except ImportError:
+    PyJWKClient = None
+
 logger = logging.getLogger(__name__)
 
 # Password hashing context
@@ -70,6 +76,47 @@ class SecurityManager:
             return payload
         except JWTError as e:
             logger.warning(f"JWT token verification failed: {e}")
+            return None
+    
+    def verify_supabase_token(self, token: str) -> Optional[dict]:
+        """Verify and decode Supabase JWT token (handles audience claims)."""
+        try:
+            if PyJWKClient is None:
+                logger.warning("PyJWKClient not available, falling back to Supabase API validation")
+                return None
+            
+            # For Supabase tokens, we need to decode without verification first to get the header
+            # Then verify using Supabase's public key
+            import jwt
+            
+            # Get the token header to find the key ID
+            header = jwt.get_unverified_header(token)
+            kid = header.get('kid')
+            
+            if not kid:
+                logger.warning("No key ID in Supabase JWT token")
+                return None
+            
+            # Get Supabase's public key
+            jwks_url = f"{self.settings.supabase_url}/auth/v1/jwks"
+            jwks_client = PyJWKClient(jwks_url)
+            signing_key = jwks_client.get_signing_key_from_jwt(token)
+            
+            # Verify the token with Supabase's public key
+            payload = jwt.decode(
+                token,
+                signing_key.key,
+                algorithms=['RS256'],
+                audience='authenticated',  # Supabase JWT audience
+                issuer=f"{self.settings.supabase_url}/auth/v1"
+            )
+            return payload
+            
+        except JWTError as e:
+            logger.warning(f"Supabase JWT token verification failed: {e}")
+            return None
+        except Exception as e:
+            logger.warning(f"Error verifying Supabase JWT token: {e}")
             return None
     
     def create_refresh_token(self, data: dict) -> str:
@@ -178,7 +225,20 @@ async def get_current_user_hybrid(
     try:
         token = credentials.credentials
         
-        # First try to validate as JWT token
+        # First try to validate as Supabase JWT token
+        try:
+            payload = security_manager.verify_supabase_token(token)
+            if payload and payload.get("sub"):
+                return {
+                    "id": payload.get("sub"),
+                    "email": payload.get("email"),
+                    "username": payload.get("user_metadata", {}).get("username"),
+                    "permissions": payload.get("user_metadata", {}).get("permissions", []),
+                }
+        except Exception as e:
+            logger.debug(f"Supabase JWT verification failed, trying regular JWT: {e}")
+        
+        # If Supabase JWT validation fails, try regular JWT token
         try:
             payload = security_manager.verify_token(token)
             if payload and payload.get("sub"):
@@ -188,8 +248,8 @@ async def get_current_user_hybrid(
                     "username": payload.get("username"),
                     "permissions": payload.get("permissions", []),
                 }
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Regular JWT verification failed: {e}")
         
         # If JWT validation fails, try Supabase token
         try:
