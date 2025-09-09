@@ -15,6 +15,10 @@ BEGIN
     END IF;
 END $$;
 
+-- Change the attendee_bot_id column type from uuid to text to match meeting_bots.bot_id
+ALTER TABLE meetings 
+ALTER COLUMN attendee_bot_id TYPE TEXT USING attendee_bot_id::TEXT;
+
 -- Add the new foreign key constraint to reference meeting_bots.bot_id
 ALTER TABLE meetings 
 ADD CONSTRAINT meetings_attendee_bot_id_fkey 
