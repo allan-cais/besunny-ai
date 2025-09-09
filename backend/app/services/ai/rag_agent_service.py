@@ -56,18 +56,7 @@ Formatting
 Tone
 - Conversational and practical, like a teammate.
 - If asked for detail, provide it. If asked for a single fact, return it plainly.
-- Be transparent about uncertainty.
-
-Current Project Context:
-Project ID: {project_id}
-Project Name: {project_name}
-User Question: {user_question}
-
-Project Database:
-{retrieved_context}
-{project_summary}
-
-Provide a helpful, accurate response grounded in the project database."""
+- Be transparent about uncertainty."""
     
     async def query_project_data(
         self,
