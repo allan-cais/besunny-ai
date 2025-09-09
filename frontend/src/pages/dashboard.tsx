@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Clock, Database, Bot, Video, Loader2, Send, ExternalLink } from 'lucide-react';
+import { Clock, Database, Bot, Video, Loader2, Send, ExternalLink, Trash2Icon } from 'lucide-react';
 import type { Project, VirtualEmailActivity, TranscriptMetadata, BotConfiguration, Document, Meeting } from '@/types';
 import BotConfigurationModal from '@/components/dashboard/BotConfigurationModal';
 import ClassificationModal from '@/components/dashboard/ClassificationModal';
@@ -44,6 +44,7 @@ const Dashboard = () => {
   const [meetingForConfig, setMeetingForConfig] = useState<Meeting | null>(null);
   const [sendingBot, setSendingBot] = useState<string | null>(null);
   const [updatingProject, setUpdatingProject] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   // Modal states for data
   const [selectedTranscript, setSelectedTranscript] = useState<{
@@ -615,6 +616,43 @@ const Dashboard = () => {
     }
   };
 
+  const deleteDocument = async (activityId: string) => {
+    try {
+      setDeleting(activityId);
+      
+      // Call the backend API to delete document and vectors
+      const response = await fetch(`/api/v1/documents/${activityId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${session?.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to delete document');
+      }
+
+      // Remove from unclassified data
+      setUnclassifiedData(prev => prev.filter(a => a.id !== activityId));
+      
+      toast({
+        title: "Document deleted successfully",
+        description: "The document and its vectors have been removed.",
+      });
+    } catch (error) {
+      console.error('Error deleting document:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete document",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleting(null);
+    }
+  };
+
   const stripHtml = (html: string) => {
     const tmp = document.createElement('div');
     tmp.innerHTML = html;
@@ -832,28 +870,46 @@ const Dashboard = () => {
                         </div>
                       </div>
                       <div className="flex flex-col items-end space-y-1">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={e => {
-                            e.stopPropagation();
-                            // Transform to match ClassificationModal expectations
-                            const classificationData = {
-                              id: activity.id,
-                              type: activity.type,
-                              title: activity.title || 'Untitled',
-                              summary: activity.summary,
-                              source: activity.source || 'unknown',
-                              sender: activity.sender,
-                              created_at: activity.created_at,
-                              project_id: activity.project_id
-                            };
-                            setClassificationActivity(classificationData);
-                          }}
-                          className="text-xs font-mono"
-                        >
-                          Classify
-                        </Button>
+                        <div className="flex space-x-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={e => {
+                              e.stopPropagation();
+                              // Transform to match ClassificationModal expectations
+                              const classificationData = {
+                                id: activity.id,
+                                type: activity.type,
+                                title: activity.title || 'Untitled',
+                                summary: activity.summary,
+                                source: activity.source || 'unknown',
+                                sender: activity.sender,
+                                created_at: activity.created_at,
+                                project_id: activity.project_id
+                              };
+                              setClassificationActivity(classificationData);
+                            }}
+                            className="text-xs font-mono"
+                          >
+                            Classify
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={e => {
+                              e.stopPropagation();
+                              deleteDocument(activity.id);
+                            }}
+                            disabled={deleting === activity.id}
+                            className="text-xs font-mono text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-950"
+                          >
+                            {deleting === activity.id ? (
+                              <div className="w-3 h-3 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <Trash2Icon className="w-3 h-3" />
+                            )}
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   ))}
