@@ -208,18 +208,23 @@ class AttendeeService:
                 user_id=user_id,
                 meeting_url=options['meeting_url'],
                 bot_name=options['bot_name'],
-                status='created',
+                status='scheduled',  # Start as scheduled, not created
                 attendee_project_id=result.get('project_id'),
                 deployment_method=deployment_method,
                 metadata=bot_data.get('metadata', {})
             )
+            
+            # Get initial bot state from Attendee.dev API
+            from .bot_state_service import BotStateService
+            bot_state_service = BotStateService()
+            await bot_state_service.update_bot_initial_state(result['id'])
             
             logger.info(f"Bot created successfully for user {user_id}, bot ID: {result['id']}, deployment: {deployment_method}")
             return {
                 "success": True,
                 "bot_id": result['id'],
                 "project_id": result.get('project_id'),
-                "status": "created",
+                "status": "scheduled",
                 "deployment_method": deployment_method,
                 "webhooks_configured": True
             }

@@ -5,7 +5,7 @@ Optimized for maximum efficiency and reliability.
 
 from fastapi import APIRouter
 
-from . import documents, projects, emails, drive, calendar, classification, attendee, ai, embeddings, meeting_intelligence, microservices, enterprise, webhooks, auth, user, drive_subscription, ai_orchestration, performance_monitoring, sync, gmail_watches, oauth, gmail, admin, rag_agent, bot_sync, meeting_classification
+from . import documents, projects, emails, drive, calendar, classification, attendee, ai, embeddings, meeting_intelligence, microservices, enterprise, webhooks, auth, user, drive_subscription, ai_orchestration, performance_monitoring, sync, gmail_watches, oauth, gmail, admin, rag_agent, bot_sync, meeting_classification, webhook_processor
 
 # Create the main router
 router = APIRouter()
@@ -36,6 +36,9 @@ router.include_router(admin.router, prefix="/admin", tags=["admin"])
 
 # Meeting Classification Router
 router.include_router(meeting_classification.router, prefix="/meeting-classification", tags=["meeting-classification"])
+
+# Webhook Processor Router
+router.include_router(webhook_processor.router, prefix="/webhook-processor", tags=["webhook-processor"])
 
 # Enterprise Routers - Phase 4
 router.include_router(enterprise.router, prefix="/enterprise", tags=["enterprise"])
