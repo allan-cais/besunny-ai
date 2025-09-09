@@ -135,15 +135,12 @@ const Dashboard = () => {
 
     try {
       setMeetingsLoading(true);
-      console.log('Loading current week meetings...');
       // First sync bot status to ensure meetings table has latest bot info
       await calendarService.syncBotStatus(session);
       // Then get meetings (original function that was working)
       const meetings = await calendarService.getCurrentWeekMeetings(session);
-      console.log('Setting currentWeekMeetings to:', meetings.length, meetings);
       setCurrentWeekMeetings(meetings);
     } catch (err: unknown) {
-      console.error('Error loading meetings:', err);
       setCurrentWeekMeetings([]);
     } finally {
       setMeetingsLoading(false);
@@ -235,8 +232,6 @@ const Dashboard = () => {
         try {
           await calendarService.initializeCalendarSync(user.id);
         } catch (error) {
-          // Log calendar sync errors for debugging
-          console.error('Calendar sync setup failed:', error);
           // Optionally show a toast notification
           if (error instanceof Error) {
             toast({
@@ -248,8 +243,7 @@ const Dashboard = () => {
         }
       }
     } catch (error) {
-      // Log credential check errors
-      console.error('Failed to check Google credentials:', error);
+      // Credential check failed
     }
   }, [user?.id, session, toast]);
 
@@ -262,18 +256,14 @@ const Dashboard = () => {
           const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
           
           if (sessionError || !currentSession) {
-            console.error('Session validation failed in main effect:', sessionError);
             // Try to refresh the session
             const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
             
             if (refreshError || !refreshData.session) {
-              console.error('Session refresh failed:', refreshError);
               // Session refresh failed, redirect to login
               window.location.href = '/auth';
               return;
             }
-            
-            console.log('Session refreshed successfully');
           }
           
           // Load projects
@@ -289,7 +279,6 @@ const Dashboard = () => {
           // Record activity
           await recordActivity('calendar_view');
         } catch (error) {
-          console.error('Error in validateAndLoadData:', error);
           // If there's an error, redirect to login
           window.location.href = '/auth';
         }
@@ -308,10 +297,6 @@ const Dashboard = () => {
     }
   }, [location.search]);
 
-  // Debug currentWeekMeetings changes
-  useEffect(() => {
-    console.log('currentWeekMeetings changed:', currentWeekMeetings.length, currentWeekMeetings);
-  }, [currentWeekMeetings]);
 
   // Helper functions
   const getDocumentType = (source: string, document: Document): VirtualEmailActivity['type'] => {
@@ -728,7 +713,6 @@ const Dashboard = () => {
                       key={activity.id} 
                       className="flex items-start space-x-3 p-3 rounded-md border border-stone-200 dark:border-zinc-700 hover:bg-stone-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
                       onClick={() => {
-                        console.log('Unclassified item clicked:', activity);
                         if (activity.type === 'meeting_transcript') {
                           // Transform RawTranscript to Meeting format for TranscriptModal
                           const transcriptData = {

@@ -362,7 +362,7 @@ export const calendarService = {
   },
 
   // Get current and upcoming meetings (for UI display)
-    async getCurrentWeekMeetings(session?: AuthSession): Promise<MeetingType[]> {
+  async getCurrentWeekMeetings(session?: AuthSession): Promise<MeetingType[]> {
     try {
       // Use provided session or get from auth
       const currentSession = session || (await supabase.auth.getSession()).data.session;
@@ -377,7 +377,18 @@ export const calendarService = {
       
       const { data: meetings, error } = await supabase
         .from('meetings')
-        .select('*')
+        .select(`
+          *,
+          meeting_bots!attendee_bot_id(
+            bot_id,
+            status,
+            bot_name,
+            deployment_method,
+            metadata,
+            created_at,
+            updated_at
+          )
+        `)
         .eq('user_id', currentSession.user.id)
         .is('project_id', null) // Only unassigned meetings
         .gte('start_time', now.toISOString()) // From current time onwards (including in-progress meetings)
@@ -385,35 +396,9 @@ export const calendarService = {
         .order('start_time', { ascending: true });
       
       if (error) {
-        console.error('Error fetching meetings from Supabase:', error);
         throw error;
       }
       
-      console.log('Found meetings from Supabase:', meetings?.length || 0, meetings);
-      
-      // If we have meetings, try to get bot status for them
-      if (meetings && meetings.length > 0) {
-        try {
-          console.log('Attempting to get bot status for meetings...');
-          // Get meetings with bot status from the backend
-          const meetingsWithBotStatus = await this.getMeetingsWithBotStatus(currentSession, true, true);
-          console.log('Meetings with bot status:', meetingsWithBotStatus?.length || 0, meetingsWithBotStatus);
-          
-          // If backend returns meetings, use them; otherwise fall back to original meetings
-          if (meetingsWithBotStatus && meetingsWithBotStatus.length > 0) {
-            return meetingsWithBotStatus;
-          } else {
-            console.warn('Backend returned 0 meetings, falling back to original Supabase meetings');
-            return meetings || [];
-          }
-        } catch (botError) {
-          console.warn('Failed to get bot status, returning meetings without bot info:', botError);
-          // Fall back to original meetings if bot sync fails
-          return meetings || [];
-        }
-      }
-      
-      console.log('No meetings found, returning empty array');
       return meetings || [];
     } catch (error) {
       throw error;
@@ -2071,33 +2056,6 @@ export const calendarService = {
     }
   },
 
-  // Get meetings with bot status
-  async getMeetingsWithBotStatus(session?: AuthSession, unassigned_only: boolean = true, future_only: boolean = true): Promise<Meeting[]> {
-    try {
-      const params = new URLSearchParams({
-        unassigned_only: unassigned_only.toString(),
-        future_only: future_only.toString()
-      });
-      
-      const response = await fetch(`${import.meta.env.VITE_PYTHON_BACKEND_URL}/api/v1/bot-sync/meetings-with-bot-status?${params}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      return data.meetings || [];
-    } catch (error) {
-      console.error('Error fetching meetings with bot status:', error);
-      return [];
-    }
-  },
 
   // Sync bot status
   async syncBotStatus(session?: AuthSession): Promise<{ success: boolean; message: string }> {
