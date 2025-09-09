@@ -72,18 +72,29 @@ class EmailProcessingService:
             # Step 4: Store in documents table with appropriate source
             document_id = await self._store_email_document(email_data, username, content_type)
             
-            # Step 5: Handle special content types
+            # Step 5: Handle special content types BEFORE classification
             if content_type['type'] == 'drive_file':
                 logger.info("Handling drive file sharing")
                 await self._handle_drive_file_sharing(email_data, username, document_id)
             elif content_type['type'] == 'calendar_invitation':
                 logger.info("Handling calendar invitation")
-                await self._handle_calendar_invitation(email_data, username, document_id)
+                try:
+                    await self._handle_calendar_invitation(email_data, username, document_id)
+                    logger.info("Calendar invitation handling completed successfully")
+                except Exception as e:
+                    logger.error(f"Calendar invitation handling failed, but continuing with email processing: {e}")
             else:
                 logger.info(f"No special content handling for type: {content_type['type']}")
             
-            # Step 6: AI Classification to user projects
-            classification_result = await self._classify_email_to_projects(email_data, username, document_id)
+            # Step 6: AI Classification to user projects (after special content handling)
+            # Make classification non-blocking for calendar invitations
+            classification_result = None
+            try:
+                classification_result = await self._classify_email_to_projects(email_data, username, document_id)
+                logger.info("Classification completed successfully")
+            except Exception as e:
+                logger.error(f"Classification failed, but continuing with email processing: {e}")
+                classification_result = {'error': str(e)}
             
             # Step 7: Update processing log with completion
             await self._update_processing_log_complete(log_entry['id'], document_id, classification_result)
@@ -429,11 +440,14 @@ class EmailProcessingService:
                 logger.info(f"Found user ID: {user_id}")
                 
                 # Set up attendee bot and initiate full workflow
-                await self._initiate_calendar_bot_workflow(
-                    calendar_info, username, user_id, document_id, meet_url
-                )
-                
-                logger.info(f"Calendar invitation workflow initiated for {username}")
+                try:
+                    await self._initiate_calendar_bot_workflow(
+                        calendar_info, username, user_id, document_id, meet_url
+                    )
+                    logger.info(f"Calendar invitation workflow initiated successfully for {username}")
+                except Exception as bot_error:
+                    logger.error(f"Bot workflow failed for {username}, but calendar invitation was detected: {bot_error}")
+                    # Don't re-raise the error - we want email processing to continue
             else:
                 logger.warning("No Google Meet URL found in calendar invitation")
                     
@@ -441,6 +455,7 @@ class EmailProcessingService:
             logger.error(f"Error handling calendar invitation: {e}")
             import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")
+            # Don't re-raise the error - we want email processing to continue
     
     async def _setup_attendee_bot(self, calendar_info: Dict[str, Any], username: str, document_id: str) -> Optional[str]:
         """Set up an attendee bot for a calendar invitation using existing tables."""
