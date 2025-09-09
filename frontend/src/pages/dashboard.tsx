@@ -164,7 +164,26 @@ const Dashboard = () => {
         .order('created_at', { ascending: false })
         .limit(50);
 
-      if (documentsError) {
+      // Load meetings that need manual classification
+      const { data: unclassifiedMeetings, error: meetingsError } = await supabase
+        .from('meeting_bots')
+        .select(`
+          *,
+          meetings!attendee_bot_id(
+            id,
+            title,
+            start_time,
+            end_time,
+            meeting_url
+          )
+        `)
+        .eq('user_id', user.id)
+        .eq('needs_manual_classification', true)
+        .is('project_id', null)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (documentsError || meetingsError) {
         setUnclassifiedData([]);
       } else {
         // Transform documents to match our interface
@@ -192,8 +211,41 @@ const Dashboard = () => {
             final_transcript_ready: true
           } : undefined
         }));
+
+        // Transform meetings to match our interface
+        const meetingActivities: VirtualEmailActivity[] = (unclassifiedMeetings || []).map(meetingBot => {
+          const meeting = meetingBot.meetings;
+          return {
+            id: meetingBot.id,
+            type: 'meeting_transcript' as const,
+            title: meeting?.title || 'Meeting Transcript',
+            summary: meetingBot.transcript ? meetingBot.transcript.substring(0, 150) + '...' : 'No transcript available',
+            source: 'meeting_bot',
+            sender: meetingBot.bot_name || 'Meeting Bot',
+            file_size: meetingBot.transcript ? meetingBot.transcript.length : 0,
+            created_at: meetingBot.created_at,
+            processed: true,
+            project_id: meetingBot.project_id,
+            transcript_duration_seconds: 0, // Could be calculated from meeting times
+            transcript_metadata: meetingBot.metadata || {},
+            rawTranscript: {
+              id: meetingBot.id,
+              title: meeting?.title || 'Meeting Transcript',
+              transcript: meetingBot.transcript || '',
+              transcript_summary: meetingBot.transcript ? meetingBot.transcript.substring(0, 500) + '...' : '',
+              transcript_metadata: meetingBot.metadata || {},
+              transcript_duration_seconds: 0,
+              transcript_retrieved_at: meetingBot.updated_at,
+              final_transcript_ready: true,
+              bot_id: meetingBot.bot_id,
+              meeting_url: meeting?.meeting_url
+            }
+          };
+        });
         
-        setUnclassifiedData(documentActivities);
+        // Combine documents and meetings
+        const allActivities = [...documentActivities, ...meetingActivities];
+        setUnclassifiedData(allActivities);
       }
     } catch (error) {
       setUnclassifiedData([]);
