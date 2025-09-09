@@ -90,6 +90,7 @@ async def lifespan(app: FastAPI):
         # Start webhook processor service
         logger.info("Starting webhook processor service...")
         try:
+            # Import here to avoid circular imports during module loading
             from app.services.attendee.webhook_processor_service import webhook_processor_service
             webhook_task = asyncio.create_task(webhook_processor_service.start())
             app.state.webhook_processor_task = webhook_task
@@ -117,6 +118,7 @@ async def lifespan(app: FastAPI):
         
         # Stop webhook processor service
         try:
+            # Import here to avoid circular imports during module loading
             from app.services.attendee.webhook_processor_service import webhook_processor_service
             await webhook_processor_service.stop()
             if hasattr(app.state, 'webhook_processor_task'):

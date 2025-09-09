@@ -8,8 +8,6 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 import logging
 
 from ...core.security import get_current_user
-from ...services.attendee.webhook_processor_service import webhook_processor_service
-from ...services.attendee.bot_state_service import BotStateService
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +20,8 @@ async def start_webhook_processor(
 ) -> Dict[str, Any]:
     """Start the webhook processor service."""
     try:
+        from ...services.attendee.webhook_processor_service import webhook_processor_service
+        
         if webhook_processor_service.is_running:
             return {
                 "success": False,
@@ -46,6 +46,8 @@ async def stop_webhook_processor(
 ) -> Dict[str, Any]:
     """Stop the webhook processor service."""
     try:
+        from ...services.attendee.webhook_processor_service import webhook_processor_service
+        
         await webhook_processor_service.stop()
         
         return {
@@ -63,6 +65,8 @@ async def get_webhook_processor_status(
 ) -> Dict[str, Any]:
     """Get webhook processor service status."""
     try:
+        from ...services.attendee.webhook_processor_service import webhook_processor_service
+        
         status = await webhook_processor_service.get_service_status()
         return {
             "success": True,
@@ -79,6 +83,8 @@ async def process_webhook_logs_once(
 ) -> Dict[str, Any]:
     """Process webhook logs once (manual trigger)."""
     try:
+        from ...services.attendee.webhook_processor_service import webhook_processor_service
+        
         processed_count = await webhook_processor_service.process_webhook_logs_once()
         
         return {
@@ -97,6 +103,8 @@ async def get_webhook_logs_summary(
 ) -> Dict[str, Any]:
     """Get webhook logs summary."""
     try:
+        from ...services.attendee.webhook_processor_service import webhook_processor_service
+        
         summary = await webhook_processor_service.get_webhook_logs_summary()
         return {
             "success": True,
@@ -113,6 +121,8 @@ async def get_bot_status_summary(
 ) -> Dict[str, Any]:
     """Get bot status summary for the current user."""
     try:
+        from ...services.attendee.bot_state_service import BotStateService
+        
         bot_state_service = BotStateService()
         status_summary = await bot_state_service.get_bot_status_summary(current_user['id'])
         

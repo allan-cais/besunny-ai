@@ -234,6 +234,7 @@ class BotStateService:
     async def _trigger_transcript_processing(self, bot_id: str):
         """Trigger transcript processing when bot ends."""
         try:
+            # Import here to avoid circular imports
             from .transcript_service import TranscriptService
             transcript_service = TranscriptService()
             
