@@ -223,6 +223,50 @@ class VectorEmbeddingService:
                 'chunks_created': 0
             }
     
+    async def delete_document_vectors(self, document_id: str, user_id: str) -> bool:
+        """
+        Delete all vectors associated with a document from Pinecone.
+        
+        Args:
+            document_id: The document ID to delete vectors for
+            user_id: The user ID for security
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            logger.info(f"Deleting vectors for document {document_id}")
+            
+            # Query Pinecone to find all vectors with this document_id
+            query_response = self.index.query(
+                vector=[0] * 1536,  # Dummy vector for querying by metadata
+                top_k=10000,  # Large number to get all matches
+                include_metadata=True,
+                filter={
+                    "document_id": document_id,
+                    "user_id": user_id
+                }
+            )
+            
+            if not query_response.matches:
+                logger.info(f"No vectors found for document {document_id}")
+                return True
+            
+            # Extract vector IDs to delete
+            vector_ids = [match.id for match in query_response.matches]
+            logger.info(f"Found {len(vector_ids)} vectors to delete for document {document_id}")
+            
+            # Delete vectors from Pinecone
+            if vector_ids:
+                self.index.delete(ids=vector_ids)
+                logger.info(f"Successfully deleted {len(vector_ids)} vectors for document {document_id}")
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error deleting document vectors: {e}")
+            return False
+    
     def _create_content_chunks(self, content: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Create optimized text chunks from content for embedding."""
         try:
