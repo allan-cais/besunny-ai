@@ -219,15 +219,269 @@ class AttendeeWebhookHandler:
         try:
             logger.info(f"Meeting completed for bot {bot_id}")
             
-            # Update meeting status
-            await self._update_meeting_status(bot_id, 'completed', user_id)
-            
-            # Fetch final transcript from Attendee API
-            # This would be done by the main service, not here
-            # We just mark it as ready for processing
+            # Check if this is a calendar invitation bot
+            meeting = await self._get_meeting_by_bot_id(bot_id)
+            if meeting and meeting.get('bot_configuration', {}).get('setup_method') == 'calendar_invitation_email':
+                # Handle calendar bot ended
+                await self._handle_calendar_bot_ended(bot_id, user_id, meeting)
+            else:
+                # Regular meeting completion
+                await self._update_meeting_status(bot_id, 'completed', user_id)
             
         except Exception as e:
             logger.error(f"Failed to handle meeting completion: {e}")
+    
+    async def _handle_calendar_bot_ended(self, bot_id: str, user_id: str, meeting: Dict[str, Any]):
+        """Handle calendar bot ended webhook - process transcript through full pipeline."""
+        try:
+            logger.info(f"Handling calendar bot ended for bot {bot_id}")
+            
+            # Get the username from bot configuration
+            bot_config = meeting.get('bot_configuration', {})
+            username = bot_config.get('username')
+            if not username:
+                logger.error(f"No username found in bot configuration for bot {bot_id}")
+                return
+            
+            # Get transcript
+            transcript_data = await self.attendee_service.get_transcript(bot_id)
+            
+            if not transcript_data:
+                logger.warning(f"No transcript available for calendar bot {bot_id}")
+                return
+            
+            # Process through full calendar bot workflow
+            await self._process_calendar_bot_transcript(
+                bot_id, meeting['id'], user_id, username, transcript_data
+            )
+            
+            # Log that this was processed via calendar invitation
+            logger.info(f"Calendar bot transcript processed for meeting {meeting['id']} (existing meeting: {meeting.get('auto_scheduled_via_email', False)})")
+            
+        except Exception as e:
+            logger.error(f"Failed to handle calendar bot ended: {e}")
+    
+    async def _get_meeting_by_bot_id(self, bot_id: str) -> Optional[Dict[str, Any]]:
+        """Get meeting record by bot ID."""
+        try:
+            result = await self.supabase.table('meetings').select('*').eq('attendee_bot_id', bot_id).single().execute()
+            return result.data if result.data else None
+        except Exception as e:
+            logger.error(f"Failed to get meeting by bot ID {bot_id}: {e}")
+            return None
+    
+    async def _process_calendar_bot_transcript(
+        self, 
+        bot_id: str, 
+        meeting_id: str, 
+        user_id: str, 
+        username: str, 
+        transcript_data: Dict[str, Any]
+    ):
+        """Process calendar bot transcript through full pipeline."""
+        try:
+            logger.info(f"Processing calendar bot transcript for bot {bot_id}, meeting {meeting_id}")
+            
+            # Step 1: Store transcript in documents table
+            transcript_document_id = await self._store_transcript_document(
+                transcript_data, bot_id, meeting_id, user_id, username
+            )
+            
+            if not transcript_document_id:
+                logger.error(f"Failed to store transcript document for bot {bot_id}")
+                return
+            
+            # Step 2: Send through classification agent
+            classification_result = await self._classify_transcript(
+                transcript_data, transcript_document_id, user_id, username
+            )
+            
+            # Step 3: Send through vector embedding pipeline
+            embedding_result = await self._embed_transcript(
+                transcript_data, classification_result, transcript_document_id, user_id
+            )
+            
+            # Step 4: Update meeting record with transcript information
+            await self._update_meeting_with_transcript(
+                meeting_id, transcript_data, transcript_document_id, classification_result
+            )
+            
+            logger.info(f"Calendar bot transcript processing completed for bot {bot_id}")
+            
+        except Exception as e:
+            logger.error(f"Failed to process calendar bot transcript: {e}")
+    
+    async def _store_transcript_document(
+        self, 
+        transcript_data: Dict[str, Any], 
+        bot_id: str, 
+        meeting_id: str, 
+        user_id: str, 
+        username: str
+    ) -> Optional[str]:
+        """Store transcript in documents table."""
+        try:
+            # Extract transcript text
+            transcript_text = transcript_data.get('transcript', '')
+            if not transcript_text:
+                logger.warning(f"No transcript text found for bot {bot_id}")
+                return None
+            
+            # Create document record
+            document_data = {
+                'title': f'Meeting Transcript - {username}',
+                'summary': transcript_text[:500] + "..." if len(transcript_text) > 500 else transcript_text,
+                'author': f'Bot {bot_id}',
+                'received_at': datetime.now().isoformat(),
+                'source': 'attendee_bot',
+                'source_id': bot_id,
+                'type': 'transcript',
+                'status': 'processed',
+                'created_at': datetime.now().isoformat(),
+                'created_by': username,
+                'project_id': None,  # Will be assigned by classification
+                'knowledge_space_id': None,
+                'metadata': {
+                    'bot_id': bot_id,
+                    'meeting_id': meeting_id,
+                    'transcript_duration': transcript_data.get('duration_minutes', 0),
+                    'participants': transcript_data.get('participants', []),
+                    'processed_at': datetime.now().isoformat()
+                }
+            }
+            
+            result = await self.supabase.table('documents').insert(document_data).execute()
+            
+            if result.data:
+                document_id = result.data[0]['id']
+                logger.info(f"Transcript document stored: {document_id}")
+                return document_id
+            else:
+                logger.error("No document ID returned from transcript insert")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error storing transcript document: {e}")
+            return None
+    
+    async def _classify_transcript(
+        self, 
+        transcript_data: Dict[str, Any], 
+        document_id: str, 
+        user_id: str, 
+        username: str
+    ) -> Dict[str, Any]:
+        """Send transcript through classification agent."""
+        try:
+            from ...services.ai.classification_service import ClassificationService
+            
+            classification_service = ClassificationService()
+            
+            # Prepare content for classification
+            content = {
+                'type': 'transcript',
+                'source_id': document_id,
+                'author': f'Bot for {username}',
+                'date': datetime.now().isoformat(),
+                'subject': f'Meeting Transcript - {username}',
+                'content_text': transcript_data.get('transcript', ''),
+                'metadata': {
+                    'bot_id': transcript_data.get('bot_id'),
+                    'meeting_id': transcript_data.get('meeting_id'),
+                    'duration_minutes': transcript_data.get('duration_minutes', 0),
+                    'participants': transcript_data.get('participants', [])
+                }
+            }
+            
+            # Classify the transcript
+            classification_result = await classification_service.classify_content(
+                content=content,
+                user_id=user_id
+            )
+            
+            logger.info(f"Transcript classified for {username}: {classification_result.get('project_id', 'unclassified')}")
+            return classification_result
+            
+        except Exception as e:
+            logger.error(f"Error classifying transcript: {e}")
+            return {
+                'project_id': '',
+                'confidence': 0.0,
+                'unclassified': True,
+                'error': str(e)
+            }
+    
+    async def _embed_transcript(
+        self, 
+        transcript_data: Dict[str, Any], 
+        classification_result: Dict[str, Any], 
+        document_id: str, 
+        user_id: str
+    ) -> Dict[str, Any]:
+        """Send transcript through vector embedding pipeline."""
+        try:
+            from ...services.ai.vector_embedding_service import VectorEmbeddingService
+            
+            vector_service = VectorEmbeddingService()
+            
+            # Prepare content for embedding
+            content = {
+                'type': 'transcript',
+                'source_id': document_id,
+                'author': f'Bot for {transcript_data.get("username", "unknown")}',
+                'date': datetime.now().isoformat(),
+                'subject': f'Meeting Transcript',
+                'content_text': transcript_data.get('transcript', ''),
+                'metadata': {
+                    'bot_id': transcript_data.get('bot_id'),
+                    'meeting_id': transcript_data.get('meeting_id'),
+                    'duration_minutes': transcript_data.get('duration_minutes', 0),
+                    'participants': transcript_data.get('participants', [])
+                }
+            }
+            
+            # Embed the content
+            embedding_result = await vector_service.embed_classified_content(
+                content=content,
+                classification_result=classification_result,
+                user_id=user_id
+            )
+            
+            logger.info(f"Transcript embedded: {embedding_result.get('embedded', False)}")
+            return embedding_result
+            
+        except Exception as e:
+            logger.error(f"Error embedding transcript: {e}")
+            return {
+                'embedded': False,
+                'error': str(e)
+            }
+    
+    async def _update_meeting_with_transcript(
+        self, 
+        meeting_id: str, 
+        transcript_data: Dict[str, Any], 
+        document_id: str, 
+        classification_result: Dict[str, Any]
+    ):
+        """Update meeting record with transcript information."""
+        try:
+            update_data = {
+                'transcript': transcript_data.get('transcript', ''),
+                'transcript_url': transcript_data.get('transcript_url'),
+                'transcript_retrieved_at': datetime.now().isoformat(),
+                'transcript_duration_seconds': transcript_data.get('duration_minutes', 0) * 60,
+                'transcript_participants': transcript_data.get('participants', []),
+                'transcript_processing_status': 'completed',
+                'project_id': classification_result.get('project_id') if not classification_result.get('unclassified') else None,
+                'updated_at': datetime.now().isoformat()
+            }
+            
+            await self.supabase.table('meetings').update(update_data).eq('id', meeting_id).execute()
+            logger.info(f"Meeting {meeting_id} updated with transcript information")
+            
+        except Exception as e:
+            logger.error(f"Error updating meeting with transcript: {e}")
     
     # Private helper methods
     

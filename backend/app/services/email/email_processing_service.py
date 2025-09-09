@@ -385,17 +385,27 @@ class EmailProcessingService:
         username: str, 
         document_id: str
     ):
-        """Handle calendar invitation by setting up attendee bot."""
+        """Handle calendar invitation by setting up attendee bot and initiating full workflow."""
         try:
             calendar_info = await self._detect_calendar_invitation(email_data)
-            if calendar_info:
-                # Set up attendee bot
-                meeting_id = await self._setup_attendee_bot(calendar_info, username, document_id)
+            if calendar_info and calendar_info.get('meet_urls'):
+                # Get the first Google Meet URL
+                meet_url = calendar_info['meet_urls'][0]
                 
-                if meeting_id:
-                    logger.info(f"Attendee bot set up for meeting: {meeting_id}")
-                else:
-                    logger.warning("Failed to set up attendee bot")
+                # Get user ID for the username
+                user_id = await self._get_user_id_by_username(username)
+                if not user_id:
+                    logger.error(f"User not found for username: {username}")
+                    return
+                
+                # Set up attendee bot and initiate full workflow
+                await self._initiate_calendar_bot_workflow(
+                    calendar_info, username, user_id, document_id, meet_url
+                )
+                
+                logger.info(f"Calendar invitation workflow initiated for {username}")
+            else:
+                logger.warning("No Google Meet URL found in calendar invitation")
                     
         except Exception as e:
             logger.error(f"Error handling calendar invitation: {e}")
@@ -650,3 +660,286 @@ class EmailProcessingService:
                 
         except Exception as e:
             logger.error(f"Error updating processing log: {e}")
+    
+    async def _get_user_id_by_username(self, username: str) -> Optional[str]:
+        """Get user ID by username."""
+        try:
+            result = self.supabase.table('users').select('id').eq('username', username).single().execute()
+            return result.data['id'] if result.data else None
+        except Exception as e:
+            logger.error(f"Error getting user ID for username {username}: {e}")
+            return None
+    
+    async def _initiate_calendar_bot_workflow(
+        self, 
+        calendar_info: Dict[str, Any], 
+        username: str, 
+        user_id: str, 
+        document_id: str, 
+        meet_url: str
+    ):
+        """Initiate the complete calendar bot workflow: schedule bot, poll status, get transcript, classify, and embed."""
+        try:
+            logger.info(f"Starting calendar bot workflow for {username} with meet URL: {meet_url}")
+            
+            # Step 1: Schedule the attendee bot
+            bot_result = await self._schedule_calendar_bot(meet_url, username, user_id, calendar_info)
+            if not bot_result.get('success'):
+                logger.error(f"Failed to schedule bot for {username}: {bot_result.get('error')}")
+                return
+            
+            bot_id = bot_result.get('bot_id')
+            meeting_id = bot_result.get('meeting_id')
+            
+            # Step 2: Bot will be processed via webhook when it ends
+            # No need for background monitoring - webhook will handle transcript processing
+            
+            logger.info(f"Calendar bot workflow started for {username}, bot_id: {bot_id}")
+            
+        except Exception as e:
+            logger.error(f"Error initiating calendar bot workflow: {e}")
+    
+    async def _schedule_calendar_bot(
+        self, 
+        meet_url: str, 
+        username: str, 
+        user_id: str, 
+        calendar_info: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Schedule an attendee bot for a calendar invitation."""
+        try:
+            from ..attendee.attendee_service import AttendeeService
+            
+            attendee_service = AttendeeService()
+            
+            # Check for existing meeting with same Google Meet URL
+            existing_meeting = await self._find_existing_meeting_by_url(meet_url, user_id)
+            
+            if existing_meeting:
+                logger.info(f"Found existing meeting {existing_meeting['id']} for URL {meet_url}")
+                
+                # Check if meeting already has a bot
+                if existing_meeting.get('attendee_bot_id'):
+                    logger.info(f"Meeting {existing_meeting['id']} already has bot {existing_meeting['attendee_bot_id']}")
+                    return {
+                        'success': True,
+                        'bot_id': existing_meeting['attendee_bot_id'],
+                        'meeting_id': existing_meeting['id'],
+                        'existing_meeting': True
+                    }
+                
+                # Schedule bot for existing meeting
+                bot_result = await self._schedule_bot_for_existing_meeting(
+                    meet_url, username, user_id, existing_meeting, attendee_service
+                )
+                
+                if bot_result.get('success'):
+                    return {
+                        'success': True,
+                        'bot_id': bot_result.get('bot_id'),
+                        'meeting_id': existing_meeting['id'],
+                        'existing_meeting': True
+                    }
+                else:
+                    return {
+                        'success': False,
+                        'error': bot_result.get('error', 'Failed to schedule bot for existing meeting')
+                    }
+            
+            # No existing meeting found, create new meeting and schedule bot
+            logger.info(f"No existing meeting found for URL {meet_url}, creating new meeting")
+            
+            # Prepare bot options
+            bot_options = {
+                'meeting_url': meet_url,
+                'bot_name': f'Sunny AI Notetaker ({username})',
+                'bot_chat_message': {
+                    'message': f'Hi, I\'m here to transcribe this meeting for {username}!',
+                    'to': 'everyone'
+                }
+            }
+            
+            # Create the bot
+            bot_result = await attendee_service.create_bot_for_meeting(bot_options, user_id)
+            
+            if bot_result.get('success'):
+                # Store meeting record
+                meeting_id = await self._store_calendar_meeting(
+                    meet_url, username, user_id, bot_result, calendar_info
+                )
+                
+                return {
+                    'success': True,
+                    'bot_id': bot_result.get('bot_id'),
+                    'meeting_id': meeting_id,
+                    'existing_meeting': False
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': bot_result.get('error', 'Failed to create bot')
+                }
+                
+        except Exception as e:
+            logger.error(f"Error scheduling calendar bot: {e}")
+            return {'success': False, 'error': str(e)}
+    
+    async def _store_calendar_meeting(
+        self, 
+        meet_url: str, 
+        username: str, 
+        user_id: str, 
+        bot_result: Dict[str, Any], 
+        calendar_info: Dict[str, Any]
+    ) -> str:
+        """Store calendar meeting record in meetings table."""
+        try:
+            meeting_data = {
+                'user_id': user_id,
+                'project_id': None,  # Will be assigned by classification
+                'google_calendar_event_id': None,
+                'title': calendar_info.get('event_title', 'Calendar Invitation'),
+                'description': f"Calendar invitation for {username}",
+                'meeting_url': meet_url,
+                'start_time': None,  # Could be parsed from calendar_info
+                'end_time': None,
+                'attendee_bot_id': bot_result.get('bot_id'),
+                'bot_name': bot_result.get('bot_name', f'Sunny AI Notetaker ({username})'),
+                'bot_chat_message': bot_result.get('bot_chat_message', ''),
+                'transcript': None,
+                'transcript_url': None,
+                'created_at': datetime.now().isoformat(),
+                'updated_at': datetime.now().isoformat(),
+                'event_status': 'confirmed',
+                'bot_status': 'scheduled',
+                'transcript_retrieved_at': None,
+                'transcript_summary': None,
+                'transcript_duration_seconds': None,
+                'next_poll_time': None,
+                'bot_configuration': {
+                    'username': username,
+                    'event_title': calendar_info.get('event_title'),
+                    'meet_urls': calendar_info.get('meet_urls', []),
+                    'meeting_time': calendar_info.get('meeting_time', {}),
+                    'organizer': calendar_info.get('organizer'),
+                    'setup_method': 'calendar_invitation_email'
+                },
+                'last_polled_at': None,
+                'transcript_metadata': None,
+                'bot_deployment_message': f"Bot scheduled via email invitation for {username}",
+                'auto_scheduled_via_calendar': False,
+                'virtual_email_attendee': f'ai+{username}@besunny.ai',
+                'auto_bot_notification': True,
+                'transcript_participants': None,
+                'transcript_speakers': None,
+                'transcript_segments': None,
+                'transcript_audio_url': None,
+                'transcript_recording_url': None,
+                'transcript_language': None,
+                'transcript_processing_status': 'pending',
+                'transcript_quality_score': None,
+                'transcript_confidence_score': None
+            }
+            
+            result = self.supabase.table('meetings').insert(meeting_data).execute()
+            
+            if result.data:
+                meeting_id = result.data[0]['id']
+                logger.info(f"Calendar meeting stored: {meeting_id}")
+                return meeting_id
+            else:
+                raise Exception("No meeting ID returned from database insert")
+                
+        except Exception as e:
+            logger.error(f"Error storing calendar meeting: {e}")
+            raise
+    
+    async def _find_existing_meeting_by_url(self, meet_url: str, user_id: str) -> Optional[Dict[str, Any]]:
+        """Find existing meeting by Google Meet URL and user ID."""
+        try:
+            result = self.supabase.table('meetings').select('*').eq('meeting_url', meet_url).eq('user_id', user_id).single().execute()
+            return result.data if result.data else None
+        except Exception as e:
+            # No meeting found is not an error, just return None
+            if "No rows found" in str(e) or "PGRST116" in str(e):
+                return None
+            logger.error(f"Error finding existing meeting by URL: {e}")
+            return None
+    
+    async def _schedule_bot_for_existing_meeting(
+        self, 
+        meet_url: str, 
+        username: str, 
+        user_id: str, 
+        existing_meeting: Dict[str, Any], 
+        attendee_service
+    ) -> Dict[str, Any]:
+        """Schedule a bot for an existing meeting."""
+        try:
+            logger.info(f"Scheduling bot for existing meeting {existing_meeting['id']}")
+            
+            # Prepare bot options
+            bot_options = {
+                'meeting_url': meet_url,
+                'bot_name': f'Sunny AI Notetaker ({username})',
+                'bot_chat_message': {
+                    'message': f'Hi, I\'m here to transcribe this meeting for {username}!',
+                    'to': 'everyone'
+                }
+            }
+            
+            # Create the bot
+            bot_result = await attendee_service.create_bot_for_meeting(bot_options, user_id)
+            
+            if bot_result.get('success'):
+                # Update existing meeting with bot information
+                await self._update_existing_meeting_with_bot(
+                    existing_meeting['id'], bot_result, username
+                )
+                
+                return {
+                    'success': True,
+                    'bot_id': bot_result.get('bot_id')
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': bot_result.get('error', 'Failed to create bot')
+                }
+                
+        except Exception as e:
+            logger.error(f"Error scheduling bot for existing meeting: {e}")
+            return {'success': False, 'error': str(e)}
+    
+    async def _update_existing_meeting_with_bot(
+        self, 
+        meeting_id: str, 
+        bot_result: Dict[str, Any], 
+        username: str
+    ):
+        """Update existing meeting record with bot information."""
+        try:
+            update_data = {
+                'attendee_bot_id': bot_result.get('bot_id'),
+                'bot_name': bot_result.get('bot_name', f'Sunny AI Notetaker ({username})'),
+                'bot_chat_message': bot_result.get('bot_chat_message', ''),
+                'bot_status': 'scheduled',
+                'bot_deployment_method': 'automatic',
+                'auto_scheduled_via_email': True,
+                'virtual_email_attendee': f'ai+{username}@besunny.ai',
+                'bot_configuration': {
+                    'username': username,
+                    'setup_method': 'calendar_invitation_email',
+                    'bot_id': bot_result.get('bot_id'),
+                    'scheduled_at': datetime.now().isoformat()
+                },
+                'updated_at': datetime.now().isoformat()
+            }
+            
+            await self.supabase.table('meetings').update(update_data).eq('id', meeting_id).execute()
+            logger.info(f"Updated existing meeting {meeting_id} with bot information")
+            
+        except Exception as e:
+            logger.error(f"Error updating existing meeting with bot: {e}")
+            raise
+    
