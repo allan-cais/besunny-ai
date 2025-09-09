@@ -147,3 +147,48 @@ def cleanup_completed_meetings(self):
             "error": str(e),
             "timestamp": datetime.now().isoformat()
         }
+
+
+@shared_task(bind=True, name="attendee.monitor_calendar_bot")
+def monitor_calendar_bot_task(
+    self, 
+    bot_id: str, 
+    meeting_id: str, 
+    user_id: str, 
+    document_id: str, 
+    username: str
+):
+    """Monitor a calendar bot and process transcript when meeting ends."""
+    try:
+        logger.info(f"Starting calendar bot monitoring for bot {bot_id}, meeting {meeting_id}")
+        start_time = datetime.now()
+        
+        # Create service instance
+        service = AttendeePollingCron()
+        
+        # Run the monitoring workflow
+        result = asyncio.run(service.monitor_calendar_bot_workflow(
+            bot_id=bot_id,
+            meeting_id=meeting_id,
+            user_id=user_id,
+            document_id=document_id,
+            username=username
+        ))
+        
+        execution_time = (datetime.now() - start_time).total_seconds()
+        logger.info(f"Calendar bot monitoring completed in {execution_time:.2f}s")
+        
+        return {
+            "success": True,
+            "result": result,
+            "execution_time": execution_time,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Calendar bot monitoring failed: {e}", exc_info=True)
+        return {
+            "success": False,
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }

@@ -487,6 +487,361 @@ class AttendeePollingCron:
         except Exception as e:
             logger.error(f"Failed to get user {user_id}: {e}")
             return None
+    
+    async def monitor_calendar_bot_workflow(
+        self, 
+        bot_id: str, 
+        meeting_id: str, 
+        user_id: str, 
+        document_id: str, 
+        username: str
+    ) -> Dict[str, Any]:
+        """
+        Monitor a calendar bot and process transcript when meeting ends.
+        
+        This workflow:
+        1. Waits for webhook notification that bot has ended
+        2. Retrieves transcript when available
+        3. Stores transcript in documents table
+        4. Sends through classification agent
+        5. Sends through vector embedding pipeline
+        
+        Args:
+            bot_id: The bot ID to monitor
+            meeting_id: The meeting ID
+            user_id: The user ID
+            document_id: The original email document ID
+            username: The username
+            
+        Returns:
+            Workflow execution results
+        """
+        try:
+            logger.info(f"Starting calendar bot workflow for bot {bot_id}, meeting {meeting_id}")
+            
+            # Step 1: Wait for webhook notification that bot has ended
+            ended_webhook = await self._wait_for_bot_ended_webhook(bot_id, user_id, max_wait_minutes=60)
+            
+            if not ended_webhook:
+                return {
+                    'success': False,
+                    'error': 'Bot ended webhook not received within timeout period',
+                    'bot_id': bot_id,
+                    'meeting_id': meeting_id
+                }
+            
+            # Step 2: Get transcript when bot is ended
+            transcript_data = await self.attendee_service.get_transcript(bot_id)
+            
+            if not transcript_data:
+                return {
+                    'success': False,
+                    'error': 'No transcript available for ended bot',
+                    'bot_id': bot_id,
+                    'meeting_id': meeting_id
+                }
+            
+            # Step 3: Store transcript in documents table
+            transcript_document_id = await self._store_transcript_document(
+                transcript_data, bot_id, meeting_id, user_id, username
+            )
+            
+            if not transcript_document_id:
+                return {
+                    'success': False,
+                    'error': 'Failed to store transcript document',
+                    'bot_id': bot_id,
+                    'meeting_id': meeting_id
+                }
+            
+            # Step 4: Send through classification agent
+            classification_result = await self._classify_transcript(
+                transcript_data, transcript_document_id, user_id, username
+            )
+            
+            # Step 5: Send through vector embedding pipeline
+            embedding_result = await self._embed_transcript(
+                transcript_data, classification_result, transcript_document_id, user_id
+            )
+            
+            # Step 6: Update meeting record with transcript information
+            await self._update_meeting_with_transcript(
+                meeting_id, transcript_data, transcript_document_id, classification_result
+            )
+            
+            logger.info(f"Calendar bot workflow completed for bot {bot_id}")
+            
+            return {
+                'success': True,
+                'bot_id': bot_id,
+                'meeting_id': meeting_id,
+                'transcript_document_id': transcript_document_id,
+                'classification_result': classification_result,
+                'embedding_result': embedding_result,
+                'message': 'Calendar bot workflow completed successfully'
+            }
+            
+        except Exception as e:
+            logger.error(f"Calendar bot workflow failed for bot {bot_id}: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'bot_id': bot_id,
+                'meeting_id': meeting_id
+            }
+    
+    async def _wait_for_bot_ended_webhook(self, bot_id: str, user_id: str, max_wait_minutes: int = 60) -> Optional[Dict[str, Any]]:
+        """Wait for webhook notification that bot has ended."""
+        try:
+            logger.info(f"Waiting for bot ended webhook for bot {bot_id} (max wait: {max_wait_minutes} minutes)")
+            
+            # Check for existing ended webhook first
+            ended_webhook = await self._check_for_ended_webhook(bot_id, user_id)
+            if ended_webhook:
+                logger.info(f"Found existing ended webhook for bot {bot_id}")
+                return ended_webhook
+            
+            # Wait for webhook notification with periodic checks
+            max_attempts = max_wait_minutes * 2  # Check every 30 seconds
+            for attempt in range(max_attempts):
+                logger.info(f"Checking for bot ended webhook (attempt {attempt + 1}/{max_attempts})")
+                
+                ended_webhook = await self._check_for_ended_webhook(bot_id, user_id)
+                if ended_webhook:
+                    logger.info(f"Bot {bot_id} ended webhook received")
+                    return ended_webhook
+                
+                # Wait 30 seconds before next check
+                await asyncio.sleep(30)
+            
+            logger.warning(f"Bot {bot_id} ended webhook not received within {max_wait_minutes} minutes")
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error waiting for bot ended webhook: {e}")
+            return None
+    
+    async def _check_for_ended_webhook(self, bot_id: str, user_id: str) -> Optional[Dict[str, Any]]:
+        """Check if there's an ended webhook for the bot."""
+        try:
+            # Query attendee_webhook_logs for bot.state_change webhooks with ended status
+            result = await self.supabase.table('attendee_webhook_logs').select('*').eq('bot_id', bot_id).eq('user_id', user_id).eq('trigger', 'bot.state_change').order('received_at', desc=True).execute()
+            
+            if not result.data:
+                return None
+            
+            # Check each webhook for ended status
+            for webhook_log in result.data:
+                webhook_data = webhook_log.get('webhook_data', {})
+                
+                # Check if the webhook indicates the bot has ended
+                if self._is_bot_ended_webhook(webhook_data):
+                    logger.info(f"Found ended webhook for bot {bot_id}: {webhook_log['id']}")
+                    return webhook_log
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error checking for ended webhook: {e}")
+            return None
+    
+    def _is_bot_ended_webhook(self, webhook_data: Dict[str, Any]) -> bool:
+        """Check if webhook data indicates bot has ended."""
+        try:
+            # Check various possible fields that might indicate bot ended
+            status = webhook_data.get('status', '').lower()
+            event_type = webhook_data.get('event_type', '').lower()
+            state = webhook_data.get('state', '').lower()
+            
+            # Check for ended status indicators
+            ended_indicators = ['ended', 'completed', 'finished', 'stopped']
+            
+            if status in ended_indicators or event_type in ended_indicators or state in ended_indicators:
+                return True
+            
+            # Check for specific bot state changes
+            if event_type == 'bot.state_change':
+                new_state = webhook_data.get('new_state', '').lower()
+                if new_state in ended_indicators:
+                    return True
+            
+            return False
+            
+        except Exception as e:
+            logger.error(f"Error checking bot ended webhook: {e}")
+            return False
+    
+    async def _store_transcript_document(
+        self, 
+        transcript_data: Dict[str, Any], 
+        bot_id: str, 
+        meeting_id: str, 
+        user_id: str, 
+        username: str
+    ) -> Optional[str]:
+        """Store transcript in documents table."""
+        try:
+            # Extract transcript text
+            transcript_text = transcript_data.get('transcript', '')
+            if not transcript_text:
+                logger.warning(f"No transcript text found for bot {bot_id}")
+                return None
+            
+            # Create document record
+            document_data = {
+                'title': f'Meeting Transcript - {username}',
+                'summary': transcript_text[:500] + "..." if len(transcript_text) > 500 else transcript_text,
+                'author': f'Bot {bot_id}',
+                'received_at': datetime.now().isoformat(),
+                'source': 'attendee_bot',
+                'source_id': bot_id,
+                'type': 'transcript',
+                'status': 'processed',
+                'created_at': datetime.now().isoformat(),
+                'created_by': username,
+                'project_id': None,  # Will be assigned by classification
+                'knowledge_space_id': None,
+                'metadata': {
+                    'bot_id': bot_id,
+                    'meeting_id': meeting_id,
+                    'transcript_duration': transcript_data.get('duration_minutes', 0),
+                    'participants': transcript_data.get('participants', []),
+                    'processed_at': datetime.now().isoformat()
+                }
+            }
+            
+            result = await self.supabase.table('documents').insert(document_data).execute()
+            
+            if result.data:
+                document_id = result.data[0]['id']
+                logger.info(f"Transcript document stored: {document_id}")
+                return document_id
+            else:
+                logger.error("No document ID returned from transcript insert")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error storing transcript document: {e}")
+            return None
+    
+    async def _classify_transcript(
+        self, 
+        transcript_data: Dict[str, Any], 
+        document_id: str, 
+        user_id: str, 
+        username: str
+    ) -> Dict[str, Any]:
+        """Send transcript through classification agent."""
+        try:
+            from ...services.ai.classification_service import ClassificationService
+            
+            classification_service = ClassificationService()
+            
+            # Prepare content for classification
+            content = {
+                'type': 'transcript',
+                'source_id': document_id,
+                'author': f'Bot for {username}',
+                'date': datetime.now().isoformat(),
+                'subject': f'Meeting Transcript - {username}',
+                'content_text': transcript_data.get('transcript', ''),
+                'metadata': {
+                    'bot_id': transcript_data.get('bot_id'),
+                    'meeting_id': transcript_data.get('meeting_id'),
+                    'duration_minutes': transcript_data.get('duration_minutes', 0),
+                    'participants': transcript_data.get('participants', [])
+                }
+            }
+            
+            # Classify the transcript
+            classification_result = await classification_service.classify_content(
+                content=content,
+                user_id=user_id
+            )
+            
+            logger.info(f"Transcript classified for {username}: {classification_result.get('project_id', 'unclassified')}")
+            return classification_result
+            
+        except Exception as e:
+            logger.error(f"Error classifying transcript: {e}")
+            return {
+                'project_id': '',
+                'confidence': 0.0,
+                'unclassified': True,
+                'error': str(e)
+            }
+    
+    async def _embed_transcript(
+        self, 
+        transcript_data: Dict[str, Any], 
+        classification_result: Dict[str, Any], 
+        document_id: str, 
+        user_id: str
+    ) -> Dict[str, Any]:
+        """Send transcript through vector embedding pipeline."""
+        try:
+            from ...services.ai.vector_embedding_service import VectorEmbeddingService
+            
+            vector_service = VectorEmbeddingService()
+            
+            # Prepare content for embedding
+            content = {
+                'type': 'transcript',
+                'source_id': document_id,
+                'author': f'Bot for {transcript_data.get("username", "unknown")}',
+                'date': datetime.now().isoformat(),
+                'subject': f'Meeting Transcript',
+                'content_text': transcript_data.get('transcript', ''),
+                'metadata': {
+                    'bot_id': transcript_data.get('bot_id'),
+                    'meeting_id': transcript_data.get('meeting_id'),
+                    'duration_minutes': transcript_data.get('duration_minutes', 0),
+                    'participants': transcript_data.get('participants', [])
+                }
+            }
+            
+            # Embed the content
+            embedding_result = await vector_service.embed_classified_content(
+                content=content,
+                classification_result=classification_result,
+                user_id=user_id
+            )
+            
+            logger.info(f"Transcript embedded: {embedding_result.get('embedded', False)}")
+            return embedding_result
+            
+        except Exception as e:
+            logger.error(f"Error embedding transcript: {e}")
+            return {
+                'embedded': False,
+                'error': str(e)
+            }
+    
+    async def _update_meeting_with_transcript(
+        self, 
+        meeting_id: str, 
+        transcript_data: Dict[str, Any], 
+        document_id: str, 
+        classification_result: Dict[str, Any]
+    ):
+        """Update meeting record with transcript information."""
+        try:
+            update_data = {
+                'transcript': transcript_data.get('transcript', ''),
+                'transcript_url': transcript_data.get('transcript_url'),
+                'transcript_retrieved_at': datetime.now().isoformat(),
+                'transcript_duration_seconds': transcript_data.get('duration_minutes', 0) * 60,
+                'transcript_participants': transcript_data.get('participants', []),
+                'transcript_processing_status': 'completed',
+                'project_id': classification_result.get('project_id') if not classification_result.get('unclassified') else None,
+                'updated_at': datetime.now().isoformat()
+            }
+            
+            await self.supabase.table('meetings').update(update_data).eq('id', meeting_id).execute()
+            logger.info(f"Meeting {meeting_id} updated with transcript information")
+            
+        except Exception as e:
+            logger.error(f"Error updating meeting with transcript: {e}")
 
 
 # Celery tasks for cron jobs
