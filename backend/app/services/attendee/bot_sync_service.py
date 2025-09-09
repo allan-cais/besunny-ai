@@ -18,7 +18,7 @@ class BotSyncService:
     def __init__(self):
         self.supabase = get_supabase()
     
-    async def sync_bot_status_to_meetings(self, user_id: str) -> Dict[str, Any]:
+    def sync_bot_status_to_meetings(self, user_id: str) -> Dict[str, Any]:
         """
         Sync bot status from meeting_bots table to meetings table.
         Now uses the foreign key relationship instead of URL lookups.
@@ -89,7 +89,7 @@ class BotSyncService:
             logger.error(f"Failed to sync bot status: {e}")
             return {"success": False, "error": str(e)}
     
-    async def get_meeting_with_bot_status(self, meeting_id: str, user_id: str) -> Optional[Dict[str, Any]]:
+    def get_meeting_with_bot_status(self, meeting_id: str, user_id: str) -> Optional[Dict[str, Any]]:
         """
         Get a meeting with its associated bot status using foreign key relationship.
         """
@@ -148,7 +148,7 @@ class BotSyncService:
             logger.error(f"Failed to get meeting with bot status: {e}")
             return None
     
-    async def get_user_meetings_with_bot_status(self, user_id: str, unassigned_only: bool = True, future_only: bool = True) -> List[Dict[str, Any]]:
+    def get_user_meetings_with_bot_status(self, user_id: str, unassigned_only: bool = True, future_only: bool = True) -> List[Dict[str, Any]]:
         """
         Get meetings for a user with their associated bot status using JOIN query.
         """

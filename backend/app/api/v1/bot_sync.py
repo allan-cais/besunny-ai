@@ -21,7 +21,7 @@ async def sync_bot_status(
     """Sync bot status from meeting_bots table to meetings table."""
     try:
         bot_sync_service = BotSyncService()
-        result = await bot_sync_service.sync_bot_status_to_meetings(current_user["id"])
+        result = bot_sync_service.sync_bot_status_to_meetings(current_user["id"])
         
         return {
             "success": True,
@@ -46,7 +46,7 @@ async def get_meetings_with_bot_status(
         logger.info(f"API endpoint called with user_id: {user_id}, unassigned_only: {unassigned_only}, future_only: {future_only}")
         
         bot_sync_service = BotSyncService()
-        meetings = await bot_sync_service.get_user_meetings_with_bot_status(
+        meetings = bot_sync_service.get_user_meetings_with_bot_status(
             user_id, 
             unassigned_only=unassigned_only, 
             future_only=future_only
@@ -73,7 +73,7 @@ async def get_meeting_with_bot_status(
     """Get a specific meeting with its associated bot status."""
     try:
         bot_sync_service = BotSyncService()
-        meeting = await bot_sync_service.get_meeting_with_bot_status(meeting_id, current_user["id"])
+        meeting = bot_sync_service.get_meeting_with_bot_status(meeting_id, current_user["id"])
         
         if not meeting:
             raise HTTPException(status_code=404, detail="Meeting not found")
