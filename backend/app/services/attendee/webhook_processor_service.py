@@ -8,15 +8,13 @@ import asyncio
 from typing import Dict, Any
 from datetime import datetime, timedelta
 
-from .bot_state_service import BotStateService
-
 logger = logging.getLogger(__name__)
 
 class WebhookProcessorService:
     """Background service for processing webhook logs."""
     
     def __init__(self):
-        self.bot_state_service = BotStateService()
+        self.bot_state_service = None
         self.is_running = False
         self.process_interval = 30  # seconds
         self.max_retries = 3
@@ -27,6 +25,11 @@ class WebhookProcessorService:
         if self.is_running:
             logger.warning("Webhook processor service is already running")
             return
+        
+        # Initialize bot state service lazily
+        if self.bot_state_service is None:
+            from .bot_state_service import BotStateService
+            self.bot_state_service = BotStateService()
         
         self.is_running = True
         logger.info("Starting webhook processor service")
@@ -68,6 +71,11 @@ class WebhookProcessorService:
             Number of webhook logs processed
         """
         try:
+            # Initialize bot state service lazily
+            if self.bot_state_service is None:
+                from .bot_state_service import BotStateService
+                self.bot_state_service = BotStateService()
+            
             return await self.bot_state_service.process_webhook_logs()
         except Exception as e:
             logger.error(f"Error processing webhook logs: {e}")
