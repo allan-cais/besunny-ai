@@ -96,6 +96,11 @@ Tone
             supabase_context = await self._retrieve_supabase_context(
                 project_id, user_id, user_question, max_results
             )
+            print(f"=== SUPABASE CONTEXT DEBUG ===")
+            print(f"Supabase context items found: {len(supabase_context)}")
+            for i, item in enumerate(supabase_context[:3]):  # Show first 3 items
+                print(f"Supabase item {i+1}: {item.get('type', 'unknown')} - {item.get('title', 'no title')[:50]}...")
+            print("=" * 50)
             
             # Step 3: Retrieve relevant context from Pinecone
             pinecone_context = await self._retrieve_pinecone_context(
@@ -237,7 +242,23 @@ Tone
             print(f"Searching with user_id: {user_id}")
             print(f"Searching with project_id: {project_id}")
             print(f"Filter dict: {filter_dict}")
+            print(f"Index name: {self.index_name}")
             
+            # First, let's try a search without filters to see if there's any data at all
+            print("=== TESTING PINECONE WITHOUT FILTERS ===")
+            test_results = self.pinecone.Index(self.index_name).query(
+                vector=query_vector,
+                top_k=5,
+                include_metadata=True
+            )
+            print(f"Total matches without filter: {len(test_results.matches)}")
+            if test_results.matches:
+                print("Sample metadata from unfiltered search:")
+                for i, match in enumerate(test_results.matches[:2]):
+                    print(f"Match {i+1} metadata: {match.metadata}")
+            print("=" * 50)
+            
+            # Now try with filters
             search_results = self.pinecone.Index(self.index_name).query(
                 vector=query_vector,
                 filter=filter_dict,
@@ -328,13 +349,18 @@ Tone
             # Format context for the prompt
             context_text = self._format_context_for_prompt(context)
             
-            # Prepare the system prompt
-            system_prompt = self.rag_prompt.format(
-                project_id=project_info.get('id', 'Unknown'),
-                project_name=project_info.get('name', 'Unknown Project'),
-                user_question=user_question,
-                retrieved_context=context_text
-            )
+            # Prepare the system prompt with context
+            system_prompt = f"""{self.rag_prompt}
+
+Current Project Context:
+Project ID: {project_info.get('id', 'Unknown')}
+Project Name: {project_info.get('name', 'Unknown Project')}
+User Question: {user_question}
+
+Project Database:
+{context_text}
+
+Provide a helpful, accurate response grounded in the project database."""
             
             # Debug logging to see the full system prompt
             print(f"=== SYSTEM PROMPT DEBUG ===")
