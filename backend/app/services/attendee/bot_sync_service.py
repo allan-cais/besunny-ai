@@ -27,18 +27,7 @@ class BotSyncService:
             logger.info(f"Syncing bot status for user {user_id}")
             
             # Get all meetings that have bots assigned (using the foreign key relationship)
-            meetings_with_bots = self.supabase.table('meetings').select('''
-                *,
-                meeting_bots!attendee_bot_id(
-                    bot_id,
-                    status,
-                    bot_name,
-                    deployment_method,
-                    metadata,
-                    created_at,
-                    updated_at
-                )
-            ''').eq('user_id', user_id).not_('attendee_bot_id', 'is', 'null').execute()
+            meetings_with_bots = self.supabase.table('meetings').select('*').eq('user_id', user_id).not_('attendee_bot_id', 'is', 'null').execute()
             
             if not meetings_with_bots.data:
                 return {"success": True, "synced": 0, "message": "No meetings with bots found"}
@@ -48,10 +37,11 @@ class BotSyncService:
             
             for meeting in meetings_with_bots.data:
                 try:
-                    # Extract bot information from the joined data
-                    bot_info = meeting.get('meeting_bots')
-                    if bot_info and len(bot_info) > 0:
-                        bot = bot_info[0]  # Get the first (and should be only) bot
+                    # Get bot information from meeting_bots table using the foreign key
+                    bot_result = self.supabase.table('meeting_bots').select('*').eq('bot_id', meeting['attendee_bot_id']).execute()
+                    
+                    if bot_result.data and len(bot_result.data) > 0:
+                        bot = bot_result.data[0]  # Get the first (and should be only) bot
                         
                         # Update the meeting with the latest bot information
                         update_data = {
