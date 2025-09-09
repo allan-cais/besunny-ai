@@ -135,15 +135,12 @@ const Dashboard = () => {
 
     try {
       setMeetingsLoading(true);
-      console.log('Loading current week meetings...');
       // First sync bot status to ensure meetings table has latest bot info
       await calendarService.syncBotStatus(session);
       // Then get meetings (original function that was working)
       const meetings = await calendarService.getCurrentWeekMeetings(session);
-      console.log('Setting currentWeekMeetings to:', meetings.length, meetings);
       setCurrentWeekMeetings(meetings);
     } catch (err: unknown) {
-      console.error('Error loading meetings:', err);
       setCurrentWeekMeetings([]);
     } finally {
       setMeetingsLoading(false);
@@ -167,7 +164,26 @@ const Dashboard = () => {
         .order('created_at', { ascending: false })
         .limit(50);
 
-      if (documentsError) {
+      // Load meetings that need manual classification
+      const { data: unclassifiedMeetings, error: meetingsError } = await supabase
+        .from('meeting_bots')
+        .select(`
+          *,
+          meetings!attendee_bot_id(
+            id,
+            title,
+            start_time,
+            end_time,
+            meeting_url
+          )
+        `)
+        .eq('user_id', user.id)
+        .eq('needs_manual_classification', true)
+        .is('project_id', null)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (documentsError || meetingsError) {
         setUnclassifiedData([]);
       } else {
         // Transform documents to match our interface
@@ -195,8 +211,41 @@ const Dashboard = () => {
             final_transcript_ready: true
           } : undefined
         }));
+
+        // Transform meetings to match our interface
+        const meetingActivities: VirtualEmailActivity[] = (unclassifiedMeetings || []).map(meetingBot => {
+          const meeting = meetingBot.meetings;
+          return {
+            id: meetingBot.id,
+            type: 'meeting_transcript' as const,
+            title: meeting?.title || 'Meeting Transcript',
+            summary: meetingBot.transcript ? meetingBot.transcript.substring(0, 150) + '...' : 'No transcript available',
+            source: 'meeting_bot',
+            sender: meetingBot.bot_name || 'Meeting Bot',
+            file_size: meetingBot.transcript ? meetingBot.transcript.length : 0,
+            created_at: meetingBot.created_at,
+            processed: true,
+            project_id: meetingBot.project_id,
+            transcript_duration_seconds: 0, // Could be calculated from meeting times
+            transcript_metadata: meetingBot.metadata || {},
+            rawTranscript: {
+              id: meetingBot.id,
+              title: meeting?.title || 'Meeting Transcript',
+              transcript: meetingBot.transcript || '',
+              transcript_summary: meetingBot.transcript ? meetingBot.transcript.substring(0, 500) + '...' : '',
+              transcript_metadata: meetingBot.metadata || {},
+              transcript_duration_seconds: 0,
+              transcript_retrieved_at: meetingBot.updated_at,
+              final_transcript_ready: true,
+              bot_id: meetingBot.bot_id,
+              meeting_url: meeting?.meeting_url
+            }
+          };
+        });
         
-        setUnclassifiedData(documentActivities);
+        // Combine documents and meetings
+        const allActivities = [...documentActivities, ...meetingActivities];
+        setUnclassifiedData(allActivities);
       }
     } catch (error) {
       setUnclassifiedData([]);
@@ -235,8 +284,6 @@ const Dashboard = () => {
         try {
           await calendarService.initializeCalendarSync(user.id);
         } catch (error) {
-          // Log calendar sync errors for debugging
-          console.error('Calendar sync setup failed:', error);
           // Optionally show a toast notification
           if (error instanceof Error) {
             toast({
@@ -248,8 +295,7 @@ const Dashboard = () => {
         }
       }
     } catch (error) {
-      // Log credential check errors
-      console.error('Failed to check Google credentials:', error);
+      // Credential check failed
     }
   }, [user?.id, session, toast]);
 
@@ -262,18 +308,14 @@ const Dashboard = () => {
           const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
           
           if (sessionError || !currentSession) {
-            console.error('Session validation failed in main effect:', sessionError);
             // Try to refresh the session
             const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
             
             if (refreshError || !refreshData.session) {
-              console.error('Session refresh failed:', refreshError);
               // Session refresh failed, redirect to login
               window.location.href = '/auth';
               return;
             }
-            
-            console.log('Session refreshed successfully');
           }
           
           // Load projects
@@ -289,7 +331,6 @@ const Dashboard = () => {
           // Record activity
           await recordActivity('calendar_view');
         } catch (error) {
-          console.error('Error in validateAndLoadData:', error);
           // If there's an error, redirect to login
           window.location.href = '/auth';
         }
@@ -308,10 +349,6 @@ const Dashboard = () => {
     }
   }, [location.search]);
 
-  // Debug currentWeekMeetings changes
-  useEffect(() => {
-    console.log('currentWeekMeetings changed:', currentWeekMeetings.length, currentWeekMeetings);
-  }, [currentWeekMeetings]);
 
   // Helper functions
   const getDocumentType = (source: string, document: Document): VirtualEmailActivity['type'] => {
@@ -668,14 +705,15 @@ const Dashboard = () => {
                               <Bot className="w-3 h-3" />
                             )}
                           </Button>
-                        ) : meeting.bot_status && meeting.bot_status !== 'pending' ? (
+                        ) : meeting.attendee_bot_id || (meeting.bot_status && meeting.bot_status !== 'pending') ? (
                           <Button
                             size="sm"
                             variant="outline"
                             disabled
-                            className="text-xs bg-green-50 text-green-700 border-green-200 hover:bg-green-50 cursor-not-allowed"
+                            className="text-xs bg-green-600 text-white border-green-600 hover:bg-green-600 cursor-not-allowed"
                           >
-                            <Bot className="w-3 h-3" />
+                            <Bot className="w-3 h-3 mr-1" />
+                            DEPLOYED
                           </Button>
                         ) : (
                           getBotStatusBadge(meeting)
@@ -727,7 +765,6 @@ const Dashboard = () => {
                       key={activity.id} 
                       className="flex items-start space-x-3 p-3 rounded-md border border-stone-200 dark:border-zinc-700 hover:bg-stone-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
                       onClick={() => {
-                        console.log('Unclassified item clicked:', activity);
                         if (activity.type === 'meeting_transcript') {
                           // Transform RawTranscript to Meeting format for TranscriptModal
                           const transcriptData = {
@@ -941,7 +978,7 @@ const Dashboard = () => {
                   size="sm"
                   variant="outline"
                   disabled
-                  className="flex-1 bg-green-50 text-green-700 border-green-200 hover:bg-green-50 cursor-not-allowed font-mono text-xs"
+                  className="flex-1 bg-green-600 text-white border-green-600 hover:bg-green-600 cursor-not-allowed font-mono text-xs"
                 >
                   <Bot className="mr-2 h-4 w-4" />
                   BOT DEPLOYED

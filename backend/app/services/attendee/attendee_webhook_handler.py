@@ -10,6 +10,7 @@ import json
 
 from ...core.database import get_supabase
 from ...models.schemas.calendar import Meeting
+from .transcript_service import TranscriptService
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +20,7 @@ class AttendeeWebhookHandler:
     
     def __init__(self):
         self.supabase = get_supabase()
+        self.transcript_service = TranscriptService()
         self.max_retries = 3
         self.retry_delay = 1  # seconds
     
@@ -73,11 +75,16 @@ class AttendeeWebhookHandler:
                 
                 logger.info(f"Meeting ended and recording available for bot {bot_id}")
                 
-                # Trigger transcript retrieval
-                await self._retrieve_final_transcript(bot_id, user_id)
-                
-                # Update meeting status to completed
-                await self._update_meeting_status(bot_id, 'completed')
+                # Process ended bot: fetch and store transcript
+                success = await self.transcript_service.process_ended_bot(self.supabase, bot_id)
+                if success:
+                    # Update meeting status to completed
+                    await self._update_meeting_status(bot_id, 'completed')
+                    
+                    # Trigger classification workflow
+                    await self._trigger_classification_workflow(bot_id, user_id)
+                else:
+                    logger.error(f"Failed to process transcript for ended bot {bot_id}")
                 
             # Handle other state changes
             elif new_state == 'joined':
@@ -372,37 +379,115 @@ class AttendeeWebhookHandler:
         except Exception as e:
             logger.error(f"Failed to update meeting status: {e}")
 
-    async def _retrieve_final_transcript(self, bot_id: str, user_id: str):
-        """Retrieve final transcript when meeting ends."""
+    async def _trigger_classification_workflow(self, bot_id: str, user_id: str):
+        """Trigger classification workflow for completed meeting."""
         try:
-            logger.info(f"Retrieving final transcript for bot {bot_id}")
+            logger.info(f"Triggering classification workflow for bot {bot_id}")
             
-            # Get transcript from Attendee.dev API
-            transcript_data = await self.attendee_service.get_transcript(bot_id)
+            # Get bot data with transcript and metadata
+            bot_result = self.supabase.table('meeting_bots').select('*').eq('bot_id', bot_id).single().execute()
             
-            if transcript_data:
-                # Store transcript in database
-                await self._store_transcript(bot_id, transcript_data)
-                
-                # Update meeting record with transcript
-                await self._update_meeting_transcript(bot_id, transcript_data)
-                
-                # Classification agent integration will be implemented in future version
-                # await self._send_to_classification_agent(bot_id, transcript_data, user_id)
-                
-                # Vector embedding workflow will be implemented in future version
-                # await self._process_vector_embedding(bot_id, transcript_data, user_id)
-                
-                logger.info(f"Final transcript retrieved and stored for bot {bot_id}")
-                
-                # Mark transcript as ready for future processing
-                await self._mark_transcript_ready_for_processing(bot_id)
-                
+            if not bot_result.data:
+                logger.error(f"No bot data found for bot {bot_id}")
+                return
+            
+            bot_data = bot_result.data
+            transcript = bot_data.get('transcript', '')
+            metadata = bot_data.get('metadata', {})
+            
+            if not transcript.strip():
+                logger.warning(f"No transcript available for bot {bot_id}")
+                return
+            
+            # Send to classification service
+            from .classification_service import ClassificationService
+            classification_service = ClassificationService()
+            
+            classification_result = await classification_service.classify_meeting_transcript(
+                bot_id=bot_id,
+                transcript=transcript,
+                metadata=metadata,
+                user_id=user_id
+            )
+            
+            if classification_result.get('success'):
+                project_id = classification_result.get('project_id')
+                if project_id:
+                    # Update bot with classified project
+                    await self._update_bot_project(bot_id, project_id)
+                    
+                    # Send to vector embedding pipeline
+                    await self._trigger_vector_embedding(bot_id, project_id, user_id)
+                else:
+                    # Classification failed, mark for manual classification
+                    await self._mark_for_manual_classification(bot_id)
             else:
-                logger.warning(f"No transcript data received for bot {bot_id}")
+                # Classification failed, mark for manual classification
+                await self._mark_for_manual_classification(bot_id)
                 
         except Exception as e:
-            logger.error(f"Failed to retrieve final transcript for bot {bot_id}: {e}")
+            logger.error(f"Failed to trigger classification workflow for bot {bot_id}: {e}")
+            # Mark for manual classification as fallback
+            await self._mark_for_manual_classification(bot_id)
+    
+    async def _update_bot_project(self, bot_id: str, project_id: str):
+        """Update bot with classified project ID."""
+        try:
+            self.supabase.table('meeting_bots').update({
+                'project_id': project_id,
+                'updated_at': datetime.now().isoformat()
+            }).eq('bot_id', bot_id).execute()
+            
+            logger.info(f"Updated bot {bot_id} with project {project_id}")
+            
+        except Exception as e:
+            logger.error(f"Failed to update bot project for {bot_id}: {e}")
+    
+    async def _trigger_vector_embedding(self, bot_id: str, project_id: str, user_id: str):
+        """Trigger vector embedding pipeline for classified meeting."""
+        try:
+            logger.info(f"Triggering vector embedding for bot {bot_id} with project {project_id}")
+            
+            # Get bot data
+            bot_result = self.supabase.table('meeting_bots').select('*').eq('bot_id', bot_id).single().execute()
+            if not bot_result.data:
+                logger.error(f"No bot data found for bot {bot_id}")
+                return
+            
+            bot_data = bot_result.data
+            transcript = bot_data.get('transcript', '')
+            metadata = bot_data.get('metadata', {})
+            
+            # Send to vector embedding service
+            from .vector_embedding_service import VectorEmbeddingService
+            embedding_service = VectorEmbeddingService()
+            
+            await embedding_service.process_meeting_transcript(
+                bot_id=bot_id,
+                transcript=transcript,
+                project_id=project_id,
+                user_id=user_id,
+                metadata=metadata
+            )
+            
+            logger.info(f"Vector embedding completed for bot {bot_id}")
+            
+        except Exception as e:
+            logger.error(f"Failed to trigger vector embedding for bot {bot_id}: {e}")
+    
+    async def _mark_for_manual_classification(self, bot_id: str):
+        """Mark bot for manual classification in unclassified data."""
+        try:
+            # Update bot to indicate it needs manual classification
+            self.supabase.table('meeting_bots').update({
+                'needs_manual_classification': True,
+                'updated_at': datetime.now().isoformat()
+            }).eq('bot_id', bot_id).execute()
+            
+            logger.info(f"Marked bot {bot_id} for manual classification")
+            
+        except Exception as e:
+            logger.error(f"Failed to mark bot {bot_id} for manual classification: {e}")
     
     async def _update_meeting_status(self, bot_id: str, status: str):
         """Update meeting status based on bot state changes."""

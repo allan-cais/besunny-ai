@@ -87,6 +87,18 @@ async def lifespan(app: FastAPI):
             logger.error(f"Gmail watch scheduler failed to start: {e}")
             _health_status["services"]["gmail_watch_scheduler"] = "failed"
         
+        # Start webhook processor service
+        logger.info("Starting webhook processor service...")
+        try:
+            from app.services.attendee.webhook_processor_service import webhook_processor_service
+            webhook_task = asyncio.create_task(webhook_processor_service.start())
+            app.state.webhook_processor_task = webhook_task
+            logger.info("Webhook processor service started successfully")
+            _health_status["services"]["webhook_processor"] = "started"
+        except Exception as e:
+            logger.error(f"Webhook processor service failed to start: {e}")
+            _health_status["services"]["webhook_processor"] = "failed"
+        
         # Mark startup as successful
         _health_status["startup_time"] = time.time()
         _health_status["last_check"] = time.time()
@@ -102,6 +114,20 @@ async def lifespan(app: FastAPI):
     
     finally:
         logger.info("Shutting down BeSunny.ai Python Backend")
+        
+        # Stop webhook processor service
+        try:
+            from app.services.attendee.webhook_processor_service import webhook_processor_service
+            await webhook_processor_service.stop()
+            if hasattr(app.state, 'webhook_processor_task'):
+                app.state.webhook_processor_task.cancel()
+                try:
+                    await app.state.webhook_processor_task
+                except asyncio.CancelledError:
+                    pass
+            logger.info("Webhook processor service stopped")
+        except Exception as e:
+            logger.error(f"Error stopping webhook processor service: {e}")
         
         # Stop Gmail watch scheduler
         try:
