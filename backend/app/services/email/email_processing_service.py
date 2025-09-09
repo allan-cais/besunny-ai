@@ -67,15 +67,20 @@ class EmailProcessingService:
             
             # Step 3: Detect content type and extract metadata
             content_type = await self._detect_content_type(email_data)
+            logger.info(f"Detected content type: {content_type}")
             
             # Step 4: Store in documents table with appropriate source
             document_id = await self._store_email_document(email_data, username, content_type)
             
             # Step 5: Handle special content types
             if content_type['type'] == 'drive_file':
+                logger.info("Handling drive file sharing")
                 await self._handle_drive_file_sharing(email_data, username, document_id)
             elif content_type['type'] == 'calendar_invitation':
+                logger.info("Handling calendar invitation")
                 await self._handle_calendar_invitation(email_data, username, document_id)
+            else:
+                logger.info(f"No special content handling for type: {content_type['type']}")
             
             # Step 6: AI Classification to user projects
             classification_result = await self._classify_email_to_projects(email_data, username, document_id)
@@ -191,11 +196,14 @@ class EmailProcessingService:
             # Check for calendar invitation
             calendar_info = await self._detect_calendar_invitation(email_data)
             if calendar_info:
+                logger.info(f"Calendar invitation detected with metadata: {calendar_info}")
                 return {
                     'type': 'calendar_invitation',
                     'metadata': calendar_info,
                     'confidence': 0.8
                 }
+            else:
+                logger.info("No calendar invitation detected")
             
             # Default to normal email
             return {
@@ -257,14 +265,23 @@ class EmailProcessingService:
             subject = email_data.get('subject', '')
             full_text = f"{subject} {content_text}"
             
+            logger.info(f"Checking for calendar invitation in email: {subject}")
+            logger.info(f"Content preview: {content_text[:200]}...")
+            
             # Check for calendar invitation patterns
             has_meet_url = bool(re.search(r'https://meet\.google\.com/', full_text))
             has_when = bool(re.search(r'When:', full_text))
             has_where = bool(re.search(r'Where:', full_text))
             
+            logger.info(f"Calendar detection - Meet URL: {has_meet_url}, When: {has_when}, Where: {has_where}")
+            
             if has_meet_url or (has_when and has_where):
+                logger.info("Calendar invitation detected, extracting metadata")
                 calendar_info = await self._extract_calendar_invitation_metadata(full_text)
+                logger.info(f"Calendar metadata extracted: {calendar_info}")
                 return calendar_info
+            else:
+                logger.info("No calendar invitation patterns found")
             
             return None
             
@@ -275,8 +292,11 @@ class EmailProcessingService:
     async def _extract_calendar_invitation_metadata(self, content_text: str) -> Dict[str, Any]:
         """Extract metadata from calendar invitation."""
         try:
+            logger.info(f"Extracting calendar metadata from content: {content_text[:300]}...")
+            
             # Extract Google Meet URLs
             meet_urls = re.findall(r'https://meet\.google\.com/([a-zA-Z0-9_-]+)', content_text)
+            logger.info(f"Found meet URLs: {meet_urls}")
             
             # Extract event title from subject or content
             event_title = "Calendar Invitation"  # Default
@@ -286,17 +306,21 @@ class EmailProcessingService:
             when_match = re.search(r'When: ([^\\n]+)', content_text)
             if when_match:
                 meeting_time['when'] = when_match.group(1).strip()
+                logger.info(f"Found meeting time: {meeting_time['when']}")
             
             # Extract organizer information
             organizer = "Unknown"  # Default
             
-            return {
+            metadata = {
                 'event_title': event_title,
                 'meet_urls': meet_urls,
                 'meeting_time': meeting_time,
                 'organizer': organizer,
                 'detected_at': datetime.now().isoformat()
             }
+            
+            logger.info(f"Extracted calendar metadata: {metadata}")
+            return metadata
             
         except Exception as e:
             logger.error(f"Error extracting calendar invitation metadata: {e}")
@@ -387,16 +411,22 @@ class EmailProcessingService:
     ):
         """Handle calendar invitation by setting up attendee bot and initiating full workflow."""
         try:
+            logger.info(f"Handling calendar invitation for {username}, document {document_id}")
             calendar_info = await self._detect_calendar_invitation(email_data)
+            logger.info(f"Calendar info from handler: {calendar_info}")
+            
             if calendar_info and calendar_info.get('meet_urls'):
                 # Get the first Google Meet URL
                 meet_url = calendar_info['meet_urls'][0]
+                logger.info(f"Found Google Meet URL: {meet_url}")
                 
                 # Get user ID for the username
                 user_id = await self._get_user_id_by_username(username)
                 if not user_id:
                     logger.error(f"User not found for username: {username}")
                     return
+                
+                logger.info(f"Found user ID: {user_id}")
                 
                 # Set up attendee bot and initiate full workflow
                 await self._initiate_calendar_bot_workflow(
@@ -409,6 +439,8 @@ class EmailProcessingService:
                     
         except Exception as e:
             logger.error(f"Error handling calendar invitation: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
     
     async def _setup_attendee_bot(self, calendar_info: Dict[str, Any], username: str, document_id: str) -> Optional[str]:
         """Set up an attendee bot for a calendar invitation using existing tables."""
@@ -681,9 +713,14 @@ class EmailProcessingService:
         """Initiate the complete calendar bot workflow: schedule bot, poll status, get transcript, classify, and embed."""
         try:
             logger.info(f"Starting calendar bot workflow for {username} with meet URL: {meet_url}")
+            logger.info(f"Calendar info: {calendar_info}")
+            logger.info(f"User ID: {user_id}, Document ID: {document_id}")
             
             # Step 1: Schedule the attendee bot
+            logger.info("Calling _schedule_calendar_bot...")
             bot_result = await self._schedule_calendar_bot(meet_url, username, user_id, calendar_info)
+            logger.info(f"Bot scheduling result: {bot_result}")
+            
             if not bot_result.get('success'):
                 logger.error(f"Failed to schedule bot for {username}: {bot_result.get('error')}")
                 return
@@ -694,10 +731,12 @@ class EmailProcessingService:
             # Step 2: Bot will be processed via webhook when it ends
             # No need for background monitoring - webhook will handle transcript processing
             
-            logger.info(f"Calendar bot workflow started for {username}, bot_id: {bot_id}")
+            logger.info(f"Calendar bot workflow started for {username}, bot_id: {bot_id}, meeting_id: {meeting_id}")
             
         except Exception as e:
             logger.error(f"Error initiating calendar bot workflow: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
     
     async def _schedule_calendar_bot(
         self, 
@@ -708,11 +747,14 @@ class EmailProcessingService:
     ) -> Dict[str, Any]:
         """Schedule an attendee bot for a calendar invitation."""
         try:
+            logger.info(f"Scheduling calendar bot for meet_url: {meet_url}, username: {username}, user_id: {user_id}")
+            
             from ..attendee.attendee_service import AttendeeService
             
             attendee_service = AttendeeService()
             
             # Check for existing meeting with same Google Meet URL
+            logger.info("Checking for existing meeting...")
             existing_meeting = await self._find_existing_meeting_by_url(meet_url, user_id)
             
             if existing_meeting:

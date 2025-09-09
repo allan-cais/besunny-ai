@@ -250,3 +250,49 @@ async def _embed_manually_assigned_document(
         
     except Exception as e:
         logger.error(f"Error in background embedding for manual assignment: {e}")
+
+@router.delete("/{document_id}")
+async def delete_document(
+    document_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Delete a document and its associated vectors."""
+    try:
+        supabase = get_supabase_service_client()
+        
+        # Verify document exists and belongs to user
+        doc_result = supabase.table('documents').select('*').eq('id', document_id).eq('user_id', current_user['id']).execute()
+        
+        if not doc_result.data:
+            raise HTTPException(status_code=404, detail="Document not found")
+        
+        document = doc_result.data[0]
+        
+        # Delete vectors from Pinecone first
+        try:
+            vector_service = VectorEmbeddingService()
+            await vector_service.delete_document_vectors(document_id, current_user['id'])
+            logger.info(f"Deleted vectors for document {document_id}")
+        except Exception as e:
+            logger.warning(f"Failed to delete vectors for document {document_id}: {e}")
+            # Continue with document deletion even if vector deletion fails
+        
+        # Delete document from database
+        delete_result = supabase.table('documents').delete().eq('id', document_id).eq('user_id', current_user['id']).execute()
+        
+        if not delete_result.data:
+            raise HTTPException(status_code=500, detail="Failed to delete document")
+        
+        logger.info(f"Document {document_id} deleted successfully for user {current_user['id']}")
+        
+        return {
+            "success": True,
+            "message": "Document deleted successfully",
+            "document_id": document_id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting document: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete document")

@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { useSupabase } from '@/hooks/use-supabase';
-import { CalendarIcon, FileTextIcon, MailIcon, MessageSquareIcon } from 'lucide-react';
+import { CalendarIcon, FileTextIcon, MailIcon, MessageSquareIcon, Trash2Icon } from 'lucide-react';
 
 interface UnclassifiedDocument {
   id: string;
@@ -31,6 +31,7 @@ export function UnclassifiedDocuments() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [assigning, setAssigning] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const [selectedProject, setSelectedProject] = useState<string>('');
   const { supabase } = useSupabase();
   const { toast } = useToast();
@@ -119,6 +120,44 @@ export function UnclassifiedDocuments() {
         variant: "destructive",
       });
       setAssigning(null);
+    }
+  };
+
+  const deleteDocument = async (documentId: string) => {
+    try {
+      setDeleting(documentId);
+      
+      // Call the backend API to delete document and vectors
+      const response = await fetch(`/api/v1/documents/${documentId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to delete document');
+      }
+
+      toast({
+        title: "Success",
+        description: "Document deleted successfully",
+      });
+
+      // Remove the document from the list
+      setDocuments(prev => prev.filter(doc => doc.id !== documentId));
+      
+    } catch (error) {
+      console.error('Error deleting document:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete document",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleting(null);
     }
   };
 
@@ -258,6 +297,25 @@ export function UnclassifiedDocuments() {
                     size="sm"
                   >
                     {assigning === doc.id ? 'Assigning...' : 'Assign to Project'}
+                  </Button>
+
+                  <Button
+                    onClick={() => deleteDocument(doc.id)}
+                    disabled={deleting === doc.id}
+                    size="sm"
+                    variant="destructive"
+                  >
+                    {deleting === doc.id ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                        Deleting...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2Icon className="w-4 h-4 mr-2" />
+                        Delete
+                      </>
+                    )}
                   </Button>
                 </div>
               </div>

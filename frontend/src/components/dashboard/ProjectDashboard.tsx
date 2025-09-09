@@ -10,7 +10,7 @@ import type { Project, Meeting, Document } from '@/types';
 import ProjectMeetingsCard from '@/components/dashboard/ProjectMeetingsCard';
 import PageHeader from '@/components/dashboard/PageHeader';
 
-import { Loader2, Brain, Tag, Users, MapPin, Calendar, FileText, Building, Clock, Database } from 'lucide-react';
+import { Loader2, Brain, Tag, Users, MapPin, Calendar, FileText, Building, Clock, Database, Trash2Icon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/providers/AuthProvider';
 import TranscriptModal from '@/components/dashboard/TranscriptModal';
@@ -97,6 +97,7 @@ const ProjectDashboard: React.FC<ProjectDashboardProps> = ({ projectId }) => {
   const [selectedDocument, setSelectedDocument] = useState<ProjectData | null>(null);
   const [selectedMeeting, setSelectedMeeting] = useState<ProjectMeeting | null>(null);
   const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([]);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const { toast } = useToast();
 
   // Load project-specific meetings
@@ -236,6 +237,44 @@ const ProjectDashboard: React.FC<ProjectDashboardProps> = ({ projectId }) => {
       setProject(null);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const deleteDocument = async (documentId: string) => {
+    try {
+      setDeleting(documentId);
+      
+      // Call the backend API to delete document and vectors
+      const response = await fetch(`/api/v1/documents/${documentId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${session?.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to delete document');
+      }
+
+      toast({
+        title: "Success",
+        description: "Document deleted successfully",
+      });
+
+      // Reload project data
+      loadProjectData();
+      
+    } catch (error) {
+      console.error('Error deleting document:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete document",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleting(null);
     }
   };
 
@@ -393,19 +432,21 @@ const ProjectDashboard: React.FC<ProjectDashboardProps> = ({ projectId }) => {
                     {projectData.map((item) => (
                       <div 
                         key={item.id} 
-                        className="flex items-start space-x-3 p-2 rounded-md border border-stone-200 dark:border-zinc-700 hover:bg-stone-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
-                        onClick={() => {
-                          // Determine the type and open appropriate modal
-                          if (item.type === 'email' || item.sender) {
-                            setSelectedEmail(item);
-                          } else {
-                            // For documents, spreadsheets, presentations, etc.
-                            setSelectedDocument(item);
-                          }
-                        }}
+                        className="flex items-start space-x-3 p-2 rounded-md border border-stone-200 dark:border-zinc-700 hover:bg-stone-50 dark:hover:bg-zinc-800 transition-colors"
                       >
                         <div className="flex-shrink-0 w-2 h-2 bg-green-500 rounded-full mt-2"></div>
-                        <div className="flex-1 min-w-0">
+                        <div 
+                          className="flex-1 min-w-0 cursor-pointer"
+                          onClick={() => {
+                            // Determine the type and open appropriate modal
+                            if (item.type === 'email' || item.sender) {
+                              setSelectedEmail(item);
+                            } else {
+                              // For documents, spreadsheets, presentations, etc.
+                              setSelectedDocument(item);
+                            }
+                          }}
+                        >
                           <div className="text-sm font-semibold font-mono text-[#4a5565] dark:text-zinc-200 truncate">
                             {item.title}
                           </div>
@@ -418,6 +459,24 @@ const ProjectDashboard: React.FC<ProjectDashboardProps> = ({ projectId }) => {
                               Source: {item.source}
                             </div>
                           )}
+                        </div>
+                        <div className="flex-shrink-0">
+                          <Button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteDocument(item.id);
+                            }}
+                            disabled={deleting === item.id}
+                            size="sm"
+                            variant="ghost"
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-950"
+                          >
+                            {deleting === item.id ? (
+                              <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <Trash2Icon className="w-4 h-4" />
+                            )}
+                          </Button>
                         </div>
                       </div>
                     ))}
