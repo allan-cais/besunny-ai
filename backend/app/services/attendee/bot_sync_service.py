@@ -155,20 +155,8 @@ class BotSyncService:
         try:
             logger.info(f"Getting meetings for user {user_id}, unassigned_only={unassigned_only}, future_only={future_only}")
             
-            # Build the JOIN query to get meetings with their associated bot information
-            # This uses the foreign key relationship between meetings.attendee_bot_id and meeting_bots.bot_id
-            query = self.supabase.table('meetings').select('''
-                *,
-                meeting_bots!attendee_bot_id(
-                    bot_id,
-                    status,
-                    bot_name,
-                    deployment_method,
-                    metadata,
-                    created_at,
-                    updated_at
-                )
-            ''').eq('user_id', user_id)
+            # Build a simple query first to test
+            query = self.supabase.table('meetings').select('*').eq('user_id', user_id)
             
             # Filter for unassigned meetings (project_id is null)
             if unassigned_only:
