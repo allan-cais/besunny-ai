@@ -25,6 +25,12 @@ class ProjectSummaryRequest(BaseModel):
     """Request model for project summary requests."""
     project_id: str
 
+class SaveMessageRequest(BaseModel):
+    """Request model for saving messages."""
+    session_id: str
+    message: str
+    message_type: str = "user"  # "user" or "assistant"
+
 @router.post("/query")
 async def query_project_data(
     request: RAGQueryRequest,
@@ -105,6 +111,37 @@ async def query_project_data_get(
     except Exception as e:
         logger.error(f"Error in RAG GET query: {e}")
         raise HTTPException(status_code=500, detail="Failed to process RAG query")
+
+@router.post("/save-message")
+async def save_message(
+    request: SaveMessageRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Save a message to chat history."""
+    try:
+        rag_service = RAGAgentService()
+        
+        if request.message_type == "user":
+            success = await rag_service.save_user_message(
+                session_id=request.session_id,
+                user_id=current_user['id'],
+                message=request.message
+            )
+        else:  # assistant
+            success = await rag_service.save_assistant_response(
+                session_id=request.session_id,
+                user_id=current_user['id'],
+                response=request.message
+            )
+        
+        if success:
+            return {"status": "success", "message": "Message saved successfully"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to save message")
+            
+    except Exception as e:
+        logger.error(f"Error saving message: {e}")
+        raise HTTPException(status_code=500, detail="Failed to save message")
 
 @router.get("/health")
 async def rag_agent_health():

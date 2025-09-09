@@ -94,12 +94,19 @@ Tone
                 yield "I couldn't find information about this project. Please check if the project exists and you have access to it."
                 return
             
-            # Step 1.5: Get conversation history if session_id is provided
+            # Step 1.5: Create or get chat session if session_id is provided
             conversation_history = []
             if session_id:
-                conversation_history = await self._get_conversation_history(session_id, user_id)
+                # Ensure chat session exists
+                actual_session_id = await self.create_or_get_chat_session(session_id, user_id, project_id)
+                if not actual_session_id:
+                    yield "I encountered an error setting up the chat session. Please try again."
+                    return
+                
+                # Get conversation history
+                conversation_history = await self._get_conversation_history(actual_session_id, user_id)
                 print(f"=== CONVERSATION HISTORY DEBUG ===")
-                print(f"Session ID: {session_id}")
+                print(f"Session ID: {actual_session_id}")
                 print(f"History messages found: {len(conversation_history)}")
                 for i, msg in enumerate(conversation_history[-3:]):  # Show last 3 messages
                     print(f"History {i+1}: {msg.get('role', 'unknown')} - {msg.get('message', '')[:50]}...")
@@ -137,8 +144,9 @@ Tone
                 return
             
             # Step 5: Generate streaming response using OpenAI
+            actual_session_id = session_id if session_id else None
             async for chunk in self._generate_streaming_response(
-                user_question, project_info, combined_context, conversation_history, session_id, user_id
+                user_question, project_info, combined_context, conversation_history, actual_session_id, user_id
             ):
                 yield chunk
                 
@@ -245,12 +253,44 @@ Tone
             logger.error(f"Error extracting conversation context: {e}")
             return {}
     
+    async def create_or_get_chat_session(self, session_id: str, user_id: str, project_id: str) -> str:
+        """Create or get existing chat session."""
+        try:
+            # First, try to get existing session
+            existing_session = self.supabase.table('chat_sessions').select('id').eq('id', session_id).single().execute()
+            
+            if existing_session.data:
+                logger.info(f"Using existing chat session {session_id}")
+                return session_id
+            
+            # Create new session if it doesn't exist
+            session_data = {
+                'id': session_id,
+                'user_id': user_id,
+                'project_id': project_id,
+                'started_at': datetime.now().isoformat(),
+                'name': f"Project Chat - {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+            }
+            
+            result = self.supabase.table('chat_sessions').insert(session_data).execute()
+            
+            if result.data:
+                logger.info(f"Created new chat session {session_id}")
+                return session_id
+            else:
+                logger.error(f"Failed to create chat session {session_id}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error creating/getting chat session: {e}")
+            return None
+    
     async def save_assistant_response(self, session_id: str, user_id: str, response: str) -> bool:
         """Save assistant response to chat history."""
         try:
             # Save the assistant's response to the chat_messages table
             message_data = {
-                'bot_id': session_id,
+                'bot_id': session_id,  # This will be the chat_sessions.id
                 'user_id': user_id,
                 'message': response,
                 'sender_name': 'Sunny AI Assistant',
@@ -270,6 +310,51 @@ Tone
                 
         except Exception as e:
             logger.error(f"Error saving assistant response: {e}")
+            return False
+    
+    async def save_user_message(self, session_id: str, user_id: str, message: str) -> bool:
+        """Save user message to chat history."""
+        try:
+            # Save the user's message to the chat_messages table
+            message_data = {
+                'bot_id': session_id,  # This will be the chat_sessions.id
+                'user_id': user_id,
+                'message': message,
+                'sender_name': 'User',
+                'sender_uuid': user_id,
+                'timestamp': datetime.now().isoformat(),
+                'created_at': datetime.now().isoformat()
+            }
+            
+            result = self.supabase.table('chat_messages').insert(message_data).execute()
+            
+            if result.data:
+                logger.info(f"Saved user message to session {session_id}")
+                return True
+            else:
+                logger.error(f"Failed to save user message to session {session_id}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error saving user message: {e}")
+            return False
+    
+    async def update_session_end_time(self, session_id: str) -> bool:
+        """Update the session end time."""
+        try:
+            result = self.supabase.table('chat_sessions').update({
+                'ended_at': datetime.now().isoformat()
+            }).eq('id', session_id).execute()
+            
+            if result.data:
+                logger.info(f"Updated session end time for {session_id}")
+                return True
+            else:
+                logger.error(f"Failed to update session end time for {session_id}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error updating session end time: {e}")
             return False
     
     async def _retrieve_supabase_context(
