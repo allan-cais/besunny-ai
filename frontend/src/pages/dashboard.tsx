@@ -616,12 +616,44 @@ const Dashboard = () => {
     }
   };
 
+  const testDeleteRoute = async (activityId: string) => {
+    try {
+      // Test the new route first
+      const testResponse = await fetch(`/api/v1/documents/test-delete/${activityId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${session?.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!testResponse.ok) {
+        throw new Error(`Test route failed: ${testResponse.status}`);
+      }
+
+      const testData = await testResponse.json();
+      console.log('Test route response:', testData);
+      
+      toast({
+        title: "Test route works!",
+        description: `Test response: ${testData.message}`,
+      });
+    } catch (error) {
+      console.error('Test route error:', error);
+      toast({
+        title: "Test route failed",
+        description: `Error: ${error}`,
+        variant: "destructive",
+      });
+    }
+  };
+
   const deleteDocument = async (activityId: string) => {
     try {
       setDeleting(activityId);
       
       // Call the backend API to delete document and vectors
-      const response = await fetch(`/api/v1/documents/${activityId}`, {
+      const response = await fetch(`/api/v1/documents/delete/${activityId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${session?.access_token}`,
@@ -892,6 +924,17 @@ const Dashboard = () => {
                             className="text-xs font-mono"
                           >
                             Classify
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={e => {
+                              e.stopPropagation();
+                              testDeleteRoute(activity.id);
+                            }}
+                            className="text-xs font-mono text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                          >
+                            Test
                           </Button>
                           <Button
                             size="sm"

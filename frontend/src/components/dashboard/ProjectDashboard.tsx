@@ -245,7 +245,7 @@ const ProjectDashboard: React.FC<ProjectDashboardProps> = ({ projectId }) => {
       setDeleting(documentId);
       
       // Call the backend API to delete document and vectors
-      const response = await fetch(`/api/v1/documents/${documentId}`, {
+      const response = await fetch(`/api/v1/documents/delete/${documentId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${session?.access_token}`,
