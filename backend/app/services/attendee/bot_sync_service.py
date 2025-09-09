@@ -171,7 +171,7 @@ class BotSyncService:
                 logger.info(f"Applied future filter from {now}")
             
             # Order by start_time descending
-            meetings_result = query.order('start_time', desc=True).execute()
+            meetings_result = query.order('start_time').execute()
             
             logger.info(f"Backend query returned {len(meetings_result.data) if meetings_result.data else 0} meetings")
             
