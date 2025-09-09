@@ -63,6 +63,7 @@ Tone
         user_question: str,
         project_id: str,
         user_id: str,
+        session_id: str = None,
         max_results: int = 10
     ) -> AsyncGenerator[str, None]:
         """
@@ -72,6 +73,7 @@ Tone
             user_question: User's question about the project
             project_id: ID of the project to query
             user_id: ID of the user asking the question
+            session_id: Optional session ID for conversation memory
             max_results: Maximum number of results to retrieve
             
         Yields:
@@ -91,6 +93,23 @@ Tone
             if not project_info:
                 yield "I couldn't find information about this project. Please check if the project exists and you have access to it."
                 return
+            
+            # Step 1.5: Get conversation history if session_id is provided
+            conversation_history = []
+            if session_id:
+                conversation_history = await self._get_conversation_history(session_id, user_id)
+                print(f"=== CONVERSATION HISTORY DEBUG ===")
+                print(f"Session ID: {session_id}")
+                print(f"History messages found: {len(conversation_history)}")
+                for i, msg in enumerate(conversation_history[-3:]):  # Show last 3 messages
+                    print(f"History {i+1}: {msg.get('role', 'unknown')} - {msg.get('message', '')[:50]}...")
+                print("=" * 50)
+                
+                # Step 1.6: Extract entities and context from conversation history
+                conversation_context = self._extract_conversation_context(conversation_history, user_question)
+                print(f"=== CONVERSATION CONTEXT DEBUG ===")
+                print(f"Extracted context: {conversation_context}")
+                print("=" * 50)
             
             # Step 2: Retrieve relevant context from Supabase
             supabase_context = await self._retrieve_supabase_context(
@@ -119,7 +138,7 @@ Tone
             
             # Step 5: Generate streaming response using OpenAI
             async for chunk in self._generate_streaming_response(
-                user_question, project_info, combined_context
+                user_question, project_info, combined_context, conversation_history, session_id, user_id
             ):
                 yield chunk
                 
@@ -135,6 +154,123 @@ Tone
         except Exception as e:
             logger.error(f"Error getting project info: {e}")
             return None
+    
+    async def _get_conversation_history(self, session_id: str, user_id: str, limit: int = 10) -> List[Dict[str, Any]]:
+        """Get conversation history for a session."""
+        try:
+            # Get recent messages from the session, ordered by timestamp
+            result = self.supabase.table('chat_messages').select('*').eq('bot_id', session_id).eq('user_id', user_id).order('created_at', desc=True).limit(limit).execute()
+            
+            if not result.data:
+                return []
+            
+            # Convert to conversation format and reverse to get chronological order
+            messages = []
+            for msg in reversed(result.data):
+                # Determine role based on sender_name or other indicators
+                role = "user"
+                if msg.get('sender_name') and 'assistant' in msg.get('sender_name', '').lower():
+                    role = "assistant"
+                elif msg.get('sender_name') and 'bot' in msg.get('sender_name', '').lower():
+                    role = "assistant"
+                
+                messages.append({
+                    'role': role,
+                    'message': msg.get('message', ''),
+                    'timestamp': msg.get('created_at', ''),
+                    'sender_name': msg.get('sender_name', '')
+                })
+            
+            return messages
+            
+        except Exception as e:
+            logger.error(f"Error getting conversation history: {e}")
+            return []
+    
+    def _extract_conversation_context(self, conversation_history: List[Dict[str, Any]], current_question: str) -> Dict[str, Any]:
+        """Extract relevant context and entities from conversation history."""
+        try:
+            context = {
+                'mentioned_people': set(),
+                'mentioned_projects': set(),
+                'mentioned_dates': set(),
+                'recent_topics': [],
+                'pronoun_references': {}
+            }
+            
+            # Extract entities from recent conversation
+            for msg in conversation_history[-5:]:  # Last 5 messages
+                message_text = msg.get('message', '').lower()
+                
+                # Simple entity extraction (you could enhance this with NLP libraries)
+                # Look for common patterns
+                import re
+                
+                # Extract names (capitalized words that might be names)
+                names = re.findall(r'\b[A-Z][a-z]+\b', msg.get('message', ''))
+                context['mentioned_people'].update(names)
+                
+                # Extract project references
+                if 'project' in message_text:
+                    context['mentioned_projects'].add('current_project')
+                
+                # Extract dates
+                dates = re.findall(r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b|\b\w+ \d{1,2},? \d{4}\b', msg.get('message', ''))
+                context['mentioned_dates'].update(dates)
+                
+                # Track recent topics
+                if len(msg.get('message', '')) > 10:
+                    context['recent_topics'].append(msg.get('message', '')[:100])
+            
+            # Convert sets to lists for JSON serialization
+            context['mentioned_people'] = list(context['mentioned_people'])
+            context['mentioned_projects'] = list(context['mentioned_projects'])
+            context['mentioned_dates'] = list(context['mentioned_dates'])
+            
+            # Handle pronoun references
+            current_question_lower = current_question.lower()
+            if 'his' in current_question_lower or 'her' in current_question_lower or 'their' in current_question_lower:
+                # Look for the most recently mentioned person
+                if context['mentioned_people']:
+                    context['pronoun_references']['his/her/their'] = context['mentioned_people'][-1]
+            
+            if 'it' in current_question_lower:
+                # Look for recently mentioned projects or topics
+                if context['mentioned_projects']:
+                    context['pronoun_references']['it'] = context['mentioned_projects'][-1]
+            
+            return context
+            
+        except Exception as e:
+            logger.error(f"Error extracting conversation context: {e}")
+            return {}
+    
+    async def save_assistant_response(self, session_id: str, user_id: str, response: str) -> bool:
+        """Save assistant response to chat history."""
+        try:
+            # Save the assistant's response to the chat_messages table
+            message_data = {
+                'bot_id': session_id,
+                'user_id': user_id,
+                'message': response,
+                'sender_name': 'Sunny AI Assistant',
+                'sender_uuid': 'assistant',
+                'timestamp': datetime.now().isoformat(),
+                'created_at': datetime.now().isoformat()
+            }
+            
+            result = self.supabase.table('chat_messages').insert(message_data).execute()
+            
+            if result.data:
+                logger.info(f"Saved assistant response to session {session_id}")
+                return True
+            else:
+                logger.error(f"Failed to save assistant response to session {session_id}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error saving assistant response: {e}")
+            return False
     
     async def _retrieve_supabase_context(
         self, 
@@ -342,7 +478,10 @@ Tone
         self, 
         user_question: str, 
         project_info: Dict[str, Any], 
-        context: List[Dict[str, Any]]
+        context: List[Dict[str, Any]],
+        conversation_history: List[Dict[str, Any]] = None,
+        session_id: str = None,
+        user_id: str = None
     ) -> AsyncGenerator[str, None]:
         """Generate streaming response using OpenAI."""
         try:
@@ -350,6 +489,19 @@ Tone
             context_text = self._format_context_for_prompt(context)
             
             # Prepare the system prompt with context
+            conversation_context_text = ""
+            if conversation_history:
+                conversation_context_text = f"""
+
+Conversation Context:
+Recent conversation history is available. Pay attention to:
+- Previously mentioned people, projects, and topics
+- Pronoun references (e.g., "his" refers to the most recently mentioned person)
+- Context from earlier in the conversation
+- Maintain continuity with previous responses
+
+Use this context to provide more coherent and contextually aware responses."""
+            
             system_prompt = f"""{self.rag_prompt}
 
 Current Project Context:
@@ -358,7 +510,7 @@ Project Name: {project_info.get('name', 'Unknown Project')}
 User Question: {user_question}
 
 Project Database:
-{context_text}
+{context_text}{conversation_context_text}
 
 Provide a helpful, accurate response grounded in the project database."""
             
@@ -369,22 +521,51 @@ Provide a helpful, accurate response grounded in the project database."""
             print(system_prompt[:1000])
             print("=" * 50)
             
+            # Prepare messages array with conversation history
+            messages = [{"role": "system", "content": system_prompt}]
+            
+            # Add conversation history if available
+            if conversation_history:
+                for msg in conversation_history[-6:]:  # Last 6 messages to avoid token limits
+                    messages.append({
+                        "role": msg['role'],
+                        "content": msg['message']
+                    })
+            
+            # Add current user question
+            messages.append({"role": "user", "content": user_question})
+            
+            print(f"=== OPENAI MESSAGES DEBUG ===")
+            print(f"Total messages: {len(messages)}")
+            print(f"System prompt length: {len(system_prompt)}")
+            print(f"Conversation history messages: {len(conversation_history) if conversation_history else 0}")
+            print("=" * 50)
+            
             # Create chat completion with streaming
             stream = await self.openai_client.chat.completions.create(
                 model=self.settings.openai_model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_question}
-                ],
+                messages=messages,
                 stream=True,
                 temperature=0.7,
                 max_tokens=1000
             )
             
-            # Stream the response
+            # Stream the response and collect it for saving
+            full_response = ""
             async for chunk in stream:
                 if chunk.choices[0].delta.content:
-                    yield chunk.choices[0].delta.content
+                    content = chunk.choices[0].delta.content
+                    full_response += content
+                    yield content
+            
+            # Save the complete response to chat history if session_id is provided
+            if session_id and full_response.strip():
+                # This will run after the streaming is complete
+                # Note: In a real implementation, you might want to save this in a background task
+                try:
+                    await self.save_assistant_response(session_id, user_id, full_response)
+                except Exception as e:
+                    logger.error(f"Failed to save assistant response: {e}")
                     
         except Exception as e:
             logger.error(f"Error generating streaming response: {e}")
