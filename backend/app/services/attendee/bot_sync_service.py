@@ -98,13 +98,25 @@ class BotSyncService:
     
     async def get_user_meetings_with_bot_status(self, user_id: str, unassigned_only: bool = True, future_only: bool = True) -> List[Dict[str, Any]]:
         """
-        Get meetings for a user with their associated bot status.
+        Get meetings for a user with their associated bot status using JOIN query.
         """
         try:
             logger.info(f"Getting meetings for user {user_id}, unassigned_only={unassigned_only}, future_only={future_only}")
             
-            # Build query
-            query = self.supabase.table('meetings').select('*').eq('user_id', user_id)
+            # Build the JOIN query to get meetings with their associated bot information
+            # This uses the foreign key relationship between meetings.attendee_bot_id and meeting_bots.bot_id
+            query = self.supabase.table('meetings').select('''
+                *,
+                meeting_bots!attendee_bot_id(
+                    bot_id,
+                    status,
+                    bot_name,
+                    deployment_method,
+                    metadata,
+                    created_at,
+                    updated_at
+                )
+            ''').eq('user_id', user_id)
             
             # Filter for unassigned meetings (project_id is null)
             if unassigned_only:
@@ -129,16 +141,12 @@ class BotSyncService:
             
             meetings = meetings_result.data
             
-            # Get all meeting bots for the user
-            meeting_bots = self._get_user_meeting_bots(user_id)
-            
-            # Create a lookup map by meeting_url
-            bot_lookup = {bot['meeting_url']: bot for bot in meeting_bots if bot.get('meeting_url')}
-            
-            # Merge bot information into meetings
+            # Process the results to merge bot information
             for meeting in meetings:
-                if meeting.get('meeting_url') and meeting['meeting_url'] in bot_lookup:
-                    bot = bot_lookup[meeting['meeting_url']]
+                # Extract bot information from the joined data
+                bot_info = meeting.get('meeting_bots')
+                if bot_info and len(bot_info) > 0:
+                    bot = bot_info[0]  # Get the first (and should be only) bot
                     meeting.update({
                         'attendee_bot_id': bot['bot_id'],
                         'bot_status': bot['status'],
@@ -148,7 +156,23 @@ class BotSyncService:
                         'bot_created_at': bot['created_at'],
                         'bot_updated_at': bot['updated_at']
                     })
+                else:
+                    # No bot associated with this meeting
+                    meeting.update({
+                        'attendee_bot_id': None,
+                        'bot_status': 'pending',
+                        'bot_name': None,
+                        'bot_deployment_method': None,
+                        'bot_metadata': {},
+                        'bot_created_at': None,
+                        'bot_updated_at': None
+                    })
+                
+                # Remove the joined data to clean up the response
+                if 'meeting_bots' in meeting:
+                    del meeting['meeting_bots']
             
+            logger.info(f"Returning {len(meetings)} meetings with bot status")
             return meetings
             
         except Exception as e:
