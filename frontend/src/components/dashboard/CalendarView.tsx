@@ -316,7 +316,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
                       size="sm"
                       variant="outline"
                       disabled
-                      className="font-mono bg-green-50 text-green-700 border-green-200 hover:bg-green-50 cursor-not-allowed"
+                      className="font-mono bg-green-600 text-white border-green-600 hover:bg-green-600 cursor-not-allowed"
                     >
                       <Bot className="w-4 h-4" />
                       <span className="ml-1">Bot Deployed</span>

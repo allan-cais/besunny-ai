@@ -668,14 +668,15 @@ const Dashboard = () => {
                               <Bot className="w-3 h-3" />
                             )}
                           </Button>
-                        ) : meeting.bot_status && meeting.bot_status !== 'pending' ? (
+                        ) : meeting.attendee_bot_id || (meeting.bot_status && meeting.bot_status !== 'pending') ? (
                           <Button
                             size="sm"
                             variant="outline"
                             disabled
-                            className="text-xs bg-green-50 text-green-700 border-green-200 hover:bg-green-50 cursor-not-allowed"
+                            className="text-xs bg-green-600 text-white border-green-600 hover:bg-green-600 cursor-not-allowed"
                           >
-                            <Bot className="w-3 h-3" />
+                            <Bot className="w-3 h-3 mr-1" />
+                            DEPLOYED
                           </Button>
                         ) : (
                           getBotStatusBadge(meeting)
@@ -941,7 +942,7 @@ const Dashboard = () => {
                   size="sm"
                   variant="outline"
                   disabled
-                  className="flex-1 bg-green-50 text-green-700 border-green-200 hover:bg-green-50 cursor-not-allowed font-mono text-xs"
+                  className="flex-1 bg-green-600 text-white border-green-600 hover:bg-green-600 cursor-not-allowed font-mono text-xs"
                 >
                   <Bot className="mr-2 h-4 w-4" />
                   BOT DEPLOYED
