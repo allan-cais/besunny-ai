@@ -128,7 +128,7 @@ export function UnclassifiedDocuments() {
       setDeleting(documentId);
       
       // Call the backend API to delete document and vectors
-      const response = await fetch(`/api/v1/documents/${documentId}`, {
+      const response = await fetch(`/api/v1/documents/delete/${documentId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,

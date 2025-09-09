@@ -251,7 +251,19 @@ async def _embed_manually_assigned_document(
     except Exception as e:
         logger.error(f"Error in background embedding for manual assignment: {e}")
 
-@router.delete("/{document_id}")
+@router.get("/test-delete/{document_id}")
+async def test_delete_document(
+    document_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Test route to verify document deletion works."""
+    return {
+        "message": f"Test delete route works for document {document_id}",
+        "user_id": current_user.get('id'),
+        "document_id": document_id
+    }
+
+@router.delete("/delete/{document_id}")
 async def delete_document(
     document_id: str,
     current_user: Dict[str, Any] = Depends(get_current_user)
