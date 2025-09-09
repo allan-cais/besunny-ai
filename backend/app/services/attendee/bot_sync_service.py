@@ -84,42 +84,40 @@ class BotSyncService:
         Get a meeting with its associated bot status using foreign key relationship.
         """
         try:
-            # Get the meeting with its associated bot information using JOIN
-            meeting_result = self.supabase.table('meetings').select('''
-                *,
-                meeting_bots!attendee_bot_id(
-                    bot_id,
-                    status,
-                    bot_name,
-                    deployment_method,
-                    metadata,
-                    created_at,
-                    updated_at
-                )
-            ''').eq('id', meeting_id).eq('user_id', user_id).single().execute()
+            # Get the meeting first
+            meeting_result = self.supabase.table('meetings').select('*').eq('id', meeting_id).eq('user_id', user_id).single().execute()
             
             if not meeting_result.data:
                 return None
             
             meeting = meeting_result.data
             
-            # Extract bot information from the joined data
-            bot_info = meeting.get('meeting_bots')
-            if bot_info and len(bot_info) > 0:
-                bot = bot_info[0]  # Get the first (and should be only) bot
-                meeting.update({
-                    'attendee_bot_id': bot['bot_id'],
-                    'bot_status': bot['status'],
-                    'bot_name': bot['bot_name'],
-                    'bot_deployment_method': bot['deployment_method'],
-                    'bot_metadata': bot.get('metadata', {}),
-                    'bot_created_at': bot['created_at'],
-                    'bot_updated_at': bot['updated_at']
-                })
+            # Get bot information separately if meeting has a bot
+            if meeting.get('attendee_bot_id'):
+                bot_result = self.supabase.table('meeting_bots').select('*').eq('bot_id', meeting['attendee_bot_id']).execute()
+                if bot_result.data and len(bot_result.data) > 0:
+                    bot = bot_result.data[0]
+                    meeting.update({
+                        'bot_status': bot['status'],
+                        'bot_name': bot['bot_name'],
+                        'bot_deployment_method': bot['deployment_method'],
+                        'bot_metadata': bot.get('metadata', {}),
+                        'bot_created_at': bot['created_at'],
+                        'bot_updated_at': bot['updated_at']
+                    })
+                else:
+                    # Bot ID exists but no bot found
+                    meeting.update({
+                        'bot_status': None,
+                        'bot_name': None,
+                        'bot_deployment_method': None,
+                        'bot_metadata': None,
+                        'bot_created_at': None,
+                        'bot_updated_at': None
+                    })
             else:
                 # No bot associated with this meeting
                 meeting.update({
-                    'attendee_bot_id': None,
                     'bot_status': 'pending',
                     'bot_name': None,
                     'bot_deployment_method': None,
