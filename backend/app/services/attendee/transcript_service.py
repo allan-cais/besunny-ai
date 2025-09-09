@@ -6,7 +6,7 @@ Handles transcript retrieval and storage in the meeting_bots table.
 import logging
 import httpx
 from typing import Optional, Dict, Any
-from ..core.config import get_settings
+from ...core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
