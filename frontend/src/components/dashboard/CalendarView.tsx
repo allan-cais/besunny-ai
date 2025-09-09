@@ -319,7 +319,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({
                       className="font-mono bg-green-600 text-white border-green-600 hover:bg-green-600 cursor-not-allowed"
                     >
                       <Bot className="w-4 h-4" />
-                      <span className="ml-1">Bot Deployed</span>
                     </Button>
                   ) : (
                     getBotStatusBadge(meeting)

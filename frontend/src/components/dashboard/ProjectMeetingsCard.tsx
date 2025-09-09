@@ -346,8 +346,7 @@ const ProjectMeetingsCard: React.FC<ProjectMeetingsCardProps> = ({ projectId }) 
                         disabled
                         className="font-mono text-xs bg-green-600 text-white border-green-600 hover:bg-green-600 cursor-not-allowed"
                       >
-                        <Send className="mr-1 h-3 w-3" />
-                        BOT DEPLOYED
+                        <Send className="h-3 w-3" />
                       </Button>
                     ) : (
                       getBotStatusBadge(meeting.bot_status)
