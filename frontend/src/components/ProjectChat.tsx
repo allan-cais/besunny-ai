@@ -201,7 +201,8 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
         // Send message to RAG Agent API for AI processing
         const ragPayload = {
           question: userMessageText,
-          project_id: projectId
+          project_id: projectId,
+          session_id: activeChatId  // Include session ID for conversation memory
         };
         
         console.log("=== FRONTEND RAG REQUEST DEBUG ===");

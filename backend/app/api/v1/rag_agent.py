@@ -19,6 +19,7 @@ class RAGQueryRequest(BaseModel):
     """Request model for RAG agent queries."""
     question: str
     project_id: str
+    session_id: str = None  # Optional session ID for conversation memory
 
 class ProjectSummaryRequest(BaseModel):
     """Request model for project summary requests."""
@@ -44,7 +45,8 @@ async def query_project_data(
             async for chunk in rag_service.query_project_data(
                 user_question=request.question,
                 project_id=request.project_id,
-                user_id=current_user['id']
+                user_id=current_user['id'],
+                session_id=request.session_id
             ):
                 yield f"data: {chunk}\n\n"
             
