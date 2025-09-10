@@ -684,7 +684,7 @@ Provide a helpful, accurate response grounded in the project database."""
             
             # Debug logging to see the full system prompt
             print(f"=== SYSTEM PROMPT DEBUG ===")
-            print(f"System prompt length: {len(system_prompt)}")
+            print(f"✅ SYSTEM PROMPT LENGTH: {len(system_prompt)} characters (should be ~2000, not 34000!)")
             print(f"First 1000 chars of system prompt:")
             print(system_prompt[:1000])
             print("=" * 50)
@@ -712,7 +712,8 @@ Please answer the question using the provided context."""
             
             print(f"=== OPENAI MESSAGES DEBUG ===")
             print(f"Total messages: {len(messages)}")
-            print(f"System prompt length: {len(system_prompt)}")
+            print(f"✅ SYSTEM PROMPT LENGTH: {len(system_prompt)} characters")
+            print(f"✅ USER MESSAGE LENGTH: {len(user_message_with_context)} characters")
             print(f"Conversation history messages: {len(conversation_history) if conversation_history else 0}")
             
             # Estimate token count (rough approximation: 1 token ≈ 4 characters)
