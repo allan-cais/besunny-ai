@@ -14,6 +14,8 @@ from pinecone import Pinecone, ServerlessSpec
 
 from ...core.supabase_config import get_supabase_service_client
 from ...core.config import get_settings
+from .semantic_chunking_service import SemanticChunkingService
+from .hierarchical_chunking_service import HierarchicalChunkingService
 
 logger = logging.getLogger(__name__)
 
@@ -40,10 +42,14 @@ class VectorEmbeddingService:
         # Tokenizer for chunking
         self.tokenizer = tiktoken.get_encoding("cl100k_base")
         
-        # Optimized chunking configuration for production
-        self.max_chunk_tokens = 512  # Smaller chunks for better semantic retrieval
-        self.min_chunk_tokens = 100  # Minimum chunk size to avoid noise
-        self.chunk_overlap = 25  # Minimal overlap (5% of max size)
+        # Initialize advanced chunking services
+        self.semantic_chunker = SemanticChunkingService()
+        self.hierarchical_chunker = HierarchicalChunkingService()
+        
+        # Use config values for chunking parameters
+        self.max_chunk_tokens = self.settings.max_chunk_tokens
+        self.min_chunk_tokens = self.settings.min_chunk_tokens
+        self.chunk_overlap = self.settings.chunk_overlap
         self.max_chunk_characters = 2000  # Character limit as fallback
     
     def _get_or_create_index(self):
@@ -282,8 +288,8 @@ class VectorEmbeddingService:
             # Clean and preprocess content
             cleaned_text = self._preprocess_content(content_text)
             
-            # Create semantic chunks
-            chunks = self._create_semantic_chunks(cleaned_text, content)
+            # Use advanced semantic chunking
+            chunks = await self.semantic_chunker.create_semantic_chunks(cleaned_text, content)
             
             # Post-process chunks to ensure quality
             optimized_chunks = self._optimize_chunks(chunks)

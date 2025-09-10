@@ -78,6 +78,18 @@ class Settings(BaseSettings):
     embedding_base_url: str = Field(default="https://api.openai.com/v1", env="EMBEDDING_BASE_URL")
     embedding_api_key: Optional[str] = Field(default=None, env="EMBEDDING_API_KEY")
     embedding_model_choice: str = Field(default="text-embedding-3-small", env="EMBEDDING_MODEL_CHOICE")
+    embedding_model_large: str = Field(default="text-embedding-3-large", env="EMBEDDING_MODEL_LARGE")
+    
+    # Hybrid search configuration
+    use_hybrid_search: bool = Field(default=True, env="USE_HYBRID_SEARCH")
+    semantic_weight: float = Field(default=0.7, env="SEMANTIC_WEIGHT")
+    keyword_weight: float = Field(default=0.3, env="KEYWORD_WEIGHT")
+    
+    # Advanced chunking configuration
+    max_chunk_tokens: int = Field(default=400, env="MAX_CHUNK_TOKENS")
+    min_chunk_tokens: int = Field(default=100, env="MIN_CHUNK_TOKENS")
+    chunk_overlap: int = Field(default=50, env="CHUNK_OVERLAP")
+    similarity_threshold: float = Field(default=0.7, env="SIMILARITY_THRESHOLD")
     
     # Webhook settings
     webhook_base_url: str = Field(default="https://backend-staging-6085.up.railway.app", env="WEBHOOK_BASE_URL")
