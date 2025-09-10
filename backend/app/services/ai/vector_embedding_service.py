@@ -122,7 +122,7 @@ class VectorEmbeddingService:
                 }
             
             # Create content chunks
-            chunks = self._create_content_chunks(content)
+            chunks = await self._create_content_chunks(content)
             logger.info(f"Created {len(chunks)} chunks for content: {content.get('source_id', 'unknown')}")
             
             # Generate embeddings for each chunk
@@ -273,7 +273,7 @@ class VectorEmbeddingService:
             logger.error(f"Error deleting document vectors: {e}")
             return False
     
-    def _create_content_chunks(self, content: Dict[str, Any]) -> List[Dict[str, Any]]:
+    async def _create_content_chunks(self, content: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Create optimized text chunks from content for embedding."""
         try:
             # Get the best available content
