@@ -36,12 +36,60 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
 
   // Utility function to format AI response with paragraph breaks and source links
   const formatAIResponse = (text: string) => {
-    // Split by double newlines to create paragraphs
-    const paragraphs = text.split('\n\n').filter(p => p.trim());
+    // First, try to split by double newlines
+    let paragraphs = text.split('\n\n').filter(p => p.trim());
+    
+    // If no double newlines found, try to create logical breaks
+    if (paragraphs.length === 1) {
+      const content = paragraphs[0];
+      
+      // Split by "Sources:" first to separate main content from sources
+      const sourceSplit = content.split(/(Sources:.*)/);
+      const mainContent = sourceSplit[0].trim();
+      const sourcesContent = sourceSplit[1] ? sourceSplit[1].trim() : '';
+      
+      // Process main content to find logical breaks
+      let mainParagraphs = [mainContent];
+      
+      // Look for numbered list items (1. Name: Description)
+      const numberedListMatch = mainContent.match(/(\d+\.\s+[^:]+:[^¹]*?)(?=\d+\.\s+[^:]+:|$)/g);
+      if (numberedListMatch && numberedListMatch.length > 1) {
+        // Split the content around the numbered items
+        let remaining = mainContent;
+        mainParagraphs = [];
+        
+        for (const item of numberedListMatch) {
+          const index = remaining.indexOf(item);
+          if (index > 0) {
+            const before = remaining.substring(0, index).trim();
+            if (before) mainParagraphs.push(before);
+          }
+          mainParagraphs.push(item.trim());
+          remaining = remaining.substring(index + item.length);
+        }
+        
+        // Add any remaining content
+        if (remaining.trim()) {
+          mainParagraphs.push(remaining.trim());
+        }
+      } else {
+        // Try to split by sentences that end with periods followed by capital letters
+        const sentenceSplit = mainContent.split(/(?<=[.!?])\s+(?=[A-Z])/);
+        if (sentenceSplit.length > 1) {
+          mainParagraphs = sentenceSplit.map(s => s.trim()).filter(s => s.length > 0);
+        }
+      }
+      
+      // Combine main paragraphs with sources
+      paragraphs = [...mainParagraphs];
+      if (sourcesContent) {
+        paragraphs.push(sourcesContent);
+      }
+    }
     
     return paragraphs.map((paragraph, index) => {
-      // Check if this paragraph contains sources (starts with [1], [2], etc.)
-      if (paragraph.match(/^\[\d+\]/)) {
+      // Check if this paragraph contains sources
+      if (paragraph.includes('Sources:') || paragraph.match(/^\[\d+\]/)) {
         return {
           type: 'sources',
           content: paragraph,
