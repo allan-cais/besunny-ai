@@ -16,6 +16,7 @@ from ...core.supabase_config import get_supabase_service_client
 from ...core.config import get_settings
 from .semantic_chunking_service import SemanticChunkingService
 from .hierarchical_chunking_service import HierarchicalChunkingService
+from .contextual_retrieval_service import ContextualRetrievalService
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,7 @@ class VectorEmbeddingService:
         # Initialize advanced chunking services
         self.semantic_chunker = SemanticChunkingService()
         self.hierarchical_chunker = HierarchicalChunkingService()
+        self.contextual_retrieval = ContextualRetrievalService()
         
         # Use config values for chunking parameters
         self.max_chunk_tokens = self.settings.max_chunk_tokens
@@ -274,7 +276,7 @@ class VectorEmbeddingService:
             return False
     
     async def _create_content_chunks(self, content: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Create optimized text chunks from content for embedding."""
+        """Create optimized text chunks from content for embedding with contextual retrieval."""
         try:
             # Get the best available content
             content_text = self._extract_best_content(content)
@@ -288,11 +290,26 @@ class VectorEmbeddingService:
             # Clean and preprocess content
             cleaned_text = self._preprocess_content(content_text)
             
-            # Use advanced semantic chunking
-            chunks = await self.semantic_chunker.create_semantic_chunks(cleaned_text, content)
-            
-            # Post-process chunks to ensure quality
-            optimized_chunks = self._optimize_chunks(chunks)
+            # Use contextual retrieval if enabled
+            if self.settings.use_contextual_retrieval:
+                contextual_chunks = await self.contextual_retrieval.create_contextual_chunks({
+                    **content,
+                    'content_text': cleaned_text
+                })
+                
+                if not contextual_chunks:
+                    # Fallback to semantic chunking if contextual retrieval fails
+                    logger.warning("Contextual retrieval failed, falling back to semantic chunking")
+                    chunks = await self.semantic_chunker.create_semantic_chunks(cleaned_text, content)
+                    optimized_chunks = self._optimize_chunks(chunks)
+                else:
+                    # Post-process contextual chunks to ensure quality
+                    optimized_chunks = self._optimize_chunks(contextual_chunks)
+            else:
+                # Use semantic chunking directly if contextual retrieval is disabled
+                logger.info("Contextual retrieval disabled, using semantic chunking")
+                chunks = await self.semantic_chunker.create_semantic_chunks(cleaned_text, content)
+                optimized_chunks = self._optimize_chunks(chunks)
             
             logger.info(f"Created {len(optimized_chunks)} optimized chunks")
             return optimized_chunks

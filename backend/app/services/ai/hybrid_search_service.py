@@ -13,6 +13,7 @@ from collections import Counter
 
 from ...core.config import get_settings
 from .query_optimization_service import QueryOptimizationService
+from .contextual_retrieval_service import ContextualRetrievalService
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,7 @@ class HybridSearchService:
             base_url=self.settings.openai_base_url if hasattr(self.settings, 'openai_base_url') else None
         )
         self.query_optimizer = QueryOptimizationService()
+        self.contextual_retrieval = ContextualRetrievalService()
         
         # Hybrid search weights
         self.semantic_weight = self.settings.semantic_weight
@@ -42,9 +44,21 @@ class HybridSearchService:
     
     async def hybrid_search(self, query: str, project_id: str, user_id: str, 
                           max_results: int = 10, context: Dict[str, Any] = None) -> List[Dict[str, Any]]:
-        """Perform hybrid search combining semantic and keyword search."""
+        """Perform hybrid search combining semantic and keyword search with contextual retrieval."""
         try:
             logger.info(f"Performing hybrid search for query: {query[:100]}...")
+            
+            # Use contextual retrieval for enhanced search
+            contextual_results = await self.contextual_retrieval.hybrid_contextual_search(
+                query, project_id, user_id, max_results
+            )
+            
+            if contextual_results:
+                logger.info(f"Contextual retrieval returned {len(contextual_results)} results")
+                return contextual_results
+            
+            # Fallback to original hybrid search if contextual retrieval fails
+            logger.warning("Contextual retrieval failed, falling back to original hybrid search")
             
             # Step 1: Optimize the query
             query_optimization = await self.query_optimizer.optimize_query(query, context or {})
