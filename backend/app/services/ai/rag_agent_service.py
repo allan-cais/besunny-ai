@@ -751,8 +751,8 @@ Provide a helpful, accurate response grounded in the project database."""
             for i, item in enumerate(context, 1):
                 source_type = item.get('source', 'unknown').replace('_', ' ').title()
                 title = item.get('title', 'Untitled')
-                # Increase content length limit to 1000 characters to preserve more context
-                content = item.get('content', '')[:1000] + "..." if len(item.get('content', '')) > 1000 else item.get('content', '')
+                # Increase content length limit to 3000 characters to preserve more context including team member info
+                content = item.get('content', '')[:3000] + "..." if len(item.get('content', '')) > 3000 else item.get('content', '')
                 author = item.get('author', 'Unknown')
                 date = item.get('created_at', 'Unknown')
                 relevance = item.get('relevance_score', 0)
