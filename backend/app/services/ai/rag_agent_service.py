@@ -256,16 +256,25 @@ Tone
     async def create_or_get_chat_session(self, session_id: str, user_id: str, project_id: str) -> str:
         """Create or get existing chat session."""
         try:
+            import uuid
+            
+            # Generate a proper UUID for the session using the frontend session_id as seed
+            # This ensures the same frontend session always gets the same UUID
+            session_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"chat_{session_id}"))
+            
             # First, try to get existing session
-            existing_session = self.supabase.table('chat_sessions').select('id').eq('id', session_id).single().execute()
+            try:
+                existing_session = self.supabase.table('chat_sessions').select('id').eq('id', session_uuid).single().execute()
+                if existing_session.data:
+                    logger.info(f"Using existing chat session {session_uuid}")
+                    return session_uuid
+            except:
+                # Session doesn't exist, we'll create it
+                pass
             
-            if existing_session.data:
-                logger.info(f"Using existing chat session {session_id}")
-                return session_id
-            
-            # Create new session if it doesn't exist
+            # Create new session
             session_data = {
-                'id': session_id,
+                'id': session_uuid,
                 'user_id': user_id,
                 'project_id': project_id,
                 'started_at': datetime.now().isoformat(),
@@ -275,10 +284,10 @@ Tone
             result = self.supabase.table('chat_sessions').insert(session_data).execute()
             
             if result.data:
-                logger.info(f"Created new chat session {session_id}")
-                return session_id
+                logger.info(f"Created new chat session {session_uuid}")
+                return session_uuid
             else:
-                logger.error(f"Failed to create chat session {session_id}")
+                logger.error(f"Failed to create chat session {session_uuid}")
                 return None
                 
         except Exception as e:
