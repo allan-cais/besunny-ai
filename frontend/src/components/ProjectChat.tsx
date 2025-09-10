@@ -8,6 +8,9 @@ import { useAuth } from '@/providers/AuthProvider';
 import { ChatMessage } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 import { config } from '@/config';
+import DocumentModal from '@/components/dashboard/DocumentModal';
+import { Document } from '@/types';
+import { supabase } from '@/lib/supabase';
 
 interface ProjectChatProps {
   projectId: string;
@@ -22,12 +25,112 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
   const [isLoading, setIsLoading] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
+  const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
+  const [isDocumentModalOpen, setIsDocumentModalOpen] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const assistantContainerRef = useRef<HTMLDivElement>(null);
 
   // Simple chat state management - no complex database operations for now
+
+  // Utility function to format AI response with paragraph breaks and source links
+  const formatAIResponse = (text: string) => {
+    // Split by double newlines to create paragraphs
+    const paragraphs = text.split('\n\n').filter(p => p.trim());
+    
+    return paragraphs.map((paragraph, index) => {
+      // Check if this paragraph contains sources (starts with [1], [2], etc.)
+      if (paragraph.match(/^\[\d+\]/)) {
+        return {
+          type: 'sources',
+          content: paragraph,
+          key: `sources-${index}`
+        };
+      }
+      
+      // Check if this paragraph contains citations (¹ ² ³)
+      const hasCitations = paragraph.includes('¹') || paragraph.includes('²') || paragraph.includes('³');
+      
+      return {
+        type: hasCitations ? 'content-with-citations' : 'content',
+        content: paragraph,
+        key: `paragraph-${index}`
+      };
+    });
+  };
+
+  // Function to handle document link clicks
+  const handleDocumentClick = async (documentTitle: string) => {
+    try {
+      // Search for the document by title in the current project
+      const { data: documents, error } = await supabase
+        .from('documents')
+        .select('*')
+        .eq('project_id', projectId)
+        .ilike('title', `%${documentTitle}%`)
+        .limit(1);
+
+      if (error) {
+        console.error('Error fetching document:', error);
+        return;
+      }
+
+      if (documents && documents.length > 0) {
+        setSelectedDocument(documents[0] as Document);
+        setIsDocumentModalOpen(true);
+      } else {
+        console.log('Document not found:', documentTitle);
+      }
+    } catch (error) {
+      console.error('Error handling document click:', error);
+    }
+  };
+
+  // Function to render formatted content with clickable sources
+  const renderFormattedContent = (content: string) => {
+    // Split content by sources pattern and render each part
+    const parts = content.split(/(\[\d+\][^\[]*)/g);
+    
+    return parts.map((part, index) => {
+      // Check if this part is a source
+      const sourceMatch = part.match(/^\[(\d+)\]\s*(.+?)\s*-\s*(.+?)\s*\((.+?)\)$/);
+      
+      if (sourceMatch) {
+        const [, number, title, date, sourceType] = sourceMatch;
+        return (
+          <div key={index} className="mt-2 p-2 bg-gray-50 dark:bg-gray-800 rounded border-l-4 border-blue-500">
+            <button
+              onClick={() => handleDocumentClick(title.trim())}
+              className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline cursor-pointer"
+            >
+              [{number}] {title.trim()} - {date.trim()} ({sourceType.trim()})
+            </button>
+          </div>
+        );
+      }
+      
+      // Regular content with potential citations
+      if (part.trim()) {
+        return (
+          <div key={index} className="mb-2">
+            {part.split(/([¹²³])/g).map((segment, segIndex) => {
+              if (segment.match(/[¹²³]/)) {
+                return (
+                  <sup key={segIndex} className="text-blue-600 dark:text-blue-400 font-bold">
+                    {segment}
+                  </sup>
+                );
+              }
+              return segment;
+            })}
+          </div>
+        );
+      }
+      
+      return null;
+    });
+  };
 
   // RAG Agent API endpoint
   const RAG_AGENT_API_URL = `${config.pythonBackend.url}/api/v1/rag-agent/query`;
@@ -517,12 +620,31 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
                     }`}>
                       {message.role === 'user' ? 'USER' : 'Sunny AI Assistant'}
                     </div>
-                    <div className={`p-2 text-xs font-mono whitespace-pre-wrap break-words ${
+                    <div className={`p-2 text-xs font-mono break-words ${
                       message.role === 'user' 
                         ? 'border border-[#4a5565] bg-[#4a5565] text-stone-100 ml-8' 
                         : 'text-[#4a5565] dark:text-zinc-50 mr-8'
                     }`}>
-                      {message.content}
+                      {message.role === 'assistant' ? (
+                        <div className="space-y-2">
+                          {formatAIResponse(message.content).map((paragraph) => (
+                            <div key={paragraph.key}>
+                              {paragraph.type === 'sources' ? (
+                                <div className="mt-4 pt-2 border-t border-gray-300 dark:border-gray-600">
+                                  <div className="text-xs font-bold text-gray-600 dark:text-gray-400 mb-2">Sources:</div>
+                                  {renderFormattedContent(paragraph.content)}
+                                </div>
+                              ) : (
+                                <div className="whitespace-pre-wrap">
+                                  {renderFormattedContent(paragraph.content)}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="whitespace-pre-wrap">{message.content}</div>
+                      )}
                       {message.role === 'assistant' && isLoading && (!message.content || message.content === "") && (
                         <span className="inline-flex items-center">
                           <span className="animate-pulse">.</span>
@@ -585,6 +707,18 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, userId, projectNam
           <MessageSquare className="w-6 h-6" />
         </button>
       )}
+
+      {/* Document Modal */}
+      <DocumentModal
+        document={selectedDocument}
+        isOpen={isDocumentModalOpen}
+        onClose={() => {
+          setIsDocumentModalOpen(false);
+          setSelectedDocument(null);
+        }}
+        projects={[]} // No project change needed in chat context
+        onProjectChange={() => {}} // No-op
+      />
     </>
   );
 };
