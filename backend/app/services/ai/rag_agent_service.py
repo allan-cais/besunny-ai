@@ -96,12 +96,20 @@ Tone
             
             # Step 1.5: Create or get chat session if session_id is provided
             conversation_history = []
+            actual_session_id = None
             if session_id:
                 # Ensure chat session exists
                 actual_session_id = await self.create_or_get_chat_session(session_id, user_id, project_id)
                 if not actual_session_id:
                     yield "I encountered an error setting up the chat session. Please try again."
                     return
+                
+                # Save user's question first
+                await self.save_user_message(actual_session_id, user_id, user_question)
+                print(f"=== SAVED USER MESSAGE ===")
+                print(f"Session ID: {actual_session_id}")
+                print(f"User question: {user_question[:100]}...")
+                print("=" * 50)
                 
                 # Get conversation history
                 conversation_history = await self._get_conversation_history(actual_session_id, user_id)
@@ -144,7 +152,6 @@ Tone
                 return
             
             # Step 5: Generate streaming response using OpenAI
-            actual_session_id = session_id if session_id else None
             async for chunk in self._generate_streaming_response(
                 user_question, project_info, combined_context, conversation_history, actual_session_id, user_id
             ):
