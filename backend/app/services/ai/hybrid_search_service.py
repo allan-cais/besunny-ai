@@ -228,10 +228,10 @@ class HybridSearchService:
     
     def _extract_content_text(self, item: Dict[str, Any]) -> str:
         """Extract text content from different item types."""
-        # Try different content fields
+        # Try different content fields in order of preference
         content_fields = [
             'content', 'body', 'text', 'summary', 'description', 'notes',
-            'full_content', 'body_text', 'body_html'
+            'full_content', 'body_text', 'body_html', 'snippet'
         ]
         
         for field in content_fields:
@@ -239,6 +239,14 @@ class HybridSearchService:
                 content = str(item[field]).strip()
                 if len(content) > 10:  # Ensure meaningful content
                     return content
+        
+        # If no direct content field found, try metadata
+        if 'metadata' in item and isinstance(item['metadata'], dict):
+            for field in content_fields:
+                if field in item['metadata'] and item['metadata'][field]:
+                    content = str(item['metadata'][field]).strip()
+                    if len(content) > 10:
+                        return content
         
         return ""
     
