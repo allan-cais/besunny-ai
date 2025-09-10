@@ -636,8 +636,8 @@ Tone
             # Sort by relevance score (highest first)
             all_context.sort(key=lambda x: x.get('relevance_score', 0), reverse=True)
             
-            # Limit total context items to stay within token limits
-            max_total_context = 8
+            # Limit total context items to balance quality with token usage
+            max_total_context = 12
             return all_context[:max_total_context]
             
         except Exception as e:
@@ -677,10 +677,8 @@ Use this context to provide more coherent and contextually aware responses."""
 Current Project Context:
 Project ID: {project_info.get('id', 'Unknown')}
 Project Name: {project_info.get('name', 'Unknown Project')}
-User Question: {user_question}
 
-Project Database:
-{context_text}{conversation_context_text}
+{conversation_context_text}
 
 Provide a helpful, accurate response grounded in the project database."""
             
@@ -702,8 +700,15 @@ Provide a helpful, accurate response grounded in the project database."""
                         "content": msg['message']
                     })
             
-            # Add current user question
-            messages.append({"role": "user", "content": user_question})
+            # Add current user question with context
+            user_message_with_context = f"""Question: {user_question}
+
+Project Database Context:
+{context_text}
+
+Please answer the question using the provided context."""
+            
+            messages.append({"role": "user", "content": user_message_with_context})
             
             print(f"=== OPENAI MESSAGES DEBUG ===")
             print(f"Total messages: {len(messages)}")
@@ -757,8 +762,8 @@ Provide a helpful, accurate response grounded in the project database."""
             for i, item in enumerate(context, 1):
                 source_type = item.get('source', 'unknown').replace('_', ' ').title()
                 title = item.get('title', 'Untitled')
-                # Reduce content length to stay within token limits
-                content = item.get('content', '')[:1500] + "..." if len(item.get('content', '')) > 1500 else item.get('content', '')
+                # Limit content length to balance detail with token usage
+                content = item.get('content', '')[:2000] + "..." if len(item.get('content', '')) > 2000 else item.get('content', '')
                 author = item.get('author', 'Unknown')
                 date = item.get('created_at', 'Unknown')
                 relevance = item.get('relevance_score', 0)
