@@ -135,56 +135,52 @@ class HybridSearchService:
             from ...core.supabase_config import get_supabase_service_client
             supabase = get_supabase_service_client()
             
-            # Query documents table
+            # Query documents table (contains all content types: emails, documents, meetings)
             documents_result = supabase.table('documents').select('*').eq('project_id', project_id).execute()
             
-            # Query emails table
-            emails_result = supabase.table('emails').select('*').eq('project_id', project_id).execute()
-            
-            # Query meetings table
+            # Query meetings table for additional metadata
             meetings_result = supabase.table('meetings').select('*').eq('project_id', project_id).execute()
             
             # Combine all content
             all_content = []
             
-            # Process documents
+            # Process documents (contains all content types: emails, documents, meetings)
             if documents_result.data:
                 for doc in documents_result.data:
                     content_text = self._extract_content_text(doc)
                     if content_text:
+                        # Determine content type and title based on document type
+                        doc_type = doc.get('type', 'document')
+                        if doc_type == 'email':
+                            title = doc.get('title', 'No Subject')  # For emails, title is the subject
+                        elif doc_type == 'meeting_transcript':
+                            title = doc.get('title', 'Untitled Meeting')
+                        else:
+                            title = doc.get('title', 'Untitled Document')
+                        
                         all_content.append({
                             'id': f"doc_{doc['id']}",
                             'content': content_text,
-                            'title': doc.get('title', 'Untitled Document'),
-                            'type': 'document',
+                            'title': title,
+                            'type': doc_type,
                             'metadata': doc
                         })
             
-            # Process emails
-            if emails_result.data:
-                for email in emails_result.data:
-                    content_text = self._extract_content_text(email)
-                    if content_text:
-                        all_content.append({
-                            'id': f"email_{email['id']}",
-                            'content': content_text,
-                            'title': email.get('subject', 'No Subject'),
-                            'type': 'email',
-                            'metadata': email
-                        })
-            
-            # Process meetings
+            # Process meetings table for additional metadata (if needed)
             if meetings_result.data:
                 for meeting in meetings_result.data:
-                    content_text = self._extract_content_text(meeting)
-                    if content_text:
-                        all_content.append({
-                            'id': f"meeting_{meeting['id']}",
-                            'content': content_text,
-                            'title': meeting.get('title', 'Untitled Meeting'),
-                            'type': 'meeting',
-                            'metadata': meeting
-                        })
+                    # Only add if not already processed from documents table
+                    meeting_id = meeting.get('id')
+                    if not any(item['metadata'].get('meeting_id') == meeting_id for item in all_content):
+                        content_text = self._extract_content_text(meeting)
+                        if content_text:
+                            all_content.append({
+                                'id': f"meeting_{meeting['id']}",
+                                'content': content_text,
+                                'title': meeting.get('title', 'Untitled Meeting'),
+                                'type': 'meeting',
+                                'metadata': meeting
+                            })
             
             # Calculate BM25 scores
             scored_results = []
@@ -232,10 +228,10 @@ class HybridSearchService:
     
     def _extract_content_text(self, item: Dict[str, Any]) -> str:
         """Extract text content from different item types."""
-        # Try different content fields
+        # Try different content fields in order of preference
         content_fields = [
             'content', 'body', 'text', 'summary', 'description', 'notes',
-            'full_content', 'body_text', 'body_html'
+            'full_content', 'body_text', 'body_html', 'snippet'
         ]
         
         for field in content_fields:
@@ -243,6 +239,14 @@ class HybridSearchService:
                 content = str(item[field]).strip()
                 if len(content) > 10:  # Ensure meaningful content
                     return content
+        
+        # If no direct content field found, try metadata
+        if 'metadata' in item and isinstance(item['metadata'], dict):
+            for field in content_fields:
+                if field in item['metadata'] and item['metadata'][field]:
+                    content = str(item['metadata'][field]).strip()
+                    if len(content) > 10:
+                        return content
         
         return ""
     

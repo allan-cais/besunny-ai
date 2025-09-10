@@ -394,11 +394,14 @@ Tone
             docs_result = self.supabase.table('documents').select('*').eq('project_id', project_id).eq('created_by', user_id).order('created_at', desc=True).limit(max_results).execute()
             if docs_result.data:
                 for doc in docs_result.data:
+                    # Extract content from various possible fields
+                    content = doc.get('content', '') or doc.get('summary', '') or doc.get('body', '') or doc.get('text', '')
+                    
                     context_items.append({
                         'type': 'document',
                         'source': doc.get('source', 'unknown'),
                         'title': doc.get('title', doc.get('subject', 'Untitled')),
-                        'content': doc.get('content', ''),
+                        'content': content,
                         'author': doc.get('author', ''),
                         'created_at': doc.get('created_at', ''),
                         'metadata': {
