@@ -91,6 +91,12 @@ class Settings(BaseSettings):
     chunk_overlap: int = Field(default=50, env="CHUNK_OVERLAP")
     similarity_threshold: float = Field(default=0.7, env="SIMILARITY_THRESHOLD")
     
+    # Contextual retrieval configuration
+    use_contextual_retrieval: bool = Field(default=True, env="USE_CONTEXTUAL_RETRIEVAL")
+    contextual_chunk_max_length: int = Field(default=4000, env="CONTEXTUAL_CHUNK_MAX_LENGTH")
+    contextual_summary_max_tokens: int = Field(default=150, env="CONTEXTUAL_SUMMARY_MAX_TOKENS")
+    contextual_temperature: float = Field(default=0.1, env="CONTEXTUAL_TEMPERATURE")
+    
     # Webhook settings
     webhook_base_url: str = Field(default="https://backend-staging-6085.up.railway.app", env="WEBHOOK_BASE_URL")
     base_url: str = Field(default="https://backend-staging-6085.up.railway.app", env="BASE_URL")

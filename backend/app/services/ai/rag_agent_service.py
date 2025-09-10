@@ -468,9 +468,9 @@ Tone
         max_results: int,
         conversation_context: Dict[str, Any] = None
     ) -> List[Dict[str, Any]]:
-        """Retrieve relevant context using hybrid search."""
+        """Retrieve relevant context using enhanced hybrid search with contextual retrieval."""
         try:
-            print(f"=== HYBRID SEARCH DEBUG ===")
+            print(f"=== ENHANCED HYBRID SEARCH DEBUG ===")
             print(f"Query: {query[:100]}...")
             print(f"Project ID: {project_id}")
             print(f"User ID: {user_id}")
@@ -483,7 +483,7 @@ Tone
                 'conversation_context': conversation_context or {}
             }
             
-            # Use hybrid search
+            # Use enhanced hybrid search with contextual retrieval
             hybrid_results = await self.hybrid_search.hybrid_search(
                 query=query,
                 project_id=project_id,
@@ -492,14 +492,14 @@ Tone
                 context=context
             )
             
-            print(f"Hybrid search returned {len(hybrid_results)} results")
+            print(f"Enhanced hybrid search returned {len(hybrid_results)} results")
             
             # Convert hybrid results to context format
             context_items = []
             for result in hybrid_results:
                 context_items.append({
                     'type': result.get('type', 'unknown'),
-                    'source': 'hybrid_search',
+                    'source': 'enhanced_hybrid_search',
                     'title': result.get('title', 'Unknown'),
                     'content': result.get('content', ''),
                     'score': result.get('combined_score', 0.0),
@@ -516,7 +516,7 @@ Tone
             return context_items
             
         except Exception as e:
-            logger.error(f"Error in hybrid context retrieval: {e}")
+            logger.error(f"Error in enhanced hybrid context retrieval: {e}")
             # Fallback to original Pinecone search
             return await self._retrieve_pinecone_context(project_id, user_id, query, max_results)
     
