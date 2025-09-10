@@ -636,8 +636,8 @@ Tone
             # Sort by relevance score (highest first)
             all_context.sort(key=lambda x: x.get('relevance_score', 0), reverse=True)
             
-            # Limit total context items
-            max_total_context = 20
+            # Limit total context items to stay within token limits
+            max_total_context = 8
             return all_context[:max_total_context]
             
         except Exception as e:
@@ -694,9 +694,9 @@ Provide a helpful, accurate response grounded in the project database."""
             # Prepare messages array with conversation history
             messages = [{"role": "system", "content": system_prompt}]
             
-            # Add conversation history if available
+            # Add conversation history if available (reduced to 3 messages to avoid token limits)
             if conversation_history:
-                for msg in conversation_history[-6:]:  # Last 6 messages to avoid token limits
+                for msg in conversation_history[-3:]:  # Last 3 messages to avoid token limits
                     messages.append({
                         "role": msg['role'],
                         "content": msg['message']
@@ -709,6 +709,12 @@ Provide a helpful, accurate response grounded in the project database."""
             print(f"Total messages: {len(messages)}")
             print(f"System prompt length: {len(system_prompt)}")
             print(f"Conversation history messages: {len(conversation_history) if conversation_history else 0}")
+            
+            # Estimate token count (rough approximation: 1 token ≈ 4 characters)
+            total_chars = sum(len(str(msg.get('content', ''))) for msg in messages)
+            estimated_tokens = total_chars // 4
+            print(f"Estimated total tokens: {estimated_tokens}")
+            print(f"Model: {self.settings.openai_model}")
             print("=" * 50)
             
             # Create chat completion with streaming
@@ -751,8 +757,8 @@ Provide a helpful, accurate response grounded in the project database."""
             for i, item in enumerate(context, 1):
                 source_type = item.get('source', 'unknown').replace('_', ' ').title()
                 title = item.get('title', 'Untitled')
-                # Increase content length limit to 3000 characters to preserve more context including team member info
-                content = item.get('content', '')[:3000] + "..." if len(item.get('content', '')) > 3000 else item.get('content', '')
+                # Reduce content length to stay within token limits
+                content = item.get('content', '')[:1500] + "..." if len(item.get('content', '')) > 1500 else item.get('content', '')
                 author = item.get('author', 'Unknown')
                 date = item.get('created_at', 'Unknown')
                 relevance = item.get('relevance_score', 0)
