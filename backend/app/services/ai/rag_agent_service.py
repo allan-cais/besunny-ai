@@ -13,6 +13,8 @@ from pinecone import Pinecone
 
 from ...core.supabase_config import get_supabase_service_client
 from ...core.config import get_settings
+from .hybrid_search_service import HybridSearchService
+from .query_optimization_service import QueryOptimizationService
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +34,10 @@ class RAGAgentService:
         # Initialize Pinecone client
         self.pinecone = Pinecone(api_key=self.settings.pinecone_api_key)
         self.index_name = self.settings.pinecone_vector_store
+        
+        # Initialize advanced search services
+        self.hybrid_search = HybridSearchService()
+        self.query_optimizer = QueryOptimizationService()
         
         # RAG Agent system prompt
         self.rag_prompt = """You are Sunny, the AI assistant for video production teams.
@@ -136,9 +142,9 @@ Tone
                 print(f"Supabase item {i+1}: {item.get('type', 'unknown')} - {item.get('title', 'no title')[:50]}...")
             print("=" * 50)
             
-            # Step 3: Retrieve relevant context from Pinecone
-            pinecone_context = await self._retrieve_pinecone_context(
-                project_id, user_id, user_question, max_results
+            # Step 3: Retrieve relevant context using hybrid search
+            pinecone_context = await self._retrieve_hybrid_context(
+                project_id, user_id, user_question, max_results, conversation_context
             )
             
             # Step 4: Combine and rank context
@@ -450,6 +456,66 @@ Tone
         except Exception as e:
             logger.error(f"Error retrieving Supabase context: {e}")
             return []
+    
+    async def _retrieve_hybrid_context(
+        self, 
+        project_id: str, 
+        user_id: str, 
+        query: str, 
+        max_results: int,
+        conversation_context: Dict[str, Any] = None
+    ) -> List[Dict[str, Any]]:
+        """Retrieve relevant context using hybrid search."""
+        try:
+            print(f"=== HYBRID SEARCH DEBUG ===")
+            print(f"Query: {query[:100]}...")
+            print(f"Project ID: {project_id}")
+            print(f"User ID: {user_id}")
+            print("=" * 50)
+            
+            # Prepare context for query optimization
+            context = {
+                'project_id': project_id,
+                'user_id': user_id,
+                'conversation_context': conversation_context or {}
+            }
+            
+            # Use hybrid search
+            hybrid_results = await self.hybrid_search.hybrid_search(
+                query=query,
+                project_id=project_id,
+                user_id=user_id,
+                max_results=max_results,
+                context=context
+            )
+            
+            print(f"Hybrid search returned {len(hybrid_results)} results")
+            
+            # Convert hybrid results to context format
+            context_items = []
+            for result in hybrid_results:
+                context_items.append({
+                    'type': result.get('type', 'unknown'),
+                    'source': 'hybrid_search',
+                    'title': result.get('title', 'Unknown'),
+                    'content': result.get('content', ''),
+                    'score': result.get('combined_score', 0.0),
+                    'search_types': result.get('search_types', []),
+                    'chunk_quality': result.get('chunk_quality', 0.0),
+                    'metadata': result.get('metadata', {}),
+                    'created_at': result.get('metadata', {}).get('date', ''),
+                    'author': result.get('metadata', {}).get('author', 'Unknown')
+                })
+            
+            print(f"Converted to {len(context_items)} context items")
+            print("=" * 50)
+            
+            return context_items
+            
+        except Exception as e:
+            logger.error(f"Error in hybrid context retrieval: {e}")
+            # Fallback to original Pinecone search
+            return await self._retrieve_pinecone_context(project_id, user_id, query, max_results)
     
     async def _retrieve_pinecone_context(
         self, 
